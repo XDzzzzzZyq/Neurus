@@ -1,11 +1,36 @@
-#include <QGuiApplication>
+/**
+ * @file main.cpp
+ * @brief Application entry point for the Neurus renderer.
+ *
+ * Initialization sequence:
+ *   1. QApplication — Qt event loop (Widgets + QML)
+ *   2. EventBus — singleton cross-layer communication
+ *   3. VulkanContext (Phase 1) — VkInstance creation
+ *   4. NeurusMainWindow + VulkanWidget — Qt window with native HWND for Vulkan surface
+ *   5. VkSurfaceKHR — created from VulkanWidget's native HWND via VK_KHR_win32_surface
+ *   6. VulkanContext (Phase 2) — logical device + queue selection
+ *   7. Renderer — swapchain, pipeline, shaders
+ *   8. Show main window — only after rendering is fully initialized
+ *   9. QTimer-driven render loop — ~60 FPS
+ *
+ * Cleanup order (CRITICAL: destroy surface BEFORE instance):
+ *   renderer -> surface -> mainWindow -> vkContext
+ */
+
+// Must define platform before including any Vulkan headers
+#define VK_USE_PLATFORM_WIN32_KHR
+
+#include <QApplication>
 #include <QTimer>
+
+#include <windows.h>
 
 #include <iostream>
 #include <memory>
 
 #include "editor/EventBus.h"
-#include "ui/MainWindow.h"
+#include "ui/NeurusMainWindow.h"
+#include "ui/VulkanWidget.h"
 #include "render/VulkanContext.h"
 #include "render/Renderer.h"
 
@@ -16,7 +41,7 @@
 int main(int argc, char* argv[])
 {
 	// --- Qt Application ---
-	QGuiApplication app(argc, argv);
+	QApplication app(argc, argv);
 	app.setApplicationName("Neurus");
 	app.setApplicationVersion("0.1.0");
 
@@ -25,9 +50,11 @@ int main(int argc, char* argv[])
 
 	// --- Two-phase Vulkan initialization ---
 	// Phase 1: Create VkInstance (needed before surface)
-	std::unique_ptr<neurus::MainWindow> mainWindow;
+	std::unique_ptr<neurus::NeurusMainWindow> mainWindow;
 	std::unique_ptr<neurus::VulkanContext> vkContext;
 	std::unique_ptr<neurus::Renderer> renderer;
+	std::unique_ptr<vk::raii::SurfaceKHR> surface;
+	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow via setCentralWidget
 
 	try
 	{
@@ -35,11 +62,27 @@ int main(int argc, char* argv[])
 		auto vkInstance = neurus::VulkanContext::CreateInstance();
 		vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
-		// Step 2: Create window + surface (references ctx's instance — safe, no moves)
-		mainWindow = std::make_unique<neurus::MainWindow>(vkContext->instance(), &bus);
+		// Step 2: Create Qt window with VulkanWidget as central widget
+		//         VulkanWidget provides the native HWND for Vulkan surface creation.
+		mainWindow = std::make_unique<neurus::NeurusMainWindow>();
+		vulkanWidget = new neurus::VulkanWidget();
+		mainWindow->setCentralWidget(vulkanWidget);
 
-		// Step 3: Create logical device (needs surface for queue family selection)
-		vkContext->initDevice(mainWindow->surface());
+		// Set explicit initial size before native window creation.
+		// Without this, QWidget::width()/height() return default values
+		// and the swapchain would be created with wrong dimensions.
+		vulkanWidget->resize(800, 600);
+
+		// Force native window handle creation before surface creation
+		vulkanWidget->winId();
+
+		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
+		HINSTANCE hinstance = GetModuleHandle(nullptr);
+		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, vulkanWidget->hwnd());
+		surface = std::make_unique<vk::raii::SurfaceKHR>(vkContext->instance(), surfaceCreateInfo);
+
+		// Step 4: Create logical device (needs surface for queue family selection)
+		vkContext->initDevice(*surface);
 
 		bus.setGpuName(QString::fromStdString(vkContext->gpuName()));
 	}
@@ -57,9 +100,9 @@ int main(int argc, char* argv[])
 			vkContext->physicalDevice(),
 			vkContext->graphicsQueue(),
 			vkContext->graphicsQueueFamily(),
-			mainWindow->surface(),
-			mainWindow->getWidth(),
-			mainWindow->getHeight(),
+			*surface,
+			vulkanWidget->width(),
+			vulkanWidget->height(),
 			triangle_vert_spv,
 			triangle_vert_spv_size,
 			triangle_frag_spv,
@@ -70,14 +113,6 @@ int main(int argc, char* argv[])
 	{
 		std::cerr << "Renderer initialization failed: " << e.what() << "\n";
 		return -1;
-	}
-
-	// Process initial window messages before render loop
-	MSG msg;
-	while (PeekMessage(&msg, mainWindow->hwnd(), 0, 0, PM_REMOVE))
-	{
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
 	}
 
 	// Window was created hidden — show it now that the renderer is ready
@@ -99,11 +134,24 @@ int main(int argc, char* argv[])
 	                     }
 	                 });
 
-	QObject::connect(&bus, &neurus::EventBus::windowResized,
+	// Handle VulkanWidget resize — trigger a frame draw; swapchain recreation
+	// is handled internally by DrawFrame when VK_ERROR_OUT_OF_DATE_KHR is received.
+	QObject::connect(vulkanWidget, &neurus::VulkanWidget::resized,
 	                 [&renderer](int /*width*/, int /*height*/) {
+	                     if (renderer)
+	                     {
+	                         try
+	                         {
+	                             renderer->DrawFrame();
+	                         }
+	                         catch (...)
+	                         {
+	                             // Swapchain recreation handled inside DrawFrame
+	                         }
+	                     }
 	                 });
 
-	// --- Timer-driven render loop (replaces QML timer) ---
+	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
 	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer]() {
@@ -118,11 +166,13 @@ int main(int argc, char* argv[])
 	int result = app.exec();
 
 	// --- Clean shutdown (CRITICAL: destroy surface BEFORE instance) ---
-	// C++ destruction order is reverse of declaration order.
-	// VkSurfaceKHR (owned by MainWindow) must be destroyed before VkInstance (owned by VulkanContext).
+	// C++ destruction order is reverse of declaration order for unique_ptrs,
+	// but we override it explicitly to ensure VkSurfaceKHR is destroyed
+	// before VkInstance.
 	renderer.reset();      // 1. Destroy swapchain, pipeline, command buffers
-	mainWindow.reset();    // 2. Destroy VkSurfaceKHR
-	vkContext.reset();     // 3. Destroy VkDevice + VkInstance
+	surface.reset();       // 2. Destroy VkSurfaceKHR
+	mainWindow.reset();    // 3. Destroy main window (deletes VulkanWidget)
+	vkContext.reset();     // 4. Destroy VkDevice + VkInstance
 
 	return result;
 }
