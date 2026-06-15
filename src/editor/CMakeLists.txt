@@ -12,3 +12,6 @@ target_link_libraries(neurus_editor PUBLIC
 )
 
 target_include_directories(neurus_editor PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Enable Qt MOC for QObject subclasses (EventBus, EditorContext)
+set_target_properties(neurus_editor PROPERTIES AUTOMOC ON)

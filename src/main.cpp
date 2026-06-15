@@ -11,8 +11,8 @@
 #include "render/Renderer.h"
 
 // Generated SPIR-V shader headers
-#include "triangle_vert.h"
-#include "triangle_frag.h"
+#include "triangle.vert.h"
+#include "triangle.frag.h"
 
 int main(int argc, char* argv[])
 {
