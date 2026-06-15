@@ -7,6 +7,7 @@ add_executable(neurus_test
 	render/test_swapchain.cpp
 	render/test_renderer.cpp
 	editor/test_event_bus.cpp
+	editor/test_event_bus_expanded.cpp
 	editor/test_editor_context.cpp
 )
 
@@ -19,6 +20,7 @@ target_link_libraries(neurus_test PRIVATE
 	gtest
 	Vulkan::Vulkan
 	Qt6::Core
+	Qt6::Test
 	Qt6::Quick
 	Qt6::Qml
 )
@@ -39,6 +41,8 @@ endif()
 # Windows: deploy Qt DLLs so test executable can run standalone
 # MUST come before gtest_discover_tests (POST_BUILD ordering)
 if(WIN32 AND WINDEPLOYQT)
+	# Qt6Test DLL is not auto-deployed by windeployqt, so we copy it manually
+	file(REAL_PATH "${Qt6_DIR}/../../../bin" _qt6_bin_dir)
 	add_custom_command(TARGET neurus_test POST_BUILD
 		COMMAND "${WINDEPLOYQT}"
 			--no-opengl-sw
@@ -46,7 +50,10 @@ if(WIN32 AND WINDEPLOYQT)
 			--no-compiler-runtime
 			--verbose 0
 			$<TARGET_FILE_DIR:neurus_test>
-		COMMENT "Deploying Qt DLLs for test executable"
+		COMMAND ${CMAKE_COMMAND} -E copy
+			"${_qt6_bin_dir}/$<IF:$<CONFIG:Debug>,Qt6Testd.dll,Qt6Test.dll>"
+			$<TARGET_FILE_DIR:neurus_test>
+		COMMENT "Deploying Qt DLLs for test executable (including Qt6Test)"
 	)
 endif()
 

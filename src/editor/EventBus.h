@@ -56,6 +56,37 @@ signals:
 	/** @brief Emitted when GPU name changes (e.g., after device selection). */
 	void gpuNameChanged();
 
+	// --- Editor-specific signals (T5) ---
+
+	/** @brief Emitted when a scene object is selected by the user.
+	 *  @param objectId Unique identifier of the selected object. */
+	void objectSelected(int objectId);
+
+	/** @brief Emitted when a scene object is deselected.
+	 *  @param objectId Unique identifier of the deselected object. */
+	void objectDeselected(int objectId);
+
+	/** @brief Emitted when a new scene object is created.
+	 *  @param objectId Unique identifier of the new object.
+	 *  @param typeName Human-readable type name (e.g. "Mesh", "Light"). */
+	void sceneObjectAdded(int objectId, QString typeName);
+
+	/** @brief Emitted when a scene object is removed/deleted.
+	 *  @param objectId Unique identifier of the removed object. */
+	void sceneObjectRemoved(int objectId);
+
+	/** @brief Emitted when the active scene camera is switched.
+	 *  @param cameraId Unique identifier of the active camera (-1 if no camera). */
+	void activeCameraChanged(int cameraId);
+
+	/** @brief Emitted when the render configuration is changed (toggled, slider, etc.). */
+	void renderConfigChanged();
+
+	/** @brief Emitted when the viewport widget is resized.
+	 *  @param width New viewport width in pixels.
+	 *  @param height New viewport height in pixels. */
+	void viewportResized(int width, int height);
+
 private:
 	EventBus() = default;
 
