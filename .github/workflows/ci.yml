@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+        platform: [x64]
+
+    runs-on: windows-2022
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2
+        with:
+          vulkan-query-version: 1.4.304.0
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
+
+      - name: Setup Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.*'
+          modules: 'qtbase qtshadertools qtdeclarative'
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure CMake
+        run: cmake --preset vs2022
+
+      - name: Build
+        run: cmake --build ../Neurus_VS2022 --config ${{ matrix.configuration }} --parallel
+
+      - name: Run Non-GPU Tests
+        run: |
+          cd ../Neurus_VS2022
+          ctest -C ${{ matrix.configuration }} --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"

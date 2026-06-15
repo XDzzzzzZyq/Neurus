@@ -1,0 +1,44 @@
+# test/CMakeLists.txt — Unit Tests
+
+add_executable(neurus_test
+	test_main.cpp
+	render/test_vulkan_context.cpp
+	render/test_shader_program.cpp
+	render/test_swapchain.cpp
+	render/test_renderer.cpp
+	editor/test_event_bus.cpp
+	editor/test_editor_context.cpp
+)
+
+target_link_libraries(neurus_test PRIVATE
+	neurus_render
+	neurus_editor
+	neurus_ui
+	neurus_data
+	shader_headers
+	gtest
+	Vulkan::Vulkan
+	Qt6::Core
+	Qt6::Quick
+	Qt6::Qml
+)
+
+target_include_directories(neurus_test PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_BINARY_DIR}/generated/shaders
+)
+
+# Enable Qt MOC for test files containing QObject subclasses
+set_target_properties(neurus_test PROPERTIES AUTOMOC ON)
+
+# MSVC: disable Qt's MOC warnings in test code
+if(MSVC)
+	target_compile_options(neurus_test PRIVATE /wd4100 /wd4189)
+endif()
+
+# Register tests with CTest
+include(GoogleTest)
+gtest_discover_tests(neurus_test
+	TEST_PREFIX "Neurus."
+	DISCOVERY_TIMEOUT 30
+)

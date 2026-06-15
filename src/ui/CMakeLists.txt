@@ -1,0 +1,29 @@
+# src/ui/CMakeLists.txt — UI Layer (Qt6 QML)
+
+add_library(neurus_ui STATIC
+	MainWindow.h
+	MainWindow.cpp
+)
+
+target_link_libraries(neurus_ui PUBLIC
+	Qt6::Core
+	Qt6::Quick
+	Qt6::Qml
+	Vulkan::Vulkan
+	neurus_editor
+)
+
+target_include_directories(neurus_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+# Qt resource file
+qt_add_resources(neurus_ui "resources"
+	PREFIX "/"
+	FILES
+		qml/main.qml
+)
+
+# Enable Qt MOC, UIC, RCC on this target
+set_target_properties(neurus_ui PROPERTIES
+	AUTOMOC ON
+	AUTORCC ON
+)
