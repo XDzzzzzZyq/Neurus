@@ -1,6 +1,7 @@
 #include "NeurusMainWindow.h"
 
 #include <QApplication>
+#include <QFile>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -37,6 +38,15 @@ void NeurusMainWindow::CreateMenus()
 	exitAction->setShortcut(QKeySequence::Quit);
 	connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
 
+	auto* viewMenu = menuBar()->addMenu("&View");
+
+	auto* saveLayoutAction = viewMenu->addAction("&Save Layout");
+	saveLayoutAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+	connect(saveLayoutAction, &QAction::triggered, this, &NeurusMainWindow::SaveLayout);
+
+	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
+	connect(resetLayoutAction, &QAction::triggered, this, &NeurusMainWindow::RestoreDefaultLayout);
+
 	auto* helpMenu = menuBar()->addMenu("&Help");
 	auto* aboutAction = helpMenu->addAction("&About Neurus");
 	connect(aboutAction, &QAction::triggered, this, [this]() {
@@ -64,10 +74,14 @@ static QWidget* makePlaceholder(const QString& text)
 void NeurusMainWindow::CreateDocks()
 {
 	// --- Viewport (MUST be created FIRST — ADS central widget requirement) ---
-	m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
-	m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-	auto* centralArea = m_dockManager->setCentralWidget(m_viewportDock);
-	centralArea->setAllowedAreas(ads::OuterDockAreas);
+	if (!m_viewportCreated)
+	{
+		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
+		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+		auto* centralArea = m_dockManager->setCentralWidget(m_viewportDock);
+		centralArea->setAllowedAreas(ads::OuterDockAreas);
+		m_viewportCreated = true;
+	}
 
 	// --- Left: Shader Editor ---
 	auto* shaderDock = new ads::CDockWidget(m_dockManager, "Shader Editor");
@@ -109,6 +123,34 @@ ads::CDockWidget* NeurusMainWindow::createViewportDock(QWidget* viewportWidget)
 {
 	m_viewportDock->setWidget(viewportWidget, ads::CDockWidget::ForceNoScrollArea);
 	return m_viewportDock;
+}
+
+void NeurusMainWindow::SaveLayout()
+{
+	QString path = QApplication::applicationDirPath() + "/layout.ads";
+	QFile file(path);
+	if (file.open(QIODevice::WriteOnly))
+	{
+		QByteArray state = m_dockManager->saveState();
+		file.write(state);
+		file.close();
+	}
+}
+
+void NeurusMainWindow::RestoreDefaultLayout()
+{
+	// Delete all non-viewport docks
+	auto docks = m_dockManager->dockWidgetsMap();
+	for (auto it = docks.begin(); it != docks.end(); ++it)
+	{
+		if (it.value() != m_viewportDock)
+		{
+			it.value()->deleteDockWidget();
+		}
+	}
+
+	// Re-create the default dock arrangement
+	CreateDocks();
 }
 
 } // namespace neurus

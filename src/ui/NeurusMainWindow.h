@@ -29,9 +29,12 @@ public:
 private:
 	void CreateMenus();
 	void CreateDocks();
+	void SaveLayout();
+	void RestoreDefaultLayout();
 
 	ads::CDockManager* m_dockManager = nullptr;
 	ads::CDockWidget* m_viewportDock = nullptr;  // created first in CreateDocks (central widget)
+	bool m_viewportCreated = false;
 };
 
 } // namespace neurus
