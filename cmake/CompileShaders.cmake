@@ -61,6 +61,8 @@ foreach(SHADER_SRC ${SHADER_SOURCES})
 	target_sources(shader_headers INTERFACE ${HEADER_FILE})
 
 	# Ensure this shader header is generated before linking
-	add_custom_target(shader_${SHADER_NAME} DEPENDS ${HEADER_FILE})
-	add_dependencies(shader_headers shader_${SHADER_NAME})
+	# Target name must be unique — include extension since vert/frag share the same stem
+	string(SUBSTRING ${SHADER_EXT} 1 -1 SHADER_EXT_NO_DOT)
+	add_custom_target(shader_${SHADER_NAME}_${SHADER_EXT_NO_DOT} DEPENDS ${HEADER_FILE})
+	add_dependencies(shader_headers shader_${SHADER_NAME}_${SHADER_EXT_NO_DOT})
 endforeach()
