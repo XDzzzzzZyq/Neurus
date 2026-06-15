@@ -80,6 +80,9 @@ int main(int argc, char* argv[])
 		DispatchMessage(&msg);
 	}
 
+	// Window is hidden — show it now that the swapchain is ready
+	mainWindow->show();
+
 	// --- Connect EventBus signals ---
 	QObject::connect(&bus, &neurus::EventBus::renderRequested,
 	                 [&renderer]() {

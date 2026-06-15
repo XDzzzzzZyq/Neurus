@@ -37,6 +37,7 @@ public:
 
 	const vk::raii::SurfaceKHR& surface() const { return *m_surface; }
 	HWND hwnd() const { return m_hwnd; }
+	void show() { ShowWindow(m_hwnd, SW_SHOW); UpdateWindow(m_hwnd); }
 	int getWidth() const { return m_width; }
 	int getHeight() const { return m_height; }
 

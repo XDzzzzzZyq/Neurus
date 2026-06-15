@@ -31,7 +31,7 @@ MainWindow::MainWindow(const vk::raii::Instance& vulkanInstance,
 
 	m_hwnd = CreateWindowEx(
 		0, L"NeurusVulkanWindow", L"Neurus",
-		WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+		WS_OVERLAPPEDWINDOW,  // Not WS_VISIBLE — show after swapchain is ready
 		CW_USEDEFAULT, CW_USEDEFAULT, m_width, m_height,
 		nullptr, nullptr, hinstance, nullptr);
 
@@ -39,9 +39,6 @@ MainWindow::MainWindow(const vk::raii::Instance& vulkanInstance,
 	{
 		throw std::runtime_error("Failed to create native window.");
 	}
-
-	ShowWindow(m_hwnd, SW_SHOW);
-	UpdateWindow(m_hwnd);
 
 	vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, m_hwnd);
 	m_surface = std::make_unique<vk::raii::SurfaceKHR>(vulkanInstance, surfaceCreateInfo);

@@ -42,7 +42,7 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 		vk::ImageUsageFlagBits::eColorAttachment,
 		vk::SharingMode::eExclusive,  // Single queue family for MVP
 		{},
-		vk::SurfaceTransformFlagBitsKHR::eIdentity,
+		capabilities.currentTransform,                     // Use surface's transform
 		vk::CompositeAlphaFlagBitsKHR::eOpaque,
 		presentMode,
 		VK_TRUE,  // clipped
