@@ -1,7 +1,7 @@
-#include "VulkanContext.h"
-
-// Must define platform before including Vulkan headers
+// Must define platform before including any Vulkan headers
 #define VK_USE_PLATFORM_WIN32_KHR
+
+#include "VulkanContext.h"
 
 #include <stdexcept>
 #include <set>
