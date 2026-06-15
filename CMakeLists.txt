@@ -64,6 +64,13 @@ endif()
 include(cmake/CompileShaders.cmake)
 
 # ---------------------------------------------------------------------------
+# Output Directories
+# ---------------------------------------------------------------------------
+# Place executables directly in build/Debug/ (or build/Release/) instead of
+# mirroring the source tree under build/src/Debug/.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+# ---------------------------------------------------------------------------
 # Subdirectories
 # ---------------------------------------------------------------------------
 add_subdirectory(src)

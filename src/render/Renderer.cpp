@@ -78,7 +78,7 @@ void Renderer::DrawFrame()
 	uint32_t imageIndex = 0;
 	try
 	{
-		imageIndex = m_swapchain->AcquireNextImage(*imageAvailable);
+		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
 	}
 	catch (const std::runtime_error&)
 	{
@@ -100,7 +100,7 @@ void Renderer::DrawFrame()
 	// --- Present using same per-image render-finished semaphore ---
 	try
 	{
-		m_swapchain->Present(*renderFinished, imageIndex);
+		m_swapchain->Present(renderFinished, imageIndex);
 	}
 	catch (...)
 	{

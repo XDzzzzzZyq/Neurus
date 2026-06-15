@@ -44,6 +44,8 @@ target_include_directories(Neurus PRIVATE
 if(WIN32)
 	set_target_properties(Neurus PROPERTIES
 		WIN32_EXECUTABLE $<IF:$<CONFIG:Debug>,FALSE,TRUE>
+		VS_DEBUGGER_COMMAND "$(TargetPath)"
+		VS_DEBUGGER_WORKING_DIRECTORY "$(OutDir)"
 	)
 
 	# Deploy Qt DLLs via windeployqt (handles Core, Gui, Qml, Quick and their dependencies)
