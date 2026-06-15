@@ -24,7 +24,8 @@ public:
 	 * @param viewportWidget The QWidget (from createWindowContainer) to embed.
 	 * @return The created CDockWidget (owned by the dock manager).
 	 */
-	ads::CDockWidget* createViewportDock(QWidget* viewportWidget);
+	void setViewportWidget(QWidget* viewportWidget);
+	ads::CDockWidget* getViewportDock() const { return m_viewportDock; }
 
 private:
 	void CreateMenus();
@@ -35,7 +36,7 @@ private:
 
 	ads::CDockManager* m_dockManager = nullptr;
 	ads::CDockWidget* m_viewportDock = nullptr;  // created first in CreateDocks (central widget)
-	bool m_viewportCreated = false;
+	QWidget* m_viewportWidget = nullptr;
 };
 
 } // namespace neurus

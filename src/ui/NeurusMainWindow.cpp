@@ -32,6 +32,13 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 
 NeurusMainWindow::~NeurusMainWindow() = default;
 
+void NeurusMainWindow::setViewportWidget(QWidget* viewportWidget)
+{
+	if (viewportWidget != nullptr)
+		m_viewportWidget = viewportWidget;
+	m_viewportDock->setWidget(m_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+}
+
 void NeurusMainWindow::CreateMenus()
 {
 	auto* fileMenu = menuBar()->addMenu("&File");
@@ -74,15 +81,13 @@ static QWidget* makePlaceholder(const QString& text)
 
 void NeurusMainWindow::CreateDocks()
 {
-	// --- Viewport (MUST be created FIRST — ADS central widget requirement) ---
-	if (!m_viewportCreated)
-	{
+	if (m_viewportWidget == nullptr) {
+		// --- Viewport (MUST be created FIRST — ADS central widget requirement) ---
 		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
-		m_viewportDock->setObjectName("ViewportDock");  // for restoreState matching
+		m_viewportDock->setWidget(makePlaceholder("Viewport"));  // for restoreState matching
 		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-		auto* centralArea = m_dockManager->setCentralWidget(m_viewportDock);
-		centralArea->setAllowedAreas(ads::OuterDockAreas);
-		m_viewportCreated = true;
+		// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
+		m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);
 	}
 
 	// --- Left: Shader Editor ---
@@ -121,12 +126,6 @@ void NeurusMainWindow::CreateDocks()
 	m_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
 }
 
-ads::CDockWidget* NeurusMainWindow::createViewportDock(QWidget* viewportWidget)
-{
-	m_viewportDock->setWidget(viewportWidget, ads::CDockWidget::ForceNoScrollArea);
-	return m_viewportDock;
-}
-
 void NeurusMainWindow::SaveLayout()
 {
 	QString path = QApplication::applicationDirPath() + "/layout.ads";
@@ -148,17 +147,6 @@ void NeurusMainWindow::LoadLayout()
 		QByteArray state = file.readAll();
 		file.close();
 		m_dockManager->restoreState(state);
-
-		// restoreState recreates docks — update m_viewportDock to the restored instance
-		auto docks = m_dockManager->dockWidgetsMap();
-		for (auto it = docks.begin(); it != docks.end(); ++it)
-		{
-			if (it.value()->objectName() == "ViewportDock")
-			{
-				m_viewportDock = it.value();
-				break;
-			}
-		}
 	}
 }
 

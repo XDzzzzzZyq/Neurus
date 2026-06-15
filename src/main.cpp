@@ -71,7 +71,8 @@ int main(int argc, char* argv[])
 		//         VulkanWidget provides the native HWND for Vulkan surface creation.
 		mainWindow = std::make_unique<neurus::NeurusMainWindow>();
 		vulkanWidget = new neurus::VulkanWidget();
-		viewportDock = mainWindow->createViewportDock(vulkanWidget);
+		mainWindow->setViewportWidget(vulkanWidget);
+		viewportDock = mainWindow->getViewportDock();
 
 		// Set explicit initial size before native window creation.
 		// Without this, QWidget::width()/height() return default values
