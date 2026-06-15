@@ -7,10 +7,10 @@
  *   2. EventBus — singleton cross-layer communication
  *   3. VulkanContext (Phase 1) — VkInstance creation
  *   4. NeurusMainWindow + VulkanWidget — Qt window with native HWND for Vulkan surface
- *   5. VkSurfaceKHR — created from VulkanWidget's native HWND via VK_KHR_win32_surface
- *   6. VulkanContext (Phase 2) — logical device + queue selection
- *   7. Renderer — swapchain, pipeline, shaders
- *   8. Show main window — only after rendering is fully initialized
+ *   5. Show main window — apply QMainWindow layout so widget has final size
+ *   6. VkSurfaceKHR — created from VulkanWidget's native HWND via VK_KHR_win32_surface
+ *   7. VulkanContext (Phase 2) — logical device + queue selection
+ *   8. Renderer — swapchain, pipeline, shaders (at correct window size)
  *   9. QTimer-driven render loop — ~60 FPS
  *
  * Cleanup order (CRITICAL: destroy surface BEFORE instance):
@@ -76,6 +76,12 @@ int main(int argc, char* argv[])
 		// Force native window handle creation before surface creation
 		vulkanWidget->winId();
 
+		// Show window BEFORE surface/swapchain creation so QMainWindow's layout
+		// is applied and the widget has its final size. This avoids swapchain
+		// extent mismatch that would cause constant VK_SUBOPTIMAL_KHR.
+		mainWindow->show();
+		app.processEvents();  // Ensure native window is fully realized
+
 		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
 		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, vulkanWidget->hwnd());
@@ -115,8 +121,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	// Window was created hidden — show it now that the renderer is ready
-	mainWindow->show();
+	// Window was shown earlier (before surface/swapchain creation) — no need to show again
 
 	// --- Connect EventBus signals ---
 	QObject::connect(&bus, &neurus::EventBus::renderRequested,
