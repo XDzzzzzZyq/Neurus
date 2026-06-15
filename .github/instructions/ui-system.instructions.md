@@ -2,195 +2,126 @@
 
 ## Overview
 
-The UI layer is a **pure presentation layer** built on Qt6 QML. It provides the
-application window, captures user input, and communicates with other layers
-exclusively through the EventBus (Qt Signals/Slots).
+The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System (ADS)** for dockable panels and **QVulkanWindow** for GPU rendering. It communicates with other layers exclusively through the EventBus (Qt Signals/Slots).
 
 ## Location
 
-- `src/ui/MainWindow.h` — QWindow subclass with Vulkan surface creation
-- `src/ui/resources.qrc` — Qt resource file for QML assets
-- `src/ui/qml/main.qml` — Main QML UI shell
+- `src/ui/NeurusMainWindow.h/cpp` — QMainWindow subclass with ADS dock manager + menus
+- `src/ui/VulkanWindow.h/cpp` — QVulkanWindow subclass hosting the triangle renderer
+- `src/ui/MainWindow.h/cpp` — (legacy) QWindow subclass
+- `src/ui/VulkanWidget.h/cpp` — (legacy) QWidget subclass with native HWND for vk::raii surface
+- `src/ui/qml/main.qml` — (legacy) QML source
+- `src/render/QVulkanRenderer.h/cpp` — QVulkanWindowRenderer implementation (triangle pipeline)
 
-## Core Responsibilities
+## Rendering Architecture
 
-1. **Window Management**
-   - Create and manage the application window
-   - Create VkSurfaceKHR from the window (passed to Renderer)
-   - Handle window resize, minimize, restore, close events
-   - Set window title, initial size (800×600), icon
+### Primary Path: QVulkanWindow (C Vulkan API)
 
-2. **EventBus Exposure**
-   - Expose EventBus singleton to QML via context property
-   - QML can emit signals (e.g., menu actions, button clicks)
-   - QML can connect to signals (e.g., status updates, validation messages)
+```
+QVulkanInstance
+  └── VulkanWindow : QVulkanWindow
+        ├── Qt handles: instance, surface, device, swapchain, command buffer
+        └── QVulkanRenderer : QVulkanWindowRenderer
+              ├── initResources() → create pipeline + shader modules
+              ├── startNextFrame() → vkCmdBeginRenderPass → draw(3) → endRenderPass
+              │   → frameReady() → requestUpdate()
+              └── releaseResources() → destroy pipeline, shader modules
+```
 
-3. **User Input Handling**
-   - Capture mouse, keyboard, and touch events
-   - Emit EventBus signals for state changes
-   - Future: interactive widgets (sliders, buttons, property editors)
+- `QVulkanWindow` handles ALL infrastructure: instance, surface, device, swapchain (including recreation), command pool, primary command buffer
+- `QVulkanRenderer` implements `QVulkanWindowRenderer` with C Vulkan API
+- Pipeline uses `QVulkanWindow::defaultRenderPass()` (traditional render pass, not dynamic rendering)
+- Continuous rendering via `requestUpdate()` in `startNextFrame()`
 
-4. **Visual Feedback** (future)
-   - Status bar showing GPU info, FPS
-   - Scene hierarchy tree (Outliner)
-   - Property panels
-   - Menu bar
+### Secondary Path: vk::raii + Dynamic Rendering (reference implementation)
 
-## Architecture Pattern
+```
+VulkanWidget (QWidget with WA_NativeWindow)
+  → vk::Win32SurfaceCreateInfoKHR → vk::raii::SurfaceKHR
+  → VulkanContext → vk::raii::Device → Renderer → Swapchain → ShaderProgram
+```
 
-### MainWindow
+- `VulkanWidget` provides native HWND for Vulkan surface
+- `Renderer::DrawFrame()` uses vk::raii fences/semaphores with `VK_KHR_dynamic_rendering`
+- QTimer at ~60 FPS drives the render loop on the main thread
+- **Re-entrancy guard** (`static bool s_frameInProgress`) prevents nested `DrawFrame()` calls
+- **Generation counter** on `Swapchain` ensures command buffers are re-recorded after swapchain recreation
+
+## Dock Layout (ADS)
+
+```
+ads::CDockManager
+├── CenterDockWidgetArea: Viewport (QVulkanWindow via QWidget::createWindowContainer)
+├── LeftDockWidgetArea:   Shader Editor
+├── RightDockWidgetArea:  Outliner | Property Editor | Render Config (tabbed)
+└── BottomDockWidgetArea: Texture Viewer
+```
+
+### Viewport Embedding
+
+The `QVulkanWindow` is embedded into the dock widget via `QWidget::createWindowContainer()`:
 
 ```cpp
-class MainWindow : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(int width READ width NOTIFY widthChanged)
-    Q_PROPERTY(int height READ height NOTIFY heightChanged)
-    Q_PROPERTY(QString title READ title NOTIFY titleChanged)
-
-public:
-    explicit MainWindow(QVulkanInstance* vulkanInstance,
-                        EventBus* bus,
-                        QObject* parent = nullptr);
-    ~MainWindow();
-
-    const vk::raii::SurfaceKHR& surface() const;
-
-signals:
-    void widthChanged(int width);
-    void heightChanged(int height);
-    void titleChanged(QString title);
-
-private:
-    std::unique_ptr<QWindow> m_window;
-    std::unique_ptr<vk::raii::SurfaceKHR> m_surface;
-};
+auto* vulkanWindow = new VulkanWindow(&qVkInstance, vertSpv, vertSize, fragSpv, fragSize);
+QWidget* container = QWidget::createWindowContainer(vulkanWindow);
+mainWindow->createViewportDock(container);
 ```
 
-**Design:**
-- QObject subclass (exposable to QML, supports signals/slots)
-- Owns the QWindow (set to Vulkan surface type)
-- Creates VkSurfaceKHR from QWindow's native handle (HWND on Windows)
-- Resize events → rebuild surface → emit `EventBus::windowResized()`
-- RAII: QWindow and VkSurfaceKHR cleaned up in destructor
-- Non-copyable
+### Layout Persistence
 
-### QVulkanInstance Strategy
+- **View → Save Layout** (`Ctrl+Shift+S`): Serializes dock state to `<appdir>/layout.ads`
+- **View → Restore Default Layout**: Deletes non-viewport docks, re-creates default arrangement
+- **Auto-load**: `LoadLayout()` called in constructor — restores saved state on startup if available
+- Viewport dock is identified by `setObjectName("ViewportDock")` for `restoreState()` matching
+- Viewport created first in `CreateDocks()` (ADS requires central widget as first dock)
 
-Qt6's `QVulkanInstance` creates its own `VkInstance`. We share this instance:
-1. MainWindow creates `QVulkanInstance` with API version 1.4
-2. `QVulkanInstance::vkInstance()` provides the VkInstance handle
-3. VulkanContext creates `vk::raii::Device` from this shared instance
-4. MainWindow creates `vk::raii::SurfaceKHR` from QWindow's HWND
+### Dock Features
 
-This avoids dual-instance complexity while maintaining layer isolation.
+- Viewport: closable disabled, movable/floatable enabled (can drag to float or any edge)
+- All other docks: closable + movable + floatable
+- Config flags: `OpaqueSplitterResize=false` (better Vulkan container behavior), `FocusHighlighting=true`
 
-### EventBus QML Integration
+## Menu Bar
 
-```qml
-// In main.qml:
-ApplicationWindow {
-    // C++ EventBus exposed as context property
-    id: mainWindow
+| Menu | Items |
+|------|-------|
+| **File** | Exit (`Alt+F4`) |
+| **View** | Save Layout (`Ctrl+Shift+S`), Restore Default Layout |
+| **Help** | About Neurus |
 
-    Timer {
-        interval: 16  // ~60 FPS
-        running: true
-        repeat: true
-        onTriggered: EventBus.renderRequested()
-    }
-}
+## Build Integration
+
+```cmake
+# ADS submodule (static build)
+set(ADS_VERSION "4.5.0")
+set(BUILD_EXAMPLES OFF)
+set(BUILD_STATIC ON)
+add_subdirectory(dep/qtadvanceddocking)
+
+# Link targets
+target_link_libraries(Neurus PRIVATE ads::qtadvanceddocking-qt6 ...)
+target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 ```
 
-### QML File Structure
-
-```
-src/ui/
-├── MainWindow.h
-├── MainWindow.cpp
-├── EventBus.h
-├── EventBus.cpp
-├── resources.qrc
-└── qml/
-    └── main.qml      # Main application window
-```
-
-## Event Emission Patterns
-
-**Direct Signal from QML:**
-```qml
-Timer {
-    onTriggered: EventBus.renderRequested()
-}
-```
-
-**Property Binding:**
-```qml
-Label {
-    text: "GPU: " + EventBus.gpuName
-}
-```
-
-**Signal from C++ to QML:**
-```cpp
-// In MainWindow::resizeEvent
-emit EventBus::instance().windowResized(newWidth, newHeight);
-```
-
-## Architectural Boundaries
+## Layer Isolation
 
 ### ✅ UI MAY:
-- Own QWindow and VkSurfaceKHR
+- Own QVulkanInstance, VulkanWindow, QMainWindow
 - Emit EventBus signals
-- Display data via QML bindings
-- Handle Qt input events
+- Handle Qt events (resize, close, menu actions)
+- Manage ADS dock layout
 
 ### ❌ UI MUST NOT:
 - Directly call Renderer methods (go through EventBus)
-- Create Vulkan objects beyond VkSurfaceKHR
+- Create Vulkan objects beyond QVulkanInstance
 - Mutate scene state directly
-- Include headers from `src/render/`
 - Access GPU resources directly
 
-## QML Theming (Future)
+## Legacy Code
 
-- Color scheme configuration via Qt styles
-- Support light/dark themes
-- Custom font application
-- Consistent component styling
-
-## Performance Considerations
-
-- QML is declarative — efficient binding evaluation by Qt engine
-- Keep QML logic minimal; push complexity to C++
-- Timer-driven rendering at target frame rate
-- Avoid heavy computations in QML signal handlers
-
-## Gizmo System (Future)
-
-For the 3D viewport:
-- Translate/rotate/scale gizmos rendered via Vulkan (not QML)
-- Math handled by C++ controllers
-- QML provides overlay menus and toolbars
-
-## Extension Points
-
-**Adding a New QML Panel:**
-1. Create `.qml` file in `src/ui/qml/`
-2. Add to `resources.qrc`
-3. Load in `main.qml` or via C++ QML engine
-4. Connect to EventBus signals for data flow
-
-**Adding a New EventBus Signal:**
-1. Add `signal` to `EventBus` header
-2. Emit from C++ or call from QML
-3. Connect slots in appropriate layer
-
-## Future Enhancements
-
-- Docking system for editor panels
-- Menu bar with file operations (open, save, export)
-- Property editor panels (transform, material)
-- Outliner (scene hierarchy tree)
-- Viewport with Vulkan rendering (QQuickRenderControl)
-- Status bar with GPU info, FPS counter
-- Settings/preferences panel
+The following files are retained as reference implementations but are no longer the primary rendering path:
+- `VulkanWidget.h/cpp` — vk::raii surface via native HWND
+- `MainWindow.h/cpp` — original QWindow subclass
+- `main.qml` — original QML window
+- `Renderer.h/cpp` — vk::raii render loop with dynamic rendering
+- `Swapchain.h/cpp` — manual vk::raii swapchain management

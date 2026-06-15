@@ -14,14 +14,18 @@ The project is in its INITIALIZATION phase. The current deliverable is a
 working colored RGB triangle rendered via the full four-layer architecture.
 
 **In scope:**
-- Vulkan-HPP RAII instance, device, swapchain, pipeline
-- VK_KHR_dynamic_rendering for the triangle pass
-- Qt6 QML window (800×600, resizable, titled "Neurus")
+- Vulkan-HPP RAII instance, device, swapchain, pipeline (vk::raii path kept as reference)
+- QVulkanWindow-based triangle rendering (primary rendering path for MVP)
+- VK_KHR_dynamic_rendering (vk::raii path) + traditional render pass (QVulkanWindow path)
+- Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
+- Viewport as dockable central widget via ADS `CenterDockWidgetArea`
+- Docks: Shader Editor (left), Viewport (center), Outliner + Properties + Render Config (right), Texture Viewer (bottom)
 - Qt Signals/Slots EventBus singleton
-- Swapchain recreation on window resize
+- Swapchain recreation on window resize (both paths)
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
 - Non-GPU Google Test samples (EventBus, EditorContext)
+- Dock layout persistence (save/restore via ADS serialization)
 
 **Out of scope (post-MVP):**
 - glTF/OBJ/PNG file loading, asset pipeline
@@ -209,12 +213,22 @@ Neurus/
 │   └── workflows/          # GitHub Actions CI
 ├── cmake/                  # CMake helper modules
 ├── dep/                    # Git submodule dependencies
+│   └── qtadvanceddocking/  # Qt-Advanced-Docking-System (ADS)
 ├── res/shaders/            # GLSL shader source files
 ├── src/
-│   ├── render/             # Renderer layer (Vulkan-HPP)
+│   ├── render/             # Renderer layer (Vulkan-HPP + QVulkanWindow)
+│   │   ├── QVulkanRenderer.h/cpp  # QVulkanWindowRenderer (primary path)
+│   │   ├── Renderer.h/cpp         # vk::raii path (reference)
+│   │   ├── ShaderProgram.h/cpp
+│   │   ├── Swapchain.h/cpp
+│   │   └── VulkanContext.h/cpp
 │   ├── editor/             # Editor layer (logic, controllers)
-│   ├── ui/                 # UI layer (Qt6 QML)
-│   │   └── qml/            # QML source files
+│   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
+│   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager
+│   │   ├── VulkanWindow.h/cpp     # QVulkanWindow subclass
+│   │   ├── MainWindow.h/cpp       # (legacy QWindow subclass)
+│   │   ├── VulkanWidget.h/cpp     # (legacy vk::raii widget)
+│   │   └── qml/            # QML source files (legacy)
 │   ├── data/               # Data & Resource layer
 │   └── main.cpp            # Application entry point
 ├── test/
