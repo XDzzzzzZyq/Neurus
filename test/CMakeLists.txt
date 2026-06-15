@@ -11,6 +11,7 @@ add_executable(neurus_test
 	editor/test_editor_context.cpp
 	scene/test_uid.cpp
 	scene/test_transform.cpp
+	scene/test_scene.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE

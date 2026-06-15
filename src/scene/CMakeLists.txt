@@ -10,6 +10,8 @@ add_library(neurus_scene STATIC
 	UID.h
 	UID.cpp
 	Transform.h
+	Scene.h
+	Scene.cpp
 )
 
 target_include_directories(neurus_scene PUBLIC
