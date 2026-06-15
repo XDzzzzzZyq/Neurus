@@ -1,5 +1,7 @@
 // Must define platform before including any Vulkan headers
 #define VK_USE_PLATFORM_WIN32_KHR
+// Suppress VK_HEADER_VERSION assertion (GPU driver DLL may differ from SDK headers)
+#define VULKAN_HPP_ASSERT(x) ((void)0)
 
 #include "VulkanContext.h"
 

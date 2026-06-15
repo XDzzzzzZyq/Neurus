@@ -15,11 +15,16 @@ Renderer::Renderer(const vk::raii::Device& device,
 	: m_device(device)
 	, m_graphicsQueue(graphicsQueue)
 	, m_commandPool(createCommandPool(device, queueFamilyIndex))
-	, m_imageAvailable(device, vk::SemaphoreCreateInfo())
-	, m_renderFinished(device, vk::SemaphoreCreateInfo())
-	, m_inFlightFence(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled))
 	, m_width(width)
 	, m_height(height)
+{
+	// --- Create per-frame synchronization (double buffering) ---
+	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
+	{
+		m_imageAvailableSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+		m_inFlightFences.emplace_back(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+	}
 {
 	// --- Create swapchain ---
 	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
@@ -52,18 +57,22 @@ Renderer::~Renderer()
 
 void Renderer::DrawFrame()
 {
-	// --- Wait for previous frame to complete ---
-	if (m_device.waitForFences(*m_inFlightFence, VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
+	// --- Wait for the oldest in-flight frame to complete ---
+	auto& fence = m_inFlightFences[m_currentFrame];
+	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
+	auto& renderFinished = m_renderFinishedSemaphores[m_currentFrame];
+
+	if (m_device.waitForFences(*fence, VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
 	{
 		return;  // Device lost or error — application should handle this
 	}
-	m_device.resetFences(*m_inFlightFence);
+	m_device.resetFences(*fence);
 
 	// --- Acquire next swapchain image ---
 	uint32_t imageIndex = 0;
 	try
 	{
-		imageIndex = m_swapchain->AcquireNextImage(m_imageAvailable);
+		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
 	}
 	catch (const std::runtime_error&)
 	{
@@ -74,23 +83,26 @@ void Renderer::DrawFrame()
 	// --- Submit command buffer ---
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submitInfo(
-		*m_imageAvailable,
+		*imageAvailable,
 		waitStage,
 		*m_commandBuffers[imageIndex],
-		*m_renderFinished
+		*renderFinished
 	);
 
-	m_graphicsQueue.submit(submitInfo, *m_inFlightFence);
+	m_graphicsQueue.submit(submitInfo, *fence);
 
 	// --- Present ---
 	try
 	{
-		m_swapchain->Present(m_renderFinished, imageIndex);
+		m_swapchain->Present(renderFinished, imageIndex);
 	}
 	catch (...)
 	{
 		// Presentation failed — skip this frame
 	}
+
+	// --- Advance to next in-flight frame (cycle through 0..kMaxFramesInFlight-1) ---
+	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
 }
 
 void Renderer::WaitIdle()

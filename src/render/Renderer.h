@@ -97,10 +97,12 @@ private:
 	vk::raii::CommandPool m_commandPool;
 	std::vector<vk::raii::CommandBuffer> m_commandBuffers;
 
-	// Synchronization
-	vk::raii::Semaphore m_imageAvailable;
-	vk::raii::Semaphore m_renderFinished;
-	vk::raii::Fence m_inFlightFence;
+	// Synchronization — one set per in-flight frame (double buffering)
+	static constexpr uint32_t kMaxFramesInFlight = 2;
+	std::vector<vk::raii::Semaphore> m_imageAvailableSemaphores;
+	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
+	std::vector<vk::raii::Fence> m_inFlightFences;
+	uint32_t m_currentFrame = 0;
 
 	// Current state
 	uint32_t m_width = 800;

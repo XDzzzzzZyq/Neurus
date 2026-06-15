@@ -5,6 +5,12 @@
 #include <iostream>
 #include <memory>
 
+// Pre-load the SDK's vulkan-1.dll to ensure header version matches
+#ifdef _WIN32
+#define NOMINMAX
+#include <windows.h>
+#endif
+
 #include "editor/EventBus.h"
 #include "ui/MainWindow.h"
 #include "render/VulkanContext.h"
@@ -108,21 +114,31 @@ int main(int argc, char* argv[])
 	                 &app, [&url](QObject* obj, const QUrl& objUrl) {
 	                     if (!obj && url == objUrl)
 	                     {
+	                         std::cerr << "QML failed to load: " << url.toString().toStdString() << "\n";
 	                         QCoreApplication::exit(-1);
 	                     }
 	                 },
 	                 Qt::QueuedConnection);
+
+	QObject::connect(&engine, &QQmlApplicationEngine::warnings,
+	                 [](const QList<QQmlError>& warnings) {
+	                     for (const auto& warning : warnings)
+	                     {
+	                         std::cerr << "QML Warning: " << warning.toString().toStdString() << "\n";
+	                     }
+	                 });
 
 	engine.load(url);
 
 	// --- Run application ---
 	int result = app.exec();
 
-	// --- Clean shutdown ---
-	if (renderer)
-	{
-		renderer->WaitIdle();
-	}
+	// --- Clean shutdown (CRITICAL: destroy surface BEFORE instance) ---
+	// C++ destruction order is reverse of declaration order.
+	// VkSurfaceKHR (owned by MainWindow) must be destroyed before VkInstance (owned by VulkanContext).
+	renderer.reset();      // 1. Destroy swapchain, pipeline, command buffers
+	mainWindow.reset();    // 2. Destroy VkSurfaceKHR
+	vkContext.reset();     // 3. Destroy VkDevice + VkInstance
 
 	return result;
 }

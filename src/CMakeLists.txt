@@ -45,4 +45,12 @@ if(WIN32)
 	set_target_properties(Neurus PROPERTIES
 		WIN32_EXECUTABLE $<IF:$<CONFIG:Debug>,FALSE,TRUE>
 	)
+
+	# Copy Vulkan SDK runtime DLL to output directory (ensures header version matches)
+	add_custom_command(TARGET Neurus POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			"$ENV{VULKAN_SDK}/Bin/vulkan-1.dll"
+			$<TARGET_FILE_DIR:Neurus>
+		COMMENT "Copying vulkan-1.dll from SDK to ensure version match"
+	)
 endif()
