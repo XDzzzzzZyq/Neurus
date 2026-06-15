@@ -78,6 +78,7 @@ void NeurusMainWindow::CreateDocks()
 	if (!m_viewportCreated)
 	{
 		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
+		m_viewportDock->setObjectName("ViewportDock");  // for restoreState matching
 		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
 		auto* centralArea = m_dockManager->setCentralWidget(m_viewportDock);
 		centralArea->setAllowedAreas(ads::OuterDockAreas);
@@ -147,6 +148,17 @@ void NeurusMainWindow::LoadLayout()
 		QByteArray state = file.readAll();
 		file.close();
 		m_dockManager->restoreState(state);
+
+		// restoreState recreates docks — update m_viewportDock to the restored instance
+		auto docks = m_dockManager->dockWidgetsMap();
+		for (auto it = docks.begin(); it != docks.end(); ++it)
+		{
+			if (it.value()->objectName() == "ViewportDock")
+			{
+				m_viewportDock = it.value();
+				break;
+			}
+		}
 	}
 }
 
