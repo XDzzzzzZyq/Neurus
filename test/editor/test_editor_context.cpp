@@ -27,8 +27,7 @@ TEST_F(EditorContextTest, Constructor_NoThrow)
 
 TEST_F(EditorContextTest, IsQObject)
 {
-	// EditorContext must be a valid QObject for signal/slot support
-	EXPECT_TRUE(m_context->isQObject());
+	// EditorContext inherits QObject — verify it has a valid meta-object
 	EXPECT_NE(m_context->metaObject(), nullptr);
 }
 

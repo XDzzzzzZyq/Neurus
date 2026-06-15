@@ -35,7 +35,10 @@ target_link_libraries(Neurus PRIVATE
 	Qt6::Qml
 )
 
-target_include_directories(Neurus PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(Neurus PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}
+	${CMAKE_BINARY_DIR}/generated/shaders
+)
 
 # Windows: mark as GUI application (no console window in Release)
 if(WIN32)
