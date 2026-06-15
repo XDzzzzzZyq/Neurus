@@ -63,6 +63,12 @@ static QWidget* makePlaceholder(const QString& text)
 
 void NeurusMainWindow::CreateDocks()
 {
+	// --- Viewport (MUST be created FIRST — ADS central widget requirement) ---
+	m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
+	m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+	auto* centralArea = m_dockManager->setCentralWidget(m_viewportDock);
+	centralArea->setAllowedAreas(ads::OuterDockAreas);
+
 	// --- Left: Shader Editor ---
 	auto* shaderDock = new ads::CDockWidget(m_dockManager, "Shader Editor");
 	shaderDock->setWidget(makePlaceholder("Shader Editor"));
@@ -101,15 +107,8 @@ void NeurusMainWindow::CreateDocks()
 
 ads::CDockWidget* NeurusMainWindow::createViewportDock(QWidget* viewportWidget)
 {
-	auto* dock = new ads::CDockWidget(m_dockManager, "Viewport");
-	dock->setWidget(viewportWidget, ads::CDockWidget::ForceNoScrollArea);
-	dock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-
-	// Set as central widget — fills the space between left and right docks
-	auto* centralArea = m_dockManager->setCentralWidget(dock);
-	centralArea->setAllowedAreas(ads::OuterDockAreas);
-
-	return dock;
+	m_viewportDock->setWidget(viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+	return m_viewportDock;
 }
 
 } // namespace neurus

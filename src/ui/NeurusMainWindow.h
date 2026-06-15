@@ -31,6 +31,7 @@ private:
 	void CreateDocks();
 
 	ads::CDockManager* m_dockManager = nullptr;
+	ads::CDockWidget* m_viewportDock = nullptr;  // created first in CreateDocks (central widget)
 };
 
 } // namespace neurus
