@@ -6,6 +6,11 @@
 
 file(READ "${SPV_FILE}" SPV_HEX HEX)
 string(LENGTH "${SPV_HEX}" SPV_LENGTH)
+
+if(SPV_LENGTH EQUAL 0)
+	message(FATAL_ERROR "SPIR-V file is empty or could not be read: ${SPV_FILE}")
+endif()
+
 math(EXPR SPV_SIZE "${SPV_LENGTH} / 2")
 
 # Convert hex string to comma-separated uint32_t literals
@@ -14,6 +19,10 @@ set(U32_LIST "")
 while(COUNTER LESS SPV_SIZE)
 	math(EXPR BYTE_OFFSET "${COUNTER} * 8")
 	string(SUBSTRING "${SPV_HEX}" ${BYTE_OFFSET} 8 WORD_HEX)
+	string(LENGTH "${WORD_HEX}" WORD_LEN)
+	if(WORD_LEN LESS 8)
+		message(FATAL_ERROR "SPIR-V hex data truncated at offset ${BYTE_OFFSET}: length=${WORD_LEN}, expected 8")
+	endif()
 	# Convert little-endian hex bytes to uint32_t value
 	set(WORD_VALUE "0x")
 	string(SUBSTRING "${WORD_HEX}" 6 2 B0)
@@ -44,4 +53,4 @@ constexpr size_t ${ARRAY_NAME}_size = sizeof(${ARRAY_NAME});
 ")
 
 file(WRITE "${HEADER_FILE}" "${HEADER_CONTENT}")
-message(STATUS "Generated shader header: ${HEADER_FILE}")
+message(STATUS "Generated shader header: ${HEADER_FILE} (${SPV_SIZE} words)")

@@ -1,13 +1,15 @@
+// Must define platform before including any Vulkan headers
+#define VK_USE_PLATFORM_WIN32_KHR
+
 #include "MainWindow.h"
 #include "editor/EventBus.h"
-
-#include <QEvent>
-#include <QResizeEvent>
 
 // Windows platform headers for HWND
 #define NOMINMAX
 #include <windows.h>
-#include <vulkan/vulkan_win32.h>
+
+#include <QEvent>
+#include <QResizeEvent>
 
 #include <stdexcept>
 
