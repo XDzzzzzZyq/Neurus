@@ -23,6 +23,8 @@ jobs:
 
       - name: Setup Qt
         uses: jurplel/install-qt-action@v4
+        with:
+          version: 6.11.1
         
       - name: Setup Vulkan SDK
         uses: humbletim/setup-vulkan-sdk@v1.2.1
