@@ -6,7 +6,7 @@
  *   1. QApplication — Qt event loop (Widgets + QML)
  *   2. EventBus — singleton cross-layer communication
  *   3. VulkanContext (Phase 1) — VkInstance creation
- *   4. NeurusMainWindow + VulkanWidget — Qt window with native HWND for Vulkan surface
+ *   4. NeurusMainWindow + VulkanWidget — Qt window with dockable Viewport for Vulkan surface
  *   5. Show main window — apply QMainWindow layout so widget has final size
  *   6. VkSurfaceKHR — created from VulkanWidget's native HWND via VK_KHR_win32_surface
  *   7. VulkanContext (Phase 2) — logical device + queue selection
@@ -54,7 +54,7 @@ int main(int argc, char* argv[])
 	std::unique_ptr<neurus::VulkanContext> vkContext;
 	std::unique_ptr<neurus::Renderer> renderer;
 	std::unique_ptr<vk::raii::SurfaceKHR> surface;
-	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow via setCentralWidget
+	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport QDockWidget
 
 	try
 	{
@@ -62,11 +62,11 @@ int main(int argc, char* argv[])
 		auto vkInstance = neurus::VulkanContext::CreateInstance();
 		vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
-		// Step 2: Create Qt window with VulkanWidget as central widget
+		// Step 2: Create Qt window with VulkanWidget embedded in a dockable Viewport
 		//         VulkanWidget provides the native HWND for Vulkan surface creation.
 		mainWindow = std::make_unique<neurus::NeurusMainWindow>();
 		vulkanWidget = new neurus::VulkanWidget();
-		mainWindow->setCentralWidget(vulkanWidget);
+		mainWindow->createViewportDock(vulkanWidget);
 
 		// Set explicit initial size before native window creation.
 		// Without this, QWidget::width()/height() return default values

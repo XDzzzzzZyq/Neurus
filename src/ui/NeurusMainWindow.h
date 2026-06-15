@@ -2,12 +2,14 @@
 
 #include <QMainWindow>
 
+class QDockWidget;
+
 namespace neurus {
 
 /**
  * @brief Main application window with dockable editor panels.
  *
- * Provides a QMainWindow with a central viewport and five dockable
+ * Provides a QMainWindow with a dockable Viewport and five dockable
  * tool panels arranged in left, right, and bottom dock areas.
  * All panels are labeled placeholders awaiting future implementation.
  */
@@ -25,12 +27,16 @@ public:
 	/** @brief Default destructor. Qt parent-child ownership handles cleanup. */
 	~NeurusMainWindow() override;
 
+	/**
+	 * @brief Creates a dockable Viewport dock widget containing the given widget.
+	 * @param vulkanWidget The VulkanWidget to embed (must outlive the dock).
+	 * @return The created QDockWidget (owned by this QMainWindow).
+	 */
+	QDockWidget* createViewportDock(QWidget* vulkanWidget);
+
 private:
 	/** @brief Creates the menu bar with File, View, and Help menus. */
 	void CreateMenus();
-
-	/** @brief Creates the central viewport placeholder widget. */
-	void CreateCentralWidget();
 
 	/** @brief Creates and arranges all dock widgets. */
 	void CreateDocks();

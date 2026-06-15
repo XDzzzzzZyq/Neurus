@@ -15,7 +15,6 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	setWindowTitle("Neurus");
 	resize(1600, 900);
 
-	CreateCentralWidget();
 	CreateDocks();
 	CreateMenus();
 }
@@ -55,21 +54,19 @@ void NeurusMainWindow::CreateMenus()
 	});
 }
 
-// --- Central Widget ---
+// --- Viewport Dock ---
 
-void NeurusMainWindow::CreateCentralWidget()
+QDockWidget* NeurusMainWindow::createViewportDock(QWidget* vulkanWidget)
 {
-	auto* central = new QWidget(this);
-	auto* layout = new QVBoxLayout(central);
+	auto* dock = new QDockWidget("Viewport", this);
+	dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+	dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+	dock->setWidget(vulkanWidget);
 
-	auto* label = new QLabel("Viewport", central);
-	label->setAlignment(Qt::AlignCenter);
-	QFont font = label->font();
-	font.setPointSize(18);
-	label->setFont(font);
+	// Add to left dock area initially, below Outliner
+	addDockWidget(Qt::LeftDockWidgetArea, dock);
 
-	layout->addWidget(label);
-	setCentralWidget(central);
+	return dock;
 }
 
 // --- Dock Layout ---
