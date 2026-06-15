@@ -9,9 +9,12 @@ add_executable(neurus_test
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
 	editor/test_editor_context.cpp
+	scene/test_uid.cpp
+	scene/test_transform.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE
+	neurus_scene
 	neurus_render
 	neurus_editor
 	neurus_ui

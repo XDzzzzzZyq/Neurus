@@ -4,6 +4,9 @@
 # Layer Libraries
 # ---------------------------------------------------------------------------
 
+# Core Types (header-only, no dependencies)
+add_subdirectory(core)
+
 # Data & Resource Layer (built first — no internal dependencies)
 add_subdirectory(data)
 
@@ -15,6 +18,9 @@ add_subdirectory(editor)
 
 # UI Layer (depends on: editor for EventBus)
 add_subdirectory(ui)
+
+# Scene Layer (base types for scene graph — no internal deps)
+add_subdirectory(scene)
 
 # ---------------------------------------------------------------------------
 # Main Executable
