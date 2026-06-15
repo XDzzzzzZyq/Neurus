@@ -136,29 +136,48 @@ int main(int argc, char* argv[])
 
 	// Handle VulkanWidget resize — trigger a frame draw; swapchain recreation
 	// is handled internally by DrawFrame when VK_ERROR_OUT_OF_DATE_KHR is received.
+	// Re-entrancy guard: shared across resize and timer callbacks to prevent
+	// nested DrawFrame() calls when processEvents() pumps the event queue.
+	static bool s_frameInProgress = false;
+
 	QObject::connect(vulkanWidget, &neurus::VulkanWidget::resized,
-	                 [&renderer](int /*width*/, int /*height*/) {
-	                     if (renderer)
+	                 [&renderer, &app](int /*width*/, int /*height*/) {
+	                     if (s_frameInProgress || !renderer)
 	                     {
-	                         try
-	                         {
-	                             renderer->DrawFrame();
-	                         }
-	                         catch (...)
-	                         {
-	                             // Swapchain recreation handled inside DrawFrame
-	                         }
+	                         return;
 	                     }
+
+	                     s_frameInProgress = true;
+	                     try
+	                     {
+	                         renderer->DrawFrame();
+	                     }
+	                     catch (...)
+	                     {
+	                         // Swapchain recreation handled inside DrawFrame
+	                     }
+	                     app.processEvents();
+	                     s_frameInProgress = false;
 	                 });
 
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer]() {
-		if (renderer)
+	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer, &app]() {
+		if (s_frameInProgress || !renderer)
 		{
-			try { renderer->DrawFrame(); } catch (...) {}
+			return;
 		}
+
+		s_frameInProgress = true;
+		try { renderer->DrawFrame(); } catch (...) {}
+
+		// Pump pending Qt events so the window remains responsive
+		// (drag, close, minimize, click) even under GPU backpressure.
+		// The guard above prevents re-entrant DrawFrame calls from cascading.
+		app.processEvents();
+
+		s_frameInProgress = false;
 	});
 	renderTimer.start();
 
