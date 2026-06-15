@@ -3,6 +3,8 @@
 add_library(neurus_ui STATIC
 	MainWindow.h
 	MainWindow.cpp
+	NeurusMainWindow.h
+	NeurusMainWindow.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC
