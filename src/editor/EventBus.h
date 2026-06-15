@@ -87,6 +87,12 @@ signals:
 	 *  @param height New viewport height in pixels. */
 	void viewportResized(int width, int height);
 
+	// --- Scene modification signals ---
+
+	/** @brief Emitted when scene modification status changes.
+	 *  @param status Bitfield of SceneModifStatus flags indicating what changed. */
+	void sceneStatusChanged(int status);
+
 private:
 	EventBus() = default;
 

@@ -4,6 +4,8 @@
 
 namespace neurus {
 
+class Scene;
+
 /**
  * @brief Container for editor and scene state.
  *
@@ -27,6 +29,14 @@ public:
 	// --- Scene state (future) ---
 	// const Scene& activeScene() const;
 
+	/** @brief Stores a pointer to the active scene. */
+	void SetScene(Scene* scene);
+
+	/** @brief Notifies that scene modification status changed.
+	 *  @param status Bitfield of SceneModifStatus flags indicating what changed.
+	 *  @note Emits sceneStatusChanged signal on EventBus. */
+	void NotifySceneChanged(int status);
+
 	// --- Editor state (future) ---
 	// SelectionManager& selection();
 
@@ -36,6 +46,9 @@ signals:
 
 	/** @brief Emitted when the editor selection changes. */
 	void selectionChanged();
+
+private:
+	Scene* m_scene = nullptr;
 };
 
 } // namespace neurus
