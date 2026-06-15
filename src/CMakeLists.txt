@@ -24,9 +24,6 @@ add_executable(Neurus
 	main.cpp
 )
 
-# Make Neurus the default startup project in Visual Studio solutions
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT Neurus)
-
 target_link_libraries(Neurus PRIVATE
 	neurus_render
 	neurus_editor

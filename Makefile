@@ -30,11 +30,9 @@ release:
 
 nobuild:
 	cmake --preset vs2022
-	@powershell -NoProfile -ExecutionPolicy Bypass -File cmake/SetVSStartup.ps1 -SlnPath "../Neurus_VS2022/Neurus.sln"
 	@echo ""
 	@echo "  Visual Studio solution generated at ../Neurus_VS2022/Neurus.sln"
-	@echo "  Neurus is set as the default startup project."
-	@echo "  Open it in VS 2022 and press F5 to build and run."
+	@echo "  Open it in VS 2022, right-click Neurus -> Set as Startup Project, then F5."
 	@echo ""
 
 # --- Help ---
