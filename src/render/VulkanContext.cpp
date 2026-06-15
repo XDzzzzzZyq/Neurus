@@ -1,5 +1,8 @@
 #include "VulkanContext.h"
 
+// Must define platform before including Vulkan headers
+#define VK_USE_PLATFORM_WIN32_KHR
+
 #include <stdexcept>
 #include <set>
 #include <cstring>
@@ -110,7 +113,8 @@ vk::raii::Instance VulkanContext::CreateInstance()
 		}
 	}
 
-	return vk::raii::Instance(nullptr, createInfo);
+	vk::raii::Context context;
+	return vk::raii::Instance(context, createInfo);
 }
 
 // --- Constructor ---

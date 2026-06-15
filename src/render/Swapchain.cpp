@@ -16,7 +16,8 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 	m_recreateWidth = width;
 	m_recreateHeight = height;
 
-	m_format = chooseSurfaceFormat(physicalDevice, surface);
+	auto surfaceFormat = chooseSurfaceFormat(physicalDevice, surface);
+	m_format = surfaceFormat.format;
 	auto presentMode = choosePresentMode(physicalDevice, surface);
 	m_extent = chooseExtent(physicalDevice, surface, width, height);
 
@@ -55,6 +56,7 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 	m_imageCount = minImageCount;
 
 	// --- Create image views ---
+	m_images = m_swapchain->getImages();
 	m_imageViews = createImageViews(device, *m_swapchain, m_format);
 }
 
@@ -116,6 +118,7 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 	m_extent = swapchainCreateInfo.imageExtent;
 	m_imageCount = minImageCount;
 
+	m_images = m_swapchain->getImages();
 	m_imageViews = createImageViews(m_device, *m_swapchain, m_format);
 }
 
@@ -149,7 +152,7 @@ void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t image
 		imageIndex
 	);
 
-	auto result = m_device.getQueue(0, 0).presentKHR(&presentInfo);
+	auto result = m_device.getQueue(0, 0).presentKHR(presentInfo);
 
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
 	{

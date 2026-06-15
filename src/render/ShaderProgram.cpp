@@ -78,9 +78,10 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 	m_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, pipelineLayoutCreateInfo);
 
 	// --- Dynamic rendering pipeline create info ---
+	vk::Format colorFormats[] = { vk::Format::eB8G8R8A8Srgb };
 	vk::PipelineRenderingCreateInfo renderingCreateInfo(
-		0,
-		vk::Format::eB8G8R8A8Srgb  // Color attachment format
+		{},
+		colorFormats
 		// No depth or stencil attachment
 	);
 

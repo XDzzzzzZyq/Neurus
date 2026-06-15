@@ -74,6 +74,9 @@ public:
 	/** @brief The swapchain image views (indexed by acquired image index). */
 	const std::vector<vk::raii::ImageView>& imageViews() const { return m_imageViews; }
 
+	/** @brief The swapchain images (VkImage handles, indexed by acquired image index). */
+	const std::vector<vk::Image>& images() const { return m_images; }
+
 	/** @brief The swapchain image format. */
 	vk::Format format() const { return m_format; }
 
@@ -112,6 +115,7 @@ private:
 
 	std::unique_ptr<vk::raii::SwapchainKHR> m_swapchain;
 	std::vector<vk::raii::ImageView> m_imageViews;
+	std::vector<vk::Image> m_images;
 
 	vk::Format m_format = vk::Format::eB8G8R8A8Srgb;
 	vk::Extent2D m_extent = {800, 600};

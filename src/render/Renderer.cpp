@@ -113,7 +113,7 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 		vk::ImageLayout::eUndefined,
 		vk::ImageLayout::eColorAttachmentOptimal,
 		0, 0,  // queue family indices (no transfer)
-		m_swapchain->imageViews()[imageIndex].getImage(),
+		m_swapchain->images()[imageIndex],
 		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
 	);
 
@@ -172,11 +172,12 @@ void Renderer::recordCommandBuffer(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 		vk::ImageLayout::eColorAttachmentOptimal,
 		vk::ImageLayout::ePresentSrcKHR,
 		0, 0,
-		m_swapchain->imageViews()[imageIndex].getImage(),
+		m_swapchain->images()[imageIndex],
 		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)
 	);
 
-	cmdBuf.pipelineBarrier2(presentBarrier);
+	vk::DependencyInfo presentBarrierDependency({}, {}, {}, presentBarrier);
+	cmdBuf.pipelineBarrier2(presentBarrierDependency);
 
 	// --- End command buffer ---
 	cmdBuf.end();
