@@ -30,6 +30,7 @@ private:
 	void CreateMenus();
 	void CreateDocks();
 	void SaveLayout();
+	void LoadLayout();
 	void RestoreDefaultLayout();
 
 	ads::CDockManager* m_dockManager = nullptr;

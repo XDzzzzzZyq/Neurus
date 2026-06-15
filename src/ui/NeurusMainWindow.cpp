@@ -26,6 +26,7 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	m_dockManager = new ads::CDockManager(this);
 
 	CreateDocks();
+	LoadLayout();   // Restore saved layout if available
 	CreateMenus();
 }
 
@@ -134,6 +135,18 @@ void NeurusMainWindow::SaveLayout()
 		QByteArray state = m_dockManager->saveState();
 		file.write(state);
 		file.close();
+	}
+}
+
+void NeurusMainWindow::LoadLayout()
+{
+	QString path = QApplication::applicationDirPath() + "/layout.ads";
+	QFile file(path);
+	if (file.open(QIODevice::ReadOnly))
+	{
+		QByteArray state = file.readAll();
+		file.close();
+		m_dockManager->restoreState(state);
 	}
 }
 
