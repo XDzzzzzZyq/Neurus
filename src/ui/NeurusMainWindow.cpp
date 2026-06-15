@@ -63,8 +63,8 @@ QDockWidget* NeurusMainWindow::createViewportDock(QWidget* vulkanWidget)
 	dock->setAllowedAreas(Qt::AllDockWidgetAreas);
 	dock->setWidget(vulkanWidget);
 
-	// Add to left dock area initially, below Outliner
-	addDockWidget(Qt::LeftDockWidgetArea, dock);
+	// Add to right dock area
+	addDockWidget(Qt::RightDockWidgetArea, dock);
 
 	return dock;
 }
@@ -86,12 +86,12 @@ void NeurusMainWindow::CreateDocks()
 		dock->setWidget(widget);
 	};
 
-	// --- Left dock: Outliner ---
+	// --- Right dock: Outliner ---
 	auto* outlinerDock = new QDockWidget("Outliner", this);
 	outlinerDock->setFeatures(kDockFeatures);
 	outlinerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 	makePlaceholder(outlinerDock, "Outliner");
-	addDockWidget(Qt::LeftDockWidgetArea, outlinerDock);
+	addDockWidget(Qt::RightDockWidgetArea, outlinerDock);
 
 	// --- Right dock: Property Editor ---
 	auto* propEditorDock = new QDockWidget("Property Editor", this);
@@ -108,20 +108,19 @@ void NeurusMainWindow::CreateDocks()
 	addDockWidget(Qt::RightDockWidgetArea, renderConfigDock);
 	tabifyDockWidget(propEditorDock, renderConfigDock);
 
-	// --- Bottom dock: Shader Editor ---
+	// --- Left dock: Shader Editor ---
 	auto* shaderEditorDock = new QDockWidget("Shader Editor", this);
 	shaderEditorDock->setFeatures(kDockFeatures);
-	shaderEditorDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
+	shaderEditorDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 	makePlaceholder(shaderEditorDock, "Shader Editor");
-	addDockWidget(Qt::BottomDockWidgetArea, shaderEditorDock);
+	addDockWidget(Qt::LeftDockWidgetArea, shaderEditorDock);
 
-	// --- Bottom dock: Texture Viewer (tabified with Shader Editor) ---
+	// --- Bottom dock: Texture Viewer ---
 	auto* textureViewerDock = new QDockWidget("Texture Viewer", this);
 	textureViewerDock->setFeatures(kDockFeatures);
 	textureViewerDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
 	makePlaceholder(textureViewerDock, "Texture Viewer");
 	addDockWidget(Qt::BottomDockWidgetArea, textureViewerDock);
-	tabifyDockWidget(shaderEditorDock, textureViewerDock);
 
 	// Raise the first dock in each tab group to be the visible one
 	propEditorDock->raise();
