@@ -1,15 +1,8 @@
 #include <QGuiApplication>
-#include <QQmlApplicationEngine>
-#include <QQmlContext>
+#include <QTimer>
 
 #include <iostream>
 #include <memory>
-
-// Pre-load the SDK's vulkan-1.dll to ensure header version matches
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#endif
 
 #include "editor/EventBus.h"
 #include "ui/MainWindow.h"
@@ -38,19 +31,16 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		// Step 1: Create VkInstance
+		// Step 1: Create VkInstance, immediately store in VulkanContext (no moves after surface creation)
 		auto vkInstance = neurus::VulkanContext::CreateInstance();
+		vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
-		// Step 2: Create window + surface (needs instance)
-		mainWindow = std::make_unique<neurus::MainWindow>(vkInstance, &bus);
+		// Step 2: Create window + surface (references ctx's instance — safe, no moves)
+		mainWindow = std::make_unique<neurus::MainWindow>(vkContext->instance(), &bus);
 
 		// Step 3: Create logical device (needs surface for queue family selection)
-		vkContext = std::make_unique<neurus::VulkanContext>(
-			std::move(vkInstance),
-			mainWindow->surface()
-		);
+		vkContext->initDevice(mainWindow->surface());
 
-		// --- Update GPU name in EventBus (for QML status bar) ---
 		bus.setGpuName(QString::fromStdString(vkContext->gpuName()));
 	}
 	catch (const std::exception& e)
@@ -68,8 +58,8 @@ int main(int argc, char* argv[])
 			vkContext->graphicsQueue(),
 			vkContext->graphicsQueueFamily(),
 			mainWindow->surface(),
-			mainWindow->windowWidth(),
-			mainWindow->windowHeight(),
+			mainWindow->getWidth(),
+			mainWindow->getHeight(),
 			triangle_vert_spv,
 			triangle_vert_spv_size,
 			triangle_frag_spv,
@@ -80,6 +70,14 @@ int main(int argc, char* argv[])
 	{
 		std::cerr << "Renderer initialization failed: " << e.what() << "\n";
 		return -1;
+	}
+
+	// Window is visible via WS_VISIBLE — process initial messages
+	MSG msg;
+	while (PeekMessage(&msg, mainWindow->hwnd(), 0, 0, PM_REMOVE))
+	{
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
 	}
 
 	// --- Connect EventBus signals ---
@@ -100,35 +98,18 @@ int main(int argc, char* argv[])
 
 	QObject::connect(&bus, &neurus::EventBus::windowResized,
 	                 [&renderer](int /*width*/, int /*height*/) {
-	                     // Swapchain recreation happens inside DrawFrame()
-	                     // when AcquireNextImage returns OutOfDate.
-	                     // No explicit action needed here for the triangle MVP.
 	                 });
 
-	// --- Load QML UI ---
-	QQmlApplicationEngine engine;
-	engine.rootContext()->setContextProperty("EventBus", &bus);
-
-	const QUrl url("qrc:/qml/main.qml");
-	QObject::connect(&engine, &QQmlApplicationEngine::objectCreated,
-	                 &app, [&url](QObject* obj, const QUrl& objUrl) {
-	                     if (!obj && url == objUrl)
-	                     {
-	                         std::cerr << "QML failed to load: " << url.toString().toStdString() << "\n";
-	                         QCoreApplication::exit(-1);
-	                     }
-	                 },
-	                 Qt::QueuedConnection);
-
-	QObject::connect(&engine, &QQmlApplicationEngine::warnings,
-	                 [](const QList<QQmlError>& warnings) {
-	                     for (const auto& warning : warnings)
-	                     {
-	                         std::cerr << "QML Warning: " << warning.toString().toStdString() << "\n";
-	                     }
-	                 });
-
-	engine.load(url);
+	// --- Timer-driven render loop (replaces QML timer) ---
+	QTimer renderTimer;
+	renderTimer.setInterval(16);  // ~60 FPS
+	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer]() {
+		if (renderer)
+		{
+			try { renderer->DrawFrame(); } catch (...) {}
+		}
+	});
+	renderTimer.start();
 
 	// --- Run application ---
 	int result = app.exec();

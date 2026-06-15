@@ -1,9 +1,12 @@
 #pragma once
 
 #include <QObject>
-#include <QWindow>
+#include <QString>
 
 #include <vulkan/vulkan_raii.hpp>
+
+#define NOMINMAX
+#include <windows.h>
 
 #include <memory>
 
@@ -14,29 +17,14 @@ class EventBus;
 /**
  * @brief Main application window with Vulkan surface.
  *
- * Creates a QWindow for Vulkan rendering and manages the VkSurfaceKHR lifecycle.
- * The Vulkan instance and device are owned by VulkanContext, NOT by Qt.
- *
- * Exposed to QML via context property for window title, size, and state.
+ * Creates a native Win32 window for Vulkan rendering and manages the
+ * VkSurfaceKHR lifecycle. Uses Qt only for the event loop (QApplication).
  */
 class MainWindow : public QObject
 {
 	Q_OBJECT
 
-	Q_PROPERTY(int windowWidth READ windowWidth NOTIFY windowWidthChanged)
-	Q_PROPERTY(int windowHeight READ windowHeight NOTIFY windowHeightChanged)
-	Q_PROPERTY(QString windowTitle READ windowTitle NOTIFY windowTitleChanged)
-
 public:
-	/**
-	 * @brief Creates the window and Vulkan surface.
-	 * @param vulkanInstance A valid VkInstance (from VulkanContext).
-	 * @param bus EventBus for resize notifications.
-	 * @param width Initial window width (default 800).
-	 * @param height Initial window height (default 600).
-	 * @param title Window title.
-	 * @param parent Qt parent object.
-	 */
 	explicit MainWindow(const vk::raii::Instance& vulkanInstance,
 	                    EventBus* bus,
 	                    int width = 800, int height = 600,
@@ -44,34 +32,19 @@ public:
 	                    QObject* parent = nullptr);
 	~MainWindow() override;
 
-	// Non-copyable — owns OS + Vulkan resources
 	MainWindow(const MainWindow&) = delete;
 	MainWindow& operator=(const MainWindow&) = delete;
 
-	/** @brief The VkSurfaceKHR for swapchain creation (pass to Renderer). */
 	const vk::raii::SurfaceKHR& surface() const { return *m_surface; }
-
-	/** @brief The QWindow for Qt integration. */
-	QWindow* window() const { return m_window.get(); }
-
-	int windowWidth() const { return m_width; }
-	int windowHeight() const { return m_height; }
-	QString windowTitle() const { return m_title; }
-
-signals:
-	void windowWidthChanged();
-	void windowHeightChanged();
-	void windowTitleChanged();
-
-protected:
-	/** @brief Handles native window resize events. */
-	bool eventFilter(QObject* obj, QEvent* event) override;
+	HWND hwnd() const { return m_hwnd; }
+	int getWidth() const { return m_width; }
+	int getHeight() const { return m_height; }
 
 private:
 	EventBus* m_bus = nullptr;
 
-	std::unique_ptr<QWindow> m_window;
 	std::unique_ptr<vk::raii::SurfaceKHR> m_surface;
+	HWND m_hwnd = nullptr;
 
 	int m_width = 800;
 	int m_height = 600;

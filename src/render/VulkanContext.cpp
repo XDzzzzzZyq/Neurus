@@ -22,96 +22,52 @@ const std::vector<const char*> kValidationLayers = {
 	"VK_LAYER_KHRONOS_validation",
 };
 
-// --- Debug messenger callback for validation layers ---
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
-	VkDebugUtilsMessageTypeFlagsEXT /*messageType*/,
+	VkDebugUtilsMessageTypeFlagsEXT,
 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-	void* /*pUserData*/)
+	void*)
 {
 	if (messageSeverity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT)
-	{
 		std::cerr << "[Vulkan Validation] " << pCallbackData->pMessage << "\n";
-	}
 	return VK_FALSE;
 }
 
-// --- Required instance extensions ---
 static std::vector<const char*> getRequiredInstanceExtensions()
 {
 	std::vector<const char*> extensions;
-
 	extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
 	extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-
 	if constexpr (kEnableValidation)
-	{
 		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	}
-
 	return extensions;
 }
 
-// --- Instance creation ---
 vk::raii::Instance VulkanContext::CreateInstance()
 {
-	vk::ApplicationInfo appInfo(
-		"Neurus", VK_MAKE_VERSION(0, 1, 0),
-		"NeurusRenderer", VK_MAKE_VERSION(0, 1, 0),
-		VK_API_VERSION_1_4
-	);
-
+	vk::ApplicationInfo appInfo("Neurus", VK_MAKE_VERSION(0,1,0), "NeurusRenderer", VK_MAKE_VERSION(0,1,0), VK_API_VERSION_1_4);
 	auto extensions = getRequiredInstanceExtensions();
 
-	vk::InstanceCreateInfo createInfo(
-		{},
-		&appInfo,
-		{},
-		extensions
-	);
+	vk::InstanceCreateInfo createInfo({}, &appInfo, {}, extensions);
 
 	if constexpr (kEnableValidation)
 	{
-		// Check if validation layers are available
-		auto availableLayers = vk::enumerateInstanceLayerProperties();
-		bool layersAvailable = true;
-		for (const char* layerName : kValidationLayers)
-		{
+		auto layers = vk::enumerateInstanceLayerProperties();
+		bool ok = true;
+		for (auto* name : kValidationLayers) {
 			bool found = false;
-			for (const auto& layer : availableLayers)
-			{
-				if (strcmp(layerName, layer.layerName) == 0)
-				{
-					found = true;
-					break;
-				}
-			}
-			if (!found)
-			{
-				layersAvailable = false;
-				break;
-			}
+			for (auto& l : layers) { if (!strcmp(name, l.layerName)) { found = true; break; } }
+			if (!found) { ok = false; break; }
 		}
-
-		if (layersAvailable)
-		{
+		if (ok) {
 			createInfo.setPEnabledLayerNames(kValidationLayers);
-
-			vk::DebugUtilsMessengerCreateInfoEXT debugCreateInfo(
-				{},
-				vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
-				vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
-				vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
-				vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
-				vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
-				debugCallback
-			);
-
-			createInfo.setPNext(&debugCreateInfo);
-		}
-		else
-		{
-			std::cerr << "[Neurus] Validation layers requested but not available.\n";
+			vk::DebugUtilsMessengerCreateInfoEXT dbg({},
+				vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
+				vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
+				debugCallback);
+			createInfo.setPNext(&dbg);
+		} else {
+			std::cerr << "[Neurus] Validation layers not available.\n";
 		}
 	}
 
@@ -119,113 +75,60 @@ vk::raii::Instance VulkanContext::CreateInstance()
 	return vk::raii::Instance(context, createInfo);
 }
 
-// --- Constructor ---
-VulkanContext::VulkanContext(vk::raii::Instance&& instance, const vk::raii::SurfaceKHR& surface)
+VulkanContext::VulkanContext(vk::raii::Instance&& instance)
 {
-	// Take ownership of the instance
 	m_instance = std::make_unique<vk::raii::Instance>(std::move(instance));
+}
 
-	// Enumerate physical devices (owned by this member for lifetime)
+void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
+{
 	m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-
-	// Pick the best device
-	m_selectedDeviceIndex = selectPhysicalDeviceIndex(*m_instance);
-
-	// Get device properties
-	auto properties = m_physicalDevices[m_selectedDeviceIndex].getProperties();
-	m_gpuName = properties.deviceName.data();
-
-	// Find graphics + present queue family
+	m_selectedDeviceIndex = selectPhysicalDeviceIndex();
+	auto& pd = m_physicalDevices[m_selectedDeviceIndex];
+	auto props = pd.getProperties();
+	m_gpuName = props.deviceName.data();
 	m_graphicsQueueFamily = findGraphicsQueueFamily(surface);
 
-	// Create logical device
-	float queuePriority = 1.0f;
-	vk::DeviceQueueCreateInfo queueCreateInfo(
-		{},
-		m_graphicsQueueFamily,
-		1,
-		&queuePriority
-	);
+	float prio = 1.0f;
+	vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
 
-	// Enable dynamic rendering (Vulkan 1.3+ feature)
-	vk::PhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeature;
-	dynamicRenderingFeature.dynamicRendering = VK_TRUE;
+	vk::PhysicalDeviceDynamicRenderingFeatures dynRendering;
+	dynRendering.dynamicRendering = VK_TRUE;
+	vk::PhysicalDeviceSynchronization2Features sync2;
+	sync2.synchronization2 = VK_TRUE;
+	sync2.pNext = &dynRendering;
 
-	// Enable synchronization2 (useful for modern barrier patterns)
-	vk::PhysicalDeviceSynchronization2Features sync2Feature;
-	sync2Feature.synchronization2 = VK_TRUE;
-	sync2Feature.pNext = &dynamicRenderingFeature;
+	vk::PhysicalDeviceFeatures features;
+	std::vector<const char*> devExts = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &sync2);
 
-	// Device features (empty for triangle — no features needed)
-	vk::PhysicalDeviceFeatures deviceFeatures;
-
-	// Request swapchain extension
-	std::vector<const char*> deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-	};
-
-	vk::DeviceCreateInfo deviceCreateInfo(
-		{},
-		queueCreateInfo,
-		{},  // No validation layers for device (instance-level only)
-		deviceExtensions,
-		&deviceFeatures,
-		&sync2Feature
-	);
-
-	m_device = std::make_unique<vk::raii::Device>(m_physicalDevices[m_selectedDeviceIndex], deviceCreateInfo);
-
-	// Get queue handle
+	m_device = std::make_unique<vk::raii::Device>(pd, devCI);
 	m_graphicsQueue = m_device->getQueue(m_graphicsQueueFamily, 0);
 }
 
-VulkanContext::~VulkanContext()
-{
-	// vk::raii handles cleanup automatically
-}
+VulkanContext::~VulkanContext() {}
 
-uint32_t VulkanContext::selectPhysicalDeviceIndex(vk::raii::Instance& instance)
+uint32_t VulkanContext::selectPhysicalDeviceIndex()
 {
 	if (m_physicalDevices.empty())
-	{
 		throw std::runtime_error("No Vulkan-capable GPUs found.");
-	}
-
-	// Prefer discrete GPU
-	for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-	{
-		auto properties = m_physicalDevices[i].getProperties();
-		if (properties.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-		{
+	for (uint32_t i = 0; i < (uint32_t)m_physicalDevices.size(); ++i)
+		if (m_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
 			return i;
-		}
-	}
-
-	// Fallback to first available
 	return 0;
 }
 
 uint32_t VulkanContext::findGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface)
 {
-	const auto& physicalDevice = m_physicalDevices[m_selectedDeviceIndex];
-	auto queueFamilies = physicalDevice.getQueueFamilyProperties();
-
-	for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilies.size()); ++i)
+	auto& pd = m_physicalDevices[m_selectedDeviceIndex];
+	auto qf = pd.getQueueFamilyProperties();
+	for (uint32_t i = 0; i < (uint32_t)qf.size(); ++i)
 	{
-		if (!(queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics))
-		{
-			continue;
-		}
-
-		if (!physicalDevice.getSurfaceSupportKHR(i, *surface))
-		{
-			continue;
-		}
-
+		if (!(qf[i].queueFlags & vk::QueueFlagBits::eGraphics)) continue;
+		if (!pd.getSurfaceSupportKHR(i, *surface)) continue;
 		return i;
 	}
-
-	throw std::runtime_error("No queue family supports both graphics and presentation.");
+	throw std::runtime_error("No queue family with graphics + present.");
 }
 
 } // namespace neurus

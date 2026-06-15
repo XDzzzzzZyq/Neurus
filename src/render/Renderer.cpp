@@ -18,14 +18,19 @@ Renderer::Renderer(const vk::raii::Device& device,
 	, m_width(width)
 	, m_height(height)
 {
-	// --- Create per-frame synchronization (double buffering) ---
+	// --- Create swapchain ---
+	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
+
+	uint32_t imageCount = m_swapchain->imageCount();
+
+	// --- Create per-frame synchronization ---
 	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
 	{
 		m_imageAvailableSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 		m_inFlightFences.emplace_back(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
 	}
-{
+
 	// --- Create swapchain ---
 	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
 
@@ -57,14 +62,14 @@ Renderer::~Renderer()
 
 void Renderer::DrawFrame()
 {
-	// --- Wait for the oldest in-flight frame to complete ---
 	auto& fence = m_inFlightFences[m_currentFrame];
 	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
 	auto& renderFinished = m_renderFinishedSemaphores[m_currentFrame];
 
+	// --- Wait for this frame slot to complete (ensures semaphores are safe to reuse) ---
 	if (m_device.waitForFences(*fence, VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
 	{
-		return;  // Device lost or error — application should handle this
+		return;
 	}
 	m_device.resetFences(*fence);
 
@@ -76,7 +81,6 @@ void Renderer::DrawFrame()
 	}
 	catch (const std::runtime_error&)
 	{
-		// Swapchain recreation failed or device lost
 		return;
 	}
 
@@ -98,10 +102,9 @@ void Renderer::DrawFrame()
 	}
 	catch (...)
 	{
-		// Presentation failed — skip this frame
 	}
 
-	// --- Advance to next in-flight frame (cycle through 0..kMaxFramesInFlight-1) ---
+	// --- Advance to next frame slot ---
 	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
 }
 

@@ -1,0 +1,2 @@
+Selected WSI platform: win32
+Selected GPU 0: NVIDIA GeForce RTX 4060 Laptop GPU, type: DiscreteGpu
