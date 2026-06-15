@@ -11,7 +11,7 @@ if(SPV_LENGTH EQUAL 0)
 	message(FATAL_ERROR "SPIR-V file is empty or could not be read: ${SPV_FILE}")
 endif()
 
-math(EXPR SPV_SIZE "${SPV_LENGTH} / 2")
+math(EXPR SPV_SIZE "${SPV_LENGTH} / 8")
 
 # Convert hex string to comma-separated uint32_t literals
 set(COUNTER 0)
