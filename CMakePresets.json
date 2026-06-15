@@ -3,37 +3,45 @@
 	"configurePresets": [
 		{
 			"name": "default",
-			"displayName": "Windows x64 Debug",
-			"description": "Debug build with validation layers and tests",
+			"displayName": "Windows x64 Debug (MSVC)",
+			"description": "Debug build with validation layers and tests — uses VS 2022 + MSVC",
 			"generator": "Visual Studio 17 2022",
 			"binaryDir": "${sourceDir}/build/debug",
 			"architecture": {
 				"value": "x64",
 				"strategy": "external"
 			},
+			"environment": {
+				"VULKAN_SDK": "D:/VulkanSDK/1.4.350.0"
+			},
 			"cacheVariables": {
+				"CMAKE_PREFIX_PATH": "D:/Qt/6.11.1/msvc2022_64",
 				"NEURUS_BUILD_TESTS": "ON",
 				"NEURUS_ENABLE_VALIDATION": "ON"
 			}
 		},
 		{
 			"name": "release",
-			"displayName": "Windows x64 Release",
-			"description": "Optimized release build",
+			"displayName": "Windows x64 Release (MSVC)",
+			"description": "Optimized release build — uses VS 2022 + MSVC",
 			"generator": "Visual Studio 17 2022",
 			"binaryDir": "${sourceDir}/build/release",
 			"architecture": {
 				"value": "x64",
 				"strategy": "external"
 			},
+			"environment": {
+				"VULKAN_SDK": "D:/VulkanSDK/1.4.350.0"
+			},
 			"cacheVariables": {
+				"CMAKE_PREFIX_PATH": "D:/Qt/6.11.1/msvc2022_64",
 				"NEURUS_BUILD_TESTS": "OFF",
 				"NEURUS_ENABLE_VALIDATION": "OFF"
 			}
 		},
 		{
 			"name": "vs2022",
-			"displayName": "Visual Studio 2022",
+			"displayName": "Visual Studio 2022 (IDE)",
 			"description": "Generate VS 2022 solution for IDE development",
 			"generator": "Visual Studio 17 2022",
 			"binaryDir": "${sourceDir}/../Neurus_VS2022",
@@ -41,7 +49,11 @@
 				"value": "x64",
 				"strategy": "external"
 			},
+			"environment": {
+				"VULKAN_SDK": "D:/VulkanSDK/1.4.350.0"
+			},
 			"cacheVariables": {
+				"CMAKE_PREFIX_PATH": "D:/Qt/6.11.1/msvc2022_64",
 				"NEURUS_BUILD_TESTS": "ON",
 				"NEURUS_ENABLE_VALIDATION": "ON"
 			}
