@@ -22,7 +22,7 @@ jobs:
           submodules: recursive
 
       - name: Setup Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v1.2
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
           vulkan-query-version: 1.4.304.0
           vulkan-components: Vulkan-Headers, Vulkan-Loader, Glslang
