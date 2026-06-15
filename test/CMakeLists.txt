@@ -36,6 +36,20 @@ if(MSVC)
 	target_compile_options(neurus_test PRIVATE /wd4100 /wd4189)
 endif()
 
+# Windows: deploy Qt DLLs so test executable can run standalone
+# MUST come before gtest_discover_tests (POST_BUILD ordering)
+if(WIN32 AND WINDEPLOYQT)
+	add_custom_command(TARGET neurus_test POST_BUILD
+		COMMAND "${WINDEPLOYQT}"
+			--no-opengl-sw
+			--no-system-d3d-compiler
+			--no-compiler-runtime
+			--verbose 0
+			$<TARGET_FILE_DIR:neurus_test>
+		COMMENT "Deploying Qt DLLs for test executable"
+	)
+endif()
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(neurus_test

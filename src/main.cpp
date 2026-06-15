@@ -72,7 +72,7 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	// Window is visible via WS_VISIBLE — process initial messages
+	// Process initial window messages before render loop
 	MSG msg;
 	while (PeekMessage(&msg, mainWindow->hwnd(), 0, 0, PM_REMOVE))
 	{
@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
 		DispatchMessage(&msg);
 	}
 
-	// Window is hidden — show it now that the swapchain is ready
+	// Window was created hidden — show it now that the renderer is ready
 	mainWindow->show();
 
 	// --- Connect EventBus signals ---

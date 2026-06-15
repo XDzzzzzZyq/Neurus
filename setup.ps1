@@ -7,7 +7,7 @@
 # Usage: .\setup.ps1
 
 param(
-    [string]$VulkanSdkPath = "D:\VulkanSDK\1.4.350.0",
+    [string]$VulkanSdkPath = "D:\VulkanSDK\1.4.341.0",
     [string]$QtPath = "D:\Qt\6.11.1\msvc2022_64"
 )
 

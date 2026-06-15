@@ -48,6 +48,16 @@ endif()
 # Qt6 (window, QML, EventBus)
 find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml)
 
+# Locate windeployqt for DLL deployment (Windows only)
+if(WIN32)
+	find_program(WINDEPLOYQT windeployqt
+		HINTS "${Qt6_DIR}/../../../bin"  # e.g. D:/Qt/6.11.1/msvc2022_64/bin
+		DOC "Path to windeployqt executable"
+		REQUIRED
+	)
+	message(STATUS "Found windeployqt: ${WINDEPLOYQT}")
+endif()
+
 # ---------------------------------------------------------------------------
 # Shader Compilation (GLSL → SPIR-V → C header)
 # ---------------------------------------------------------------------------

@@ -1,7 +1,5 @@
 // Must define platform before including any Vulkan headers
 #define VK_USE_PLATFORM_WIN32_KHR
-// Suppress VK_HEADER_VERSION assertion (GPU driver DLL may differ from SDK headers)
-#define VULKAN_HPP_ASSERT(x) ((void)0)
 
 #include "VulkanContext.h"
 
@@ -100,6 +98,19 @@ void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 
 	vk::PhysicalDeviceFeatures features;
 	std::vector<const char*> devExts = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+	// VK_KHR_portability_subset is required when a profile layer simulates portability
+	// (e.g. VP_LUNARG_desktop_baseline). Check if supported and add to extensions.
+	auto availableDevExtensions = pd.enumerateDeviceExtensionProperties();
+	for (const auto& ext : availableDevExtensions)
+	{
+		if (strcmp(ext.extensionName, "VK_KHR_portability_subset") == 0)
+		{
+			devExts.push_back("VK_KHR_portability_subset");
+			break;
+		}
+	}
+
 	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &sync2);
 
 	m_device = std::make_unique<vk::raii::Device>(pd, devCI);

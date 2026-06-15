@@ -46,11 +46,14 @@ if(WIN32)
 		WIN32_EXECUTABLE $<IF:$<CONFIG:Debug>,FALSE,TRUE>
 	)
 
-	# Copy Vulkan SDK runtime DLL to output directory (ensures header version matches)
+	# Deploy Qt DLLs via windeployqt (handles Core, Gui, Qml, Quick and their dependencies)
 	add_custom_command(TARGET Neurus POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E copy_if_different
-			"$ENV{VULKAN_SDK}/Bin/vulkan-1.dll"
+		COMMAND "${WINDEPLOYQT}"
+			--no-opengl-sw
+			--no-system-d3d-compiler
+			--no-compiler-runtime
+			--verbose 0
 			$<TARGET_FILE_DIR:Neurus>
-		COMMENT "Copying vulkan-1.dll from SDK to ensure version match"
+		COMMENT "Deploying Qt DLLs via windeployqt"
 	)
 endif()

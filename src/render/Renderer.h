@@ -97,11 +97,11 @@ private:
 	vk::raii::CommandPool m_commandPool;
 	std::vector<vk::raii::CommandBuffer> m_commandBuffers;
 
-	// Synchronization — kMaxFramesInFlight concurrent frames
+	// Synchronization
 	static constexpr uint32_t kMaxFramesInFlight = 2;
-	std::vector<vk::raii::Semaphore> m_imageAvailableSemaphores;
-	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
-	std::vector<vk::raii::Fence> m_inFlightFences;
+	std::vector<vk::raii::Fence> m_inFlightFences;              // per-frame CPU-GPU sync
+	std::vector<vk::raii::Semaphore> m_imageAvailableSemaphores; // per-frame acquire
+	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores; // per-SWAPCHAIN-IMAGE (indexed by acquire result)
 	uint32_t m_currentFrame = 0;
 
 	// Current state

@@ -38,15 +38,15 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 		m_format,
 		vk::ColorSpaceKHR::eSrgbNonlinear,
 		m_extent,
-		1,  // Single array layer (no stereo rendering)
+		1,                                  // Single array layer (no stereo rendering)
 		vk::ImageUsageFlagBits::eColorAttachment,
-		vk::SharingMode::eExclusive,  // Single queue family for MVP
+		vk::SharingMode::eExclusive,        // Single queue family for MVP
 		{},
-		capabilities.currentTransform,                     // Use surface's transform
+		capabilities.currentTransform,      // Use surface's actual transform
 		vk::CompositeAlphaFlagBitsKHR::eOpaque,
 		presentMode,
-		VK_TRUE,  // clipped
-		nullptr   // old swapchain (null for initial creation)
+		VK_TRUE,                            // clipped
+		nullptr                             // old swapchain (null for initial creation)
 	);
 
 	m_swapchain = std::make_unique<vk::raii::SwapchainKHR>(device, swapchainCreateInfo);

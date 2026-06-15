@@ -23,16 +23,18 @@ Renderer::Renderer(const vk::raii::Device& device,
 
 	uint32_t imageCount = m_swapchain->imageCount();
 
-	// --- Create per-frame synchronization ---
+	// --- Per-frame fences + acquire semaphores (CPU-GPU sync) ---
 	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
 	{
-		m_imageAvailableSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
-		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 		m_inFlightFences.emplace_back(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+		m_imageAvailableSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 	}
 
-	// --- Create swapchain ---
-	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
+	// --- Per-swapchain-image render-finished semaphores (must be indexed by acquire imageIndex) ---
+	for (uint32_t i = 0; i < imageCount; ++i)
+	{
+		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+	}
 
 	// --- Create shader program ---
 	m_shaderProgram = std::make_unique<ShaderProgram>(device,
@@ -64,9 +66,8 @@ void Renderer::DrawFrame()
 {
 	auto& fence = m_inFlightFences[m_currentFrame];
 	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
-	auto& renderFinished = m_renderFinishedSemaphores[m_currentFrame];
 
-	// --- Wait for this frame slot to complete (ensures semaphores are safe to reuse) ---
+	// --- Wait for this frame slot's fence ---
 	if (m_device.waitForFences(*fence, VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
 	{
 		return;
@@ -77,14 +78,15 @@ void Renderer::DrawFrame()
 	uint32_t imageIndex = 0;
 	try
 	{
-		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
+		imageIndex = m_swapchain->AcquireNextImage(*imageAvailable);
 	}
 	catch (const std::runtime_error&)
 	{
 		return;
 	}
 
-	// --- Submit command buffer ---
+	// --- Submit: render-finished semaphore indexed by swapchain image (required by spec) ---
+	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 	vk::SubmitInfo submitInfo(
 		*imageAvailable,
@@ -95,16 +97,16 @@ void Renderer::DrawFrame()
 
 	m_graphicsQueue.submit(submitInfo, *fence);
 
-	// --- Present ---
+	// --- Present using same per-image render-finished semaphore ---
 	try
 	{
-		m_swapchain->Present(renderFinished, imageIndex);
+		m_swapchain->Present(*renderFinished, imageIndex);
 	}
 	catch (...)
 	{
 	}
 
-	// --- Advance to next frame slot ---
+	// --- Advance frame slot ---
 	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
 }
 
