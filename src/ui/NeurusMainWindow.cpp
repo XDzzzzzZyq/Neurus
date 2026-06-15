@@ -1,11 +1,14 @@
 #include "NeurusMainWindow.h"
 
 #include <QApplication>
-#include <QDockWidget>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QVBoxLayout>
+
+#include <DockManager.h>
+#include <DockWidget.h>
+#include <DockAreaWidget.h>
 
 namespace neurus {
 
@@ -15,38 +18,28 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	setWindowTitle("Neurus");
 	resize(1600, 900);
 
+	// Disable opaque splitter resize for better Vulkan window container behavior
+	ads::CDockManager::setConfigFlag(ads::CDockManager::OpaqueSplitterResize, false);
+	ads::CDockManager::setConfigFlag(ads::CDockManager::FocusHighlighting, true);
+
+	m_dockManager = new ads::CDockManager(this);
+
 	CreateDocks();
 	CreateMenus();
 }
 
 NeurusMainWindow::~NeurusMainWindow() = default;
 
-// --- Menu Bar ---
-
 void NeurusMainWindow::CreateMenus()
 {
-	// --- File Menu ---
 	auto* fileMenu = menuBar()->addMenu("&File");
-
 	auto* exitAction = fileMenu->addAction("E&xit");
 	exitAction->setShortcut(QKeySequence::Quit);
 	connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
 
-	// --- View Menu ---
-	auto* viewMenu = menuBar()->addMenu("&View");
-
-	const auto docks = findChildren<QDockWidget*>();
-	for (auto* dock : docks)
-	{
-		viewMenu->addAction(dock->toggleViewAction());
-	}
-
-	// --- Help Menu ---
 	auto* helpMenu = menuBar()->addMenu("&Help");
-
 	auto* aboutAction = helpMenu->addAction("&About Neurus");
-	connect(aboutAction, &QAction::triggered, this, [this]()
-	{
+	connect(aboutAction, &QAction::triggered, this, [this]() {
 		QMessageBox::about(this, "About Neurus",
 			"<h2>Neurus</h2>"
 			"<p>A C++20 Vulkan-HPP 1.4 real-time renderer.</p>"
@@ -54,77 +47,69 @@ void NeurusMainWindow::CreateMenus()
 	});
 }
 
-// --- Viewport Dock ---
-
-QDockWidget* NeurusMainWindow::createViewportDock(QWidget* vulkanWidget)
+// Helper: create a labeled placeholder widget
+static QWidget* makePlaceholder(const QString& text)
 {
-	auto* dock = new QDockWidget("Viewport", this);
-	dock->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
-	dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-	dock->setWidget(vulkanWidget);
-
-	// Add to right dock area
-	addDockWidget(Qt::RightDockWidgetArea, dock);
-
-	return dock;
+	auto* widget = new QWidget();
+	auto* layout = new QVBoxLayout(widget);
+	auto* label = new QLabel(text, widget);
+	label->setAlignment(Qt::AlignCenter);
+	QFont font = label->font();
+	font.setPointSize(14);
+	label->setFont(font);
+	layout->addWidget(label);
+	return widget;
 }
-
-// --- Dock Layout ---
 
 void NeurusMainWindow::CreateDocks()
 {
-	constexpr auto kDockFeatures = QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable;
+	// --- Left: Shader Editor ---
+	auto* shaderDock = new ads::CDockWidget(m_dockManager, "Shader Editor");
+	shaderDock->setWidget(makePlaceholder("Shader Editor"));
+	shaderDock->resize(280, 300);
+	shaderDock->setMinimumSize(200, 200);
+	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
 
-	// Helper: create a labeled placeholder widget inside a dock
-	auto makePlaceholder = [](QDockWidget* dock, const QString& text)
-	{
-		auto* widget = new QWidget(dock);
-		auto* layout = new QVBoxLayout(widget);
-		auto* label = new QLabel(text, widget);
-		label->setAlignment(Qt::AlignCenter);
-		layout->addWidget(label);
-		dock->setWidget(widget);
-	};
+	// --- Right: Outliner ---
+	auto* outlinerDock = new ads::CDockWidget(m_dockManager, "Outliner");
+	outlinerDock->setWidget(makePlaceholder("Outliner"));
+	outlinerDock->resize(280, 300);
+	outlinerDock->setMinimumSize(200, 200);
+	m_dockManager->addDockWidget(ads::RightDockWidgetArea, outlinerDock);
 
-	// --- Right dock: Outliner ---
-	auto* outlinerDock = new QDockWidget("Outliner", this);
-	outlinerDock->setFeatures(kDockFeatures);
-	outlinerDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-	makePlaceholder(outlinerDock, "Outliner");
-	addDockWidget(Qt::RightDockWidgetArea, outlinerDock);
+	// --- Right: Property Editor ---
+	auto* propDock = new ads::CDockWidget(m_dockManager, "Property Editor");
+	propDock->setWidget(makePlaceholder("Property Editor"));
+	propDock->resize(280, 300);
+	propDock->setMinimumSize(200, 200);
+	m_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
 
-	// --- Right dock: Property Editor ---
-	auto* propEditorDock = new QDockWidget("Property Editor", this);
-	propEditorDock->setFeatures(kDockFeatures);
-	propEditorDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-	makePlaceholder(propEditorDock, "Property Editor");
-	addDockWidget(Qt::RightDockWidgetArea, propEditorDock);
+	// --- Right: Render Config ---
+	auto* configDock = new ads::CDockWidget(m_dockManager, "Render Config");
+	configDock->setWidget(makePlaceholder("Render Config"));
+	configDock->resize(280, 300);
+	configDock->setMinimumSize(200, 200);
+	m_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
 
-	// --- Right dock: Render Config (tabified with Property Editor) ---
-	auto* renderConfigDock = new QDockWidget("Render Config", this);
-	renderConfigDock->setFeatures(kDockFeatures);
-	renderConfigDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-	makePlaceholder(renderConfigDock, "Render Config");
-	addDockWidget(Qt::RightDockWidgetArea, renderConfigDock);
-	tabifyDockWidget(propEditorDock, renderConfigDock);
+	// --- Bottom: Texture Viewer ---
+	auto* textureDock = new ads::CDockWidget(m_dockManager, "Texture Viewer");
+	textureDock->setWidget(makePlaceholder("Texture Viewer"));
+	textureDock->resize(300, 200);
+	textureDock->setMinimumSize(200, 150);
+	m_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
+}
 
-	// --- Left dock: Shader Editor ---
-	auto* shaderEditorDock = new QDockWidget("Shader Editor", this);
-	shaderEditorDock->setFeatures(kDockFeatures);
-	shaderEditorDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
-	makePlaceholder(shaderEditorDock, "Shader Editor");
-	addDockWidget(Qt::LeftDockWidgetArea, shaderEditorDock);
+ads::CDockWidget* NeurusMainWindow::createViewportDock(QWidget* viewportWidget)
+{
+	auto* dock = new ads::CDockWidget(m_dockManager, "Viewport");
+	dock->setWidget(viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+	dock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
 
-	// --- Bottom dock: Texture Viewer ---
-	auto* textureViewerDock = new QDockWidget("Texture Viewer", this);
-	textureViewerDock->setFeatures(kDockFeatures);
-	textureViewerDock->setAllowedAreas(Qt::BottomDockWidgetArea | Qt::TopDockWidgetArea);
-	makePlaceholder(textureViewerDock, "Texture Viewer");
-	addDockWidget(Qt::BottomDockWidgetArea, textureViewerDock);
+	// Set as central widget — fills the space between left and right docks
+	auto* centralArea = m_dockManager->setCentralWidget(dock);
+	centralArea->setAllowedAreas(ads::OuterDockAreas);
 
-	// Raise the first dock in each tab group to be the visible one
-	propEditorDock->raise();
-	shaderEditorDock->raise();
+	return dock;
 }
 
 } // namespace neurus

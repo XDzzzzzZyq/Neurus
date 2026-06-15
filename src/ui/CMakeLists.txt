@@ -18,6 +18,7 @@ target_link_libraries(neurus_ui PUBLIC
 	Qt6::Widgets
 	Vulkan::Vulkan
 	neurus_editor
+	ads::qtadvanceddocking-qt6
 )
 
 target_include_directories(neurus_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)

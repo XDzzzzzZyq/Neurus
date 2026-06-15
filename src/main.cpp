@@ -21,7 +21,7 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 
 #include <QApplication>
-#include <QDockWidget>
+#include <DockWidget.h>
 #include <QVulkanWindow>
 #include <QTimer>
 
@@ -58,8 +58,8 @@ int main(int argc, char* argv[])
 	std::unique_ptr<neurus::Renderer> renderer;
 	std::unique_ptr<vk::raii::SurfaceKHR> surface;
 	std::unique_ptr<QVulkanInstance> qVkInstance;
-	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport QDockWidget
-	QDockWidget* viewportDock = nullptr;           // Saved for later widget swap
+	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport CDockWidget
+	ads::CDockWidget* viewportDock = nullptr;       // Saved for later widget swap
 
 	try
 	{
@@ -140,7 +140,7 @@ int main(int argc, char* argv[])
 	QWidget* viewportContainer = QWidget::createWindowContainer(vulkanWindow);
 
 	// Replace the old VulkanWidget in the viewport dock with the QVulkanWindow container
-	viewportDock->setWidget(viewportContainer);
+	viewportDock->setWidget(viewportContainer, ads::CDockWidget::ForceNoScrollArea);
 
 	// --- Connect EventBus signals ---
 	QObject::connect(&bus, &neurus::EventBus::renderRequested,

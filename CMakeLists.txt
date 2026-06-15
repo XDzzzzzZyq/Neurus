@@ -45,8 +45,13 @@ if(NOT Vulkan_FOUND)
 	message(FATAL_ERROR "Vulkan SDK not found. Set VULKAN_SDK environment variable.")
 endif()
 
+# Qt-Advanced-Docking-System (submodule)
+set(ADS_VERSION "4.5.0")
+set(BUILD_EXAMPLES OFF)
+add_subdirectory(dep/qtadvanceddocking)
+
 # Qt6 (window, QML, EventBus)
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick Qml Widgets Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate Quick Qml Widgets Test)
 
 # Locate windeployqt for DLL deployment (Windows only)
 if(WIN32)
