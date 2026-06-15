@@ -70,6 +70,7 @@ make test
 - GPU tests require a Vulkan 1.4-capable device
 - Run all tests: `cd build/debug && ctest --output-on-failure`
 - Run a single test: `cd build/debug && ctest -R EventBus_Singleton`
+- On local machine, launch `Neurus.exe` to check any runtime error.
 
 **Lint / format:**
 - No repo-wide formatter configured.

@@ -48,6 +48,9 @@ target_include_directories(Neurus PRIVATE
 	${CMAKE_BINARY_DIR}/generated/shaders
 )
 
+# ADS_STATIC: tell Qt-Advanced-Docking-System headers to use static linkage
+target_compile_definitions(Neurus PRIVATE ADS_STATIC)
+
 # Windows: mark as GUI application (no console window in Release)
 if(WIN32)
 	set_target_properties(Neurus PROPERTIES

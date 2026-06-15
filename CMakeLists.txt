@@ -48,6 +48,7 @@ endif()
 # Qt-Advanced-Docking-System (submodule)
 set(ADS_VERSION "4.5.0")
 set(BUILD_EXAMPLES OFF)
+set(BUILD_STATIC ON)       # Static library — no DLL deployment needed
 add_subdirectory(dep/qtadvanceddocking)
 
 # Qt6 (window, QML, EventBus)
