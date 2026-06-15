@@ -1,20 +1,32 @@
 # Patches a Visual Studio .sln file to set a specific project as the default startup.
-# Usage: cmake\SetVSStartup.ps1 <slnPath> <projectName>
+# Usage: powershell -File cmake\SetVSStartup.ps1 -SlnPath <path> [-ProjectName Neurus]
 param([string]$SlnPath, [string]$ProjectName = "Neurus")
 
-$sln = Get-Content $SlnPath -Raw
-if (-not $sln) { Write-Error "Cannot read $SlnPath"; exit 1 }
+$lines = @(Get-Content $SlnPath -Encoding UTF8)
+if (-not $lines) { Write-Error "Cannot read $SlnPath"; exit 1 }
 
-# Extract project GUID
-$match = [regex]::Match($sln, "Project\(.+?\)\s*=\s*`"$ProjectName`",\s*`"[^`"]+`",\s*`"\{([A-F0-9-]+)\}`"")
-if (-not $match.Success) { Write-Error "Project '$ProjectName' not found in solution"; exit 1 }
+# Extract project GUID from line like: Project("{...}") = "Neurus", "src\Neurus.vcxproj", "{GUID}"
+$guid = $null
+foreach ($line in $lines) {
+    if ($line -match "Project\(.+?\)\s*=\s*`"$ProjectName`",\s*`"[^`"]+`",\s*`"\{([A-F0-9-]+)\}`"") {
+        $guid = $Matches[1]
+        break
+    }
+}
+if (-not $guid) { Write-Error "Project '$ProjectName' not found in solution"; exit 1 }
 
-$guid = $match.Groups[1].Value
+# Find the Global section and insert SolutionProperties before NestedProjects
+$out = [System.Collections.ArrayList]::new()
+foreach ($line in $lines) {
+    if ($line -match "^\tGlobalSection\(NestedProjects\)") {
+        # Insert SolutionProperties section before NestedProjects
+        [void]$out.Add("`tGlobalSection(SolutionProperties) = preSolution")
+        [void]$out.Add("`t`tHideSolutionNode = FALSE")
+        [void]$out.Add("`t`tStartupProject = {$guid}")
+        [void]$out.Add("`tEndGlobalSection")
+    }
+    [void]$out.Add($line)
+}
 
-# Insert GlobalSection(SolutionProperties) before GlobalSection(NestedProjects)
-$section = "`tGlobalSection(SolutionProperties) = preSolution`r`n`t`tHideSolutionNode = FALSE`r`n`t`tStartupProject = {$guid}`r`n`tEndGlobalSection`r`n"
-
-$sln = $sln -replace "(?=`tGlobalSection\(NestedProjects\))", $section
-
-Set-Content $SlnPath -Value $sln -NoNewline
+[System.IO.File]::WriteAllLines($SlnPath, $out, [System.Text.UTF8Encoding]::new($false))
 Write-Output "  Set '$ProjectName' ({$guid}) as VS startup project"
