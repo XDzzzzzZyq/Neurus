@@ -120,11 +120,15 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 
 	m_images = m_swapchain->getImages();
 	m_imageViews = createImageViews(m_device, *m_swapchain, m_format);
+
+	++m_generation;
 }
 
 uint32_t Swapchain::AcquireNextImage(const vk::raii::Semaphore& signalSemaphore)
 {
-	// A timeout of UINT64_MAX disables the timeout
+	// UINT64_MAX disables the timeout — the call blocks until an image is
+	// available. This is safe because waitForFences (in DrawFrame) uses a
+	// finite timeout and processEvents() keeps the Qt event loop responsive.
 	auto [result, imageIndex] = m_swapchain->acquireNextImage(
 		UINT64_MAX, *signalSemaphore, nullptr);
 
@@ -144,7 +148,7 @@ uint32_t Swapchain::AcquireNextImage(const vk::raii::Semaphore& signalSemaphore)
 	return imageIndex;
 }
 
-void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t imageIndex)
+void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t imageIndex, vk::Queue presentQueue)
 {
 	vk::PresentInfoKHR presentInfo(
 		*waitSemaphore,
@@ -152,7 +156,7 @@ void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t image
 		imageIndex
 	);
 
-	auto result = m_device.getQueue(0, 0).presentKHR(presentInfo);
+	auto result = presentQueue.presentKHR(presentInfo);
 
 	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
 	{

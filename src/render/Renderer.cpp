@@ -68,11 +68,13 @@ void Renderer::DrawFrame()
 	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
 
 	// --- Wait for this frame slot's fence ---
-	if (m_device.waitForFences(*fence, VK_TRUE, UINT64_MAX) != vk::Result::eSuccess)
+	// Use a finite timeout so the main thread is never blocked indefinitely.
+	// On timeout, skip this frame — the GPU hasn't finished the previous frame
+	// for this slot, and Qt needs time to process window events.
+	if (m_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
 		return;
 	}
-	m_device.resetFences(*fence);
 
 	// --- Acquire next swapchain image ---
 	uint32_t imageIndex = 0;
@@ -82,7 +84,43 @@ void Renderer::DrawFrame()
 	}
 	catch (const std::runtime_error&)
 	{
+		// Acquire failed — do NOT reset the fence so it remains signaled
+		// for the next iteration. m_currentFrame is intentionally NOT advanced.
 		return;
+	}
+
+	// Only reset the fence AFTER acquire succeeds.
+	// If acquire failed above, the fence stays signaled to avoid a deadlock
+	// where a reset-but-never-submitted fence blocks the main thread forever.
+	m_device.resetFences(*fence);
+
+	// --- Re-record command buffers if swapchain was recreated ---
+	if (m_swapchain->generation() != m_swapchainGeneration)
+	{
+		// Resize render-finished semaphores to match new image count
+		uint32_t newImageCount = m_swapchain->imageCount();
+		m_renderFinishedSemaphores.clear();
+		for (uint32_t i = 0; i < newImageCount; ++i)
+		{
+			m_renderFinishedSemaphores.emplace_back(m_device, vk::SemaphoreCreateInfo());
+		}
+
+		// Re-record ALL command buffers with the current swapchain image views
+		// (must free and reallocate if image count changed)
+		m_commandBuffers.clear();
+		vk::CommandBufferAllocateInfo allocInfo(
+			*m_commandPool,
+			vk::CommandBufferLevel::ePrimary,
+			newImageCount
+		);
+		m_commandBuffers = vk::raii::CommandBuffers(m_device, allocInfo);
+
+		for (uint32_t i = 0; i < newImageCount; ++i)
+		{
+			recordCommandBuffer(*m_commandBuffers[i], i);
+		}
+
+		m_swapchainGeneration = m_swapchain->generation();
 	}
 
 	// --- Submit: render-finished semaphore indexed by swapchain image (required by spec) ---
@@ -100,7 +138,7 @@ void Renderer::DrawFrame()
 	// --- Present using same per-image render-finished semaphore ---
 	try
 	{
-		m_swapchain->Present(renderFinished, imageIndex);
+		m_swapchain->Present(renderFinished, imageIndex, m_graphicsQueue);
 	}
 	catch (...)
 	{

@@ -62,8 +62,9 @@ public:
 	 * @brief Presents the rendered image to the surface.
 	 * @param waitSemaphore Semaphore to wait on before presentation.
 	 * @param imageIndex Index of the image to present (from AcquireNextImage).
+	 * @param presentQueue The queue to use for presentation (must be present-capable).
 	 */
-	void Present(const vk::raii::Semaphore& waitSemaphore, uint32_t imageIndex);
+	void Present(const vk::raii::Semaphore& waitSemaphore, uint32_t imageIndex, vk::Queue presentQueue);
 
 	/** @brief Current swapchain extent (width × height). */
 	vk::Extent2D extent() const { return m_extent; }
@@ -79,6 +80,9 @@ public:
 
 	/** @brief The swapchain image format. */
 	vk::Format format() const { return m_format; }
+
+	/** @brief Monotonically increasing generation counter. Incremented on each Recreate(). */
+	uint32_t generation() const { return m_generation; }
 
 private:
 	/**
@@ -120,6 +124,7 @@ private:
 	vk::Format m_format = vk::Format::eB8G8R8A8Srgb;
 	vk::Extent2D m_extent = {800, 600};
 	uint32_t m_imageCount = 0;
+	uint32_t m_generation = 0;
 
 	uint32_t m_recreateWidth = 800;
 	uint32_t m_recreateHeight = 600;

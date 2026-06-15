@@ -99,6 +99,7 @@ private:
 
 	// Synchronization
 	static constexpr uint32_t kMaxFramesInFlight = 2;
+	static constexpr uint64_t kFenceTimeoutNs = 100'000'000;  // 100ms — finite timeout prevents main-thread deadlock
 	std::vector<vk::raii::Fence> m_inFlightFences;              // per-frame CPU-GPU sync
 	std::vector<vk::raii::Semaphore> m_imageAvailableSemaphores; // per-frame acquire
 	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores; // per-SWAPCHAIN-IMAGE (indexed by acquire result)
@@ -107,6 +108,7 @@ private:
 	// Current state
 	uint32_t m_width = 800;
 	uint32_t m_height = 600;
+	uint32_t m_swapchainGeneration = 0;
 };
 
 } // namespace neurus
