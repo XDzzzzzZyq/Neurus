@@ -1,12 +1,18 @@
 # src/render/CMakeLists.txt — Renderer Layer
 
 add_library(neurus_render STATIC
+	MeshData.h
+	MeshData.cpp
 	VulkanContext.h
 	VulkanContext.cpp
 	Swapchain.h
 	Swapchain.cpp
 	ShaderProgram.h
 	ShaderProgram.cpp
+	ShaderModule.h
+	ShaderModule.cpp
+	ShaderLib.h
+	ShaderLib.cpp
 	Renderer.h
 	Renderer.cpp
 	QVulkanRenderer.h

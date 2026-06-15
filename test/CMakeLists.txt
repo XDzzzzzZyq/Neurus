@@ -4,6 +4,8 @@ add_executable(neurus_test
 	test_main.cpp
 	render/test_vulkan_context.cpp
 	render/test_shader_program.cpp
+	render/test_meshdata.cpp
+	render/test_shader_module.cpp
 	render/test_swapchain.cpp
 	render/test_renderer.cpp
 	editor/test_event_bus.cpp
