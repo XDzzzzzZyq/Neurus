@@ -21,6 +21,8 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 
 #include <QApplication>
+#include <QDockWidget>
+#include <QVulkanWindow>
 #include <QTimer>
 
 #include <windows.h>
@@ -31,6 +33,7 @@
 #include "editor/EventBus.h"
 #include "ui/NeurusMainWindow.h"
 #include "ui/VulkanWidget.h"
+#include "ui/VulkanWindow.h"
 #include "render/VulkanContext.h"
 #include "render/Renderer.h"
 
@@ -54,7 +57,9 @@ int main(int argc, char* argv[])
 	std::unique_ptr<neurus::VulkanContext> vkContext;
 	std::unique_ptr<neurus::Renderer> renderer;
 	std::unique_ptr<vk::raii::SurfaceKHR> surface;
+	std::unique_ptr<QVulkanInstance> qVkInstance;
 	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport QDockWidget
+	QDockWidget* viewportDock = nullptr;           // Saved for later widget swap
 
 	try
 	{
@@ -66,7 +71,7 @@ int main(int argc, char* argv[])
 		//         VulkanWidget provides the native HWND for Vulkan surface creation.
 		mainWindow = std::make_unique<neurus::NeurusMainWindow>();
 		vulkanWidget = new neurus::VulkanWidget();
-		mainWindow->createViewportDock(vulkanWidget);
+		viewportDock = mainWindow->createViewportDock(vulkanWidget);
 
 		// Set explicit initial size before native window creation.
 		// Without this, QWidget::width()/height() return default values
@@ -122,6 +127,20 @@ int main(int argc, char* argv[])
 	}
 
 	// Window was shown earlier (before surface/swapchain creation) — no need to show again
+
+	// --- QVulkanWindow-based rendering (parallel path) ---
+	qVkInstance = std::make_unique<QVulkanInstance>();
+	qVkInstance->setLayers({ "VK_LAYER_KHRONOS_validation" });
+	if (!qVkInstance->create())
+		qFatal("Failed to create QVulkanInstance");
+
+	auto* vulkanWindow = new VulkanWindow(qVkInstance.get(),
+		triangle_vert_spv, triangle_vert_spv_size,
+		triangle_frag_spv, triangle_frag_spv_size);
+	QWidget* viewportContainer = QWidget::createWindowContainer(vulkanWindow);
+
+	// Replace the old VulkanWidget in the viewport dock with the QVulkanWindow container
+	viewportDock->setWidget(viewportContainer);
 
 	// --- Connect EventBus signals ---
 	QObject::connect(&bus, &neurus::EventBus::renderRequested,
