@@ -33,6 +33,7 @@ target_link_libraries(Neurus PRIVATE
 	Qt6::Core
 	Qt6::Quick
 	Qt6::Qml
+	Qt6::Widgets
 )
 
 target_include_directories(Neurus PRIVATE

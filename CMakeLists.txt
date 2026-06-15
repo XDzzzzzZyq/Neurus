@@ -46,7 +46,7 @@ if(NOT Vulkan_FOUND)
 endif()
 
 # Qt6 (window, QML, EventBus)
-find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml)
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Qml Widgets)
 
 # Locate windeployqt for DLL deployment (Windows only)
 if(WIN32)

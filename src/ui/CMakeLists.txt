@@ -9,6 +9,7 @@ target_link_libraries(neurus_ui PUBLIC
 	Qt6::Core
 	Qt6::Quick
 	Qt6::Qml
+	Qt6::Widgets
 	Vulkan::Vulkan
 	neurus_editor
 )
