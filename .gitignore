@@ -81,8 +81,3 @@ temp/
 
 # Plan drafts and metafiles
 .omo/
-
-# Dependencies (populated by git submodule update --init)
-dep/
-!dep/Vulkan-Hpp/
-!dep/Vulkan-Hpp/README.md
