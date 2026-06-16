@@ -1,8 +1,6 @@
 # src/render/CMakeLists.txt — Renderer Layer
 
 add_library(neurus_render STATIC
-	MeshData.h
-	MeshData.cpp
 	VulkanContext.h
 	VulkanContext.cpp
 	Swapchain.h
