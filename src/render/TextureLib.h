@@ -28,6 +28,9 @@ namespace neurus {
 class TextureLib
 {
 public:
+	/** @brief Shared pointer to a Texture (convenience alias). */
+	using TextureRes = std::shared_ptr<Texture>;
+
 	/**
 	 * @brief Loads (or retrieves from cache) a texture from a file path.
 	 *

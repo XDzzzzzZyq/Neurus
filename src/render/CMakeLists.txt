@@ -27,6 +27,8 @@ add_library(neurus_render STATIC
 	TextureLib.cpp
 	Renderer.h
 	Renderer.cpp
+	Material.h
+	Material.cpp
 	QVulkanRenderer.h
 	QVulkanRenderer.cpp
 )

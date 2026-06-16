@@ -12,6 +12,7 @@ add_executable(neurus_test
 	render/test_vulkanimage.cpp
 	render/test_renderer.cpp
 	render/test_texture.cpp
+	render/test_material.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
 	editor/test_event_bus_typed.cpp
