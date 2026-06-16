@@ -14,15 +14,14 @@ The project is in its INITIALIZATION phase. The current deliverable is a
 working colored RGB triangle rendered via the full four-layer architecture.
 
 **In scope:**
-- Vulkan-HPP RAII instance, device, swapchain, pipeline (vk::raii path kept as reference)
-- QVulkanWindow-based triangle rendering (primary rendering path for MVP)
-- VK_KHR_dynamic_rendering (vk::raii path) + traditional render pass (QVulkanWindow path)
+- Vulkan-HPP RAII instance, device, swapchain, pipeline
+- VK_KHR_dynamic_rendering for render passes
 - Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
 - Viewport as dockable central widget via ADS `CenterDockWidgetArea`
 - Docks: Shader Editor (left), Viewport (center), Outliner + Properties + Render Config (right), Texture Viewer (bottom)
 - Qt Signals/Slots UIEvents singleton (UI↔Editor)
 - Typed EventBus (EventPool) for Editor↔Renderer event dispatch
-- Swapchain recreation on window resize (both paths)
+- Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
 - Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
@@ -243,9 +242,8 @@ Neurus/
 │   └── qtadvanceddocking/  # Qt-Advanced-Docking-System (ADS)
 ├── res/shaders/            # GLSL shader source files
 ├── src/
-│   ├── render/             # Renderer layer (Vulkan-HPP + QVulkanWindow)
-│   │   ├── QVulkanRenderer.h/cpp  # QVulkanWindowRenderer (primary path)
-│   │   ├── Renderer.h/cpp         # vk::raii path (reference)
+│   ├── render/             # Renderer layer (Vulkan-HPP)
+│   │   ├── DeferredRenderer.h/cpp # Deferred PBR pipeline (active renderer)
 │   │   ├── ShaderProgram.h/cpp
 │   │   ├── Swapchain.h/cpp
 │   │   └── VulkanContext.h/cpp
@@ -258,7 +256,6 @@ Neurus/
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager
-│   │   ├── VulkanWindow.h/cpp     # QVulkanWindow subclass
 │   │   ├── MainWindow.h/cpp       # (legacy QWindow subclass)
 │   │   ├── VulkanWidget.h/cpp     # (legacy vk::raii widget)
 │   │   └── qml/            # QML source files (legacy)

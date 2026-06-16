@@ -7,8 +7,6 @@ add_library(neurus_ui STATIC
 	NeurusMainWindow.cpp
 	VulkanWidget.h
 	VulkanWidget.cpp
-	VulkanWindow.h
-	VulkanWindow.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC

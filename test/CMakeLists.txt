@@ -13,7 +13,6 @@ add_executable(neurus_test
 	render/test_vulkanimage.cpp
 	render/test_descriptor.cpp
 	render/test_compute_pipeline.cpp
-	render/test_renderer.cpp
 	render/test_texture.cpp
 	render/test_material.cpp
 	render/test_pipeline.cpp

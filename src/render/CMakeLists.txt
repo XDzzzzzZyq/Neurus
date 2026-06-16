@@ -32,14 +32,10 @@ add_library(neurus_render STATIC
 	Texture.cpp
 	TextureLib.h
 	TextureLib.cpp
-	Renderer.h
-	Renderer.cpp
 	PipelineBuilder.h
 	PipelineBuilder.cpp
 	Material.h
 	Material.cpp
-	QVulkanRenderer.h
-	QVulkanRenderer.cpp
 	RenderPassManager.h
 	RenderPassManager.cpp
 	GeometryPass.h
