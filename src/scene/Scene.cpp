@@ -76,8 +76,15 @@ Camera* Scene::GetActiveCamera()
 
 void Scene::UpdateObjTransforms()
 {
-	// Stub — will be implemented when scene object hierarchy exists.
-	// Future: iterate obj_list, propagate parent transforms to children.
+	for (auto& [id, obj] : obj_list)
+	{
+		void* transformVoid = obj->GetTransform();
+		if (transformVoid)
+		{
+			auto* t3d = static_cast<Transform3D*>(transformVoid);
+			t3d->GetModelMatrix(); // Force cached matrix recomputation if dirty.
+		}
+	}
 }
 
 } // namespace neurus

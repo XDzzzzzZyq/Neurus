@@ -24,9 +24,6 @@
  *
  * @note Inheritance: Scene inherits UID for unique scene identifier.
  * @note Thread-safety: Not thread-safe. Access from main thread only.
- * @note Forward-declared types (Camera, Mesh, etc.) are defined in their
- *       respective headers. Registration methods are inline to defer
- *       template instantiation until complete types are available.
  */
 
 #pragma once
@@ -36,17 +33,15 @@
 
 #include "UID.h"
 
+#include "Camera.h"
+#include "DebugLine.h"
+#include "DebugPoints.h"
+#include "Light.h"
+#include "Mesh.h"
+#include "Sprite.h"
+
 namespace neurus
 {
-
-// --- Forward declarations (scene object types) ---------------------------
-
-class Camera;
-class Mesh;
-class Light;
-class Sprite;
-class DebugLine;
-class DebugPoints;
 
 /**
  * @brief Container for all scene objects and scene-wide state.
@@ -278,14 +273,12 @@ private:
 	 * @param obj Shared pointer to the object.
 	 * @param typePool Type-specific pool to register in.
 	 * @note Uses shared_ptr aliasing constructor to store the base ObjectID* in
-	 *       obj_list while sharing ownership with the typed shared_ptr. This avoids
-	 *       requiring the complete type definition at header parse time — the
-	 *       template is only instantiated at call sites where T is complete.
+	 *       obj_list while sharing ownership with the typed shared_ptr.
 	 */
 	template<typename T>
 	void RegisterObject(Resource<T> obj, ResPool<T>& typePool)
 	{
-		auto* basePtr = reinterpret_cast<ObjectID*>(obj.get());
+		auto* basePtr = static_cast<ObjectID*>(obj.get());
 		int id = basePtr->GetObjectID();
 		typePool[id] = obj;
 		obj_list[id] = Resource<ObjectID>(obj, basePtr);

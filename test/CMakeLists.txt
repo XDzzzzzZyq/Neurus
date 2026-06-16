@@ -32,6 +32,7 @@ add_executable(neurus_test
 	scene/test_light.cpp
 	scene/test_sprite.cpp
 	scene/test_scene.cpp
+	scene/test_scene_integration.cpp
 	scene/test_debug.cpp
 )
 
