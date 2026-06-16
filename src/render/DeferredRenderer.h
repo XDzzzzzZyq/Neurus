@@ -1,6 +1,6 @@
 /**
  * @file DeferredRenderer.h
- * @brief Deferred rendering pipeline — GeometryPass → LightingPass → composite to swapchain.
+ * @brief Deferred rendering pipeline - GeometryPass → LightingPass → composite to swapchain.
  *
  * DeferredRenderer owns the full deferred pipeline and all scene GPU resources:
  *   - Swapchain management (reuses neurus::Swapchain)

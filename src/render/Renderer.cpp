@@ -2,6 +2,10 @@
 #include "Swapchain.h"
 #include "shaders/ShaderProgram.h"
 
+#include "Log.h"
+
+#include <iostream>
+
 namespace neurus {
 
 Renderer::Renderer(const vk::raii::Device& device,
@@ -54,6 +58,11 @@ Renderer::Renderer(const vk::raii::Device& device,
 	{
 		recordCommandBuffer(*m_commandBuffers[i], i);
 	}
+
+	NEURUS_LOG("[Renderer] " << m_width << "x" << m_height
+	          << " swapchainImages=" << imageCount
+	          << " vertSpvSize=" << vertSize
+	          << " fragSpvSize=" << fragSize);
 }
 
 Renderer::~Renderer()
@@ -69,7 +78,7 @@ void Renderer::DrawFrame()
 
 	// --- Wait for this frame slot's fence ---
 	// Use a finite timeout so the main thread is never blocked indefinitely.
-	// On timeout, skip this frame — the GPU hasn't finished the previous frame
+	// On timeout, skip this frame - the GPU hasn't finished the previous frame
 	// for this slot, and Qt needs time to process window events.
 	if (m_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
@@ -82,12 +91,13 @@ void Renderer::DrawFrame()
 	{
 		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
 	}
-	catch (const std::runtime_error&)
-	{
-		// Acquire failed — do NOT reset the fence so it remains signaled
-		// for the next iteration. m_currentFrame is intentionally NOT advanced.
-		return;
-	}
+		catch (const std::exception& e)
+		{
+			NEURUS_ERR("AcquireNextImage failed: " << e.what());
+			// do NOT reset the fence so it remains signaled
+			// for the next iteration. m_currentFrame is intentionally NOT advanced.
+			return;
+		}
 
 	// Only reset the fence AFTER acquire succeeds.
 	// If acquire failed above, the fence stays signaled to avoid a deadlock
@@ -107,6 +117,8 @@ void Renderer::DrawFrame()
 
 		// Re-record ALL command buffers with the current swapchain image views
 		// (must free and reallocate if image count changed)
+		// WaitIdle ensures no command buffer is still in-flight on the GPU.
+		WaitIdle();
 		m_commandBuffers.clear();
 		vk::CommandBufferAllocateInfo allocInfo(
 			*m_commandPool,
@@ -140,8 +152,9 @@ void Renderer::DrawFrame()
 	{
 		m_swapchain->Present(renderFinished, imageIndex, m_graphicsQueue);
 	}
-	catch (...)
+	catch (const std::exception& e)
 	{
+		NEURUS_ERR("Present failed: " << e.what());
 	}
 
 	// --- Advance frame slot ---

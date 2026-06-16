@@ -75,7 +75,7 @@ make test
 - GPU tests require a Vulkan 1.4-capable device
 - Run all tests: `cd build/debug && ctest --output-on-failure`
 - Run a single test: `cd build/debug && ctest -R UIEvents_Singleton`
-- On local machine, launch `Neurus.exe` to check any runtime error.
+- On local machine, launch `Neurus.exe` to check the terminal output and any runtime error.
 
 **Lint / format:**
 - No repo-wide formatter configured.
@@ -179,12 +179,32 @@ CODE STYLE GUIDELINES
 - Use `const` for non-mutating methods and references.
 - Renderer receives `const` scene/context data.
 
-**Error handling:**
-- Debug builds: enable `VK_LAYER_KHRONOS_validation`.
-- Use assertions for precondition violations.
+**Error handling (Karpathy Guidelines):**
+- Follow the four Karpathy principles below. No deviation.
+- **Never use try-catch to hide or swallow errors.** Every catch block MUST
+  either re-throw (with enhanced message) or print the error.
+  Silent `catch (...) {}` is forbidden.
+- Use `catch (const std::exception& e)` and `NEURUS_ERR(e.what())` when
+  recovery is legitimate (e.g., swapchain out-of-date, acquire failure).
+- `assert()` for precondition violations (debug-only). Do not use try-catch for
+  logic flow.
 - Handle `VK_ERROR_DEVICE_LOST` and `VK_ERROR_OUT_OF_DATE_KHR` as normal
-  lifecycle events (not crashes).
-- Early return on invalid state.
+  lifecycle events - print the error, then recover.
+- Early return on invalid state after printing the reason.
+
+**Debug printing (Karpathy Guidelines):**
+- Use the `NEURUS_LOG` / `NEURUS_ERR` macros from `core/Log.h` - they
+  automatically inject `[func:line]` prefix for traceability:
+  ```cpp
+  NEURUS_LOG("[Swapchain] " << extent.width << "x" << extent.height);
+  NEURUS_ERR("Texture::createFromPixelData failed: " << e.what());
+  ```
+- `NEURUS_LOG` - debug-only info output (`std::cout`). Compiles to nothing in
+  Release. Use for constructor diagnostics, key parameters, lifecycle events.
+- `NEURUS_ERR` - always-on error output (`std::cerr`). Active in all builds.
+  Use in catch blocks and unrecoverable error paths.
+- Always print debug information in constructors of large classes (Swapchain,
+  DeferredRenderer, etc.) - dimension, image count, format, key parameters.
 
 **Comments / documentation:**
 - Doxygen-style on all public APIs:

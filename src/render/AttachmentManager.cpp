@@ -1,5 +1,7 @@
 #include "AttachmentManager.h"
 
+#include "Log.h"
+
 #include <stdexcept>
 
 namespace neurus {
@@ -35,6 +37,10 @@ void AttachmentManager::Create(const vk::Extent2D extent)
 	createAttachment(AttachmentName::HDRColor);
 	createAttachment(AttachmentName::SSAO);
 	createAttachment(AttachmentName::SSR);
+
+	NEURUS_LOG("[AttachmentManager] extent=" << m_extent.width << "x" << m_extent.height
+	          << " attachments=8"
+	          << " (position, normal, albedo, metallicRoughness, depth, hdrColor, ssao, ssr)");
 }
 
 void AttachmentManager::Resize(const vk::Extent2D extent)
@@ -97,17 +103,17 @@ bool AttachmentManager::HasAttachment(const AttachmentName name) const
 AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const AttachmentName name)
 {
 	// Common usage for color attachments:
-	//   COLOR_ATTACHMENT — written by fragment shader
-	//   SAMPLED          — read by subsequent passes (deferred shading, post-FX)
-	//   TRANSFER_SRC     — screenshot capture (T24a), debug readback
+	//   COLOR_ATTACHMENT - written by fragment shader
+	//   SAMPLED          - read by subsequent passes (deferred shading, post-FX)
+	//   TRANSFER_SRC     - screenshot capture (T24a), debug readback
 	constexpr vk::ImageUsageFlags kColorAttachmentUsage =
 		vk::ImageUsageFlagBits::eColorAttachment |
 		vk::ImageUsageFlagBits::eSampled |
 		vk::ImageUsageFlagBits::eTransferSrc;
 
 	// Depth attachment usage:
-	//   DEPTH_STENCIL_ATTACHMENT — written by depth test
-	//   SAMPLED                  — read by SSAO, SSR, etc.
+	//   DEPTH_STENCIL_ATTACHMENT - written by depth test
+	//   SAMPLED                  - read by SSAO, SSR, etc.
 	constexpr vk::ImageUsageFlags kDepthAttachmentUsage =
 		vk::ImageUsageFlagBits::eDepthStencilAttachment |
 		vk::ImageUsageFlagBits::eSampled;

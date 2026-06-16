@@ -1,5 +1,7 @@
 #include "MeshData.h"
 
+#include "Log.h"
+
 #include <algorithm>
 #include <cmath>
 #include <fstream>
@@ -202,8 +204,8 @@ void MeshData::AddFace(const std::vector<std::string>& faceTokens,
 				glm::vec2 uv = (ui >= 0) ? texCoords[ui] : glm::vec2(0.0f);
 
 				WriteVertex(m_meshData.dataArray, pos, norm, uv,
-				            glm::vec3(0.0f),   // tangent — computed later
-				            glm::vec3(0.0f));  // bitangent — computed later
+				            glm::vec3(0.0f),   // tangent - computed later
+				            glm::vec3(0.0f));  // bitangent - computed later
 
 				m_meshData.indexArray.push_back(newIdx);
 			}
@@ -282,7 +284,7 @@ void MeshData::ComputeTangents()
 		}
 		else
 		{
-			// Degenerate UVs — fallback to edge direction
+			// Degenerate UVs - fallback to edge direction
 			if (glm::length(edge1) > 0.0f)
 				tangent = glm::normalize(edge1);
 		}
@@ -326,11 +328,22 @@ bool MeshData::LoadObj(const std::string& path)
 {
 	std::ifstream file(path);
 	if (!file.is_open())
+	{
+		NEURUS_ERR("MeshData::LoadObj failed to open: " << path);
 		return false;
+	}
 
 	std::stringstream buffer;
 	buffer << file.rdbuf();
-	return LoadObjFromString(buffer.str());
+	bool ok = LoadObjFromString(buffer.str());
+	if (ok)
+	{
+		NEURUS_LOG("[MeshData] loaded '" << m_meshData.name
+		          << "' from " << path
+		          << " — " << GetVertexCount() << " verts, "
+		          << GetIndexCount() << " indices");
+	}
+	return ok;
 }
 
 bool MeshData::LoadObjFromString(const std::string& objContent)
@@ -473,6 +486,11 @@ bool MeshData::LoadObjFromString(const std::string& objContent)
 	// Compute bounding box center
 	ComputeCenter();
 
+	NEURUS_LOG("[MeshData] parsed '" << m_meshData.name
+	          << "' — " << GetVertexCount() << " verts, "
+	          << GetIndexCount() << " indices, "
+	          << "center=(" << m_meshData.center.x << ", "
+	          << m_meshData.center.y << ", " << m_meshData.center.z << ")");
 	return true;
 }
 

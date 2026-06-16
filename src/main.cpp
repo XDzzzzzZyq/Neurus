@@ -3,16 +3,16 @@
  * @brief Application entry point for the Neurus renderer.
  *
  * Initialization sequence:
- *   1. QApplication — Qt event loop (Widgets)
- *   2. EventBus — singleton cross-layer communication
- *   3. VulkanContext (Phase 1) — VkInstance creation
- *   4. NeurusMainWindow + VulkanWidget — Qt window with dockable Viewport
- *   5. Show main window — apply layout so widget has final size
- *   6. VkSurfaceKHR — created from VulkanWidget's native HWND
- *   7. VulkanContext (Phase 2) — logical device + queue selection
+ *   1. QApplication - Qt event loop (Widgets)
+ *   2. EventBus - singleton cross-layer communication
+ *   3. VulkanContext (Phase 1) - VkInstance creation
+ *   4. NeurusMainWindow + VulkanWidget - Qt window with dockable Viewport
+ *   5. Show main window - apply layout so widget has final size
+ *   6. VkSurfaceKHR - created from VulkanWidget's native HWND
+ *   7. VulkanContext (Phase 2) - logical device + queue selection
  *   8. Load scene assets (sphere.obj + BAKED.png)
- *   9. DeferredRenderer — swapchain, G-Buffer, geometry pass, lighting pass, composite
- *  10. QTimer-driven render loop — ~60 FPS
+ *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
+ *  10. QTimer-driven render loop - ~60 FPS
  *
  * Cleanup order (CRITICAL: destroy surface BEFORE instance):
  *   renderer -> surface -> mainWindow -> vkContext
@@ -34,6 +34,7 @@
 #include <memory>
 #include <cstring>
 
+#include "core/Log.h"
 #include "editor/events/UIEvents.h"
 #include "editor/events/EventBus.h"
 #include "ui/NeurusMainWindow.h"
@@ -96,7 +97,7 @@ int main(int argc, char* argv[])
 	app.setApplicationName("Neurus");
 	app.setApplicationVersion("0.1.0");
 
-	// --- UIEvents (must be created first — used by all layers) ---
+	// --- UIEvents (must be created first - used by all layers) ---
 	auto& uiEvents = neurus::UIEvents::instance();
 
 	// --- Two-phase Vulkan initialization ---
@@ -132,7 +133,7 @@ int main(int argc, char* argv[])
 	}
 	catch (const std::exception& e)
 	{
-		std::cerr << "Vulkan initialization failed: " << e.what() << "\n";
+		NEURUS_ERR("Vulkan initialization failed: " << e.what());
 		return -1;
 	}
 
@@ -162,7 +163,7 @@ int main(int argc, char* argv[])
 		if (!bakedTex.IsValid())
 		{
 			std::cerr << "Warning: Failed to load texture: " << texPath.toStdString() << "\n";
-			// Non-fatal — gbuffer.frag uses hardcoded albedo for MVP.
+			// Non-fatal - gbuffer.frag uses hardcoded albedo for MVP.
 		}
 	}
 
@@ -206,11 +207,11 @@ int main(int argc, char* argv[])
 	}
 	catch (const std::exception& e)
 	{
-		std::cerr << "DeferredRenderer initialization failed: " << e.what() << "\n";
+		NEURUS_ERR("DeferredRenderer initialization failed: " << e.what());
 		return -1;
 	}
 
-	// Window was created hidden — show it now that the renderer is ready
+	// Window was created hidden - show it now that the renderer is ready
 	mainWindow->show();
 
 	// --- Connect UIEvents signals ---
@@ -219,7 +220,7 @@ int main(int argc, char* argv[])
 	                     if (renderer)
 	                     {
 	                         try { renderer->DrawFrame(); }
-	                         catch (...) {}
+	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
 
@@ -234,7 +235,8 @@ int main(int argc, char* argv[])
 	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer]() {
 		if (renderer)
 		{
-			try { renderer->DrawFrame(); } catch (...) {}
+			try { renderer->DrawFrame(); }
+			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}
 	});
 	renderTimer.start();

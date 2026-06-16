@@ -1,5 +1,7 @@
 #include "VulkanBuffer.h"
 
+#include "Log.h"
+
 #include <stdexcept>
 #include <cstring>
 
@@ -72,6 +74,10 @@ VulkanBuffer::VulkanBuffer(const vk::raii::Device& device,
 
 	// --- Bind memory to buffer ---
 	m_buffer->bindMemory(**m_memory, 0);
+
+	NEURUS_LOG("[VulkanBuffer] size=" << m_size
+	          << " usage=" << vk::to_string(m_usageFlags)
+	          << " memProps=" << vk::to_string(m_memoryProperties));
 }
 
 VulkanBuffer::~VulkanBuffer()
@@ -196,6 +202,8 @@ void VulkanBuffer::Upload(const void* data, vk::DeviceSize size)
 	vk::SubmitInfo submitInfo({}, {}, *cmdBufs[0]);
 	m_queue.submit(submitInfo);
 	m_queue.waitIdle();
+
+	NEURUS_LOG("[VulkanBuffer::Upload] " << size << " bytes transferred");
 
 	// Staging resources are destroyed via vk::raii when leaving scope.
 }

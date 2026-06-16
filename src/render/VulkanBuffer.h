@@ -48,7 +48,7 @@ public:
 	             vk::MemoryPropertyFlags memoryProperties);
 	~VulkanBuffer();
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	VulkanBuffer(const VulkanBuffer&) = delete;
 	VulkanBuffer& operator=(const VulkanBuffer&) = delete;
 

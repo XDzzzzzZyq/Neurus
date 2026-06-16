@@ -1,5 +1,7 @@
 #include "IndexBuffer.h"
 
+#include "Log.h"
+
 #include <stdexcept>
 
 namespace neurus {
@@ -33,6 +35,8 @@ IndexBuffer::IndexBuffer(const vk::raii::Device& device,
 	{
 		m_buffer.Upload(data, size);
 	}
+
+	NEURUS_LOG("[IndexBuffer] " << indexCount << " indices, size=" << size << " bytes");
 }
 
 } // namespace neurus

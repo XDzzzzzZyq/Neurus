@@ -1,5 +1,7 @@
 #include "VertexBuffer.h"
 
+#include "Log.h"
+
 #include <stdexcept>
 
 namespace neurus {
@@ -35,6 +37,9 @@ VertexBuffer::VertexBuffer(const vk::raii::Device& device,
 	{
 		m_buffer.Upload(data, size);
 	}
+
+	NEURUS_LOG("[VertexBuffer] " << vertexCount << " verts, stride=" << stride
+	          << ", size=" << size << " bytes");
 }
 
 } // namespace neurus

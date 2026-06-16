@@ -211,6 +211,7 @@ protected:
 			m_lightingPass = std::make_unique<LightingPass>(
 				*m_device, pd,
 				*m_attachmentManager,
+				2u,                          // numSets = kMaxFramesInFlight
 				pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 
 			m_hasVulkan = true;
@@ -438,7 +439,7 @@ protected:
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// 1. Constructor — pipeline is created successfully
+// 1. Constructor - pipeline is created successfully
 // ---------------------------------------------------------------------------
 
 TEST_F(ModelRenderTest, Constructor_CreatesValidPipelines)
@@ -496,11 +497,11 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		texPath.c_str(),
 		vk::Format::eR8G8B8A8Srgb);
 
-	// Texture loading may fail if file not found — warn but don't abort
+	// Texture loading may fail if file not found - warn but don't abort
 	if (!albedoTexture.IsValid())
 	{
 		std::cerr << "[WARN] Failed to load texture: " << texPath
-		          << " — continuing without albedo texture." << std::endl;
+		          << " - continuing without albedo texture." << std::endl;
 	}
 
 	// -----------------------------------------------------------------------
@@ -549,7 +550,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	auto mesh = std::make_shared<Mesh>();
 	mesh->o_name = "SphereMesh";
-	mesh->o_mesh = meshData;  // share ownership (no move — we copied data above)
+	mesh->o_mesh = meshData;  // share ownership (no move - we copied data above)
 	mesh->o_material = material;
 
 	// -----------------------------------------------------------------------
@@ -658,7 +659,8 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		                       1,                                      // light count
 		                       camera->GetPosition(),                 // camera world pos
 		                       camUBO.view,                           // view matrix
-		                       {kRenderWidth, kRenderHeight});
+		                       {kRenderWidth, kRenderHeight},
+		                       0);                                     // frame index
 
 		EndSubmitWait(cmd);
 	}

@@ -31,7 +31,7 @@ public:
 	          uint32_t height);
 	~Swapchain();
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	Swapchain(const Swapchain&) = delete;
 	Swapchain& operator=(const Swapchain&) = delete;
 
@@ -81,6 +81,9 @@ public:
 	/** @brief The swapchain image format. */
 	vk::Format format() const { return m_format; }
 
+	/** @brief The actual image usage flags of swapchain images (may differ from requested). */
+	vk::ImageUsageFlags actualImageUsage() const { return m_actualUsage; }
+
 	/** @brief Monotonically increasing generation counter. Incremented on each Recreate(). */
 	uint32_t generation() const { return m_generation; }
 
@@ -123,6 +126,7 @@ private:
 
 	vk::Format m_format = vk::Format::eB8G8R8A8Srgb;
 	vk::Extent2D m_extent = {800, 600};
+	vk::ImageUsageFlags m_actualUsage = {};
 	uint32_t m_imageCount = 0;
 	uint32_t m_generation = 0;
 

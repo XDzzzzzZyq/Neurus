@@ -18,8 +18,11 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "Log.h"
+
 #include <array>
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 
 namespace neurus {
@@ -101,17 +104,29 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	m_lightingPass = std::make_unique<LightingPass>(
 		device, physicalDevice,
 		*m_attachmentManager,
+		kMaxFramesInFlight,
 		lightCompSpv, lightCompSize);
 
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
+	uint32_t imageCount = m_swapchain->imageCount();
+
+	// Verify the swapchain supports TRANSFER_DST for the blit composite path
+	const bool hasTransferDst = (m_swapchain->actualImageUsage() & vk::ImageUsageFlagBits::eTransferDst) != vk::ImageUsageFlags{};
+	if (!hasTransferDst)
+	{
+		throw std::runtime_error(
+			"Swapchain surface does not support VK_IMAGE_USAGE_TRANSFER_DST_BIT.\n"
+			"DeferredRenderer requires TRANSFER_DST for the HDRColor-to-swapchain blit composite.\n"
+			"Try running on a GPU/driver that supports this usage flag for the surface format.");
+	}
+
 	vk::CommandBufferAllocateInfo cmdBufAlloc(*m_commandPool, vk::CommandBufferLevel::ePrimary, imageCount);
 	m_commandBuffers = vk::raii::CommandBuffers(device, cmdBufAlloc);
 
 	// --- 10. Create sync objects ---
-	uint32_t imageCount = m_swapchain->imageCount();
 	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
 	{
 		m_inFlightFences.emplace_back(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
@@ -121,6 +136,14 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 	}
+
+	NEURUS_LOG("[DeferredRenderer] " << m_width << "x" << m_height
+	          << " swapchainImages=" << imageCount
+	          << " vertices=" << vertexCount
+	          << " indices=" << indexCount
+	          << " lightPower=" << light.power
+	          << " lightRadius=" << light.radius
+	          << " transferDst=" << (hasTransferDst ? "yes" : "no"));
 }
 
 DeferredRenderer::~DeferredRenderer()
@@ -171,16 +194,18 @@ GeometryRenderItem DeferredRenderer::buildRenderItem() const
 	item.indexCount = m_indexCount;
 	item.indexType = vk::IndexType::eUint32;
 
-	// Identity model matrix (sphere at origin)
-	const glm::mat4 identity(1.0f);
-	item.pushConstants.model = identity;
-	item.pushConstants.normalMatrix = identity;
+	// Identity model matrix (sphere at origin).
+	// The icosphere OBJ has radius ~7.44 — scale down to fit the view
+	// frustum (camera at ~5 units from origin).
+	const glm::mat4 sphereScale = glm::scale(glm::mat4(1.0f), glm::vec3(0.12f));
+	item.pushConstants.model = sphereScale;
+	item.pushConstants.normalMatrix = glm::transpose(glm::inverse(sphereScale));
 
 	return item;
 }
 
 // ---------------------------------------------------------------------------
-// DrawFrame — main render loop entry point
+// DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
 
 void DeferredRenderer::DrawFrame()
@@ -191,29 +216,43 @@ void DeferredRenderer::DrawFrame()
 	// --- Wait for this frame slot's fence ---
 	if (m_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
-		return;  // Timeout — skip this frame
+		return;  // Timeout - skip this frame
 	}
 
 	// --- Acquire next swapchain image ---
 	uint32_t imageIndex = 0;
+	bool skipFrame = false;
 	try
 	{
 		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
 		m_lastImageIndex = imageIndex;
 	}
-	catch (const std::runtime_error&)
+	catch (const vk::OutOfDateKHRError&)
 	{
-		return;  // Acquire failed — retry next frame
+		NEURUS_ERR("AcquireNextImage: swapchain out of date");
+		skipFrame = true;
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("AcquireNextImage failed: " << e.what());
+		skipFrame = true;
+	}
+
+	// --- Handle swapchain recreation (from out-of-date acquire or external resize) ---
+	if (m_swapchain->generation() != m_swapchainGeneration)
+	{
+		recreateSwapchain();
+		skipFrame = true;
+	}
+
+	if (skipFrame)
+	{
+		// Don't advance m_currentFrame - retry same slot next frame
+		return;
 	}
 
 	// Only reset fence after successful acquire
 	m_device.resetFences(*fence);
-
-	// --- Handle swapchain recreation ---
-	if (m_swapchain->generation() != m_swapchainGeneration)
-	{
-		recreateSwapchain();
-	}
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
@@ -227,13 +266,28 @@ void DeferredRenderer::DrawFrame()
 	m_graphicsQueue.submit(submitInfo, *fence);
 
 	// --- Present ---
+	bool presentFailed = false;
 	try
 	{
 		m_swapchain->Present(renderFinished, imageIndex, m_graphicsQueue);
 	}
-	catch (...)
+	catch (const std::exception& e)
 	{
-		// Presentation failed — skip
+		NEURUS_ERR("Present failed: " << e.what());
+		presentFailed = true;
+	}
+
+	// --- Handle swapchain recreation after present ---
+	if (m_swapchain->generation() != m_swapchainGeneration)
+	{
+		recreateSwapchain();
+		presentFailed = true;
+	}
+
+	if (presentFailed)
+	{
+		// Don't advance frame - retry same slot next iteration
+		return;
 	}
 
 	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
@@ -260,11 +314,21 @@ void DeferredRenderer::recreateSwapchain()
 	// Recreate attachments at new extent
 	m_attachmentManager->Resize(newExtent);
 
-	// Rebuild render-finished semaphores
+	// Rebuild render-finished semaphores (one per swapchain image)
 	m_renderFinishedSemaphores.clear();
 	for (uint32_t i = 0; i < newImageCount; ++i)
 	{
 		m_renderFinishedSemaphores.emplace_back(m_device, vk::SemaphoreCreateInfo());
+	}
+
+	// Rebuild command buffers if image count changed (swapchain image count
+	// may differ across surfaces/drivers).
+	if (m_commandBuffers.size() != newImageCount)
+	{
+		m_commandBuffers.clear();
+		vk::CommandBufferAllocateInfo cmdBufAlloc(
+			*m_commandPool, vk::CommandBufferLevel::ePrimary, newImageCount);
+		m_commandBuffers = vk::raii::CommandBuffers(m_device, cmdBufAlloc);
 	}
 
 	m_swapchainGeneration = m_swapchain->generation();
@@ -281,6 +345,48 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	// --- Begin command buffer ---
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBuf.begin(beginInfo);
+
+	// --- Transition G-Buffer images to attachment layouts for this frame ---
+	//     Uses eUndefined as oldLayout to discard previous contents (beginRendering
+	//     will clear them anyway). This explicit barrier ensures the validation
+	//     layer's layout tracking is synchronised before dynamic rendering.
+	{
+		const std::array<AttachmentName, 4> gBufferColors = {
+			AttachmentName::Position,
+			AttachmentName::Normal,
+			AttachmentName::Albedo,
+			AttachmentName::MetallicRoughness,
+		};
+
+		std::array<vk::ImageMemoryBarrier2, 5> preBarriers;
+
+		for (size_t i = 0; i < 4; ++i)
+		{
+			const auto& att = m_attachmentManager->GetAttachment(gBufferColors[i]);
+			preBarriers[i] = ImageBarrier(
+				*att.ImageHandle(),
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eColorAttachmentOptimal,
+				vk::PipelineStageFlagBits2::eTopOfPipe,
+				vk::AccessFlagBits2::eNone,
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				vk::AccessFlagBits2::eColorAttachmentWrite);
+		}
+
+		const auto& depthAtt = m_attachmentManager->GetAttachment(AttachmentName::Depth);
+		preBarriers[4] = ImageBarrier(
+			*depthAtt.ImageHandle(),
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			vk::PipelineStageFlagBits2::eTopOfPipe,
+			vk::AccessFlagBits2::eNone,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests,
+			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			vk::ImageAspectFlagBits::eDepth);
+
+		const vk::DependencyInfo depInfo({}, {}, {}, preBarriers);
+		cmdBuf.pipelineBarrier2(depInfo);
+	}
 
 	// --- Compute camera matrices for this frame ---
 	const CameraUBOData cameraData = computeCameraData(extent);
@@ -299,7 +405,8 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	                       m_lightCount,
 	                       m_cameraPos,
 	                       viewMatrix,
-	                       extent);
+	                       extent,
+	                       m_currentFrame);
 
 	// --- Phase 3: Blit HDRColor → swapchain image ---
 	// LightingPass leaves HDRColor in GENERAL layout.

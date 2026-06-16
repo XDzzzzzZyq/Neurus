@@ -1,6 +1,6 @@
 /**
  * @file LightingPass.h
- * @brief PBR lighting pass — compute shader reading G-Buffer and evaluating
+ * @brief PBR lighting pass - compute shader reading G-Buffer and evaluating
  *        Cook-Torrance GGX BRDF per point light.
  *
  * LightingPass consumes the G-Buffer attachments written by GeometryPass and
@@ -100,6 +100,9 @@ public:
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for sampler creation).
 	 * @param attachmentManager G-Buffer and HDR colour attachment provider (borrowed).
+	 * @param numSets           Number of descriptor sets to allocate (one per
+	 *                          in-flight frame). Must match kMaxFramesInFlight
+	 *                          in the renderer.
 	 * @param compSpv           Embedded compute shader SPIR-V data.
 	 * @param compSize          Compute shader SPIR-V size in bytes.
 	 *
@@ -108,6 +111,7 @@ public:
 	LightingPass(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
 	             AttachmentManager& attachmentManager,
+	             uint32_t numSets,
 	             const uint32_t* compSpv,
 	             size_t compSize);
 
@@ -124,9 +128,10 @@ public:
 	 *
 	 *   1. Transitions G-Buffer images to SHADER_READ_ONLY_OPTIMAL.
 	 *   2. Transitions HDRColor output to GENERAL.
-	 *   3. Binds the compute pipeline, descriptor set, and push constants.
-	 *   4. Dispatches ceil(width/16) × ceil(height/16) × 1 thread groups.
-	 *   5. Inserts a memory barrier to make the output visible.
+	 *   3. Writes descriptors into the descriptor set for this frame slot.
+	 *   4. Binds the compute pipeline, descriptor set, and push constants.
+	 *   5. Dispatches ceil(width/16) × ceil(height/16) × 1 thread groups.
+	 *   6. Inserts a memory barrier to make the output visible.
 	 *
 	 * @param cmdBuf          Command buffer in recording state.
 	 * @param lightSSBO       SSBO containing PointLightGpu data.
@@ -134,13 +139,17 @@ public:
 	 * @param cameraPos       Camera world-space position.
 	 * @param viewMatrix      View matrix (for normal VS→WS transform).
 	 * @param renderExtent    Render area dimensions.
+	 * @param frameIndex      Index into the descriptor-set ring buffer
+	 *                        (0 … numSets-1). One set per in-flight frame
+	 *                        avoids updating a set while the GPU is reading it.
 	 */
 	void Record(vk::CommandBuffer cmdBuf,
 	            const VulkanBuffer& lightSSBO,
 	            uint32_t lightCount,
 	            const glm::vec3& cameraPos,
 	            const glm::mat4& viewMatrix,
-	            vk::Extent2D renderExtent);
+	            vk::Extent2D renderExtent,
+	            uint32_t frameIndex);
 
 private:
 	/**
@@ -170,12 +179,15 @@ private:
 	                                  size_t compSize);
 
 	/**
-	 * @brief Writes all descriptors (image + buffer) into the allocated set.
+	 * @brief Writes all descriptors (image + buffer) into the specified set.
 	 *
-	 * Called once during construction; re-called by RebindImages() after
-	 * resize if image views change.
+	 * Called every frame during Record(). One set per in-flight frame
+	 * prevents updating a set while the GPU is still reading it.
+	 *
+	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
+	 * @param lightSSBO SSBO containing PointLightGpu data.
 	 */
-	void WriteDescriptors(const VulkanBuffer& lightSSBO);
+	void WriteDescriptors(uint32_t setIndex, const VulkanBuffer& lightSSBO);
 
 	// --- References (non-owning) ---
 	const vk::raii::Device* m_device;
@@ -188,7 +200,7 @@ private:
 	// --- Descriptor resources ---
 	DescriptorSetLayout m_descriptorSetLayout;
 	DescriptorPool m_descriptorPool;
-	DescriptorSet m_descriptorSet;
+	std::vector<DescriptorSet> m_descriptorSets;  // one per in-flight frame
 
 	// --- Pipeline ---
 	std::unique_ptr<ComputePipelineBuilder> m_pipelineBuilder;  // must outlive pipeline

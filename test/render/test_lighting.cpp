@@ -1,6 +1,6 @@
 /**
  * @file test_lighting.cpp
- * @brief Tests for LightingPass — PBR Cook-Torrance GGX compute shader.
+ * @brief Tests for LightingPass - PBR Cook-Torrance GGX compute shader.
  *
  * Validates:
  *   - LightingPass constructor creates a valid pipeline
@@ -164,6 +164,7 @@ protected:
 			m_lightingPass = std::make_unique<LightingPass>(
 				*m_device, pd,
 				*m_attachmentManager,
+				2u,                          // numSets = kMaxFramesInFlight
 				pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 
 			m_hasVulkan = true;
@@ -493,7 +494,7 @@ protected:
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// 1. Constructor — pipeline is created successfully
+// 1. Constructor - pipeline is created successfully
 // ---------------------------------------------------------------------------
 
 TEST_F(LightingPassTest, Constructor_CreatesValidPipeline)
@@ -508,7 +509,7 @@ TEST_F(LightingPassTest, Constructor_CreatesValidPipeline)
 }
 
 // ---------------------------------------------------------------------------
-// 2. PointLightGpu — size matches shader expectation (std140, 48 bytes)
+// 2. PointLightGpu - size matches shader expectation (std140, 48 bytes)
 // ---------------------------------------------------------------------------
 
 TEST_F(LightingPassTest, PointLightGpu_SizeIs48Bytes)
@@ -517,7 +518,7 @@ TEST_F(LightingPassTest, PointLightGpu_SizeIs48Bytes)
 }
 
 // ---------------------------------------------------------------------------
-// 3. LightingPushConstants — size matches shader expectation (96 bytes)
+// 3. LightingPushConstants - size matches shader expectation (96 bytes)
 // ---------------------------------------------------------------------------
 
 TEST_F(LightingPassTest, PushConstants_SizeIs96Bytes)
@@ -548,7 +549,7 @@ TEST_F(LightingPassTest, Movable)
 }
 
 // ---------------------------------------------------------------------------
-// 5. Single point light — dispatch produces non-zero HDR output
+// 5. Single point light - dispatch produces non-zero HDR output
 // ---------------------------------------------------------------------------
 
 TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
@@ -576,7 +577,8 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 		                       1,                        // light count
 		                       glm::vec3(0.0f, 0.0f, 2.0f), // camera pos
 		                       MakeTestCamera().view,        // view matrix
-		                       {kRenderWidth, kRenderHeight});
+		                       {kRenderWidth, kRenderHeight},
+		                       0);                           // frame index
 
 		EndSubmitWait(cmd);
 	}
@@ -619,7 +621,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 }
 
 // ---------------------------------------------------------------------------
-// 6. Zero lights — produces ambient-only output (non-black for covered pixels)
+// 6. Zero lights - produces ambient-only output (non-black for covered pixels)
 // ---------------------------------------------------------------------------
 
 TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
@@ -649,7 +651,8 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 		                       0,                        // zero lights
 		                       glm::vec3(0.0f, 0.0f, 2.0f),
 		                       MakeTestCamera().view,
-		                       {kRenderWidth, kRenderHeight});
+		                       {kRenderWidth, kRenderHeight},
+		                       0);
 
 		EndSubmitWait(cmd);
 	}

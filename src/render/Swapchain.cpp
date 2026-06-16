@@ -1,5 +1,7 @@
 #include "Swapchain.h"
 
+#include "Log.h"
+
 #include <algorithm>
 #include <stdexcept>
 
@@ -21,7 +23,7 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 	auto presentMode = choosePresentMode(physicalDevice, surface);
 	m_extent = chooseExtent(physicalDevice, surface, width, height);
 
-	// --- Get surface capabilities for image count ---
+	// --- Get surface capabilities for image count and supported usage ---
 	auto capabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
 	uint32_t minImageCount = capabilities.minImageCount + 1;
 
@@ -31,6 +33,11 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 		minImageCount = capabilities.maxImageCount;
 	}
 
+	// Determine actual image usage: intersect requested usage with surface-supported usage
+	constexpr vk::ImageUsageFlags kRequestedUsage =
+		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
+	m_actualUsage = kRequestedUsage & capabilities.supportedUsageFlags;
+
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo(
 		{},
 		*surface,
@@ -39,7 +46,7 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 		vk::ColorSpaceKHR::eSrgbNonlinear,
 		m_extent,
 		1,                                  // Single array layer (no stereo rendering)
-		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
+		m_actualUsage,
 		vk::SharingMode::eExclusive,        // Single queue family for MVP
 		{},
 		capabilities.currentTransform,      // Use surface's actual transform
@@ -54,6 +61,12 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 	// --- Store actual values ---
 	m_extent = swapchainCreateInfo.imageExtent;
 	m_imageCount = minImageCount;
+
+	NEURUS_LOG("[Swapchain] " << m_extent.width << "x" << m_extent.height
+	          << " format=" << vk::to_string(m_format)
+	          << " present=" << vk::to_string(presentMode)
+	          << " images=" << m_imageCount
+	          << " usage=" << vk::to_string(m_actualUsage));
 
 	// --- Create image views ---
 	m_images = m_swapchain->getImages();
@@ -72,12 +85,19 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 	m_recreateWidth = width;
 	m_recreateHeight = height;
 
-	// Destroy old resources (swapchain + image views)
-	m_imageViews.clear();
-	m_swapchain.reset();
-
-	// Get new surface capabilities (window may have changed)
-	auto capabilities = m_physicalDevice.getSurfaceCapabilitiesKHR(*m_surface);
+	// Get new surface capabilities (window may have changed).
+	// Query surface validity BEFORE destroying the old swapchain so that
+	// a lost surface doesn't leave us with a null m_swapchain.
+	auto capabilities = vk::SurfaceCapabilitiesKHR{};
+	try
+	{
+		capabilities = m_physicalDevice.getSurfaceCapabilitiesKHR(*m_surface);
+	}
+	catch (const vk::SurfaceLostKHRError&)
+	{
+		NEURUS_LOG("[Swapchain] Surface lost during recreation - deferring.");
+		return;  // Keep the old swapchain - retry next frame
+	}
 
 	// Handle minimized window (zero-area surface)
 	if (capabilities.currentExtent.width == 0 || capabilities.currentExtent.height == 0)
@@ -86,6 +106,10 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 		// The next DrawFrame() call will retry recreation
 		return;
 	}
+
+	// Destroy old resources **after** confirming the surface is still valid
+	m_imageViews.clear();
+	m_swapchain.reset();
 
 	m_extent = chooseExtent(m_physicalDevice, m_surface, width, height);
 	auto presentMode = choosePresentMode(m_physicalDevice, m_surface);
@@ -96,6 +120,11 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 		minImageCount = capabilities.maxImageCount;
 	}
 
+	// Determine actual image usage: intersect requested usage with surface-supported usage
+	constexpr vk::ImageUsageFlags kRequestedUsage =
+		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
+	m_actualUsage = kRequestedUsage & capabilities.supportedUsageFlags;
+
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo(
 		{},
 		*m_surface,
@@ -104,7 +133,7 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 		vk::ColorSpaceKHR::eSrgbNonlinear,
 		m_extent,
 		1,
-		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
+		m_actualUsage,
 		vk::SharingMode::eExclusive,
 		{},
 		vk::SurfaceTransformFlagBitsKHR::eIdentity,
@@ -126,41 +155,65 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 
 uint32_t Swapchain::AcquireNextImage(const vk::raii::Semaphore& signalSemaphore)
 {
-	// UINT64_MAX disables the timeout — the call blocks until an image is
-	// available. This is safe because waitForFences (in DrawFrame) uses a
-	// finite timeout and processEvents() keeps the Qt event loop responsive.
-	auto [result, imageIndex] = m_swapchain->acquireNextImage(
-		UINT64_MAX, *signalSemaphore, nullptr);
-
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
+	try
 	{
-		// Swapchain needs recreation (window resized)
+		// UINT64_MAX disables the timeout - the call blocks until an image is
+		// available. This is safe because waitForFences (in DrawFrame) uses a
+		// finite timeout and processEvents() keeps the Qt event loop responsive.
+		auto [result, imageIndex] = m_swapchain->acquireNextImage(
+			UINT64_MAX, *signalSemaphore, nullptr);
+
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
+		{
+			// Swapchain needs recreation (window resized)
+			Recreate(m_recreateWidth, m_recreateHeight);
+			return 0;
+		}
+
+		if (result != vk::Result::eSuccess)
+		{
+			throw std::runtime_error("Failed to acquire swapchain image.");
+		}
+
+		return imageIndex;
+	}
+	catch (const vk::OutOfDateKHRError&)
+	{
+		// vk::raii wrapper may throw instead of returning the error result
 		Recreate(m_recreateWidth, m_recreateHeight);
-		// Return placeholder — caller should skip this frame
 		return 0;
 	}
-
-	if (result != vk::Result::eSuccess)
+	catch (const vk::SurfaceLostKHRError&)
 	{
-		throw std::runtime_error("Failed to acquire swapchain image.");
+		// Surface lost - can't acquire. Keep the old swapchain, signal caller.
+		return 0;
 	}
-
-	return imageIndex;
 }
 
 void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t imageIndex, vk::Queue presentQueue)
 {
-	vk::PresentInfoKHR presentInfo(
-		*waitSemaphore,
-		**m_swapchain,
-		imageIndex
-	);
+	try
+	{
+		vk::PresentInfoKHR presentInfo(
+			*waitSemaphore,
+			**m_swapchain,
+			imageIndex
+		);
 
-	auto result = presentQueue.presentKHR(presentInfo);
+		auto result = presentQueue.presentKHR(presentInfo);
 
-	if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
+		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
+		{
+			Recreate(m_recreateWidth, m_recreateHeight);
+		}
+	}
+	catch (const vk::OutOfDateKHRError&)
 	{
 		Recreate(m_recreateWidth, m_recreateHeight);
+	}
+	catch (const vk::SurfaceLostKHRError&)
+	{
+		// Surface lost - can't present. Don't recreate (would fail).
 	}
 }
 

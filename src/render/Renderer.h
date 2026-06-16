@@ -10,7 +10,7 @@ class Swapchain;
 class ShaderProgram;
 
 /**
- * @brief Public rendering API — owns the render loop and GPU resources.
+ * @brief Public rendering API - owns the render loop and GPU resources.
  *
  * Created with a shared VulkanContext (device/queue) and a borrowed surface.
  * Constructs swapchain, pipeline, command pool, and synchronization primitives.
@@ -50,7 +50,7 @@ public:
 	         const uint32_t* fragSpv, size_t fragSize);
 	~Renderer();
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	Renderer(const Renderer&) = delete;
 	Renderer& operator=(const Renderer&) = delete;
 
@@ -65,7 +65,7 @@ public:
 	 * and presents the result. Handles swapchain recreation on resize.
 	 *
 	 * @note Called each frame from UIEvents::renderRequested signal.
-	 * @note May throw if the swapchain needs recreation — caller should retry.
+	 * @note May throw if the swapchain needs recreation - caller should retry.
 	 */
 	void DrawFrame();
 
@@ -99,7 +99,7 @@ private:
 
 	// Synchronization
 	static constexpr uint32_t kMaxFramesInFlight = 2;
-	static constexpr uint64_t kFenceTimeoutNs = 100'000'000;  // 100ms — finite timeout prevents main-thread deadlock
+	static constexpr uint64_t kFenceTimeoutNs = 100'000'000;  // 100ms - finite timeout prevents main-thread deadlock
 	std::vector<vk::raii::Fence> m_inFlightFences;              // per-frame CPU-GPU sync
 	std::vector<vk::raii::Semaphore> m_imageAvailableSemaphores; // per-frame acquire
 	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores; // per-SWAPCHAIN-IMAGE (indexed by acquire result)

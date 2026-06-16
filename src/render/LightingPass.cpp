@@ -11,6 +11,8 @@
 #include "VulkanImage.h"
 #include "shaders/ShaderModule.h"
 
+#include "Log.h"
+
 #include <array>
 #include <stdexcept>
 
@@ -23,6 +25,7 @@ namespace neurus {
 LightingPass::LightingPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            AttachmentManager& attachmentManager,
+                           uint32_t numSets,
                            const uint32_t* compSpv,
                            size_t compSize)
 	: m_device(&device)
@@ -32,17 +35,17 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	, m_sampler(CreateSampler(device, physicalDevice))
 	// --- Descriptor set layout ---
 	, m_descriptorSetLayout(CreateDescriptorSetLayout(device))
-	// --- Descriptor pool (1 set, pool sizes from layout) ---
+	// --- Descriptor pool (numSets sets, pool sizes from layout × numSets) ---
 	, m_descriptorPool(device,
-	                   1,
-	                   DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, 1))
-	// --- Descriptor set ---
-	, m_descriptorSet(std::move(
-	      m_descriptorPool.Allocate(m_descriptorSetLayout, 1).front()))
+	                   numSets,
+	                   DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, numSets))
+	// --- Descriptor sets (one per in-flight frame) ---
+	, m_descriptorSets(m_descriptorPool.Allocate(m_descriptorSetLayout, numSets))
 	// --- Pipeline builder (must outlive pipeline) ---
 	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
+	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets);
 }
 
 LightingPass::~LightingPass() = default;
@@ -133,8 +136,10 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 // Descriptor writes
 // ---------------------------------------------------------------------------
 
-void LightingPass::WriteDescriptors(const VulkanBuffer& lightSSBO)
+void LightingPass::WriteDescriptors(uint32_t setIndex, const VulkanBuffer& lightSSBO)
 {
+	DescriptorSet& dstSet = m_descriptorSets[setIndex];
+
 	const std::array<AttachmentName, 4> gBufferInputs = {
 		AttachmentName::Position,
 		AttachmentName::Normal,
@@ -153,8 +158,8 @@ void LightingPass::WriteDescriptors(const VulkanBuffer& lightSSBO)
 			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 		);
 
-		m_descriptorSet.WriteImage(i, imageInfo,
-		                           vk::DescriptorType::eCombinedImageSampler);
+		dstSet.WriteImage(i, imageInfo,
+		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 
 	// --- Write HDR colour output (storage image) ---
@@ -167,14 +172,14 @@ void LightingPass::WriteDescriptors(const VulkanBuffer& lightSSBO)
 			vk::ImageLayout::eGeneral             // imageLayout
 		);
 
-		m_descriptorSet.WriteImage(4, imageInfo,
-		                           vk::DescriptorType::eStorageImage);
+		dstSet.WriteImage(4, imageInfo,
+		                  vk::DescriptorType::eStorageImage);
 	}
 
 	// --- Write light SSBO ---
 	{
-		m_descriptorSet.WriteBuffer(5, lightSSBO.GetDescriptorInfo(),
-		                            vk::DescriptorType::eStorageBuffer);
+		dstSet.WriteBuffer(5, lightSSBO.GetDescriptorInfo(),
+		                   vk::DescriptorType::eStorageBuffer);
 	}
 }
 
@@ -187,13 +192,16 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
                           uint32_t lightCount,
                           const glm::vec3& cameraPos,
                           const glm::mat4& viewMatrix,
-                          vk::Extent2D renderExtent)
+                          vk::Extent2D renderExtent,
+                          uint32_t frameIndex)
 {
-	// --- 1. Write descriptor set (binds image views + SSBO) ---
-	WriteDescriptors(lightSSBO);
+	// --- 1. Write descriptor set for this frame slot ---
+	WriteDescriptors(frameIndex, lightSSBO);
 
 	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
 	//     and HDRColor to GENERAL for compute write.
+	//     Uses pipelineBarrier2 (synchronization2) for correct layout
+	//     tracking with VK_KHR_dynamic_rendering.
 	{
 		const std::array<AttachmentName, 4> gBufferInputs = {
 			AttachmentName::Position,
@@ -202,16 +210,18 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 			AttachmentName::MetallicRoughness,
 		};
 
-		std::array<vk::ImageMemoryBarrier, 5> barriers;
+		std::array<vk::ImageMemoryBarrier2, 5> barriers;
 
 		for (size_t i = 0; i < 4; ++i)
 		{
 			const auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
-			barriers[i] = vk::ImageMemoryBarrier(
-				vk::AccessFlagBits::eColorAttachmentWrite,      // srcAccessMask
-				vk::AccessFlagBits::eShaderRead,                 // dstAccessMask
-				vk::ImageLayout::eColorAttachmentOptimal,        // oldLayout
-				vk::ImageLayout::eShaderReadOnlyOptimal,         // newLayout
+			barriers[i] = vk::ImageMemoryBarrier2(
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput,  // srcStage
+				vk::AccessFlagBits2::eColorAttachmentWrite,           // srcAccess
+				vk::PipelineStageFlagBits2::eComputeShader,            // dstStage
+				vk::AccessFlagBits2::eShaderRead,                      // dstAccess
+				vk::ImageLayout::eColorAttachmentOptimal,              // oldLayout
+				vk::ImageLayout::eShaderReadOnlyOptimal,               // newLayout
 				VK_QUEUE_FAMILY_IGNORED,
 				VK_QUEUE_FAMILY_IGNORED,
 				*attachment.ImageHandle(),
@@ -221,24 +231,21 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 
 		// HDRColor: UNDEFINED → GENERAL
 		const auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
-		barriers[4] = vk::ImageMemoryBarrier(
-			vk::AccessFlagBits::eNone,                         // srcAccessMask
-			vk::AccessFlagBits::eShaderWrite,                   // dstAccessMask
-			vk::ImageLayout::eUndefined,                        // oldLayout
-			vk::ImageLayout::eGeneral,                          // newLayout
+		barriers[4] = vk::ImageMemoryBarrier2(
+			vk::PipelineStageFlagBits2::eTopOfPipe,               // srcStage
+			vk::AccessFlagBits2::eNone,                            // srcAccess
+			vk::PipelineStageFlagBits2::eComputeShader,             // dstStage
+			vk::AccessFlagBits2::eShaderWrite,                      // dstAccess
+			vk::ImageLayout::eUndefined,                            // oldLayout
+			vk::ImageLayout::eGeneral,                              // newLayout
 			VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED,
 			*hdrColor.ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
 			                          0, 1, 0, 1));
 
-		cmdBuf.pipelineBarrier(
-			vk::PipelineStageFlagBits::eColorAttachmentOutput,  // srcStage
-			vk::PipelineStageFlagBits::eComputeShader,           // dstStage
-			{},
-			{},
-			{},
-			barriers);
+		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
+		cmdBuf.pipelineBarrier2(depInfo);
 	}
 
 	// --- 3. Bind compute pipeline ---
@@ -248,7 +255,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
 	                          *m_pipelineBuilder->pipelineLayout(),
 	                          0,                                    // firstSet
-	                          {m_descriptorSet.handle()},
+	                          {m_descriptorSets[frameIndex].handle()},
 	                          {});
 
 	// --- 5. Push constants ---
@@ -278,26 +285,24 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Memory barrier: make HDR output visible for subsequent passes ---
+	//     Uses pipelineBarrier2 for consistent layout tracking.
 	{
 		const auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
-		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eShaderWrite,                    // srcAccessMask
-			vk::AccessFlagBits::eShaderRead,                      // dstAccessMask
-			vk::ImageLayout::eGeneral,                            // oldLayout
-			vk::ImageLayout::eGeneral,                            // newLayout
+		const vk::ImageMemoryBarrier2 barrier(
+			vk::PipelineStageFlagBits2::eComputeShader,          // srcStage
+			vk::AccessFlagBits2::eShaderWrite,                    // srcAccess
+			vk::PipelineStageFlagBits2::eComputeShader,            // dstStage
+			vk::AccessFlagBits2::eShaderRead,                      // dstAccess
+			vk::ImageLayout::eGeneral,                             // oldLayout
+			vk::ImageLayout::eGeneral,                             // newLayout
 			VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED,
 			*hdrColor.ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
 			                          0, 1, 0, 1));
 
-		cmdBuf.pipelineBarrier(
-			vk::PipelineStageFlagBits::eComputeShader,
-			vk::PipelineStageFlagBits::eComputeShader,
-			{},
-			{},
-			{},
-			{barrier});
+		const vk::DependencyInfo depInfo({}, {}, {}, barrier);
+		cmdBuf.pipelineBarrier2(depInfo);
 	}
 }
 
