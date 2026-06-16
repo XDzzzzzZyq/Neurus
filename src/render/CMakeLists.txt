@@ -11,6 +11,8 @@ add_library(neurus_render STATIC
 	VulkanBuffer.cpp
 	VulkanImage.h
 	VulkanImage.cpp
+	AttachmentManager.h
+	AttachmentManager.cpp
 	DescriptorManager.h
 	DescriptorManager.cpp
 	ComputePipelineBuilder.h
