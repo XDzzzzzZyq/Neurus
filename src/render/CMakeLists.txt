@@ -1,6 +1,10 @@
 # src/render/CMakeLists.txt — Renderer Layer
 
 add_library(neurus_render STATIC
+	VulkanBuffer.h
+	VulkanBuffer.cpp
+	VulkanImage.h
+	VulkanImage.cpp
 	VulkanContext.h
 	VulkanContext.cpp
 	Swapchain.h
