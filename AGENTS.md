@@ -204,6 +204,11 @@ CODE STYLE GUIDELINES
 - SPIR-V compiled at CMake configure time via glslangValidator
 - Embedded as C headers in `${CMAKE_BINARY_DIR}/generated/shaders/`
 
+**Version Control:**
+- Prefer Git submodule.
+- For the renaming and moving, use `git mv` to track the history.
+- Complete and Double check all aspects (tests, coding style, document) of the current task before commit.
+ 
 --------------------------------------------------------------------------------
 FILE LAYOUT
 --------------------------------------------------------------------------------
