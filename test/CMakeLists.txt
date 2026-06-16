@@ -25,9 +25,14 @@ add_executable(neurus_test
 	editor/test_event_bus_typed.cpp
 	editor/test_editor_context.cpp
 	editor/test_scene_status.cpp
+	scene/test_camera.cpp
+	scene/test_mesh.cpp
 	scene/test_uid.cpp
 	scene/test_transform.cpp
+	scene/test_light.cpp
+	scene/test_sprite.cpp
 	scene/test_scene.cpp
+	scene/test_debug.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE

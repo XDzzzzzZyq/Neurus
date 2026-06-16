@@ -17,103 +17,14 @@
 
 #include <gtest/gtest.h>
 
+#include <scene/Camera.h>
+#include <scene/DebugLine.h>
+#include <scene/DebugPoints.h>
+#include <scene/Light.h>
+#include <scene/Mesh.h>
 #include <scene/Scene.h>
+#include <scene/Sprite.h>
 #include <scene/UID.h>
-
-// -----------------------------------------------------------------------
-// Minimal mock types for testing registration patterns
-// Camera, Mesh, Light, Sprite, DebugLine, DebugPoints are forward-declared
-// in Scene.h. We define them here as test-only stubs inheriting ObjectID.
-// -----------------------------------------------------------------------
-
-namespace neurus
-{
-
-/**
- * @brief Test-only Camera class inheriting ObjectID.
- * @note This is a minimal stub until the real Camera is implemented.
- */
-class Camera : public ObjectID
-{
-public:
-	Camera()
-	{
-		o_name = "TestCamera";
-		o_type = ObjectID::GOType::GO_CAM;
-	}
-};
-
-/**
- * @brief Test-only Mesh class inheriting ObjectID.
- * @note This is a minimal stub until the real Mesh is implemented.
- */
-class Mesh : public ObjectID
-{
-public:
-	Mesh()
-	{
-		o_name = "TestMesh";
-		o_type = ObjectID::GOType::GO_MESH;
-	}
-};
-
-/**
- * @brief Test-only Light class inheriting ObjectID.
- * @note This is a minimal stub until the real Light is implemented.
- */
-class Light : public ObjectID
-{
-public:
-	Light()
-	{
-		o_name = "TestLight";
-		o_type = ObjectID::GOType::GO_LIGHT;
-	}
-};
-
-/**
- * @brief Test-only Sprite class inheriting ObjectID.
- * @note This is a minimal stub until the real Sprite is implemented.
- */
-class Sprite : public ObjectID
-{
-public:
-	Sprite()
-	{
-		o_name = "TestSprite";
-		o_type = ObjectID::GOType::GO_SPRITE;
-	}
-};
-
-/**
- * @brief Test-only DebugLine class inheriting ObjectID.
- * @note This is a minimal stub until the real DebugLine is implemented.
- */
-class DebugLine : public ObjectID
-{
-public:
-	DebugLine()
-	{
-		o_name = "TestDebugLine";
-		o_type = ObjectID::GOType::GO_DL;
-	}
-};
-
-/**
- * @brief Test-only DebugPoints class inheriting ObjectID.
- * @note This is a minimal stub until the real DebugPoints is implemented.
- */
-class DebugPoints : public ObjectID
-{
-public:
-	DebugPoints()
-	{
-		o_name = "TestDebugPoints";
-		o_type = ObjectID::GOType::GO_DP;
-	}
-};
-
-} // namespace neurus
 
 using namespace neurus;
 
