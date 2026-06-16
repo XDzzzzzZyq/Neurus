@@ -42,6 +42,8 @@ add_library(neurus_render STATIC
 	QVulkanRenderer.cpp
 	RenderPassManager.h
 	RenderPassManager.cpp
+	GeometryPass.h
+	GeometryPass.cpp
 	SyncObjects.h
 )
 

@@ -179,7 +179,7 @@ uint32_t RenderPassManager::ColorAttachmentCount(PassType passType)
 {
 	switch (passType)
 	{
-	case PassType::G_BUFFER:   return 5;
+	case PassType::G_BUFFER:   return 4;
 	case PassType::LIGHTING:   return 1;
 	case PassType::SHADOW:     return 0;
 	case PassType::COMPOSITE:  return 1;

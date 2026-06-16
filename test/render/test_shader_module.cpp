@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "render/ShaderModule.h"
-#include "render/ShaderLib.h"
+#include "render/shaders/ShaderModule.h"
+#include "render/shaders/ShaderLib.h"
 #include "render/VulkanContext.h"
 
 #include <triangle.vert.h>

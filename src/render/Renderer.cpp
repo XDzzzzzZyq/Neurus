@@ -1,6 +1,6 @@
 #include "Renderer.h"
 #include "Swapchain.h"
-#include "ShaderProgram.h"
+#include "shaders/ShaderProgram.h"
 
 namespace neurus {
 

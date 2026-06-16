@@ -183,12 +183,8 @@ TEST_F(RenderPassManagerTest, PassType_EnumValuesExist)
 
 TEST_F(RenderPassManagerTest, ColorAttachmentCount_PerPassType)
 {
-	// G_BUFFER: 5 color attachments (Position, Normal, Albedo, MetallicRoughness, ?)
-	// Wait, let me think. G-Buffer typically has:
-	//   Position (RGBA16F), Normal (RGBA16F), Albedo (RGBA8_SRGB),
-	//   MetallicRoughness (RGBA8_UNORM) — that's 4 color + 1 depth.
-	//   The task says "G_Buffer (5 color + depth)" so let's go with 5 color.
-	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::G_BUFFER), 5u);
+	// G_BUFFER: 4 color attachments (Position, Normal, Albedo, MetallicRoughness) + depth
+	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::G_BUFFER), 4u);
 	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::LIGHTING), 1u);
 	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::SHADOW), 0u);
 	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::COMPOSITE), 1u);
@@ -216,11 +212,11 @@ TEST_F(RenderPassManagerTest, PresetClearValues_G_Buffer)
 {
 	const auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::G_BUFFER);
 
-	// G_BUFFER: 5 color clear values + 1 depth clear value = 6
-	ASSERT_EQ(clearValues.size(), 6u);
+	// G_BUFFER: 4 color clear values + 1 depth clear value = 5
+	ASSERT_EQ(clearValues.size(), 5u);
 
 	// All color clear values should be of type ClearColorValue
-	for (size_t i = 0; i < 5; ++i)
+	for (size_t i = 0; i < 4; ++i)
 	{
 		EXPECT_EQ(clearValues[i].color.float32[0], 0.0f);
 		EXPECT_EQ(clearValues[i].color.float32[1], 0.0f);
@@ -229,8 +225,8 @@ TEST_F(RenderPassManagerTest, PresetClearValues_G_Buffer)
 	}
 
 	// Depth clear value: 1.0f (far plane)
-	EXPECT_FLOAT_EQ(clearValues[5].depthStencil.depth, 1.0f);
-	EXPECT_EQ(clearValues[5].depthStencil.stencil, 0u);
+	EXPECT_FLOAT_EQ(clearValues[4].depthStencil.depth, 1.0f);
+	EXPECT_EQ(clearValues[4].depthStencil.stencil, 0u);
 }
 
 TEST_F(RenderPassManagerTest, PresetClearValues_Lighting)
@@ -406,13 +402,12 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 		GTEST_SKIP() << "D32_SFLOAT depth attachment not supported.";
 	}
 
-	// Create 5 color attachments + 1 depth
+	// Create 4 color attachments + 1 depth
 	std::vector<vk::Format> gbufferColorFormats = {
 		vk::Format::eR16G16B16A16Sfloat,  // Position
 		vk::Format::eR16G16B16A16Sfloat,  // Normal
 		vk::Format::eR8G8B8A8Srgb,        // Albedo
 		vk::Format::eR8G8B8A8Unorm,       // MetallicRoughness
-		vk::Format::eR8G8B8A8Unorm        // (5th color for future use)
 	};
 
 	std::vector<VulkanImage> colorAttachments;

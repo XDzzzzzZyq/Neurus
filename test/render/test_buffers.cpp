@@ -7,9 +7,9 @@
 #include <cstring>
 #include <vector>
 
-#include "render/BufferLayout.h"
-#include "render/VertexBuffer.h"
-#include "render/IndexBuffer.h"
+#include "render/buffers/BufferLayout.h"
+#include "render/buffers/VertexBuffer.h"
+#include "render/buffers/IndexBuffer.h"
 #include "render/VulkanContext.h"
 
 using namespace neurus;
