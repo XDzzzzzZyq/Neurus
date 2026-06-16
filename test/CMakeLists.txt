@@ -10,6 +10,7 @@ add_executable(neurus_test
 	render/test_shader_module.cpp
 	render/test_swapchain.cpp
 	render/test_vulkanimage.cpp
+	render/test_descriptor.cpp
 	render/test_renderer.cpp
 	render/test_texture.cpp
 	render/test_material.cpp

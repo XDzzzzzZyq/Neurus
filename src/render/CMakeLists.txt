@@ -1,26 +1,28 @@
 # src/render/CMakeLists.txt — Renderer Layer
 
 add_library(neurus_render STATIC
-	BufferLayout.h
-	BufferLayout.cpp
-	IndexBuffer.h
-	IndexBuffer.cpp
-	VertexBuffer.h
-	VertexBuffer.cpp
+	buffers/BufferLayout.h
+	buffers/BufferLayout.cpp
+	buffers/IndexBuffer.h
+	buffers/IndexBuffer.cpp
+	buffers/VertexBuffer.h
+	buffers/VertexBuffer.cpp
 	VulkanBuffer.h
 	VulkanBuffer.cpp
 	VulkanImage.h
 	VulkanImage.cpp
+	DescriptorManager.h
+	DescriptorManager.cpp
 	VulkanContext.h
 	VulkanContext.cpp
 	Swapchain.h
 	Swapchain.cpp
-	ShaderProgram.h
-	ShaderProgram.cpp
-	ShaderModule.h
-	ShaderModule.cpp
-	ShaderLib.h
-	ShaderLib.cpp
+	shaders/ShaderProgram.h
+	shaders/ShaderProgram.cpp
+	shaders/ShaderModule.h
+	shaders/ShaderModule.cpp
+	shaders/ShaderLib.h
+	shaders/ShaderLib.cpp
 	Texture.h
 	Texture.cpp
 	TextureLib.h
