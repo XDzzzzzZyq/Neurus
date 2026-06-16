@@ -13,7 +13,7 @@ namespace neurus {
  * Uploads host vertex data immediately upon construction via the staging pattern.
  * Stores metadata: vertex count and per-vertex stride in bytes.
  *
- * @note Template-free design — vertex data is passed as raw bytes + stride.
+ * @note Template-free design - vertex data is passed as raw bytes + stride.
  *       Callers must ensure the data pointer remains valid during construction.
  *
  * Usage:
@@ -49,7 +49,7 @@ public:
 	             uint32_t stride,
 	             uint32_t vertexCount);
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	VertexBuffer(const VertexBuffer&) = delete;
 	VertexBuffer& operator=(const VertexBuffer&) = delete;
 

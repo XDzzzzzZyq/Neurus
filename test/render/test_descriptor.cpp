@@ -15,7 +15,7 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
-// Non-GPU tests — Fluent builder (no Vulkan device needed)
+// Non-GPU tests - Fluent builder (no Vulkan device needed)
 // ---------------------------------------------------------------------------
 
 /**
@@ -88,7 +88,7 @@ TEST(DescriptorSetLayoutBuilderTest, ChainedAddBinding_ReturnsBuilderReference)
 }
 
 // ---------------------------------------------------------------------------
-// GPU tests — Layout, Pool, Set allocation and writing
+// GPU tests - Layout, Pool, Set allocation and writing
 // ---------------------------------------------------------------------------
 
 /**
@@ -484,7 +484,7 @@ TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 	auto sets = pool.Allocate(layout, 1);
 	ASSERT_EQ(sets.size(), 1u);
 
-	// Write the buffer descriptor — must not throw
+	// Write the buffer descriptor - must not throw
 	ASSERT_NO_THROW({
 		sets[0].WriteBuffer(0, bufInfo,
 		                    vk::DescriptorType::eUniformBuffer);
@@ -543,7 +543,7 @@ TEST_F(DescriptorManagerTest, StandardLayout_CameraUBO)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// Camera UBO: set 0, binding 0 — uniform buffer, vertex stage
+	// Camera UBO: set 0, binding 0 - uniform buffer, vertex stage
 	auto bindings = BuildLayout()
 	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
 	                                vk::ShaderStageFlagBits::eVertex)

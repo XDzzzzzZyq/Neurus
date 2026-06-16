@@ -1,6 +1,6 @@
 /**
  * @file GeometryPass.h
- * @brief G-Buffer geometry pass — renders scene meshes to MRT attachments.
+ * @brief G-Buffer geometry pass - renders scene meshes to MRT attachments.
  *
  * GeometryPass records the first phase of a deferred rendering pipeline:
  * it draws all opaque geometry into the G-Buffer colour attachments
@@ -14,7 +14,7 @@
  * - Receives pre-assembled GeometryRenderItem batches from the caller.
  * - Each GeometryRenderItem bundles GPU buffers + model matrices.
  *
- * @note No PBR lighting — only geometry data is written to the G-Buffer.
+ * @note No PBR lighting - only geometry data is written to the G-Buffer.
  * @note Uses PipelineBuilder for MRT pipeline construction.
  */
 

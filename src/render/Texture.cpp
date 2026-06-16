@@ -1,6 +1,8 @@
 #include "Texture.h"
 #include "VulkanBuffer.h"
 
+#include "Log.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -34,7 +36,7 @@ static vk::DeviceSize pixelByteSize(vk::Format format)
 	case vk::Format::eR32Sfloat:
 		return 4;
 	default:
-		// Conservative fallback — treat as RGBA8
+		// Conservative fallback - treat as RGBA8
 		return 4;
 	}
 }
@@ -187,8 +189,9 @@ Texture Texture::ForAttachment(const vk::raii::Device& device,
 			tex.m_sampler = createSampler(device, config, 1);
 		}
 	}
-	catch (...)
+	catch (const std::exception& e)
 	{
+		NEURUS_ERR("Texture::ForAttachment failed: " << e.what());
 		return Texture{};
 	}
 
@@ -301,8 +304,9 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		// --- 8. Create sampler ---
 		tex.m_sampler = createSampler(device, config, mipLevels);
 	}
-	catch (...)
+	catch (const std::exception& e)
 	{
+		NEURUS_ERR("Texture::createFromPixelData failed: " << e.what());
 		return Texture{};
 	}
 

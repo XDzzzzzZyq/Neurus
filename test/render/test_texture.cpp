@@ -12,7 +12,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for Texture — RAII texture wrapping VulkanImage + Sampler.
+ * @brief Tests for Texture - RAII texture wrapping VulkanImage + Sampler.
  *
  * Creates Vulkan instance and device without a surface (graphics queue
  * without present support is sufficient for texture operations).
@@ -94,7 +94,7 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// FromData — embedded pixel data → GPU texture
+// FromData - embedded pixel data → GPU texture
 // ---------------------------------------------------------------------------
 
 TEST_F(TextureTest, FromData_4x4_RGBA8_Valid)
@@ -181,7 +181,7 @@ TEST_F(TextureTest, FromData_2x2_HDR_Valid)
 }
 
 // ---------------------------------------------------------------------------
-// ForAttachment — framebuffer attachment (no sampler)
+// ForAttachment - framebuffer attachment (no sampler)
 // ---------------------------------------------------------------------------
 
 TEST_F(TextureTest, ForAttachment_64x64_Color)

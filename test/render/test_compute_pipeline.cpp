@@ -196,7 +196,7 @@ TEST_F(ComputePipelineTest, WithLayoutAndPushConstants_BuildsSuccessfully)
 }
 
 // ---------------------------------------------------------------------------
-// ComputePipelineBuilder is reusable — two successive builds
+// ComputePipelineBuilder is reusable - two successive builds
 // ---------------------------------------------------------------------------
 
 TEST_F(ComputePipelineTest, TwoBuilds_BothProduceValidPipelines)

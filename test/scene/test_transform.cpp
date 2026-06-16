@@ -3,7 +3,7 @@
  * @brief Unit tests for Transform base and Transform3D classes.
  *
  * TDD: RED (test written first) → GREEN (implementation verified).
- * All tests are pure CPU math — no GPU required.
+ * All tests are pure CPU math - no GPU required.
  */
 
 #include <gtest/gtest.h>
@@ -24,7 +24,7 @@ TEST(Transform, GetTransformPtr_ReturnsPolymorphicPointer)
 	Transform3D t3d;
 	Transform* base = &t3d;
 
-	// Call through base pointer — must not return nullptr
+	// Call through base pointer - must not return nullptr
 	Transform* ptr = base->GetTransformPtr();
 	EXPECT_NE(ptr, nullptr);
 	// Dynamic cast to verify it's actually a Transform3D
@@ -43,7 +43,7 @@ TEST(Transform, NonCopyable)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Identity
+// Transform3D - Identity
 // -----------------------------------------------------------------------
 
 /**
@@ -57,7 +57,7 @@ TEST(Transform3D, IdentityMatrix)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Translation
+// Transform3D - Translation
 // -----------------------------------------------------------------------
 
 /**
@@ -81,7 +81,7 @@ TEST(Transform3D, TranslateOnly)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Rotation (90 degrees around X axis)
+// Transform3D - Rotation (90 degrees around X axis)
 // -----------------------------------------------------------------------
 
 /**
@@ -100,24 +100,24 @@ TEST(Transform3D, Rotate90X)
 
 	glm::mat4 model = t.GetModelMatrix();
 
-	// Column 0 (X axis) — unchanged
+	// Column 0 (X axis) - unchanged
 	EXPECT_FLOAT_EQ(model[0][0], 1.0f);
 	EXPECT_NEAR(model[0][1], 0.0f, 1e-6f);
 	EXPECT_NEAR(model[0][2], 0.0f, 1e-6f);
 
-	// Column 1 (Y axis) — rotates to Z: (0, 0, 1)
+	// Column 1 (Y axis) - rotates to Z: (0, 0, 1)
 	EXPECT_NEAR(model[1][0], 0.0f, 1e-6f);
 	EXPECT_NEAR(model[1][1], 0.0f, 1e-6f);
 	EXPECT_FLOAT_EQ(model[1][2], 1.0f);
 
-	// Column 2 (Z axis) — rotates to -Y: (0, -1, 0)
+	// Column 2 (Z axis) - rotates to -Y: (0, -1, 0)
 	EXPECT_NEAR(model[2][0], 0.0f, 1e-6f);
 	EXPECT_FLOAT_EQ(model[2][1], -1.0f);
 	EXPECT_NEAR(model[2][2], 0.0f, 1e-6f);
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Rotation (90 degrees around Y axis)
+// Transform3D - Rotation (90 degrees around Y axis)
 // -----------------------------------------------------------------------
 
 /**
@@ -136,24 +136,24 @@ TEST(Transform3D, Rotate90Y)
 
 	glm::mat4 model = t.GetModelMatrix();
 
-	// Column 0 (X axis) — rotates to -Z: (0, 0, -1)
+	// Column 0 (X axis) - rotates to -Z: (0, 0, -1)
 	EXPECT_NEAR(model[0][0], 0.0f, 1e-6f);
 	EXPECT_NEAR(model[0][1], 0.0f, 1e-6f);
 	EXPECT_FLOAT_EQ(model[0][2], -1.0f);
 
-	// Column 1 (Y axis) — unchanged
+	// Column 1 (Y axis) - unchanged
 	EXPECT_NEAR(model[1][0], 0.0f, 1e-6f);
 	EXPECT_FLOAT_EQ(model[1][1], 1.0f);
 	EXPECT_NEAR(model[1][2], 0.0f, 1e-6f);
 
-	// Column 2 (Z axis) — rotates to X: (1, 0, 0)
+	// Column 2 (Z axis) - rotates to X: (1, 0, 0)
 	EXPECT_FLOAT_EQ(model[2][0], 1.0f);
 	EXPECT_NEAR(model[2][1], 0.0f, 1e-6f);
 	EXPECT_NEAR(model[2][2], 0.0f, 1e-6f);
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Scale (uniform)
+// Transform3D - Scale (uniform)
 // -----------------------------------------------------------------------
 
 /**
@@ -173,7 +173,7 @@ TEST(Transform3D, ScaleUniform)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Scale (non-uniform)
+// Transform3D - Scale (non-uniform)
 // -----------------------------------------------------------------------
 
 /**
@@ -192,7 +192,7 @@ TEST(Transform3D, ScaleNonUniform)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Normal matrix
+// Transform3D - Normal matrix
 // -----------------------------------------------------------------------
 
 /**
@@ -218,7 +218,7 @@ TEST(Transform3D, NormalMatrix)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Dirty flag / cached matrix
+// Transform3D - Dirty flag / cached matrix
 // -----------------------------------------------------------------------
 
 /**
@@ -285,7 +285,7 @@ TEST(Transform3D, Dirty_InvalidateForcesRecompute)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D — Combined TRS
+// Transform3D - Combined TRS
 // -----------------------------------------------------------------------
 
 /**

@@ -14,7 +14,7 @@ using namespace neurus;
  *        to the typed EventBus (EventPool).
  *
  * TDD: RED (test written first) → GREEN (after implementing method).
- * All tests are pure CPU — no GPU required.
+ * All tests are pure CPU - no GPU required.
  */
 class SceneStatusTest : public ::testing::Test
 {
@@ -90,7 +90,7 @@ TEST_F(SceneStatusTest, SetScene_Nullptr)
 }
 
 // -----------------------------------------------------------------------
-// Isolated channel — only SceneStatusChanged fires
+// Isolated channel - only SceneStatusChanged fires
 // -----------------------------------------------------------------------
 
 TEST_F(SceneStatusTest, NoCrossContaminationWithOtherSignals)

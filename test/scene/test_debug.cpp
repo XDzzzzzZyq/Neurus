@@ -3,7 +3,7 @@
  * @brief Unit tests for DebugLine and DebugPoints classes.
  *
  * TDD: RED (test written first) → GREEN (implementation verified).
- * All tests are pure CPU data storage — no GPU required.
+ * All tests are pure CPU data storage - no GPU required.
  */
 
 #include <gtest/gtest.h>
@@ -49,7 +49,7 @@ TEST(DebugLine, DefaultConstruction)
 }
 
 /**
- * @test DebugLine inherits Transform3D — can set position.
+ * @test DebugLine inherits Transform3D - can set position.
  */
 TEST(DebugLine, InheritsTransform3D)
 {
@@ -231,7 +231,7 @@ TEST(DebugPoints, DefaultConstruction)
 }
 
 /**
- * @test DebugPoints inherits Transform3D — can set position.
+ * @test DebugPoints inherits Transform3D - can set position.
  */
 TEST(DebugPoints, InheritsTransform3D)
 {

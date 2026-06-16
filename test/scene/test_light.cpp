@@ -3,7 +3,7 @@
  * @brief Unit tests for Light class (point, sun, spot, area).
  *
  * TDD: RED (test written first) → GREEN (implementation verified).
- * All tests are pure CPU math — no GPU required.
+ * All tests are pure CPU math - no GPU required.
  */
 
 #include <gtest/gtest.h>
@@ -34,7 +34,7 @@ TEST(Light, DefaultConstructor)
 }
 
 // -----------------------------------------------------------------------
-// Typed constructors — all 4 types
+// Typed constructors - all 4 types
 // -----------------------------------------------------------------------
 
 /**
@@ -255,7 +255,7 @@ TEST(Light, SetRatio)
 }
 
 // -----------------------------------------------------------------------
-// Dirty flag — all setters mark is_light_changed
+// Dirty flag - all setters mark is_light_changed
 // -----------------------------------------------------------------------
 
 /**

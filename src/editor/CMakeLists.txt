@@ -1,4 +1,4 @@
-# src/editor/CMakeLists.txt — Editor Layer
+# src/editor/CMakeLists.txt - Editor Layer
 
 add_library(neurus_editor STATIC
 	EditorContext.h

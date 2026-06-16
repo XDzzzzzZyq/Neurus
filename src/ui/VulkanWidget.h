@@ -10,7 +10,7 @@ namespace neurus {
  *
  * Sets WA_NativeWindow and WA_OpaquePaintEvent attributes to ensure the widget
  * has a dedicated native window handle and Qt does not draw a background behind
- * the Vulkan content. Overrides paintEvent() to be a no-op — all rendering is
+ * the Vulkan content. Overrides paintEvent() to be a no-op - all rendering is
  * handled by Vulkan.
  *
  * The widget is focusable (Qt::StrongFocus) to receive keyboard input.

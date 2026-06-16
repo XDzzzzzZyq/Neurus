@@ -6,7 +6,7 @@
 using namespace neurus;
 
 /**
- * @brief Expanded tests for typed EventBus — covering edge cases and
+ * @brief Expanded tests for typed EventBus - covering edge cases and
  *        specific editor event type behavior.
  *
  * These complement test_event_bus_typed.cpp with additional validation
@@ -49,7 +49,7 @@ TEST_F(TypedEventBusExpandedTest, ObjectSelected_MultipleEmits)
 	EXPECT_EQ(receivedIds[2], 99);
 }
 
-// --- ObjectSelected vs ObjectDeselected — no cross-contamination ---
+// --- ObjectSelected vs ObjectDeselected - no cross-contamination ---
 
 TEST_F(TypedEventBusExpandedTest, ObjectDeselected_NoCrossContamination)
 {

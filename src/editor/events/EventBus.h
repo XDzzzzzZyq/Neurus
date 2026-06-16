@@ -14,7 +14,7 @@
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Typed Event Pool — deferred event dispatch with FIFO queue
+// Typed Event Pool - deferred event dispatch with FIFO queue
 // ---------------------------------------------------------------------------
 
 /**
@@ -51,7 +51,7 @@ class EventPool
 public:
 	EventPool() = default;
 
-	// Non-copyable — singleton semantics
+	// Non-copyable - singleton semantics
 	EventPool(const EventPool&) = delete;
 	EventPool& operator=(const EventPool&) = delete;
 

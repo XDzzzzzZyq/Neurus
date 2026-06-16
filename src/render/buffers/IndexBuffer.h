@@ -48,7 +48,7 @@ public:
 	            vk::DeviceSize size,
 	            uint32_t indexCount);
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	IndexBuffer(const IndexBuffer&) = delete;
 	IndexBuffer& operator=(const IndexBuffer&) = delete;
 
@@ -59,7 +59,7 @@ public:
 	/** @brief Number of indices in the buffer. */
 	uint32_t GetIndexCount() const { return m_indexCount; }
 
-	/** @brief Index type — always VK_INDEX_TYPE_UINT32. */
+	/** @brief Index type - always VK_INDEX_TYPE_UINT32. */
 	vk::IndexType GetIndexType() const { return vk::IndexType::eUint32; }
 
 	/** @brief Underlying Vulkan buffer handle for binding. */

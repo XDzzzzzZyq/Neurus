@@ -1,5 +1,7 @@
 #include "ShaderProgram.h"
 
+#include "Log.h"
+
 namespace neurus {
 
 ShaderProgram::ShaderProgram(const vk::raii::Device& device,
@@ -73,7 +75,7 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 
 	vk::PipelineDynamicStateCreateInfo dynamicState({}, dynamicStates);
 
-	// --- Pipeline layout (empty — no descriptors or push constants for triangle) ---
+	// --- Pipeline layout (empty - no descriptors or push constants for triangle) ---
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
 	m_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, pipelineLayoutCreateInfo);
 
@@ -106,6 +108,11 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 	);
 
 	m_pipeline = std::make_unique<vk::raii::Pipeline>(device, nullptr, pipelineCreateInfo);
+
+	NEURUS_LOG("[ShaderProgram] extent=" << extent.width << "x" << extent.height
+	          << " vertSize=" << vertSize
+	          << " fragSize=" << fragSize
+	          << " format=" << vk::to_string(colorFormats[0]));
 }
 
 ShaderProgram::~ShaderProgram()

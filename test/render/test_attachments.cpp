@@ -11,7 +11,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for AttachmentManager — G-Buffer and post-FX attachment creation, resize, and named access.
+ * @brief Tests for AttachmentManager - G-Buffer and post-FX attachment creation, resize, and named access.
  *
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
@@ -103,7 +103,7 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// Creation — G-Buffer attachments
+// Creation - G-Buffer attachments
 // ---------------------------------------------------------------------------
 
 TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndExtent)
@@ -171,7 +171,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 }
 
 // ---------------------------------------------------------------------------
-// Creation — Post-FX attachments
+// Creation - Post-FX attachments
 // ---------------------------------------------------------------------------
 
 TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExtent)
@@ -256,7 +256,7 @@ TEST_F(AttachmentManagerTest, Resize_AllAttachmentsHaveNewExtent)
 }
 
 // ---------------------------------------------------------------------------
-// Named access — all attachment names reachable
+// Named access - all attachment names reachable
 // ---------------------------------------------------------------------------
 
 TEST_F(AttachmentManagerTest, GetAllAttachments_ByEnumAndString)

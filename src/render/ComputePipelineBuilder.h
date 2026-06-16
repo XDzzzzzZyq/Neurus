@@ -15,7 +15,7 @@ class ShaderModule;
  * @brief Fluent builder for compute pipelines.
  *
  * Builds a vk::raii::Pipeline configured for compute workloads.
- * Simpler than the graphics pipeline builder — no vertex input,
+ * Simpler than the graphics pipeline builder - no vertex input,
  * rasterization, or framebuffer state needed.
  *
  * The builder owns the underlying vk::raii::PipelineLayout and must
@@ -106,7 +106,7 @@ public:
 private:
 	const vk::raii::Device& m_device;
 
-	// Compute shader stage info — stored before BuildComputePipeline() is called
+	// Compute shader stage info - stored before BuildComputePipeline() is called
 	vk::PipelineShaderStageCreateInfo m_stageInfo = {};
 	bool m_stageSet = false;
 
@@ -114,7 +114,7 @@ private:
 	std::vector<vk::DescriptorSetLayout> m_descriptorSetLayouts;
 	std::vector<vk::PushConstantRange> m_pushConstantRanges;
 
-	// Owned pipeline layout — created in BuildComputePipeline()
+	// Owned pipeline layout - created in BuildComputePipeline()
 	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
 };
 

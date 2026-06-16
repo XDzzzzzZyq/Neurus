@@ -69,7 +69,7 @@ public:
 	static size_t CacheSize();
 
 private:
-	// Hidden constructor — static-only class
+	// Hidden constructor - static-only class
 	TextureLib() = default;
 
 	static std::unordered_map<std::string, std::shared_ptr<Texture>> s_cache;

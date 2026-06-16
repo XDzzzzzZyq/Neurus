@@ -8,11 +8,11 @@ changes through the event system.
 
 ## Location
 
-- `src/editor/events/UIEvents.h` — QObject singleton for UI↔Editor signals
-- `src/editor/events/EventBus.h` — Typed EventPool for Editor↔Renderer events
-- `src/editor/events/EditorEvents.h` — Event type structs (ObjectSelected, etc.)
-- `src/editor/EditorContext.h` — Editor + scene state container
-- `src/editor/controllers/` — Specific controller implementations (future)
+- `src/editor/events/UIEvents.h` - QObject singleton for UI↔Editor signals
+- `src/editor/events/EventBus.h` - Typed EventPool for Editor↔Renderer events
+- `src/editor/events/EditorEvents.h` - Event type structs (ObjectSelected, etc.)
+- `src/editor/EditorContext.h` - Editor + scene state container
+- `src/editor/controllers/` - Specific controller implementations (future)
 
 ## Core Responsibilities
 
@@ -28,9 +28,9 @@ changes through the event system.
    - Updated by Editor logic, read by other layers
 
 3. **Controller Orchestration** (future)
-   - CameraController — Camera movement and view manipulation
-   - SelectionController — Object selection management
-   - ViewportController — Viewport interaction and rendering settings
+   - CameraController - Camera movement and view manipulation
+   - SelectionController - Object selection management
+   - ViewportController - Viewport interaction and rendering settings
 
 4. **Scene State Management** (future)
    - Create, modify, delete scene objects
@@ -85,7 +85,7 @@ EventBus().Process();
 - Deferred FIFO queue: `enqueue()` stores, `Process()` dispatches
 - Re-entrant safe: events emitted from handlers are appended to queue
 - Max events cap (default 1000) prevents infinite loops
-- Not thread-safe — all calls on main thread
+- Not thread-safe - all calls on main thread
 
 ### EditorContext
 
@@ -108,10 +108,10 @@ private:
 ```
 
 **Design:**
-- Pure data class — holds state, no rendering logic
+- Pure data class - holds state, no rendering logic
 - QObject subclass for signal/slot and QML exposure
 - Non-copyable
-- RAII — constructor fully initializes, destructor cleans up
+- RAII - constructor fully initializes, destructor cleans up
 
 ## Data Flow
 

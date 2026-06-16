@@ -35,7 +35,7 @@ option(NEURUS_ENABLE_VALIDATION "Enable Vulkan validation layers" OFF)
 add_subdirectory(dep/glm EXCLUDE_FROM_ALL)
 target_include_directories(glm INTERFACE dep/glm)
 
-# STB (header-only image library — stub, only stb_image.h needed later)
+# STB (header-only image library - stub, only stb_image.h needed later)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE dep/stb)
 
@@ -48,7 +48,7 @@ endif()
 # Qt-Advanced-Docking-System (submodule)
 set(ADS_VERSION "4.5.0")
 set(BUILD_EXAMPLES OFF)
-set(BUILD_STATIC ON)       # Static library — no DLL deployment needed
+set(BUILD_STATIC ON)       # Static library - no DLL deployment needed
 add_subdirectory(dep/qtadvanceddocking)
 
 # Qt6 (window, QML, EventBus)

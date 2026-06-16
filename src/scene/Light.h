@@ -90,7 +90,7 @@ public:
 	float area_ratio{ 1.0f };
 
 	// -----------------------------------------------------------------------
-	// Static shadow parameters (constexpr — compile-time constants)
+	// Static shadow parameters (constexpr - compile-time constants)
 	// -----------------------------------------------------------------------
 
 	/** @brief Orthographic projection field size for sun shadows. */
@@ -152,7 +152,7 @@ public:
 	static std::pair<SpriteType, std::string> ParseLightName(LightType _type);
 
 	// -----------------------------------------------------------------------
-	// Setters — mark is_light_changed dirty flag
+	// Setters - mark is_light_changed dirty flag
 	// -----------------------------------------------------------------------
 
 	/** @brief Dirty flag indicating light parameters changed since last frame. */

@@ -49,7 +49,7 @@ public:
 
 	~CommandBuffer() = default;
 
-	// Non-copyable — owns a GPU resource allocation
+	// Non-copyable - owns a GPU resource allocation
 	CommandBuffer(const CommandBuffer&) = delete;
 	CommandBuffer& operator=(const CommandBuffer&) = delete;
 

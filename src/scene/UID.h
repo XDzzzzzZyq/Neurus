@@ -48,22 +48,22 @@ public:
 	virtual ~UID() = default;
 
 	/**
-	 * @brief Deleted copy constructor — UIDs must be unique.
+	 * @brief Deleted copy constructor - UIDs must be unique.
 	 */
 	UID(const UID&) = delete;
 
 	/**
-	 * @brief Deleted copy assignment — UIDs must be unique.
+	 * @brief Deleted copy assignment - UIDs must be unique.
 	 */
 	UID& operator=(const UID&) = delete;
 
 	/**
-	 * @brief Deleted move constructor — UIDs must be unique.
+	 * @brief Deleted move constructor - UIDs must be unique.
 	 */
 	UID(UID&&) = delete;
 
 	/**
-	 * @brief Deleted move assignment — UIDs must be unique.
+	 * @brief Deleted move assignment - UIDs must be unique.
 	 */
 	UID& operator=(UID&&) = delete;
 

@@ -1,4 +1,4 @@
-# test/CMakeLists.txt — Unit Tests
+# test/CMakeLists.txt - Unit Tests
 
 add_executable(neurus_test
 	test_main.cpp

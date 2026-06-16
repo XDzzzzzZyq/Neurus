@@ -24,14 +24,14 @@ class AttachmentManager;
  * - G-Buffer attachments (RGBA8, BGRA8, RGBA16F → u8 PNG)
  * - Batch capture of all attachments via CaptureAllAttachments
  *
- * The constructor is deleted — this is a purely static utility class.
+ * The constructor is deleted - this is a purely static utility class.
  */
 class Screenshot
 {
 public:
 	Screenshot() = delete;
 
-	// Non-copyable, non-movable — purely static utility
+	// Non-copyable, non-movable - purely static utility
 	Screenshot(const Screenshot&) = delete;
 	Screenshot& operator=(const Screenshot&) = delete;
 	Screenshot(Screenshot&&) = delete;

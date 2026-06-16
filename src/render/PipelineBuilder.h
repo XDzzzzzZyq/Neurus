@@ -11,7 +11,7 @@ class BufferLayout;
 class ShaderModule;
 
 // ---------------------------------------------------------------------------
-// PipelineBuilder — Fluent API for constructing graphics pipelines
+// PipelineBuilder - Fluent API for constructing graphics pipelines
 // ---------------------------------------------------------------------------
 
 /**
@@ -261,7 +261,7 @@ public:
 	/**
 	 * @brief Sets the color attachment formats for dynamic rendering.
 	 *
-	 * Must be called — one format per color attachment referenced by the
+	 * Must be called - one format per color attachment referenced by the
 	 * pipeline.
 	 *
 	 * @param formats  Vector of VkFormat per color attachment.

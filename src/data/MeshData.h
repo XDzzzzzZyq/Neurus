@@ -15,7 +15,7 @@ namespace neurus {
  * Stores interleaved vertex attributes and index buffer for indexed drawing.
  * Vertex layout (14 floats): position(3), normal(3), uv(2), tangent(3), bitangent(3).
  *
- * Pure CPU data — no Vulkan/GPU resources.
+ * Pure CPU data - no Vulkan/GPU resources.
  */
 class MeshData
 {

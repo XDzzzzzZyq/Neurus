@@ -19,10 +19,10 @@ Describe what you'd like to happen. Be specific about the behavior and scope.
 
 Which architectural layer(s) does this touch?
 
-- [ ] **Renderer** — Vulkan pipeline, shaders, GPU resources
-- [ ] **Editor** — Application logic, controllers, scene state
-- [ ] **UI** — Qt QML window, input, signals
-- [ ] **Data & Resource** — Allocators, descriptor pools, assets
+- [ ] **Renderer** - Vulkan pipeline, shaders, GPU resources
+- [ ] **Editor** - Application logic, controllers, scene state
+- [ ] **UI** - Qt QML window, input, signals
+- [ ] **Data & Resource** - Allocators, descriptor pools, assets
 
 ## Alternatives Considered
 

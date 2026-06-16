@@ -5,7 +5,7 @@
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Editor Events — domain events for Editor state changes
+// Editor Events - domain events for Editor state changes
 // ---------------------------------------------------------------------------
 
 /** @brief Emitted when a scene object is selected by the user. */

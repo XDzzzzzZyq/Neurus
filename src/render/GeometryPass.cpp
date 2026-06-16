@@ -10,6 +10,8 @@
 #include "RenderPassManager.h"
 #include "shaders/ShaderModule.h"
 
+#include "Log.h"
+
 #include <array>
 #include <cstring>
 #include <stdexcept>
@@ -67,6 +69,12 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 
 	// --- Create graphics pipeline ---
 	m_pipeline = CreatePipeline(device, vertSpv, vertSize, fragSpv, fragSize);
+
+	NEURUS_LOG("[GeometryPass] vertSize=" << vertSize
+	          << " fragSize=" << fragSize
+	          << " colorAttachments=4"
+	          << " depthAttachments=1"
+	          << " vertexStride=" << m_vertexLayout.GetStride());
 }
 
 // ---------------------------------------------------------------------------

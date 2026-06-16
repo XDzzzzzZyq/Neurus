@@ -5,13 +5,13 @@
 This is a C++20 Vulkan-HPP 1.4 real-time renderer designed for experimentation
 with modern rendering algorithms. The architecture prioritizes:
 
-- **Strict layer isolation** — Renderer ↔ Editor ↔ UI ↔ Data & Resource
+- **Strict layer isolation** - Renderer ↔ Editor ↔ UI ↔ Data & Resource
   boundaries must not be violated
-- **Minimal global state** — State is explicit and localized
-- **Explicit data flow** — Communication via UIEvents (Qt Signals/Slots),
+- **Minimal global state** - State is explicit and localized
+- **Explicit data flow** - Communication via UIEvents (Qt Signals/Slots),
   EventBus (typed EventPool), and Context objects
-- **Stateless rendering** — Renderer does not own application-level state
-- **Deterministic GPU resource management** — Vulkan resources have explicit
+- **Stateless rendering** - Renderer does not own application-level state
+- **Deterministic GPU resource management** - Vulkan resources have explicit
   RAII ownership via `vk::raii` namespace
 
 ## Four-Layer Architecture
@@ -70,7 +70,7 @@ with modern rendering algorithms. The architecture prioritizes:
 - GPU resource management abstractions (Buffer, Image, DescriptorSet)
 - Memory allocation strategies (stub for MVP)
 - Pipeline cache management (future)
-- Asset pipeline integration (future — file loading, serialization)
+- Asset pipeline integration (future - file loading, serialization)
 
 ### Communication Protocols
 
@@ -88,7 +88,7 @@ with modern rendering algorithms. The architecture prioritizes:
 - Dispatch: `EventBus().Process()` (call once per frame)
 
 **Context System** (Data)
-- `EditorContext` — Scene + editor state
+- `EditorContext` - Scene + editor state
 - Read-only access to scene data for Renderer
 - Data flows: Editor mutates, Renderer consumes
 
@@ -116,12 +116,12 @@ Data & Resource Layer owns (future):
 
 ### Architectural Invariants
 
-1. **No cross-layer direct coupling** — Use UIEvents/EventBus/Context only
-2. **Renderer is stateless** — Application state lives in Editor
-3. **Full RAII** — No two-phase initialization; no `Init()`/`Terminate()` methods
-4. **Explicit GPU ownership** — Each Vulkan handle has one owning layer
-5. **Non-copyable GPU resources** — `= delete` copy/assign
-6. **Vulkan validation** — Debug builds enable `VK_LAYER_KHRONOS_validation`
+1. **No cross-layer direct coupling** - Use UIEvents/EventBus/Context only
+2. **Renderer is stateless** - Application state lives in Editor
+3. **Full RAII** - No two-phase initialization; no `Init()`/`Terminate()` methods
+4. **Explicit GPU ownership** - Each Vulkan handle has one owning layer
+5. **Non-copyable GPU resources** - `= delete` copy/assign
+6. **Vulkan validation** - Debug builds enable `VK_LAYER_KHRONOS_validation`
 
 ### Naming Conventions
 

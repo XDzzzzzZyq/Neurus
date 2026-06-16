@@ -1,6 +1,6 @@
 /**
  * @file Sprite.cpp
- * @brief Implementation of Sprite — billboard icon data object.
+ * @brief Implementation of Sprite - billboard icon data object.
  */
 
 #include "scene/Sprite.h"

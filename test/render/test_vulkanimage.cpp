@@ -10,7 +10,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for VulkanImage — RAII image creation, layout transition, and mipmap generation.
+ * @brief Tests for VulkanImage - RAII image creation, layout transition, and mipmap generation.
  *
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.

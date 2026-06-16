@@ -93,7 +93,7 @@ public:
 	Transform3D* GetTransformPtr() override { return this; }
 
 	// -----------------------------------------------------------------------
-	// Setters — mark cached matrix dirty
+	// Setters - mark cached matrix dirty
 	// -----------------------------------------------------------------------
 
 	/**

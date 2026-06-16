@@ -3,7 +3,7 @@
  * @brief Integration tests for Scene container wired with all real scene object types.
  *
  * TDD: RED (test written first) → GREEN (implementation verified).
- * All tests are pure CPU — no GPU required.
+ * All tests are pure CPU - no GPU required.
  *
  * Tests cover:
  * - Registering all six object types (Camera, Light, Mesh, Sprite, DebugLine, DebugPoints)
@@ -27,7 +27,7 @@
 using namespace neurus;
 
 // -----------------------------------------------------------------------
-// 1. Full scene registration — all six types in both type pool and obj_list
+// 1. Full scene registration - all six types in both type pool and obj_list
 // -----------------------------------------------------------------------
 
 /**
@@ -78,7 +78,7 @@ TEST(SceneIntegrationTest, RegisterAllObjectTypes)
 }
 
 // -----------------------------------------------------------------------
-// 2. Cross-pool isolation — objects are NOT in wrong type pools
+// 2. Cross-pool isolation - objects are NOT in wrong type pools
 // -----------------------------------------------------------------------
 
 /**
@@ -225,7 +225,7 @@ TEST(SceneIntegrationTest, StatusTrackingWithRealObjects)
 	EXPECT_FALSE(scene.CheckStatus(Scene::SceneModifStatus::CameraChanged));
 	EXPECT_FALSE(scene.CheckStatus(Scene::SceneModifStatus::LightChanged));
 
-	// Simulate camera change — set CameraChanged flag
+	// Simulate camera change - set CameraChanged flag
 	scene.UpdateSceneStatus(static_cast<int>(Scene::SceneModifStatus::CameraChanged), true);
 	EXPECT_TRUE(scene.CheckStatus(Scene::SceneModifStatus::CameraChanged));
 	EXPECT_FALSE(scene.CheckStatus(Scene::SceneModifStatus::LightChanged));
@@ -251,7 +251,7 @@ TEST(SceneIntegrationTest, StatusTrackingWithRealObjects)
 }
 
 // -----------------------------------------------------------------------
-// 6. UpdateObjTransforms — iterates and processes transforms
+// 6. UpdateObjTransforms - iterates and processes transforms
 // -----------------------------------------------------------------------
 
 /**
@@ -285,14 +285,14 @@ TEST(SceneIntegrationTest, UpdateObjTransformsIteratesAll)
 	scene.UseDebugLine(dLine);
 	scene.UseDebugPoints(dPoints);
 
-	// Register a sprite (no Transform3D — should not crash)
+	// Register a sprite (no Transform3D - should not crash)
 	auto sprite = std::make_shared<Sprite>();
 	scene.UseSprite(sprite);
 
 	// All 6 objects in obj_list
 	EXPECT_EQ(scene.obj_list.size(), 6u);
 
-	// Call UpdateObjTransforms — should iterate all, skip sprite (no transform),
+	// Call UpdateObjTransforms - should iterate all, skip sprite (no transform),
 	// and call GetModelMatrix() on the 5 objects with Transform3D
 	EXPECT_NO_THROW(scene.UpdateObjTransforms());
 
@@ -410,7 +410,7 @@ TEST(SceneIntegrationTest, LightPropertiesAfterRegistration)
 }
 
 // -----------------------------------------------------------------------
-// 9. Shared ownership — object stays alive after scene destruction
+// 9. Shared ownership - object stays alive after scene destruction
 // -----------------------------------------------------------------------
 
 /**

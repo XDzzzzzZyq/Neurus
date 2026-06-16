@@ -88,7 +88,7 @@ public:
 	using ResPool = std::unordered_map<int, Resource<Object>>;
 
 	// -------------------------------------------------------------------
-	// SceneModifStatus — change tracking bitfield
+	// SceneModifStatus - change tracking bitfield
 	// -------------------------------------------------------------------
 
 	/**
@@ -173,7 +173,7 @@ public:
 	ResPool<DebugPoints> dPoints_list;  ///< Debug point primitives
 
 	// -------------------------------------------------------------------
-	// Registration — store in both type-specific pool AND obj_list
+	// Registration - store in both type-specific pool AND obj_list
 	// -------------------------------------------------------------------
 
 	/**
@@ -260,7 +260,7 @@ public:
 
 	/**
 	 * @brief Updates all object transforms in the scene hierarchy.
-	 * @note Stub for MVP — implementation deferred until scene objects exist.
+	 * @note Stub for MVP - implementation deferred until scene objects exist.
 	 */
 	void UpdateObjTransforms();
 

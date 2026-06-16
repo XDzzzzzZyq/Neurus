@@ -33,7 +33,7 @@ private:
     const uint32_t* m_fragSpv;
     size_t m_fragSize;
 
-    // Vulkan resources (C API handles — QVulkanWindow uses C API internally)
+    // Vulkan resources (C API handles - QVulkanWindow uses C API internally)
     VkShaderModule m_vertModule = VK_NULL_HANDLE;
     VkShaderModule m_fragModule = VK_NULL_HANDLE;
     VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;

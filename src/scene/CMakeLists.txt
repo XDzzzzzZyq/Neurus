@@ -1,4 +1,4 @@
-# src/scene/CMakeLists.txt — Scene Layer Library
+# src/scene/CMakeLists.txt - Scene Layer Library
 #
 # Contains scene graph base classes: UID, ObjectID, and eventually
 # Camera, Light, Mesh, and other scene objects.

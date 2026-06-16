@@ -7,10 +7,10 @@ renders frames. It must remain stateless with respect to application logic.
 
 ## Location
 
-- `src/render/VulkanContext.h` — Instance, physical device, logical device, queues
-- `src/render/Swapchain.h` — Swapchain creation, image acquisition, presentation, recreation
-- `src/render/ShaderProgram.h` — SPIR-V loading, pipeline creation
-- `src/render/Renderer.h` — Public renderer API, frame drawing
+- `src/render/VulkanContext.h` - Instance, physical device, logical device, queues
+- `src/render/Swapchain.h` - Swapchain creation, image acquisition, presentation, recreation
+- `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
+- `src/render/Renderer.h` - Public renderer API, frame drawing
 
 ## Core Responsibilities
 
@@ -59,7 +59,7 @@ EventBus::renderRequested() → Renderer::DrawFrame()
 All Vulkan objects use the `vk::raii` namespace:
 
 ```cpp
-// DO: RAII — automatically destroyed on scope exit
+// DO: RAII - automatically destroyed on scope exit
 vk::raii::Device device(physicalDevice, deviceCreateInfo);
 
 // DON'T: raw handles requiring manual vkDestroy
@@ -117,13 +117,13 @@ vk::raii::Device device(physicalDevice, deviceCreateInfo);
 
 The triangle MVP implements a minimal but correct rendering path:
 
-1. **No vertex buffers** — Triangle vertices are hard-coded in the vertex shader
+1. **No vertex buffers** - Triangle vertices are hard-coded in the vertex shader
    using `gl_VertexIndex` to select positions/colors
-2. **No descriptor sets** — No uniforms needed for static triangle
-3. **No depth buffer** — Single triangle, no depth testing needed
-4. **VK_KHR_dynamic_rendering** — No explicit VkRenderPass/VkFramebuffer objects
-5. **Single command buffer** — Recorded once, replayed each frame
-6. **Single in-flight frame** — No frame overlap (fence-synchronized)
+2. **No descriptor sets** - No uniforms needed for static triangle
+3. **No depth buffer** - Single triangle, no depth testing needed
+4. **VK_KHR_dynamic_rendering** - No explicit VkRenderPass/VkFramebuffer objects
+5. **Single command buffer** - Recorded once, replayed each frame
+6. **Single in-flight frame** - No frame overlap (fence-synchronized)
 
 ## Future Evolution
 

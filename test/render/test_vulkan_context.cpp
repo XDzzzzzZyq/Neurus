@@ -8,7 +8,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for VulkanContext — instance creation, device selection, and cleanup.
+ * @brief Tests for VulkanContext - instance creation, device selection, and cleanup.
  *
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access by checking for available devices.

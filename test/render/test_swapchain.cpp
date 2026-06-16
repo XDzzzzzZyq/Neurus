@@ -21,7 +21,7 @@ TEST_F(SwapchainTest, Placeholder_CompilationGuard)
 {
 	if (!m_hasVulkan)
 	{
-		GTEST_SKIP() << "Swapchain tests require a Vulkan device + surface — not yet implemented in test fixture.";
+		GTEST_SKIP() << "Swapchain tests require a Vulkan device + surface - not yet implemented in test fixture.";
 	}
 
 	SUCCEED();

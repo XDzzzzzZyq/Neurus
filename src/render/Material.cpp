@@ -119,14 +119,14 @@ void Material::SetMatParam(MatParaType _tar, TextureLib::TextureRes _tex)
 
 Material::MaterialRes Material::LoadMaterial(std::string /*_path*/)
 {
-	// Stub — returns a default-constructed material.
+	// Stub - returns a default-constructed material.
 	// Full JSON parsing will be added post-MVP.
 	return std::make_shared<Material>();
 }
 
 void Material::ParseConfig(const std::string& /*_config*/)
 {
-	// Stub — actual configuration parsing will be added post-MVP.
+	// Stub - actual configuration parsing will be added post-MVP.
 }
 
 // ---------------------------------------------------------------------------
@@ -135,7 +135,7 @@ void Material::ParseConfig(const std::string& /*_config*/)
 
 void Material::BindMatTexture() const
 {
-	// Stub — actual Vulkan texture binding happens in the render pass.
+	// Stub - actual Vulkan texture binding happens in the render pass.
 	// This will iterate mat_params and bind MPARA_TEX entries.
 }
 

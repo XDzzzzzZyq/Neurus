@@ -77,12 +77,12 @@ public:
 	Camera();
 
 	/**
-	 * @brief Deleted copy constructor — Camera identity must be unique.
+	 * @brief Deleted copy constructor - Camera identity must be unique.
 	 */
 	Camera(const Camera&) = delete;
 
 	/**
-	 * @brief Deleted copy assignment — Camera identity must be unique.
+	 * @brief Deleted copy assignment - Camera identity must be unique.
 	 */
 	Camera& operator=(const Camera&) = delete;
 

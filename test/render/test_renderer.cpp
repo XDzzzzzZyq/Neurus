@@ -21,7 +21,7 @@ TEST_F(RendererTest, Placeholder_CompilationGuard)
 {
 	if (!m_hasVulkan)
 	{
-		GTEST_SKIP() << "Renderer tests require a full Vulkan pipeline — not yet implemented in test fixture.";
+		GTEST_SKIP() << "Renderer tests require a full Vulkan pipeline - not yet implemented in test fixture.";
 	}
 
 	SUCCEED();

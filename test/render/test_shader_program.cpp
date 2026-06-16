@@ -12,7 +12,7 @@ protected:
 	void SetUp() override
 	{
 		m_hasVulkan = false;
-		// Full Vulkan init needed for pipeline tests — placeholder
+		// Full Vulkan init needed for pipeline tests - placeholder
 	}
 
 	bool m_hasVulkan = false;
@@ -24,7 +24,7 @@ TEST_F(ShaderProgramTest, Placeholder_CompilationGuard)
 	// Full shader pipeline tests will be added when GPU test fixtures are complete.
 	if (!m_hasVulkan)
 	{
-		GTEST_SKIP() << "Shader pipeline tests require a full Vulkan device — not yet implemented in test fixture.";
+		GTEST_SKIP() << "Shader pipeline tests require a full Vulkan device - not yet implemented in test fixture.";
 	}
 
 	SUCCEED();

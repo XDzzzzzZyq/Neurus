@@ -5,7 +5,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for EditorContext — no GPU required.
+ * @brief Tests for EditorContext - no GPU required.
  */
 class EditorContextTest : public ::testing::Test
 {
@@ -27,7 +27,7 @@ TEST_F(EditorContextTest, Constructor_NoThrow)
 
 TEST_F(EditorContextTest, IsQObject)
 {
-	// EditorContext inherits QObject — verify it has a valid meta-object
+	// EditorContext inherits QObject - verify it has a valid meta-object
 	EXPECT_NE(m_context->metaObject(), nullptr);
 }
 

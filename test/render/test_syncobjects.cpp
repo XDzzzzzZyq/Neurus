@@ -12,7 +12,7 @@
 using namespace neurus;
 
 // ============================================================================
-// Barrier helper tests — pure construction, no device required
+// Barrier helper tests - pure construction, no device required
 // ============================================================================
 
 /**
@@ -95,7 +95,7 @@ TEST(SyncObjectsTest, BufferBarrier_CustomStages)
 }
 
 // ============================================================================
-// Device-dependent tests — require a Vulkan-capable GPU
+// Device-dependent tests - require a Vulkan-capable GPU
 // ============================================================================
 
 class SyncObjectsDeviceTest : public ::testing::Test
@@ -215,10 +215,10 @@ TEST_F(SyncObjectsDeviceTest, Fence_WaitAndReset_Signaled)
 
 	Fence fence(*m_device, vk::FenceCreateFlagBits::eSignaled);
 
-	// First wait — fence is signaled, should succeed immediately
+	// First wait - fence is signaled, should succeed immediately
 	EXPECT_TRUE(fence.WaitAndReset(0));
 
-	// Second wait — fence was reset to unsignaled, should time out immediately
+	// Second wait - fence was reset to unsignaled, should time out immediately
 	EXPECT_FALSE(fence.WaitAndReset(0));
 }
 

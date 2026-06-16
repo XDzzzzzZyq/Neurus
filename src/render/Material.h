@@ -64,7 +64,7 @@ public:
 		MAT_ALPHA,       ///< Opacity (float or texture)
 		MAT_NORMAL,      ///< Normal map (texture, tangent-space)
 		MAT_BUMP,        ///< Bump / height map (texture)
-		MAT_END          ///< Sentinel — number of parameter types
+		MAT_END          ///< Sentinel - number of parameter types
 	};
 
 	/**
@@ -144,7 +144,7 @@ public:
 	 * - Albedo:     white (1, 1, 1)
 	 * - Metallic:   0.0
 	 * - Roughness:  0.5
-	 * - Specular:   (0.04, 0.04, 0.04)  — dielectric F0
+	 * - Specular:   (0.04, 0.04, 0.04)  - dielectric F0
 	 * - Emissive:   black, strength 0
 	 * - Alpha:      1.0 (opaque)
 	 *
@@ -203,7 +203,7 @@ public:
 	 *
 	 * @param _config Material configuration string.
 	 *
-	 * @note Stub — actual JSON/file parsing will be added post-MVP.
+	 * @note Stub - actual JSON/file parsing will be added post-MVP.
 	 */
 	void ParseConfig(const std::string& _config);
 

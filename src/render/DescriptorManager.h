@@ -13,7 +13,7 @@ class DescriptorPool;
 class DescriptorSet;
 
 // ---------------------------------------------------------------------------
-// DescriptorSetLayoutBuilder — Fluent API for building bindings vectors
+// DescriptorSetLayoutBuilder - Fluent API for building bindings vectors
 // ---------------------------------------------------------------------------
 
 /**
@@ -69,7 +69,7 @@ private:
 DescriptorSetLayoutBuilder BuildLayout();
 
 // ---------------------------------------------------------------------------
-// DescriptorSetLayout — RAII wrapper around vk::raii::DescriptorSetLayout
+// DescriptorSetLayout - RAII wrapper around vk::raii::DescriptorSetLayout
 // ---------------------------------------------------------------------------
 
 /**
@@ -113,7 +113,7 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// DescriptorSet — A single allocated descriptor set with write helpers
+// DescriptorSet - A single allocated descriptor set with write helpers
 // ---------------------------------------------------------------------------
 
 /**
@@ -186,7 +186,7 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// DescriptorPool — RAII wrapper around vk::raii::DescriptorPool
+// DescriptorPool - RAII wrapper around vk::raii::DescriptorPool
 // ---------------------------------------------------------------------------
 
 /**

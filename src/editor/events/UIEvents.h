@@ -9,7 +9,7 @@ namespace neurus {
  * @brief Singleton Qt signal bus for UI Layer ↔ Editor Layer communication.
  *
  * Owns signals related to window lifecycle, rendering triggers, and Vulkan device
- * status. These signals are Qt-dependent by design — the UI layer (QWindow,
+ * status. These signals are Qt-dependent by design - the UI layer (QWindow,
  * QTimer, Qt event loop) emits them, and Editor/Renderer slots consume them.
  *
  * For Editor ↔ Renderer typed events (no Qt dependency), see EventBus.h.

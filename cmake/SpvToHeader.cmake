@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# SpvToHeader.cmake — Convert SPIR-V binary to C uint32_t array header
+# SpvToHeader.cmake - Convert SPIR-V binary to C uint32_t array header
 #
 # Usage: cmake -DSPV_FILE=shader.spv -DHEADER_FILE=shader.h -DARRAY_NAME=name -P SpvToHeader.cmake
 # ---------------------------------------------------------------------------

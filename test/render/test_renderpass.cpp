@@ -13,7 +13,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for RenderPassManager — dynamic rendering pass orchestration.
+ * @brief Tests for RenderPassManager - dynamic rendering pass orchestration.
  *
  * Validates BeginPass/EndPass using VK_KHR_dynamic_rendering with preset
  * clear values per pass type.
@@ -273,7 +273,7 @@ TEST_F(RenderPassManagerTest, PresetClearValues_PostFX)
 }
 
 // ---------------------------------------------------------------------------
-// BeginPass / EndPass — Basic Smoke Test (single color, no depth)
+// BeginPass / EndPass - Basic Smoke Test (single color, no depth)
 // ---------------------------------------------------------------------------
 
 TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
@@ -323,7 +323,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
 }
 
 // ---------------------------------------------------------------------------
-// BeginPass / EndPass — Depth Attachment
+// BeginPass / EndPass - Depth Attachment
 // ---------------------------------------------------------------------------
 
 TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
@@ -384,7 +384,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
 }
 
 // ---------------------------------------------------------------------------
-// BeginPass / EndPass — G-Buffer (multiple color + depth)
+// BeginPass / EndPass - G-Buffer (multiple color + depth)
 // ---------------------------------------------------------------------------
 
 TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)

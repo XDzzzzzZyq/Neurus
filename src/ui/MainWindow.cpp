@@ -31,7 +31,7 @@ MainWindow::MainWindow(const vk::raii::Instance& vulkanInstance,
 
 	m_hwnd = CreateWindowEx(
 		0, L"NeurusVulkanWindow", L"Neurus",
-		WS_OVERLAPPEDWINDOW,  // Not WS_VISIBLE — show after swapchain is ready
+		WS_OVERLAPPEDWINDOW,  // Not WS_VISIBLE - show after swapchain is ready
 		CW_USEDEFAULT, CW_USEDEFAULT, m_width, m_height,
 		nullptr, nullptr, hinstance, nullptr);
 

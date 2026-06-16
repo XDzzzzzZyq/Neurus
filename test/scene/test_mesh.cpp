@@ -245,7 +245,7 @@ TEST(Mesh, SetMatColorVec3)
 TEST(Mesh, SetMatColorNoMaterialNoCrash)
 {
 	Mesh mesh;
-	// No material assigned — calling SetMatColor should be safe
+	// No material assigned - calling SetMatColor should be safe
 	mesh.SetMatColor(Material::MAT_ALBEDO, glm::vec3(1.0f));
 	mesh.SetMatColor(Material::MAT_METAL, 0.5f);
 	// Reaching this line means no crash
@@ -280,7 +280,7 @@ TEST(Mesh, SetObjShader)
 TEST(Mesh, SetTexNoMaterialNoCrash)
 {
 	Mesh mesh;
-	// No material — should be safe (no-op or error-free)
+	// No material - should be safe (no-op or error-free)
 	mesh.SetTex(Material::MAT_NORMAL, "dummy.png");
 	SUCCEED();
 }

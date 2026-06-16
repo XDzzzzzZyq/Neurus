@@ -11,7 +11,7 @@ VulkanWidget::VulkanWidget(QWidget* parent)
 	// Ensure a dedicated native window handle exists for Vulkan surface creation
 	setAttribute(Qt::WA_NativeWindow);
 
-	// Tell Qt this widget paints all its pixels — no background fill needed.
+	// Tell Qt this widget paints all its pixels - no background fill needed.
 	// Vulkan handles all rendering for this widget's area.
 	setAttribute(Qt::WA_OpaquePaintEvent);
 	setAutoFillBackground(false);

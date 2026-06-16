@@ -32,7 +32,7 @@ public:
 	              vk::Extent2D extent);
 	~ShaderProgram();
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	ShaderProgram(const ShaderProgram&) = delete;
 	ShaderProgram& operator=(const ShaderProgram&) = delete;
 

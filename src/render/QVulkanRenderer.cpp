@@ -54,7 +54,7 @@ void QVulkanRenderer::initResources()
 
     VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
 
-    // --- Vertex input (no vertex buffers — triangle MVP) ---
+    // --- Vertex input (no vertex buffers - triangle MVP) ---
     VkPipelineVertexInputStateCreateInfo vertexInput{};
     vertexInput.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
@@ -128,7 +128,7 @@ void QVulkanRenderer::initResources()
 
 void QVulkanRenderer::initSwapChainResources()
 {
-    // Nothing to do — viewport/scissor set dynamically in startNextFrame
+    // Nothing to do - viewport/scissor set dynamically in startNextFrame
 }
 
 void QVulkanRenderer::releaseSwapChainResources()

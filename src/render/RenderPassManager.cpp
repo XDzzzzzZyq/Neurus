@@ -6,7 +6,7 @@
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Static helpers — pass configuration
+// Static helpers - pass configuration
 // ---------------------------------------------------------------------------
 
 /** @brief Returns color attachment load op for a pass type. */
@@ -207,11 +207,11 @@ std::vector<vk::ClearValue> RenderPassManager::PresetClearValues(PassType passTy
 	const uint32_t colorCount = ColorAttachmentCount(passType);
 	const bool hasDepth = HasDepth(passType);
 
-	// Color clear values — all black (0, 0, 0, 0)
+	// Color clear values - all black (0, 0, 0, 0)
 	const vk::ClearValue blackColor(vk::ClearColorValue(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f}));
 	result.insert(result.end(), colorCount, blackColor);
 
-	// Depth clear value — far plane (1.0f)
+	// Depth clear value - far plane (1.0f)
 	if (hasDepth)
 	{
 		const vk::ClearValue depthClear(vk::ClearDepthStencilValue(1.0f, 0));

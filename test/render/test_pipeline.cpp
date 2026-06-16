@@ -14,7 +14,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for PipelineBuilder — fluent graphics pipeline construction.
+ * @brief Tests for PipelineBuilder - fluent graphics pipeline construction.
  *
  * Creates a headless Vulkan device with dynamicRendering enabled and
  * validates pipeline creation through the builder API.
@@ -381,7 +381,7 @@ TEST_F(PipelineBuilderTest, SetPipelineCache_CreatesValidPipeline)
 }
 
 // ---------------------------------------------------------------------------
-// Missing shader stages — should throw
+// Missing shader stages - should throw
 // ---------------------------------------------------------------------------
 
 TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_NoStages_Throws)
@@ -407,7 +407,7 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_NoStages_Throws)
 }
 
 // ---------------------------------------------------------------------------
-// Missing color formats — should throw
+// Missing color formats - should throw
 // ---------------------------------------------------------------------------
 
 TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_NoColorFormats_Throws)
@@ -433,7 +433,7 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_NoColorFormats_Throws)
 				.SetMultisampling()
 				.SetDepthStencil(false, false)
 				.SetColorBlendAttachment()
-				// No SetColorFormats() call — should throw
+				// No SetColorFormats() call - should throw
 				.BuildGraphicsPipeline(*m_device);
 		},
 		std::runtime_error);

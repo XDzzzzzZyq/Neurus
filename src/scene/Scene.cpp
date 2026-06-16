@@ -1,6 +1,6 @@
 /**
  * @file Scene.cpp
- * @brief Scene container implementation — status tracking and object lookup.
+ * @brief Scene container implementation - status tracking and object lookup.
  */
 
 #include "Scene.h"

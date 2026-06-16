@@ -1,4 +1,4 @@
-# Neurus — Environment Setup Script
+# Neurus - Environment Setup Script
 #
 # Run this script after installing the prerequisites:
 #   1. Vulkan SDK 1.4.x from https://vulkan.lunarg.com/ (install to D:\VulkanSDK)

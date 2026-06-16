@@ -12,7 +12,7 @@ namespace neurus {
  *
  * Provides BeginPass/EndPass wrappers around vkCmdBeginRendering/vkCmdEndRendering
  * with per-pass-type preset load/store operations and clear values.
- * No VkRenderPass or VkFramebuffer is used — dynamic rendering only.
+ * No VkRenderPass or VkFramebuffer is used - dynamic rendering only.
  *
  * Stateless: all pass state is carried in the command buffer by the driver.
  *

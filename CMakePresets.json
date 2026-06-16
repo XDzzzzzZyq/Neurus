@@ -4,7 +4,7 @@
 		{
 			"name": "default",
 			"displayName": "Windows x64 Debug (MSVC)",
-			"description": "Debug build with validation layers and tests — uses VS 2022 + MSVC",
+			"description": "Debug build with validation layers and tests - uses VS 2022 + MSVC",
 			"generator": "Visual Studio 17 2022",
 			"binaryDir": "${sourceDir}/build/debug",
 			"architecture": {
@@ -23,7 +23,7 @@
 		{
 			"name": "release",
 			"displayName": "Windows x64 Release (MSVC)",
-			"description": "Optimized release build — uses VS 2022 + MSVC",
+			"description": "Optimized release build - uses VS 2022 + MSVC",
 			"generator": "Visual Studio 17 2022",
 			"binaryDir": "${sourceDir}/build/release",
 			"architecture": {

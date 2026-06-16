@@ -182,7 +182,7 @@ std::vector<uint8_t> Screenshot::convertHalfToU8(const void* data,
 	{
 		for (int c = 0; c < 4; ++c)
 		{
-			// Read as raw uint16_t (little-endian ordering — GPU uses native endian)
+			// Read as raw uint16_t (little-endian ordering - GPU uses native endian)
 			// Vulkan spec: data in buffer matches host endian
 			uint16_t raw = src[i * 4 + c];
 
@@ -466,7 +466,7 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
 		// Transition SHADER_READ_ONLY → TRANSFER_SRC
-		// (image may also be in UNDEFINED or GENERAL; use oldLayout from VulkanImage? No — we
+		// (image may also be in UNDEFINED or GENERAL; use oldLayout from VulkanImage? No - we
 		//  transition from UNDEFINED for simplicity; the real layout may be SHADER_READ_ONLY
 		//  after rendering. For a readback, transitioning from SHADER_READ_ONLY is safe.)
 		vk::ImageMemoryBarrier barrier(

@@ -12,7 +12,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for CommandBuffer — RAII wrapper around vk::raii::CommandBuffer.
+ * @brief Tests for CommandBuffer - RAII wrapper around vk::raii::CommandBuffer.
  *
  * Creates Vulkan instance, device, and command pool (no surface needed for
  * command buffer operations).

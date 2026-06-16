@@ -98,7 +98,7 @@ TEST(MaterialTest, DefaultConstruction_SetsDefaults)
 }
 
 // ---------------------------------------------------------------------------
-// 2. SetMatParam — float overload
+// 2. SetMatParam - float overload
 // ---------------------------------------------------------------------------
 
 TEST(MaterialTest, SetMatParam_Float)
@@ -116,7 +116,7 @@ TEST(MaterialTest, SetMatParam_Float)
 }
 
 // ---------------------------------------------------------------------------
-// 3. SetMatParam — vec3 (colour) overload
+// 3. SetMatParam - vec3 (colour) overload
 // ---------------------------------------------------------------------------
 
 TEST(MaterialTest, SetMatParam_Vec3)
@@ -137,14 +137,14 @@ TEST(MaterialTest, SetMatParam_Vec3)
 }
 
 // ---------------------------------------------------------------------------
-// 4. SetMatParam — texture overload (shared_ptr<Texture>)
+// 4. SetMatParam - texture overload (shared_ptr<Texture>)
 // ---------------------------------------------------------------------------
 
 TEST(MaterialTest, SetMatParam_Texture)
 {
 	Material mat;
 
-	// Use a default-constructed shared_ptr (nullptr) — no GPU needed
+	// Use a default-constructed shared_ptr (nullptr) - no GPU needed
 	TextureLib::TextureRes tex = std::make_shared<Texture>();
 
 	mat.SetMatParam(Material::MAT_NORMAL, tex);
@@ -159,7 +159,7 @@ TEST(MaterialTest, SetMatParam_Texture)
 }
 
 // ---------------------------------------------------------------------------
-// 5. SetMatParam — change data type via MatDataType overload
+// 5. SetMatParam - change data type via MatDataType overload
 // ---------------------------------------------------------------------------
 
 TEST(MaterialTest, SetMatParam_ChangeType)
@@ -333,7 +333,7 @@ TEST(MaterialTest, InvalidMatParaType_NoOp)
 {
 	Material mat;
 
-	// MAT_NONE (-1) is not in the map — must not crash
+	// MAT_NONE (-1) is not in the map - must not crash
 	EXPECT_NO_THROW(mat.SetMatParam(static_cast<Material::MatParaType>(Material::MAT_NONE), 1.0f));
 	EXPECT_NO_THROW(mat.SetMatParam(static_cast<Material::MatParaType>(Material::MAT_NONE), glm::vec3(1.0f)));
 	EXPECT_NO_THROW(mat.SetMatParam(static_cast<Material::MatParaType>(Material::MAT_NONE), Material::MPARA_FLT));

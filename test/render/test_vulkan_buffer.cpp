@@ -12,7 +12,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for VulkanBuffer — RAII buffer + staging upload.
+ * @brief Tests for VulkanBuffer - RAII buffer + staging upload.
  *
  * Creates Vulkan instance and device without a surface (graphics queue
  * without present support is sufficient for buffer operations).
@@ -179,7 +179,7 @@ TEST_F(VulkanBufferTest, UploadThenMap_DataRoundtrips)
 }
 
 // ---------------------------------------------------------------------------
-// Map + write + Unmap + Map + read (no staging — direct host-visible access)
+// Map + write + Unmap + Map + read (no staging - direct host-visible access)
 // ---------------------------------------------------------------------------
 
 TEST_F(VulkanBufferTest, MapWriteThenRead_DataRoundtrips)

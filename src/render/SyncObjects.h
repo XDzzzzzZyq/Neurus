@@ -10,7 +10,7 @@ namespace neurus {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** @brief Default fence timeout: 100 ms — finite timeout prevents main-thread deadlock. */
+/** @brief Default fence timeout: 100 ms - finite timeout prevents main-thread deadlock. */
 constexpr uint64_t kDefaultFenceTimeoutNs = 100'000'000;
 
 // ---------------------------------------------------------------------------

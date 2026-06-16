@@ -9,7 +9,7 @@
  * Architecture:
  * - Used by layers that need to describe shader uniform/parameter types
  * - Does NOT own values or provide storage (cf. OpenGL Parameters class)
- * - Pure type metadata — no runtime state
+ * - Pure type metadata - no runtime state
  *
  * @note ParaType is designed to match shader uniform types, not UI types.
  */

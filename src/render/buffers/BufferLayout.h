@@ -14,7 +14,7 @@ namespace neurus {
  * Produces VkVertexInputBindingDescription and VkVertexInputAttributeDescription
  * structures for use in VkPipelineVertexInputStateCreateInfo.
  *
- * @note Configurable — no hardcoded vertex layouts. Callers add attributes
+ * @note Configurable - no hardcoded vertex layouts. Callers add attributes
  *       matching their vertex data structure.
  *
  * Usage:

@@ -1,4 +1,4 @@
-# src/core/CMakeLists.txt — Core Type Definitions (header-only)
+# src/core/CMakeLists.txt - Core Type Definitions (header-only)
 
 add_library(neurus_core INTERFACE)
 

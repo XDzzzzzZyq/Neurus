@@ -1,5 +1,7 @@
 #include "VulkanImage.h"
 
+#include "Log.h"
+
 #include <stdexcept>
 #include <algorithm>
 
@@ -25,6 +27,17 @@ VulkanImage::VulkanImage(const vk::raii::Device& device,
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
 	createImageView(device);
+
+	{
+		const char* typeStr = (m_imageType == ImageType::e2D) ? "2D" :
+		                      (m_imageType == ImageType::eCube) ? "Cube" :
+		                      (m_imageType == ImageType::eDepthStencil) ? "DepthStencil" : "Unknown";
+		NEURUS_LOG("[VulkanImage] " << m_extent.width << "x" << m_extent.height
+		          << " mips=" << m_mipLevels
+		          << " type=" << typeStr
+		          << " format=" << vk::to_string(m_format)
+		          << " usage=" << vk::to_string(m_usage));
+	}
 }
 
 // ---------------------------------------------------------------------------

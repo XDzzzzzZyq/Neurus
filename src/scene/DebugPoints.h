@@ -10,11 +10,11 @@
  * Architecture:
  * - Inherits ObjectID for scene graph identity and type discrimination
  * - Inherits Transform3D for world-space placement
- * - Point storage via std::vector<glm::vec3> — no GPU resources
+ * - Point storage via std::vector<glm::vec3> - no GPU resources
  * - PointType enum for choosing point sprite shape
  * - PushDebugPoint/PushDebugPoints for adding point data
  *
- * @note No GPU resources or shaders — pure CPU data container.
+ * @note No GPU resources or shaders - pure CPU data container.
  */
 
 #pragma once

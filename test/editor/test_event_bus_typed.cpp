@@ -8,7 +8,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for the typed EventPool (EventBus) — no Qt, no GPU required.
+ * @brief Tests for the typed EventPool (EventBus) - no Qt, no GPU required.
  *
  * These tests validate the typed event dispatch system: subscribe, emit,
  * deferred Process(), independent event channels, and handler ordering.
@@ -24,7 +24,7 @@ protected:
 
 	void TearDown() override
 	{
-		// Each test starts fresh — Process any remaining events
+		// Each test starts fresh - Process any remaining events
 		m_pool->Process();
 	}
 
@@ -48,7 +48,7 @@ TEST_F(TypedEventBusTest, SubscribeAndEmit_HandlerReceivesEvent)
 
 	m_pool->enqueue(ObjectSelected{42});
 
-	// Not received yet — deferred dispatch
+	// Not received yet - deferred dispatch
 	EXPECT_FALSE(received);
 
 	m_pool->Process();
@@ -80,7 +80,7 @@ TEST_F(TypedEventBusTest, Process_EmptyQueueIsNoOp)
 
 TEST_F(TypedEventBusTest, Emit_WithoutSubscribersIsNoOp)
 {
-	// No subscribers registered — emit + process should not crash
+	// No subscribers registered - emit + process should not crash
 	EXPECT_NO_THROW({
 		m_pool->enqueue(ObjectSelected{99});
 		m_pool->Process();
@@ -254,7 +254,7 @@ TEST_F(TypedEventBusTest, Process_MaxEventsCapPreventsInfiniteLoop)
 
 	m_pool->enqueue(ObjectSelected{0});
 
-	// Should not hang — capped at maxEvents
+	// Should not hang - capped at maxEvents
 	EXPECT_NO_THROW({ m_pool->Process(10); });
 }
 

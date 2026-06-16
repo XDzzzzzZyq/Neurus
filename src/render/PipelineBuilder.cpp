@@ -268,17 +268,17 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 	{
 		throw std::runtime_error(
 			"PipelineBuilder::BuildGraphicsPipeline: "
-			"no shader stages added — call AddShaderStage() at least once.");
+			"no shader stages added - call AddShaderStage() at least once.");
 	}
 
 	if (m_colorFormats.empty() && !m_depthFormat.has_value())
 	{
 		throw std::runtime_error(
 			"PipelineBuilder::BuildGraphicsPipeline: "
-			"no color or depth format set — call SetColorFormats() or SetDepthFormat().");
+			"no color or depth format set - call SetColorFormats() or SetDepthFormat().");
 	}
 
-	// --- Viewport state (dynamic — count non-zero, pointers null) ---
+	// --- Viewport state (dynamic - count non-zero, pointers null) ---
 	vk::PipelineViewportStateCreateInfo viewportState({}, 1, nullptr, 1, nullptr);
 
 	// --- Dynamic state ---

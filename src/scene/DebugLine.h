@@ -10,10 +10,10 @@
  * Architecture:
  * - Inherits ObjectID for scene graph identity and type discrimination
  * - Inherits Transform3D for world-space placement
- * - Vertex storage via std::vector<glm::vec3> — no GPU resources
+ * - Vertex storage via std::vector<glm::vec3> - no GPU resources
  * - PushDebugLine/PushDebugLines for adding segment data
  *
- * @note No GPU resources or shaders — pure CPU data container.
+ * @note No GPU resources or shaders - pure CPU data container.
  * @note Vertices are interpreted as pairs for line segments.
  */
 

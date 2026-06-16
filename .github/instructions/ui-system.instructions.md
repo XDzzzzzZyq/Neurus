@@ -6,12 +6,12 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 
 ## Location
 
-- `src/ui/NeurusMainWindow.h/cpp` — QMainWindow subclass with ADS dock manager + menus
-- `src/ui/VulkanWindow.h/cpp` — QVulkanWindow subclass hosting the triangle renderer
-- `src/ui/MainWindow.h/cpp` — (legacy) QWindow subclass
-- `src/ui/VulkanWidget.h/cpp` — (legacy) QWidget subclass with native HWND for vk::raii surface
-- `src/ui/qml/main.qml` — (legacy) QML source
-- `src/render/QVulkanRenderer.h/cpp` — QVulkanWindowRenderer implementation (triangle pipeline)
+- `src/ui/NeurusMainWindow.h/cpp` - QMainWindow subclass with ADS dock manager + menus
+- `src/ui/VulkanWindow.h/cpp` - QVulkanWindow subclass hosting the triangle renderer
+- `src/ui/MainWindow.h/cpp` - (legacy) QWindow subclass
+- `src/ui/VulkanWidget.h/cpp` - (legacy) QWidget subclass with native HWND for vk::raii surface
+- `src/ui/qml/main.qml` - (legacy) QML source
+- `src/render/QVulkanRenderer.h/cpp` - QVulkanWindowRenderer implementation (triangle pipeline)
 
 ## Rendering Architecture
 
@@ -71,7 +71,7 @@ mainWindow->createViewportDock(container);
 
 - **View → Save Layout** (`Ctrl+Shift+S`): Serializes dock state to `<appdir>/layout.ads`
 - **View → Restore Default Layout**: Deletes non-viewport docks, re-creates default arrangement
-- **Auto-load**: `LoadLayout()` called in constructor — restores saved state on startup if available
+- **Auto-load**: `LoadLayout()` called in constructor - restores saved state on startup if available
 - Viewport dock is identified by `setObjectName("ViewportDock")` for `restoreState()` matching
 - Viewport created first in `CreateDocks()` (ADS requires central widget as first dock)
 
@@ -120,8 +120,8 @@ target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 ## Legacy Code
 
 The following files are retained as reference implementations but are no longer the primary rendering path:
-- `VulkanWidget.h/cpp` — vk::raii surface via native HWND
-- `MainWindow.h/cpp` — original QWindow subclass
-- `main.qml` — original QML window
-- `Renderer.h/cpp` — vk::raii render loop with dynamic rendering
-- `Swapchain.h/cpp` — manual vk::raii swapchain management
+- `VulkanWidget.h/cpp` - vk::raii surface via native HWND
+- `MainWindow.h/cpp` - original QWindow subclass
+- `main.qml` - original QML window
+- `Renderer.h/cpp` - vk::raii render loop with dynamic rendering
+- `Swapchain.h/cpp` - manual vk::raii swapchain management

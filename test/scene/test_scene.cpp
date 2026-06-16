@@ -3,7 +3,7 @@
  * @brief Unit tests for Scene container class.
  *
  * TDD: RED (test written first) → GREEN (implementation verified).
- * All tests are pure CPU — no GPU required.
+ * All tests are pure CPU - no GPU required.
  *
  * Tests cover:
  * - Scene inherits UID with its own ID

@@ -12,7 +12,7 @@ class Scene;
  * Provides immutable scene data to the Renderer layer and mutable
  * editor state (selections, active tool, etc.) to the UI layer.
  *
- * For the Triangle MVP, this is a stub — no scene graph exists yet.
+ * For the Triangle MVP, this is a stub - no scene graph exists yet.
  */
 class EditorContext : public QObject
 {

@@ -82,7 +82,7 @@ static QWidget* makePlaceholder(const QString& text)
 void NeurusMainWindow::CreateDocks()
 {
 	if (m_viewportWidget == nullptr) {
-		// --- Viewport (MUST be created FIRST — ADS central widget requirement) ---
+		// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
 		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
 		m_viewportDock->setWidget(makePlaceholder("Viewport"));  // for restoreState matching
 		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);

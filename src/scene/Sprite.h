@@ -9,7 +9,7 @@
  * - Sprite inherits ObjectID for scene graph identity and type tracking
  * - Holds a shared_ptr<Texture> reference (GPU resource owned by Renderer)
  * - ParsePath() resolves icon file paths based on SpriteType
- * - Pure data class — no GPU rendering logic
+ * - Pure data class - no GPU rendering logic
  *
  * @note GPU rendering of sprites is a separate concern and lives in the
  *       Renderer layer (future: sprite shader pipeline).

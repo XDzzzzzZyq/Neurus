@@ -18,7 +18,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for Screenshot — GPU image capture to PNG via staging buffer.
+ * @brief Tests for Screenshot - GPU image capture to PNG via staging buffer.
  *
  * Creates a VulkanImage, uploads known pixel data, captures to PNG,
  * and verifies file existence and non-zero size.
@@ -231,7 +231,7 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// CaptureAttachment — RGBA8 image → PNG
+// CaptureAttachment - RGBA8 image → PNG
 // ---------------------------------------------------------------------------
 
 TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
@@ -278,7 +278,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 }
 
 // ---------------------------------------------------------------------------
-// CaptureAttachment — RGBA16F image → PNG (half-float conversion)
+// CaptureAttachment - RGBA16F image → PNG (half-float conversion)
 // ---------------------------------------------------------------------------
 
 TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
@@ -338,7 +338,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 }
 
 // ---------------------------------------------------------------------------
-// CaptureAttachment — handles non-existent directory (auto-creation)
+// CaptureAttachment - handles non-existent directory (auto-creation)
 // ---------------------------------------------------------------------------
 
 TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
@@ -389,7 +389,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 }
 
 // ---------------------------------------------------------------------------
-// CaptureAttachment — non-copyable class check
+// CaptureAttachment - non-copyable class check
 // ---------------------------------------------------------------------------
 
 TEST_F(ScreenshotTest, NonCopyable)

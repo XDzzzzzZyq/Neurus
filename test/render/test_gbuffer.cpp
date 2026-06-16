@@ -1,6 +1,6 @@
 /**
  * @file test_gbuffer.cpp
- * @brief Tests for GeometryPass — G-Buffer MRT rendering.
+ * @brief Tests for GeometryPass - G-Buffer MRT rendering.
  *
  * Validates:
  *   - GeometryPass constructor creates a valid pipeline
@@ -290,7 +290,7 @@ protected:
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
-// 1. Constructor — pipeline is created successfully
+// 1. Constructor - pipeline is created successfully
 // ---------------------------------------------------------------------------
 
 TEST_F(GeometryPassTest, Constructor_CreatesValidPipeline)
@@ -300,13 +300,13 @@ TEST_F(GeometryPassTest, Constructor_CreatesValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// GeometryPass was created in SetUp — verify it exists
+	// GeometryPass was created in SetUp - verify it exists
 	ASSERT_NE(m_geometryPass, nullptr);
 	SUCCEED();
 }
 
 // ---------------------------------------------------------------------------
-// 2. Record — single triangle, no validation errors
+// 2. Record - single triangle, no validation errors
 // ---------------------------------------------------------------------------
 
 TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
@@ -360,7 +360,7 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 }
 
 // ---------------------------------------------------------------------------
-// 3. Record — multiple render items
+// 3. Record - multiple render items
 // ---------------------------------------------------------------------------
 
 TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
@@ -414,7 +414,7 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 }
 
 // ---------------------------------------------------------------------------
-// 4. Record — empty render items (should not crash)
+// 4. Record - empty render items (should not crash)
 // ---------------------------------------------------------------------------
 
 TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
@@ -462,7 +462,7 @@ TEST_F(GeometryPassTest, Movable)
 }
 
 // ---------------------------------------------------------------------------
-// 6. Camera UBO layout — size sanity check
+// 6. Camera UBO layout - size sanity check
 // ---------------------------------------------------------------------------
 
 TEST_F(GeometryPassTest, CameraUBOData_SizeMatchesShaderExpectation)

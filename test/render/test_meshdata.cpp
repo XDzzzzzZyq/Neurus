@@ -22,7 +22,7 @@ static std::string MakeObj(std::initializer_list<const char*> lines)
 }
 
 // ---------------------------------------------------------------------------
-// 1. Simple triangle — all components (pos, uv, norm)
+// 1. Simple triangle - all components (pos, uv, norm)
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, Triangle_AllComponents)
@@ -82,7 +82,7 @@ TEST(MeshDataTest, Triangle_AllComponents)
 }
 
 // ---------------------------------------------------------------------------
-// 2. Triangle without UVs — format: f v//vn
+// 2. Triangle without UVs - format: f v//vn
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, Triangle_NoUVs)
@@ -113,7 +113,7 @@ TEST(MeshDataTest, Triangle_NoUVs)
 }
 
 // ---------------------------------------------------------------------------
-// 3. Triangle without normals — format: f v/vt
+// 3. Triangle without normals - format: f v/vt
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, Triangle_NoNormals)
@@ -147,7 +147,7 @@ TEST(MeshDataTest, Triangle_NoNormals)
 }
 
 // ---------------------------------------------------------------------------
-// 4. Triangle with only positions — format: f v
+// 4. Triangle with only positions - format: f v
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, Triangle_OnlyPositions)
@@ -177,7 +177,7 @@ TEST(MeshDataTest, Triangle_OnlyPositions)
 }
 
 // ---------------------------------------------------------------------------
-// 5. Quad face — should triangulate into 2 triangles (6 indices, 4 unique verts)
+// 5. Quad face - should triangulate into 2 triangles (6 indices, 4 unique verts)
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, Quad_Triangulation)
@@ -214,7 +214,7 @@ TEST(MeshDataTest, Quad_Triangulation)
 }
 
 // ---------------------------------------------------------------------------
-// 6. Comments and empty lines — should be ignored
+// 6. Comments and empty lines - should be ignored
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, CommentsAndEmptyLines)
@@ -240,7 +240,7 @@ TEST(MeshDataTest, CommentsAndEmptyLines)
 }
 
 // ---------------------------------------------------------------------------
-// 7. Negative / relative indices — -1 = last, -2 = second-to-last, etc.
+// 7. Negative / relative indices - -1 = last, -2 = second-to-last, etc.
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, NegativeIndices)
@@ -278,7 +278,7 @@ TEST(MeshDataTest, NegativeIndices)
 }
 
 // ---------------------------------------------------------------------------
-// 8. Vertex deduplication — reused vertices should share index
+// 8. Vertex deduplication - reused vertices should share index
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, VertexDeduplication)
@@ -315,7 +315,7 @@ TEST(MeshDataTest, VertexDeduplication)
 }
 
 // ---------------------------------------------------------------------------
-// 9. Object name — parsed from 'o' line
+// 9. Object name - parsed from 'o' line
 // ---------------------------------------------------------------------------
 
 TEST(MeshDataTest, ObjectName)

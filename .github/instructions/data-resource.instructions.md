@@ -6,15 +6,15 @@ The Data & Resource layer manages **GPU resource lifecycles** and provides an
 **asset pipeline** for loading external data. It abstracts Vulkan buffer/image
 allocation, descriptor set management, and resource caching.
 
-For the Triangle MVP, this layer is a **stub** — minimal abstractions that
+For the Triangle MVP, this layer is a **stub** - minimal abstractions that
 establish the API contract without full implementation.
 
 ## Location
 
-- `src/data/GPUResource.h` — Abstract GPU resource base class
-- `src/data/Buffer.h` — Vulkan buffer + device memory abstraction (future)
-- `src/data/Image.h` — Vulkan image + memory + image view abstraction (future)
-- `src/data/DescriptorPool.h` — Descriptor set allocation (future)
+- `src/data/GPUResource.h` - Abstract GPU resource base class
+- `src/data/Buffer.h` - Vulkan buffer + device memory abstraction (future)
+- `src/data/Image.h` - Vulkan image + memory + image view abstraction (future)
+- `src/data/DescriptorPool.h` - Descriptor set allocation (future)
 
 ## Core Responsibilities
 

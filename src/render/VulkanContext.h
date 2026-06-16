@@ -13,8 +13,8 @@ namespace neurus {
  *
  * Two-phase construction to avoid moving the instance while the surface
  * holds a reference to its dispatcher:
- *   1. VulkanContext(std::move(instance)) — stores the instance (no move during surface lifetime)
- *   2. initDevice(surface) — creates physical device + logical device
+ *   1. VulkanContext(std::move(instance)) - stores the instance (no move during surface lifetime)
+ *   2. initDevice(surface) - creates physical device + logical device
  */
 class VulkanContext
 {

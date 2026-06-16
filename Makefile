@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------------------
-# Neurus — Convenience Build Wrapper
+# Neurus - Convenience Build Wrapper
 #
 # This Makefile provides quick-build shortcuts. All real logic is in CMake.
 # Requires: cmake >= 3.27, Visual Studio 2022 with C++20 toolchain
@@ -41,10 +41,10 @@ help:
 	@echo "Neurus Build System"
 	@echo "==================="
 	@echo ""
-	@echo "  make configure   — Configure Debug build (VS 2022)"
-	@echo "  make build       — Build Debug"
-	@echo "  make test        — Run tests (Debug)"
-	@echo "  make clean       — Clean Debug build"
-	@echo "  make release     — Configure + Build Release"
-	@echo "  make nobuild     — Generate VS 2022 solution at ../Neurus_VS2022"
+	@echo "  make configure   - Configure Debug build (VS 2022)"
+	@echo "  make build       - Build Debug"
+	@echo "  make test        - Run tests (Debug)"
+	@echo "  make clean       - Clean Debug build"
+	@echo "  make release     - Configure + Build Release"
+	@echo "  make nobuild     - Generate VS 2022 solution at ../Neurus_VS2022"
 	@echo ""

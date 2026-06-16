@@ -28,7 +28,7 @@ public:
 	ShaderModule(const vk::raii::Device& device, const std::vector<uint32_t>& spirv);
 	~ShaderModule();
 
-	// Non-copyable — owns GPU resources
+	// Non-copyable - owns GPU resources
 	ShaderModule(const ShaderModule&) = delete;
 	ShaderModule& operator=(const ShaderModule&) = delete;
 

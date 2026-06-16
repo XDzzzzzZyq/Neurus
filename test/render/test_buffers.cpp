@@ -15,7 +15,7 @@
 using namespace neurus;
 
 // ===========================================================================
-// BufferLayout — pure CPU tests (no Vulkan required)
+// BufferLayout - pure CPU tests (no Vulkan required)
 // ===========================================================================
 
 TEST(BufferLayoutTest, EmptyLayout_HasZeroAttributes)
@@ -99,7 +99,7 @@ TEST(BufferLayoutTest, GetFormatSize_CommonFormats)
 }
 
 // ===========================================================================
-// VertexBuffer + IndexBuffer — GPU tests
+// VertexBuffer + IndexBuffer - GPU tests
 // ===========================================================================
 
 /**

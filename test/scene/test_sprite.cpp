@@ -3,7 +3,7 @@
  * @brief Unit tests for Sprite class (billboard icon data object).
  *
  * TDD: RED (test written first) -> GREEN (implementation verified).
- * No GPU required — all tests are pure CPU data tests.
+ * No GPU required - all tests are pure CPU data tests.
  */
 
 #include <gtest/gtest.h>
@@ -13,7 +13,7 @@
 using namespace neurus;
 
 // -----------------------------------------------------------------------
-// Sprite — inheritance & identity
+// Sprite - inheritance & identity
 // -----------------------------------------------------------------------
 
 /**
@@ -35,7 +35,7 @@ TEST(SpriteTest, DefaultTypeIsGoSprite)
 }
 
 // -----------------------------------------------------------------------
-// Sprite — default member values
+// Sprite - default member values
 // -----------------------------------------------------------------------
 
 /**
@@ -66,7 +66,7 @@ TEST(SpriteTest, DefaultTextureIsNull)
 }
 
 // -----------------------------------------------------------------------
-// Sprite — ParsePath type-to-path mapping
+// Sprite - ParsePath type-to-path mapping
 // -----------------------------------------------------------------------
 
 /**

@@ -10,7 +10,7 @@ using namespace neurus;
  * @brief Tests for the UIEvents singleton (Qt signal bus for UI↔Editor).
  *
  * UIEvents carries rendering lifecycle signals that are Qt-dependent by
- * design — QTimer, QWindow, and the Qt event loop drive these signals.
+ * design - QTimer, QWindow, and the Qt event loop drive these signals.
  *
  * For typed Editor↔Renderer events, see test_event_bus_typed.cpp.
  */
