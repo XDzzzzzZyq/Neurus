@@ -44,7 +44,13 @@ add_library(neurus_render STATIC
 	RenderPassManager.cpp
 	GeometryPass.h
 	GeometryPass.cpp
+	LightingPass.h
+	LightingPass.cpp
+	DeferredRenderer.h
+	DeferredRenderer.cpp
 	SyncObjects.h
+	Screenshot.h
+	Screenshot.cpp
 )
 
 target_link_libraries(neurus_render PUBLIC

@@ -1,0 +1,220 @@
+#version 450
+
+// ---------------------------------------------------------------------------
+// PBR Lighting Compute Shader
+//
+// Reads the G-Buffer (position, normal, albedo, metallic/roughness) and
+// evaluates Cook-Torrance GGX BRDF for each point light in the SSBO.
+// Writes HDR colour output to a storage image.
+//
+// Dispatch: ceil(width/16), ceil(height/16), 1
+// ---------------------------------------------------------------------------
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// --- G-Buffer inputs (combined image samplers) ---
+layout(binding = 0) uniform sampler2D gPosition;
+layout(binding = 1) uniform sampler2D gNormal;
+layout(binding = 2) uniform sampler2D gAlbedo;
+layout(binding = 3) uniform sampler2D gMetallicRoughness;
+
+// --- HDR colour output ---
+layout(rgba16f, binding = 4) uniform writeonly image2D outputImage;
+
+// --- Point light SSBO (std140) ---
+struct PointLight
+{
+	vec3 color;     // offset 0,  size 12
+	float _pad0;    // offset 12 (std140 vec3 → 16-byte aligned stride)
+	vec3 pos;       // offset 16, size 12
+	float _pad1;    // offset 28
+	float power;    // offset 32, size 4
+	float radius;   // offset 36, size 4
+	float _pad2[2]; // offset 40 → struct size 48 (16-byte aligned)
+};
+
+layout(std140, binding = 5) buffer LightBuffer
+{
+	PointLight lights[];
+};
+
+// --- Push constants ---
+layout(push_constant) uniform PushConstants
+{
+	int lightCount;   // offset 0
+	vec4 cameraPos;   // offset 16 (vec4 = 16-byte aligned)
+	mat4 view;        // offset 32 (mat4 = 64 bytes)
+};
+// Total: 96 bytes
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const float PI = 3.14159265359;
+
+// ---------------------------------------------------------------------------
+// Cook-Torrance GGX BRDF functions
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Trowbridge-Reitz (GGX) normal distribution function.
+ * @param NdotH Cosine of angle between normal and half-vector.
+ * @param a    Roughness squared (alpha = roughness^2).
+ * @return NDF value.
+ */
+float DistributionGGX(float NdotH, float a)
+{
+	float a2     = a * a;
+	float NdotH2 = NdotH * NdotH;
+
+	float denom = NdotH2 * (a2 - 1.0) + 1.0;
+	denom = PI * denom * denom;
+
+	return a2 / max(denom, 1e-6);
+}
+
+/**
+ * @brief Schlick-GGX geometry sub-function.
+ * @param NdotX Cosine of angle between normal and direction (V or L).
+ * @param k    Roughness remapping: k = (roughness + 1)^2 / 8 (direct lighting).
+ * @return G1 value.
+ */
+float GeometrySchlickGGX(float NdotX, float k)
+{
+	return NdotX / (NdotX * (1.0 - k) + k);
+}
+
+/**
+ * @brief Smith geometry function (height-correlated).
+ * @param NdotV Cosine between normal and view direction.
+ * @param NdotL Cosine between normal and light direction.
+ * @param k    Roughness remapping parameter.
+ * @return Combined geometry attenuation value.
+ */
+float GeometrySmith(float NdotV, float NdotL, float k)
+{
+	return GeometrySchlickGGX(NdotV, k) * GeometrySchlickGGX(NdotL, k);
+}
+
+/**
+ * @brief Fresnel-Schlick approximation.
+ * @param cosTheta Cosine of angle between half-vector and view direction (HdotV).
+ * @param F0       Surface reflectance at normal incidence (0°).
+ * @return Fresnel reflectance.
+ */
+vec3 FresnelSchlick(float cosTheta, vec3 F0)
+{
+	return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// ---------------------------------------------------------------------------
+// Main compute entry point
+// ---------------------------------------------------------------------------
+
+void main()
+{
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 imageSize2D = imageSize(outputImage);
+
+	// Discard out-of-bounds threads
+	if (pixelCoord.x >= imageSize2D.x || pixelCoord.y >= imageSize2D.y)
+	{
+		return;
+	}
+
+	// --- Sample G-Buffer ---
+	vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(imageSize2D);
+
+	vec4  posSample  = textureLod(gPosition, uv, 0.0);
+	vec3  worldPos   = posSample.xyz;
+	vec4  nrmSample  = textureLod(gNormal, uv, 0.0);
+	vec3  normalVS   = nrmSample.xyz;
+	vec3  albedo     = textureLod(gAlbedo, uv, 0.0).rgb;
+	vec4  mrSample   = textureLod(gMetallicRoughness, uv, 0.0);
+	float metallic   = clamp(mrSample.r, 0.001, 0.999);
+	float roughness  = clamp(mrSample.g, 0.001, 0.999);
+
+	// Early out: clear-value pixels (no geometry rendered)
+	if (posSample.w < 0.5)
+	{
+		imageStore(outputImage, pixelCoord, vec4(0.0, 0.0, 0.0, 1.0));
+		return;
+	}
+
+	// --- Transform normal from view-space to world-space ---
+	// normalWS  = transpose(inverse(view)) * normalVS
+	// For an orthogonal rotation part (typical lookAt camera):
+	//   inv(view_rot) = transpose(view_rot)
+	// Therefore: normalWS = mat3(view) * normalVS  (after normalization)
+	// Note: mat3(view) extracts the upper-left 3x3 rotation part.
+	mat3 invViewRot = transpose(mat3(view));
+	vec3 normalWS = normalize(invViewRot * normalVS);
+
+	// --- View direction ---
+	vec3 V = normalize(cameraPos.xyz - worldPos);
+	float NdotV = max(dot(normalWS, V), 0.001);
+
+	// --- Base reflectance ---
+	// Dielectric F0 = ~0.04, metallic uses albedo as F0
+	vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+	// --- Roughness remapping for direct lighting ---
+	float roughness2 = roughness * roughness;
+	float k = (roughness + 1.0) * (roughness + 1.0) / 8.0;
+
+	// --- Accumulate lighting ---
+	vec3 Lo = vec3(0.0);
+
+	for (int i = 0; i < lightCount; ++i)
+	{
+		PointLight light = lights[i];
+
+		vec3 toLight  = light.pos - worldPos;
+		float dist    = length(toLight);
+		vec3 L        = toLight / dist;
+
+		float NdotL = max(dot(normalWS, L), 0.0);
+		if (NdotL <= 0.0)
+		{
+			continue;
+		}
+
+		// --- Attenuation (inverse-square falloff) ---
+		float attenuation = 1.0 / (dist * dist);
+
+		// --- Incident radiance ---
+		vec3 radiance = light.power * light.color * attenuation * NdotL;
+
+		// --- Cook-Torrance BRDF ---
+		vec3 H = normalize(L + V);
+		float NdotH = max(dot(normalWS, H), 0.0);
+		float HdotV = max(dot(H, V), 0.0);
+
+		// D: Normal Distribution Function (Trowbridge-Reitz / GGX)
+		float D = DistributionGGX(NdotH, roughness2);
+
+		// G: Geometry function (Smith with Schlick-GGX)
+		float G = GeometrySmith(NdotV, NdotL, k);
+
+		// F: Fresnel (Schlick)
+		vec3 F = FresnelSchlick(HdotV, F0);
+
+		// --- Specular ---
+		vec3 numerator    = D * G * F;
+		float denominator = 4.0 * NdotV * NdotL + 0.0001;
+		vec3 specular     = numerator / denominator;
+
+		// --- Diffuse ---
+		vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
+
+		// --- Accumulate ---
+		Lo += (kD * albedo / PI + specular) * radiance;
+	}
+
+	// --- Write output ---
+	vec3 ambient = vec3(0.03) * albedo;   // minimal ambient for pure black avoidance
+	vec3 colour = ambient + Lo;
+
+	imageStore(outputImage, pixelCoord, vec4(colour, 1.0));
+}

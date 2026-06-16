@@ -3,15 +3,16 @@
  * @brief Application entry point for the Neurus renderer.
  *
  * Initialization sequence:
- *   1. QApplication — Qt event loop (Widgets + QML)
+ *   1. QApplication — Qt event loop (Widgets)
  *   2. EventBus — singleton cross-layer communication
  *   3. VulkanContext (Phase 1) — VkInstance creation
- *   4. NeurusMainWindow + VulkanWidget — Qt window with dockable Viewport for Vulkan surface
- *   5. Show main window — apply QMainWindow layout so widget has final size
- *   6. VkSurfaceKHR — created from VulkanWidget's native HWND via VK_KHR_win32_surface
+ *   4. NeurusMainWindow + VulkanWidget — Qt window with dockable Viewport
+ *   5. Show main window — apply layout so widget has final size
+ *   6. VkSurfaceKHR — created from VulkanWidget's native HWND
  *   7. VulkanContext (Phase 2) — logical device + queue selection
- *   8. Renderer — swapchain, pipeline, shaders (at correct window size)
- *   9. QTimer-driven render loop — ~60 FPS
+ *   8. Load scene assets (sphere.obj + BAKED.png)
+ *   9. DeferredRenderer — swapchain, G-Buffer, geometry pass, lighting pass, composite
+ *  10. QTimer-driven render loop — ~60 FPS
  *
  * Cleanup order (CRITICAL: destroy surface BEFORE instance):
  *   renderer -> surface -> mainWindow -> vkContext
@@ -21,26 +22,72 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 
 #include <QApplication>
+#include <QCoreApplication>
+#include <QDir>
+#include <QKeyEvent>
 #include <DockWidget.h>
-#include <QVulkanWindow>
 #include <QTimer>
 
 #include <windows.h>
 
 #include <iostream>
 #include <memory>
+#include <cstring>
 
 #include "editor/events/UIEvents.h"
 #include "editor/events/EventBus.h"
 #include "ui/NeurusMainWindow.h"
 #include "ui/VulkanWidget.h"
-#include "ui/VulkanWindow.h"
 #include "render/VulkanContext.h"
-#include "render/Renderer.h"
+#include "render/DeferredRenderer.h"
+#include "render/Texture.h"
+#include "data/MeshData.h"
 
 // Generated SPIR-V shader headers
-#include "triangle.vert.h"
-#include "triangle.frag.h"
+#include "gbuffer.vert.h"
+#include "gbuffer.frag.h"
+#include "pbr_lighting.comp.h"
+
+/**
+ * @brief Resolves a resource path relative to the executable directory.
+ *
+ * The executable is at build/debug/Debug/Neurus.exe.
+ * This walks up 3 levels to the project root, then appends \p relativePath.
+ *
+ * @param relativePath Path relative to the project root (e.g., "res/obj/sphere.obj").
+ * @return Absolute path to the resource.
+ */
+static QString resolveResourcePath(const char* relativePath)
+{
+	QDir dir(QCoreApplication::applicationDirPath());
+	dir.cdUp();  // Debug/
+	dir.cdUp();  // build/debug/
+	dir.cdUp();  // project root
+	return dir.absoluteFilePath(relativePath);
+}
+
+/**
+ * @brief Extracts the first 8 floats (pos+normal+uv) from each 14-float vertex
+ *        in the MeshData interleaved array.
+ *
+ * @param dataArray Interleaved vertex data (14 floats per vertex).
+ * @return Vector of 8-float vertices suitable for GeometryPass.
+ */
+static std::vector<float> extractGeometryVertices(const std::vector<float>& dataArray)
+{
+	constexpr size_t kSrcStride = 14;  // pos(3) + normal(3) + uv(2) + tangent(3) + bitangent(3)
+	constexpr size_t kDstStride = 8;   // pos(3) + normal(3) + uv(2)
+	const size_t numVertices = dataArray.size() / kSrcStride;
+
+	std::vector<float> result(numVertices * kDstStride);
+	for (size_t i = 0; i < numVertices; ++i)
+	{
+		std::memcpy(&result[i * kDstStride],
+		            &dataArray[i * kSrcStride],
+		            kDstStride * sizeof(float));
+	}
+	return result;
+}
 
 int main(int argc, char* argv[])
 {
@@ -53,48 +100,32 @@ int main(int argc, char* argv[])
 	auto& uiEvents = neurus::UIEvents::instance();
 
 	// --- Two-phase Vulkan initialization ---
-	// Phase 1: Create VkInstance (needed before surface)
 	std::unique_ptr<neurus::NeurusMainWindow> mainWindow;
 	std::unique_ptr<neurus::VulkanContext> vkContext;
-	std::unique_ptr<neurus::Renderer> renderer;
+	std::unique_ptr<neurus::DeferredRenderer> renderer;
 	std::unique_ptr<vk::raii::SurfaceKHR> surface;
-	std::unique_ptr<QVulkanInstance> qVkInstance;
 	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport CDockWidget
-	ads::CDockWidget* viewportDock = nullptr;       // Saved for later widget swap
 
 	try
 	{
-		// Step 1: Create VkInstance, immediately store in VulkanContext (no moves after surface creation)
+		// Step 1: Create VkInstance
 		auto vkInstance = neurus::VulkanContext::CreateInstance();
 		vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
-		// Step 2: Create Qt window with VulkanWidget embedded in a dockable Viewport
-		//         VulkanWidget provides the native HWND for Vulkan surface creation.
+		// Step 2: Create Qt window with VulkanWidget
 		mainWindow = std::make_unique<neurus::NeurusMainWindow>();
 		vulkanWidget = new neurus::VulkanWidget();
 		mainWindow->setViewportWidget(vulkanWidget);
-		viewportDock = mainWindow->getViewportDock();
 
-		// Set explicit initial size before native window creation.
-		// Without this, QWidget::width()/height() return default values
-		// and the swapchain would be created with wrong dimensions.
 		vulkanWidget->resize(800, 600);
-
-		// Force native window handle creation before surface creation
-		vulkanWidget->winId();
-
-		// Show window BEFORE surface/swapchain creation so QMainWindow's layout
-		// is applied and the widget has its final size. This avoids swapchain
-		// extent mismatch that would cause constant VK_SUBOPTIMAL_KHR.
-		mainWindow->show();
-		app.processEvents();  // Ensure native window is fully realized
+		vulkanWidget->winId();  // Force native window handle creation
 
 		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
 		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, vulkanWidget->hwnd());
 		surface = std::make_unique<vk::raii::SurfaceKHR>(vkContext->instance(), surfaceCreateInfo);
 
-		// Step 4: Create logical device (needs surface for queue family selection)
+		// Step 4: Create logical device
 		vkContext->initDevice(*surface);
 
 		uiEvents.setGpuName(QString::fromStdString(vkContext->gpuName()));
@@ -105,10 +136,57 @@ int main(int argc, char* argv[])
 		return -1;
 	}
 
-	// --- Create renderer ---
+	// --- Load scene assets ---
+	// Load sphere OBJ mesh
+	neurus::MeshData sphereMeshData;
+	{
+		const QString objPath = resolveResourcePath("res/obj/sphere.obj");
+		if (!sphereMeshData.LoadObj(objPath.toStdString()))
+		{
+			std::cerr << "Failed to load sphere mesh: " << objPath.toStdString() << "\n";
+			return -1;
+		}
+	}
+
+	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
+	{
+		const QString texPath = resolveResourcePath("res/tex/BAKED.png");
+		auto bakedTex = neurus::Texture::FromFile(
+			vkContext->device(),
+			vkContext->physicalDevice(),
+			vkContext->graphicsQueue(),
+			vkContext->graphicsQueueFamily(),
+			texPath.toStdString().c_str(),
+			vk::Format::eR8G8B8A8Srgb);
+
+		if (!bakedTex.IsValid())
+		{
+			std::cerr << "Warning: Failed to load texture: " << texPath.toStdString() << "\n";
+			// Non-fatal — gbuffer.frag uses hardcoded albedo for MVP.
+		}
+	}
+
+	// --- Extract vertex data for GeometryPass ---
+	const auto& meshData = sphereMeshData.GetMeshData();
+	const std::vector<float> gpuVertices = extractGeometryVertices(meshData.dataArray);
+	const uint32_t vertexCount = static_cast<uint32_t>(gpuVertices.size() / 8);
+	const uint32_t indexCount = static_cast<uint32_t>(meshData.indexArray.size());
+
+	// --- Build point light data (GPU-compatible) ---
+	neurus::PointLightGpu pointLight = {};
+	pointLight.posX = 3.0f;
+	pointLight.posY = 3.0f;
+	pointLight.posZ = 3.0f;
+	pointLight.colorR = 1.0f;
+	pointLight.colorG = 1.0f;
+	pointLight.colorB = 1.0f;
+	pointLight.power = 10.0f;
+	pointLight.radius = 0.05f;
+
+	// --- Create deferred renderer ---
 	try
 	{
-		renderer = std::make_unique<neurus::Renderer>(
+		renderer = std::make_unique<neurus::DeferredRenderer>(
 			vkContext->device(),
 			vkContext->physicalDevice(),
 			vkContext->graphicsQueue(),
@@ -116,94 +194,48 @@ int main(int argc, char* argv[])
 			*surface,
 			vulkanWidget->width(),
 			vulkanWidget->height(),
-			triangle_vert_spv,
-			triangle_vert_spv_size,
-			triangle_frag_spv,
-			triangle_frag_spv_size
+			gpuVertices.data(),
+			vertexCount,
+			meshData.indexArray.data(),
+			indexCount,
+			pointLight,
+			gbuffer_vert_spv, gbuffer_vert_spv_size,
+			gbuffer_frag_spv, gbuffer_frag_spv_size,
+			pbr_lighting_comp_spv, pbr_lighting_comp_spv_size
 		);
 	}
 	catch (const std::exception& e)
 	{
-		std::cerr << "Renderer initialization failed: " << e.what() << "\n";
+		std::cerr << "DeferredRenderer initialization failed: " << e.what() << "\n";
 		return -1;
 	}
 
-	// Window was shown earlier (before surface/swapchain creation) — no need to show again
-
-	// --- QVulkanWindow-based rendering (parallel path) ---
-	qVkInstance = std::make_unique<QVulkanInstance>();
-	qVkInstance->setLayers({ "VK_LAYER_KHRONOS_validation" });
-	if (!qVkInstance->create())
-		qFatal("Failed to create QVulkanInstance");
-
-	auto* vulkanWindow = new VulkanWindow(qVkInstance.get(),
-		triangle_vert_spv, triangle_vert_spv_size,
-		triangle_frag_spv, triangle_frag_spv_size);
-	QWidget* viewportContainer = QWidget::createWindowContainer(vulkanWindow);
-
-	// Replace the old VulkanWidget in the viewport dock with the QVulkanWindow container
-	viewportDock->setWidget(viewportContainer, ads::CDockWidget::ForceNoScrollArea);
+	// Window was created hidden — show it now that the renderer is ready
+	mainWindow->show();
 
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
 	                 [&renderer]() {
 	                     if (renderer)
 	                     {
-	                         try
-	                         {
-	                             renderer->DrawFrame();
-	                         }
-	                         catch (...)
-	                         {
-	                             // Frame failed — continue
-	                         }
+	                         try { renderer->DrawFrame(); }
+	                         catch (...) {}
 	                     }
 	                 });
 
-	// Handle VulkanWidget resize — trigger a frame draw; swapchain recreation
-	// is handled internally by DrawFrame when VK_ERROR_OUT_OF_DATE_KHR is received.
-	// Re-entrancy guard: shared across resize and timer callbacks to prevent
-	// nested DrawFrame() calls when processEvents() pumps the event queue.
-	static bool s_frameInProgress = false;
-
+	// Handle VulkanWidget resize
 	QObject::connect(vulkanWidget, &neurus::VulkanWidget::resized,
-	                 [&renderer, &app](int /*width*/, int /*height*/) {
-	                     if (s_frameInProgress || !renderer)
-	                     {
-	                         return;
-	                     }
-
-	                     s_frameInProgress = true;
-	                     try
-	                     {
-	                         renderer->DrawFrame();
-	                     }
-	                     catch (...)
-	                     {
-	                         // Swapchain recreation handled inside DrawFrame
-	                     }
-	                     app.processEvents();
-	                     s_frameInProgress = false;
+	                 [&renderer](int /*width*/, int /*height*/) {
 	                 });
 
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer, &app]() {
-		if (s_frameInProgress || !renderer)
+	QObject::connect(&renderTimer, &QTimer::timeout, [&renderer]() {
+		if (renderer)
 		{
-			return;
+			try { renderer->DrawFrame(); } catch (...) {}
 		}
-
-		s_frameInProgress = true;
-		try { renderer->DrawFrame(); } catch (...) {}
-
-		// Pump pending Qt events so the window remains responsive
-		// (drag, close, minimize, click) even under GPU backpressure.
-		// The guard above prevents re-entrant DrawFrame calls from cascading.
-		app.processEvents();
-
-		s_frameInProgress = false;
 	});
 	renderTimer.start();
 
@@ -211,10 +243,7 @@ int main(int argc, char* argv[])
 	int result = app.exec();
 
 	// --- Clean shutdown (CRITICAL: destroy surface BEFORE instance) ---
-	// C++ destruction order is reverse of declaration order for unique_ptrs,
-	// but we override it explicitly to ensure VkSurfaceKHR is destroyed
-	// before VkInstance.
-	renderer.reset();      // 1. Destroy swapchain, pipeline, command buffers
+	renderer.reset();      // 1. Destroy DeferredRenderer (swapchain, pipeline, etc.)
 	surface.reset();       // 2. Destroy VkSurfaceKHR
 	mainWindow.reset();    // 3. Destroy main window (deletes VulkanWidget)
 	vkContext.reset();     // 4. Destroy VkDevice + VkInstance

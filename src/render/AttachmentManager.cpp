@@ -131,7 +131,9 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 
 	// --- Post-FX ---
 	case AttachmentName::HDRColor:
-		return { vk::Format::eR16G16B16A16Sfloat, kColorAttachmentUsage, e2D };
+		// STORAGE added for compute shader write (PBR lighting pass)
+		return { vk::Format::eR16G16B16A16Sfloat,
+		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
 	case AttachmentName::SSAO:
 		return { vk::Format::eR8Unorm, kColorAttachmentUsage, e2D };
 	case AttachmentName::SSR:

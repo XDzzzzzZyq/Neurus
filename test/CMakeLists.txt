@@ -21,6 +21,9 @@ add_executable(neurus_test
 	render/test_commandbuffer.cpp
 	render/test_renderpass.cpp
 	render/test_gbuffer.cpp
+	render/test_lighting.cpp
+	render/test_model_render.cpp
+	render/test_screenshot.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
 	editor/test_event_bus_typed.cpp
