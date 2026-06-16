@@ -17,6 +17,7 @@ add_library(neurus_render STATIC
 	DescriptorManager.cpp
 	ComputePipelineBuilder.h
 	ComputePipelineBuilder.cpp
+	CommandBuffer.h
 	VulkanContext.h
 	VulkanContext.cpp
 	Swapchain.h
@@ -39,6 +40,9 @@ add_library(neurus_render STATIC
 	Material.cpp
 	QVulkanRenderer.h
 	QVulkanRenderer.cpp
+	RenderPassManager.h
+	RenderPassManager.cpp
+	SyncObjects.h
 )
 
 target_link_libraries(neurus_render PUBLIC

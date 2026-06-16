@@ -9,6 +9,7 @@ add_executable(neurus_test
 	render/test_meshdata.cpp
 	render/test_shader_module.cpp
 	render/test_swapchain.cpp
+	render/test_syncobjects.cpp
 	render/test_vulkanimage.cpp
 	render/test_descriptor.cpp
 	render/test_compute_pipeline.cpp
@@ -17,6 +18,8 @@ add_executable(neurus_test
 	render/test_material.cpp
 	render/test_pipeline.cpp
 	render/test_attachments.cpp
+	render/test_commandbuffer.cpp
+	render/test_renderpass.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
 	editor/test_event_bus_typed.cpp
