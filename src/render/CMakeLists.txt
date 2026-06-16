@@ -1,6 +1,12 @@
 # src/render/CMakeLists.txt — Renderer Layer
 
 add_library(neurus_render STATIC
+	BufferLayout.h
+	BufferLayout.cpp
+	IndexBuffer.h
+	IndexBuffer.cpp
+	VertexBuffer.h
+	VertexBuffer.cpp
 	VulkanBuffer.h
 	VulkanBuffer.cpp
 	VulkanImage.h
@@ -15,6 +21,10 @@ add_library(neurus_render STATIC
 	ShaderModule.cpp
 	ShaderLib.h
 	ShaderLib.cpp
+	Texture.h
+	Texture.cpp
+	TextureLib.h
+	TextureLib.cpp
 	Renderer.h
 	Renderer.cpp
 	QVulkanRenderer.h
@@ -25,6 +35,7 @@ target_link_libraries(neurus_render PUBLIC
 	Vulkan::Vulkan
 	Qt6::Gui
 	glm
+	stb
 	neurus_editor
 )
 
