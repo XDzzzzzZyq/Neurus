@@ -39,7 +39,7 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 		vk::ColorSpaceKHR::eSrgbNonlinear,
 		m_extent,
 		1,                                  // Single array layer (no stereo rendering)
-		vk::ImageUsageFlagBits::eColorAttachment,
+		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
 		vk::SharingMode::eExclusive,        // Single queue family for MVP
 		{},
 		capabilities.currentTransform,      // Use surface's actual transform
@@ -104,7 +104,7 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 		vk::ColorSpaceKHR::eSrgbNonlinear,
 		m_extent,
 		1,
-		vk::ImageUsageFlagBits::eColorAttachment,
+		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst,
 		vk::SharingMode::eExclusive,
 		{},
 		vk::SurfaceTransformFlagBitsKHR::eIdentity,

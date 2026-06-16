@@ -204,6 +204,9 @@ private:
 	// --- Command pool ---
 	vk::raii::CommandPool m_commandPool;
 
+	// --- Command buffers (one per swapchain image, reused each frame) ---
+	std::vector<vk::raii::CommandBuffer> m_commandBuffers;
+
 	// --- Synchronization ---
 	static constexpr uint32_t kMaxFramesInFlight = 2;
 	static constexpr uint64_t kFenceTimeoutNs = 100'000'000;

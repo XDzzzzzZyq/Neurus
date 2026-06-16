@@ -106,7 +106,11 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
 
-	// --- 9. Create sync objects ---
+	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
+	vk::CommandBufferAllocateInfo cmdBufAlloc(*m_commandPool, vk::CommandBufferLevel::ePrimary, imageCount);
+	m_commandBuffers = vk::raii::CommandBuffers(device, cmdBufAlloc);
+
+	// --- 10. Create sync objects ---
 	uint32_t imageCount = m_swapchain->imageCount();
 	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
 	{
@@ -211,10 +215,8 @@ void DeferredRenderer::DrawFrame()
 		recreateSwapchain();
 	}
 
-	// --- Allocate, record, and submit one command buffer ---
-	vk::raii::CommandBuffers cmdBufs(m_device,
-		vk::CommandBufferAllocateInfo(*m_commandPool, vk::CommandBufferLevel::ePrimary, 1));
-	vk::CommandBuffer cmdBuf = *cmdBufs[0];
+	// --- Record and submit (reuse pre-allocated command buffer) ---
+	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
 
 	recordFrame(cmdBuf, imageIndex);
 
