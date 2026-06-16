@@ -18,7 +18,7 @@ class ShaderProgram;
  * Usage:
  *   Renderer renderer(vkContext, surface, width, height, vertSpv, vertSize, fragSpv, fragSize);
  *   // Each frame:
- *   renderer.DrawFrame();  // May be called from EventBus signal
+ *   renderer.DrawFrame();  // May be called from UIEvents signal
  *   // On shutdown:
  *   renderer.WaitIdle();
  */
@@ -64,7 +64,7 @@ public:
 	 * Acquires a swapchain image, records and submits command buffer,
 	 * and presents the result. Handles swapchain recreation on resize.
 	 *
-	 * @note Called each frame from EventBus::renderRequested signal.
+	 * @note Called each frame from UIEvents::renderRequested signal.
 	 * @note May throw if the swapchain needs recreation — caller should retry.
 	 */
 	void DrawFrame();

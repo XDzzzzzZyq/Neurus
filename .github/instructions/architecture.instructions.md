@@ -8,8 +8,8 @@ with modern rendering algorithms. The architecture prioritizes:
 - **Strict layer isolation** — Renderer ↔ Editor ↔ UI ↔ Data & Resource
   boundaries must not be violated
 - **Minimal global state** — State is explicit and localized
-- **Explicit data flow** — Communication via EventBus (Qt Signals/Slots) and
-  Context objects
+- **Explicit data flow** — Communication via UIEvents (Qt Signals/Slots),
+  EventBus (typed EventPool), and Context objects
 - **Stateless rendering** — Renderer does not own application-level state
 - **Deterministic GPU resource management** — Vulkan resources have explicit
   RAII ownership via `vk::raii` namespace
@@ -19,13 +19,14 @@ with modern rendering algorithms. The architecture prioritizes:
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                   UI Layer (Qt6 QML)                         │
-│  (Window, surface, EventBus, user input)                    │
+│  (Window, surface, UIEvents, user input)                    │
 └──────────────────────┬───────────────────────────────────────┘
-                       │ Qt Signals/Slots
+                       │ Qt Signals/Slots (UIEvents)
+                       │ + Typed Events (EventBus)              │
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                Editor Layer                                  │
-│  (Application logic, controllers, scene state, EventBus)    │
+│  (Application logic, controllers, scene state, event system)│
 └──────────────────────┬───────────────────────────────────────┘
                        │
              ┌─────────┴──────────┐
@@ -52,8 +53,8 @@ with modern rendering algorithms. The architecture prioritizes:
 - Contains application logic and scene mutation
 - Owns Controllers (Camera, Selection, etc.)
 - Manages EditorContext (scene + editor state)
-- Owns EventBus singleton (QObject-based signal/slot dispatch)
-- Communicates with Renderer via Context and EventBus
+- Owns UIEvents (Qt signals) and EventBus (typed EventPool)
+- Communicates with Renderer via Context and typed EventBus
 - Must NOT directly manipulate GPU resources
 
 **UI Layer** (`src/ui/`)
@@ -73,11 +74,18 @@ with modern rendering algorithms. The architecture prioritizes:
 
 ### Communication Protocols
 
-**EventBus System** (Signals)
+**UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals
-- Cross-layer event dispatch
+- UI↔Editor layer dispatch
 - Main signals: `renderRequested()`, `windowResized(int, int)`
 - Decoupled: emitters don't know subscribers
+
+**EventBus System** (Typed EventPool)
+- Header-only template-based event dispatcher (no Qt dependency)
+- Editor↔Renderer event dispatch with deferred Process()
+- Subscribe: `EventBus().subscribe<T>(handler)`
+- Enqueue: `EventBus().enqueue(event)`
+- Dispatch: `EventBus().Process()` (call once per frame)
 
 **Context System** (Data)
 - `EditorContext` — Scene + editor state
@@ -108,7 +116,7 @@ Data & Resource Layer owns (future):
 
 ### Architectural Invariants
 
-1. **No cross-layer direct coupling** — Use EventBus/Context only
+1. **No cross-layer direct coupling** — Use UIEvents/EventBus/Context only
 2. **Renderer is stateless** — Application state lives in Editor
 3. **Full RAII** — No two-phase initialization; no `Init()`/`Terminate()` methods
 4. **Explicit GPU ownership** — Each Vulkan handle has one owning layer
@@ -151,7 +159,7 @@ architecture. This proves the stack end-to-end before adding features.
 - EventBus with renderRequested signal
 - Validation layers (Debug only)
 - Swapchain recreation on resize
-- Non-GPU unit tests (EventBus, EditorContext)
+- Non-GPU unit tests (UIEvents, EventBus, EditorContext)
 
 **Features out of scope:**
 - PBR, multi-pass, deferred rendering

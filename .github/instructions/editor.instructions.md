@@ -4,21 +4,23 @@
 
 The Editor layer contains **application logic and scene mutation**. It owns the
 Controllers, manages user input, maintains selections, and orchestrates state
-changes through the EventBus.
+changes through the event system.
 
 ## Location
 
-- `src/editor/EventBus.h` — QObject singleton for cross-layer communication
+- `src/editor/events/UIEvents.h` — QObject singleton for UI↔Editor signals
+- `src/editor/events/EventBus.h` — Typed EventPool for Editor↔Renderer events
+- `src/editor/events/EditorEvents.h` — Event type structs (ObjectSelected, etc.)
 - `src/editor/EditorContext.h` — Editor + scene state container
 - `src/editor/controllers/` — Specific controller implementations (future)
 
 ## Core Responsibilities
 
-1. **EventBus Management**
-   - QObject singleton accessible from both C++ and QML
-   - Defines typed signals for cross-layer communication
-   - Handles signal/slot connections
-   - Must NOT have circular signal chains
+1. **Event Management**
+   - **UIEvents**: QObject singleton with Qt signals for UI↔Editor communication
+     (renderRequested, windowResized, deviceLost, validationMessage, etc.)
+   - **EventBus**: Typed EventPool for Editor↔Renderer event dispatch (no Qt
+     dependency). Events are enqueued on `enqueue()` and dispatched on `Process()`.
 
 2. **Context Provisioning**
    - `EditorContext` aggregates scene state and editor state
@@ -37,13 +39,13 @@ changes through the EventBus.
 
 ## Key Components
 
-### EventBus
+### UIEvents (Qt Signal Bus)
 
 ```cpp
-class EventBus : public QObject {
+class UIEvents : public QObject {
     Q_OBJECT
 public:
-    static EventBus& instance();
+    static UIEvents& instance();
 
 signals:
     void renderRequested();
@@ -52,7 +54,7 @@ signals:
     void validationMessage(QString severity, QString message);
 
 private:
-    EventBus() = default;
+    UIEvents() = default;
 };
 ```
 
@@ -61,7 +63,29 @@ private:
 - Qt's signal/slot mechanism provides type-safe dispatch
 - Signals are implicitly thread-safe (Qt handles queued connections)
 - Multiple slots can connect to the same signal
-- QML exposure via `rootContext()->setContextProperty("EventBus", &bus)`
+- QML exposure via `rootContext()->setContextProperty("UIEvents", &ui)`
+
+### EventBus (Typed EventPool)
+
+```cpp
+// Subscribe to typed events
+EventBus().subscribe<ObjectSelected>([](const ObjectSelected& e) {
+    inspector.showEntity(e.objectId);
+});
+
+// Enqueue events (deferred dispatch)
+EventBus().enqueue(ObjectSelected{42});
+
+// Process all queued events (call once per frame)
+EventBus().Process();
+```
+
+**Design:**
+- Header-only template-based dispatcher (zero Qt dependency)
+- Deferred FIFO queue: `enqueue()` stores, `Process()` dispatches
+- Re-entrant safe: events emitted from handlers are appended to queue
+- Max events cap (default 1000) prevents infinite loops
+- Not thread-safe — all calls on main thread
 
 ### EditorContext
 
@@ -92,16 +116,18 @@ private:
 ## Data Flow
 
 ```
-User Input (QML) → EventBus Signal → Editor Subscriber → State Update
+User Input (QML) → UIEvents Signal → Editor Subscriber → State Update
                                                               ↓
-                                                      EventBus Signal
+                                                       EventBus.enqueue
                                                               ↓
-                                                      UI Refresh
+                                                       EventBus.Process()
+                                                              ↓
+                                                       UI Refresh
 ```
 
 **Example: Window Resize**
 1. QWindow detects resize in MainWindow
-2. MainWindow emits `EventBus::windowResized(w, h)`
+2. MainWindow emits `UIEvents::windowResized(w, h)`
 3. Renderer slot connected → `Swapchain::Recreate(w, h)`
 4. Next `renderRequested()` → renders at new resolution
 
@@ -110,29 +136,30 @@ User Input (QML) → EventBus Signal → Editor Subscriber → State Update
 ### ✅ Editor MAY:
 - Mutate scene objects (future)
 - Own Controllers and managers
-- Emit and subscribe to EventBus signals
+- Emit and subscribe to UIEvents signals and EventBus typed events
 - Update EditorContext state
 - Call into scene management systems
 
 ### ❌ Editor MUST NOT:
 - Directly manipulate GPU resources
 - Call Vulkan functions
-- Depend on UI implementation details (only EventBus signals)
+- Depend on UI implementation details (only UIEvents signals)
 - Store rendering-specific state (belongs in Renderer or Data/Resource layer)
 
 ## Integration with Other Layers
 
 **With Renderer:**
 - Provides scene data via EditorContext
-- Receives rendering events via EventBus
+- Receives rendering events via UIEvents (Qt signals)
+- Sends Editor events via EventBus (typed event pool)
 - Renderer NEVER calls back into Editor directly
 - One-way dependency: Editor → Renderer (via EventBus)
 
 **With UI:**
-- UI emits signals via EventBus
+- UI emits signals via UIEvents
 - Editor subscribes to UI-relevant signals
 - UI reads EditorContext for display (future)
-- Two-way via EventBus, NOT direct C++ calls
+- Two-way via UIEvents, NOT direct C++ calls
 
 **With Data & Resource:**
 - Editor may request resource creation (e.g., "load this mesh")
@@ -141,7 +168,8 @@ User Input (QML) → EventBus Signal → Editor Subscriber → State Update
 
 ## Current Scope (Triangle MVP)
 
-- EventBus singleton with `renderRequested()` and `windowResized()` signals
+- UIEvents singleton with UI↔Editor signals (renderRequested, windowResized, etc.)
+- EventBus typed EventPool for Editor↔Renderer events
 - EditorContext stub (empty, placeholder for future scene state)
 - No controllers yet
 - No selection manager yet

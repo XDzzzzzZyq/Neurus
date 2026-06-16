@@ -1,5 +1,5 @@
 // GTest entry point with Qt event loop support.
-// Required because EventBus and EditorContext use QObject signals/slots.
+// Required because UIEvents and EditorContext use QObject signals/slots.
 
 #include <gtest/gtest.h>
 #include <QGuiApplication>

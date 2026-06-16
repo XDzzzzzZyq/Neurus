@@ -10,6 +10,7 @@ add_executable(neurus_test
 	render/test_renderer.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
+	editor/test_event_bus_typed.cpp
 	editor/test_editor_context.cpp
 	editor/test_scene_status.cpp
 	scene/test_uid.cpp

@@ -2,134 +2,139 @@
 
 #include <QObject>
 
-#include "editor/EventBus.h"
+#include "editor/events/UIEvents.h"
 
 using namespace neurus;
 
 /**
- * @brief Tests for the EventBus singleton — no GPU required.
+ * @brief Tests for the UIEvents singleton (Qt signal bus for UI↔Editor).
+ *
+ * UIEvents carries rendering lifecycle signals that are Qt-dependent by
+ * design — QTimer, QWindow, and the Qt event loop drive these signals.
+ *
+ * For typed Editor↔Renderer events, see test_event_bus_typed.cpp.
  */
-class EventBusTest : public ::testing::Test
+class UIEventsTest : public ::testing::Test
 {
 protected:
 	void SetUp() override
 	{
-		m_bus = &EventBus::instance();
+		m_ui = &UIEvents::instance();
 	}
 
-	EventBus* m_bus = nullptr;
+	UIEvents* m_ui = nullptr;
 };
 
-TEST_F(EventBusTest, Singleton_SameInstance)
+TEST_F(UIEventsTest, Singleton_SameInstance)
 {
-	auto& bus1 = EventBus::instance();
-	auto& bus2 = EventBus::instance();
+	auto& bus1 = UIEvents::instance();
+	auto& bus2 = UIEvents::instance();
 
 	EXPECT_EQ(&bus1, &bus2);
 }
 
-TEST_F(EventBusTest, EmitRenderRequested_CallsConnectedSlot)
+TEST_F(UIEventsTest, EmitRenderRequested_CallsConnectedSlot)
 {
 	bool wasCalled = false;
 
-	QObject::connect(m_bus, &EventBus::renderRequested,
+	QObject::connect(m_ui, &UIEvents::renderRequested,
 	                 [&wasCalled]() { wasCalled = true; });
 
-	emit m_bus->renderRequested();
+	emit m_ui->renderRequested();
 
 	EXPECT_TRUE(wasCalled);
 }
 
-TEST_F(EventBusTest, EmitWindowResized_CallsConnectedSlot)
+TEST_F(UIEventsTest, EmitWindowResized_CallsConnectedSlot)
 {
 	int receivedWidth = 0;
 	int receivedHeight = 0;
 
-	QObject::connect(m_bus, &EventBus::windowResized,
+	QObject::connect(m_ui, &UIEvents::windowResized,
 	                 [&receivedWidth, &receivedHeight](int w, int h) {
 	                     receivedWidth = w;
 	                     receivedHeight = h;
 	                 });
 
-	emit m_bus->windowResized(1920, 1080);
+	emit m_ui->windowResized(1920, 1080);
 
 	EXPECT_EQ(receivedWidth, 1920);
 	EXPECT_EQ(receivedHeight, 1080);
 }
 
-TEST_F(EventBusTest, EmitWindowResized_MultipleSubscribers)
+TEST_F(UIEventsTest, EmitWindowResized_MultipleSubscribers)
 {
 	int callCount = 0;
 
-	QObject::connect(m_bus, &EventBus::windowResized,
+	QObject::connect(m_ui, &UIEvents::windowResized,
 	                 [&callCount](int, int) { callCount++; });
-	QObject::connect(m_bus, &EventBus::windowResized,
+	QObject::connect(m_ui, &UIEvents::windowResized,
 	                 [&callCount](int, int) { callCount++; });
 
-	emit m_bus->windowResized(800, 600);
+	emit m_ui->windowResized(800, 600);
 
 	EXPECT_EQ(callCount, 2);
 }
 
-TEST_F(EventBusTest, GpuName_DefaultEmpty)
+TEST_F(UIEventsTest, GpuName_DefaultEmpty)
 {
-	EXPECT_TRUE(m_bus->gpuName().isEmpty());
+	EXPECT_TRUE(m_ui->gpuName().isEmpty());
 }
 
-TEST_F(EventBusTest, GpuName_UpdateEmitsChanged)
+TEST_F(UIEventsTest, GpuName_UpdateEmitsChanged)
 {
 	bool wasEmitted = false;
-	QObject::connect(m_bus, &EventBus::gpuNameChanged,
+	QObject::connect(m_ui, &UIEvents::gpuNameChanged,
 	                 [&wasEmitted]() { wasEmitted = true; });
 
-	m_bus->setGpuName("NVIDIA GeForce RTX 4090");
+	m_ui->setGpuName("NVIDIA GeForce RTX 4090");
 
-	EXPECT_EQ(m_bus->gpuName(), QString("NVIDIA GeForce RTX 4090"));
+	EXPECT_EQ(m_ui->gpuName(), QString("NVIDIA GeForce RTX 4090"));
 	EXPECT_TRUE(wasEmitted);
 }
 
-TEST_F(EventBusTest, EmitValidationMessage_CallsConnectedSlot)
+TEST_F(UIEventsTest, EmitValidationMessage_CallsConnectedSlot)
 {
 	QString receivedSeverity;
 	QString receivedMessage;
 
-	QObject::connect(m_bus, &EventBus::validationMessage,
+	QObject::connect(m_ui, &UIEvents::validationMessage,
 	                 [&receivedSeverity, &receivedMessage](QString severity, QString message) {
 	                     receivedSeverity = severity;
 	                     receivedMessage = message;
 	                 });
 
-	emit m_bus->validationMessage("error", "Test error message");
+	emit m_ui->validationMessage("error", "Test error message");
 
 	EXPECT_EQ(receivedSeverity, QString("error"));
 	EXPECT_EQ(receivedMessage, QString("Test error message"));
 }
 
-TEST_F(EventBusTest, EmitDeviceLost_CallsConnectedSlot)
+TEST_F(UIEventsTest, EmitDeviceLost_CallsConnectedSlot)
 {
 	bool wasCalled = false;
 
-	QObject::connect(m_bus, &EventBus::deviceLost,
+	QObject::connect(m_ui, &UIEvents::deviceLost,
 	                 [&wasCalled]() { wasCalled = true; });
 
-	emit m_bus->deviceLost();
+	emit m_ui->deviceLost();
 
 	EXPECT_TRUE(wasCalled);
 }
 
-TEST_F(EventBusTest, MultipleSignals_IndependentChannels)
+TEST_F(UIEventsTest, MultipleSignals_IndependentChannels)
 {
 	int renderCount = 0;
 	int resizeCount = 0;
 
-	QObject::connect(m_bus, &EventBus::renderRequested,
+	QObject::connect(m_ui, &UIEvents::renderRequested,
 	                 [&renderCount]() { renderCount++; });
-	QObject::connect(m_bus, &EventBus::windowResized,
+	QObject::connect(m_ui, &UIEvents::windowResized,
 	                 [&resizeCount](int, int) { resizeCount++; });
 
 	// Only emit renderRequested
-	emit m_bus->renderRequested();
-	emit m_bus->renderRequested();
+	emit m_ui->renderRequested();
+	emit m_ui->renderRequested();
 
 	// Only resizeCount should NOT have changed
 	EXPECT_EQ(renderCount, 2);

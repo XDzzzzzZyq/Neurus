@@ -30,7 +30,8 @@
 #include <iostream>
 #include <memory>
 
-#include "editor/EventBus.h"
+#include "editor/events/UIEvents.h"
+#include "editor/events/EventBus.h"
 #include "ui/NeurusMainWindow.h"
 #include "ui/VulkanWidget.h"
 #include "ui/VulkanWindow.h"
@@ -48,8 +49,8 @@ int main(int argc, char* argv[])
 	app.setApplicationName("Neurus");
 	app.setApplicationVersion("0.1.0");
 
-	// --- EventBus (must be created first — used by all layers) ---
-	auto& bus = neurus::EventBus::instance();
+	// --- UIEvents (must be created first — used by all layers) ---
+	auto& uiEvents = neurus::UIEvents::instance();
 
 	// --- Two-phase Vulkan initialization ---
 	// Phase 1: Create VkInstance (needed before surface)
@@ -96,7 +97,7 @@ int main(int argc, char* argv[])
 		// Step 4: Create logical device (needs surface for queue family selection)
 		vkContext->initDevice(*surface);
 
-		bus.setGpuName(QString::fromStdString(vkContext->gpuName()));
+		uiEvents.setGpuName(QString::fromStdString(vkContext->gpuName()));
 	}
 	catch (const std::exception& e)
 	{
@@ -143,8 +144,8 @@ int main(int argc, char* argv[])
 	// Replace the old VulkanWidget in the viewport dock with the QVulkanWindow container
 	viewportDock->setWidget(viewportContainer, ads::CDockWidget::ForceNoScrollArea);
 
-	// --- Connect EventBus signals ---
-	QObject::connect(&bus, &neurus::EventBus::renderRequested,
+	// --- Connect UIEvents signals ---
+	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
 	                 [&renderer]() {
 	                     if (renderer)
 	                     {

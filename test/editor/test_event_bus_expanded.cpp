@@ -1,212 +1,185 @@
 #include <gtest/gtest.h>
 
-#include <QObject>
-#include <QSignalSpy>
-
-#include "editor/EventBus.h"
+#include "editor/events/EventBus.h"
+#include "editor/events/EditorEvents.h"
 
 using namespace neurus;
 
 /**
- * @brief Tests for the 7 new editor-specific EventBus signals — no GPU required.
+ * @brief Expanded tests for typed EventBus — covering edge cases and
+ *        specific editor event type behavior.
  *
- * RED phase: this file will NOT compile until the signals exist in EventBus.h.
- * GREEN phase: after adding signals, all tests pass.
+ * These complement test_event_bus_typed.cpp with additional validation
+ * of concrete editor event structs.
  */
-class EventBusExpandedTest : public ::testing::Test
+class TypedEventBusExpandedTest : public ::testing::Test
 {
 protected:
 	void SetUp() override
 	{
-		m_bus = &EventBus::instance();
+		m_pool = &EventBus();
 	}
 
-	EventBus* m_bus = nullptr;
+	void TearDown() override
+	{
+		m_pool->Process();
+	}
+
+	EventPool* m_pool = nullptr;
 };
 
-// --- objectSelected(int objectId) ---
+// --- ObjectSelected: multiple values ---
 
-TEST_F(EventBusExpandedTest, ObjectSelected_EmitReceivesCorrectId)
+TEST_F(TypedEventBusExpandedTest, ObjectSelected_MultipleEmits)
 {
-	QSignalSpy spy(m_bus, &EventBus::objectSelected);
+	std::vector<int> receivedIds;
 
-	emit m_bus->objectSelected(42);
+	m_pool->subscribe<ObjectSelected>(
+		[&](const ObjectSelected& e) { receivedIds.push_back(e.objectId); });
 
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 1);
-	EXPECT_EQ(args.at(0).toInt(), 42);
+	m_pool->enqueue(ObjectSelected{1});
+	m_pool->enqueue(ObjectSelected{2});
+	m_pool->enqueue(ObjectSelected{99});
+
+	m_pool->Process();
+
+	ASSERT_EQ(receivedIds.size(), 3);
+	EXPECT_EQ(receivedIds[0], 1);
+	EXPECT_EQ(receivedIds[1], 2);
+	EXPECT_EQ(receivedIds[2], 99);
 }
 
-TEST_F(EventBusExpandedTest, ObjectSelected_MultipleEmits)
+// --- ObjectSelected vs ObjectDeselected — no cross-contamination ---
+
+TEST_F(TypedEventBusExpandedTest, ObjectDeselected_NoCrossContamination)
 {
-	QSignalSpy spy(m_bus, &EventBus::objectSelected);
+	int selectCount = 0;
+	int deselectCount = 0;
 
-	emit m_bus->objectSelected(1);
-	emit m_bus->objectSelected(2);
-	emit m_bus->objectSelected(99);
+	m_pool->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
+	m_pool->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
 
-	ASSERT_EQ(spy.count(), 3);
-	EXPECT_EQ(spy.at(0).at(0).toInt(), 1);
-	EXPECT_EQ(spy.at(1).at(0).toInt(), 2);
-	EXPECT_EQ(spy.at(2).at(0).toInt(), 99);
+	m_pool->enqueue(ObjectDeselected{7});
+	m_pool->Process();
+
+	EXPECT_EQ(selectCount, 0);
+	EXPECT_EQ(deselectCount, 1);
 }
 
-// --- objectDeselected(int objectId) ---
+// --- ObjectDeselected: correct data ---
 
-TEST_F(EventBusExpandedTest, ObjectDeselected_EmitReceivesCorrectId)
+TEST_F(TypedEventBusExpandedTest, ObjectDeselected_EmitReceivesCorrectId)
 {
-	QSignalSpy spy(m_bus, &EventBus::objectDeselected);
+	int receivedId = 0;
 
-	emit m_bus->objectDeselected(7);
+	m_pool->subscribe<ObjectDeselected>(
+		[&](const ObjectDeselected& e) { receivedId = e.objectId; });
 
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 1);
-	EXPECT_EQ(args.at(0).toInt(), 7);
+	m_pool->enqueue(ObjectDeselected{7});
+	m_pool->Process();
+
+	EXPECT_EQ(receivedId, 7);
 }
 
-TEST_F(EventBusExpandedTest, ObjectDeselected_NoCrossContamination)
+// --- SceneObjectRemoved: correct ID ---
+
+TEST_F(TypedEventBusExpandedTest, SceneObjectRemoved_EmitReceivesCorrectId)
 {
-	QSignalSpy selectSpy(m_bus, &EventBus::objectSelected);
-	QSignalSpy deselectSpy(m_bus, &EventBus::objectDeselected);
+	int receivedId = 0;
 
-	emit m_bus->objectDeselected(7);
+	m_pool->subscribe<SceneObjectRemoved>(
+		[&](const SceneObjectRemoved& e) { receivedId = e.objectId; });
 
-	EXPECT_EQ(selectSpy.count(), 0);
-	EXPECT_EQ(deselectSpy.count(), 1);
+	m_pool->enqueue(SceneObjectRemoved{200});
+	m_pool->Process();
+
+	EXPECT_EQ(receivedId, 200);
 }
 
-// --- sceneObjectAdded(int objectId, QString typeName) ---
+// --- ActiveCameraChanged: normal value ---
 
-TEST_F(EventBusExpandedTest, SceneObjectAdded_EmitReceivesCorrectData)
+TEST_F(TypedEventBusExpandedTest, ActiveCameraChanged_EmitReceivesCorrectId)
 {
-	QSignalSpy spy(m_bus, &EventBus::sceneObjectAdded);
+	int receivedId = -1;
 
-	emit m_bus->sceneObjectAdded(100, QString("Mesh"));
+	m_pool->subscribe<ActiveCameraChanged>(
+		[&](const ActiveCameraChanged& e) { receivedId = e.cameraId; });
 
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 2);
-	EXPECT_EQ(args.at(0).toInt(), 100);
-	EXPECT_EQ(args.at(1).toString(), QString("Mesh"));
+	m_pool->enqueue(ActiveCameraChanged{3});
+	m_pool->Process();
+
+	EXPECT_EQ(receivedId, 3);
 }
 
-// --- sceneObjectRemoved(int objectId) ---
+// --- SceneStatusChanged: propagation (mimics EditorContext::NotifySceneChanged) ---
 
-TEST_F(EventBusExpandedTest, SceneObjectRemoved_EmitReceivesCorrectId)
+TEST_F(TypedEventBusExpandedTest, SceneStatusChanged_EmitReceivesCorrectStatus)
 {
-	QSignalSpy spy(m_bus, &EventBus::sceneObjectRemoved);
+	int receivedStatus = -1;
 
-	emit m_bus->sceneObjectRemoved(200);
+	m_pool->subscribe<SceneStatusChanged>(
+		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
 
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 1);
-	EXPECT_EQ(args.at(0).toInt(), 200);
+	// Simulate what EditorContext::NotifySceneChanged does
+	m_pool->enqueue(SceneStatusChanged{1 << 2});
+	m_pool->Process();
+
+	EXPECT_EQ(receivedStatus, 4);
 }
 
-// --- activeCameraChanged(int cameraId) ---
+// --- SceneStatusChanged: multiple status values ---
 
-TEST_F(EventBusExpandedTest, ActiveCameraChanged_EmitReceivesCorrectId)
+TEST_F(TypedEventBusExpandedTest, SceneStatusChanged_MultipleValues)
 {
-	QSignalSpy spy(m_bus, &EventBus::activeCameraChanged);
+	std::vector<int> receivedStatuses;
 
-	emit m_bus->activeCameraChanged(3);
+	m_pool->subscribe<SceneStatusChanged>(
+		[&](const SceneStatusChanged& e) { receivedStatuses.push_back(e.status); });
 
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 1);
-	EXPECT_EQ(args.at(0).toInt(), 3);
+	m_pool->enqueue(SceneStatusChanged{1});   // ObjectTransChanged
+	m_pool->enqueue(SceneStatusChanged{2 | 4}); // LightChanged | CameraChanged
+	m_pool->enqueue(SceneStatusChanged{0});    // NoChanges
+
+	m_pool->Process();
+
+	ASSERT_EQ(receivedStatuses.size(), 3);
+	EXPECT_EQ(receivedStatuses[0], 1);
+	EXPECT_EQ(receivedStatuses[1], 6);
+	EXPECT_EQ(receivedStatuses[2], 0);
 }
 
-TEST_F(EventBusExpandedTest, ActiveCameraChanged_MinusOneForNoCamera)
+// --- All event types: independent channels ---
+
+TEST_F(TypedEventBusExpandedTest, AllNewSignals_IndependentChannels)
 {
-	QSignalSpy spy(m_bus, &EventBus::activeCameraChanged);
+	int selectCount = 0;
+	int deselectCount = 0;
+	int addCount = 0;
+	int removeCount = 0;
+	int camCount = 0;
+	int statusCount = 0;
 
-	emit m_bus->activeCameraChanged(-1);
-
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	EXPECT_EQ(args.at(0).toInt(), -1);
-}
-
-// --- renderConfigChanged() ---
-
-TEST_F(EventBusExpandedTest, RenderConfigChanged_EmitTriggersSlot)
-{
-	QSignalSpy spy(m_bus, &EventBus::renderConfigChanged);
-
-	emit m_bus->renderConfigChanged();
-
-	ASSERT_EQ(spy.count(), 1);
-	// No parameters to verify — just emission
-}
-
-TEST_F(EventBusExpandedTest, RenderConfigChanged_MultipleEmits)
-{
-	QSignalSpy spy(m_bus, &EventBus::renderConfigChanged);
-
-	emit m_bus->renderConfigChanged();
-	emit m_bus->renderConfigChanged();
-	emit m_bus->renderConfigChanged();
-
-	EXPECT_EQ(spy.count(), 3);
-}
-
-// --- viewportResized(int width, int height) ---
-
-TEST_F(EventBusExpandedTest, ViewportResized_EmitReceivesCorrectDimensions)
-{
-	QSignalSpy spy(m_bus, &EventBus::viewportResized);
-
-	emit m_bus->viewportResized(640, 480);
-
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 2);
-	EXPECT_EQ(args.at(0).toInt(), 640);
-	EXPECT_EQ(args.at(1).toInt(), 480);
-}
-
-TEST_F(EventBusExpandedTest, ViewportResized_ZeroDimensions)
-{
-	QSignalSpy spy(m_bus, &EventBus::viewportResized);
-
-	emit m_bus->viewportResized(0, 0);
-
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	EXPECT_EQ(args.at(0).toInt(), 0);
-	EXPECT_EQ(args.at(1).toInt(), 0);
-}
-
-// --- All signals independent channels ---
-
-TEST_F(EventBusExpandedTest, AllNewSignals_IndependentChannels)
-{
-	QSignalSpy selectSpy(m_bus, &EventBus::objectSelected);
-	QSignalSpy deselectSpy(m_bus, &EventBus::objectDeselected);
-	QSignalSpy addSpy(m_bus, &EventBus::sceneObjectAdded);
-	QSignalSpy removeSpy(m_bus, &EventBus::sceneObjectRemoved);
-	QSignalSpy camSpy(m_bus, &EventBus::activeCameraChanged);
-	QSignalSpy configSpy(m_bus, &EventBus::renderConfigChanged);
-	QSignalSpy resizeSpy(m_bus, &EventBus::viewportResized);
+	m_pool->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
+	m_pool->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
+	m_pool->subscribe<SceneObjectAdded>([&](const SceneObjectAdded&) { addCount++; });
+	m_pool->subscribe<SceneObjectRemoved>([&](const SceneObjectRemoved&) { removeCount++; });
+	m_pool->subscribe<ActiveCameraChanged>([&](const ActiveCameraChanged&) { camCount++; });
+	m_pool->subscribe<SceneStatusChanged>([&](const SceneStatusChanged&) { statusCount++; });
 
 	// Emit each signal exactly once
-	emit m_bus->objectSelected(1);
-	emit m_bus->objectDeselected(2);
-	emit m_bus->sceneObjectAdded(3, "Light");
-	emit m_bus->sceneObjectRemoved(4);
-	emit m_bus->activeCameraChanged(5);
-	emit m_bus->renderConfigChanged();
-	emit m_bus->viewportResized(800, 600);
+	m_pool->enqueue(ObjectSelected{1});
+	m_pool->enqueue(ObjectDeselected{2});
+	m_pool->enqueue(SceneObjectAdded{3, "Light"});
+	m_pool->enqueue(SceneObjectRemoved{4});
+	m_pool->enqueue(ActiveCameraChanged{5});
+	m_pool->enqueue(SceneStatusChanged{0});
 
-	EXPECT_EQ(selectSpy.count(), 1);
-	EXPECT_EQ(deselectSpy.count(), 1);
-	EXPECT_EQ(addSpy.count(), 1);
-	EXPECT_EQ(removeSpy.count(), 1);
-	EXPECT_EQ(camSpy.count(), 1);
-	EXPECT_EQ(configSpy.count(), 1);
-	EXPECT_EQ(resizeSpy.count(), 1);
+	m_pool->Process();
+
+	EXPECT_EQ(selectCount, 1);
+	EXPECT_EQ(deselectCount, 1);
+	EXPECT_EQ(addCount, 1);
+	EXPECT_EQ(removeCount, 1);
+	EXPECT_EQ(camCount, 1);
+	EXPECT_EQ(statusCount, 1);
 }

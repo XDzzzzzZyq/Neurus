@@ -20,11 +20,12 @@ working colored RGB triangle rendered via the full four-layer architecture.
 - Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
 - Viewport as dockable central widget via ADS `CenterDockWidgetArea`
 - Docks: Shader Editor (left), Viewport (center), Outliner + Properties + Render Config (right), Texture Viewer (bottom)
-- Qt Signals/Slots EventBus singleton
+- Qt Signals/Slots UIEvents singleton (UI↔Editor)
+- Typed EventBus (EventPool) for Editor↔Renderer event dispatch
 - Swapchain recreation on window resize (both paths)
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
-- Non-GPU Google Test samples (EventBus, EditorContext)
+- Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
 - Dock layout persistence (save/restore via ADS serialization)
 
 **Out of scope (post-MVP):**
@@ -70,10 +71,10 @@ make test
 
 **Tests:**
 - Framework: Google Test
-- Non-GPU tests run in CI (EventBus, EditorContext)
+- Non-GPU tests run in CI (UIEvents, EventBus, EditorContext)
 - GPU tests require a Vulkan 1.4-capable device
 - Run all tests: `cd build/debug && ctest --output-on-failure`
-- Run a single test: `cd build/debug && ctest -R EventBus_Singleton`
+- Run a single test: `cd build/debug && ctest -R UIEvents_Singleton`
 - On local machine, launch `Neurus.exe` to check any runtime error.
 
 **Lint / format:**
@@ -90,7 +91,7 @@ ARCHITECTURE RULES (HARD REQUIREMENTS)
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ UI Layer (Qt6 QML)                                          │
-│  owns: VkSurfaceKHR, QWindow, EventBus (QObject singleton)  │
+│  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
 │  QML provides window + input ONLY. No rendering logic.      │
 └─────────────────────┬────────────────────────────────────────┘
                       │ Qt Signals/Slots
@@ -116,14 +117,15 @@ ARCHITECTURE RULES (HARD REQUIREMENTS)
 - **Renderer**: pure rendering service; owns GPU resources; consumes read-only
   scene data; must not mutate application-level state.
 - **Editor**: application logic and scene mutation; owns Controllers;
-  communicates via Context and EventBus.
+  communicates via Context, UIEvents (Qt signals), and EventBus (typed events).
 - **UI**: Qt QML presentation only; owns surface; emits signals.
 - **Data & Resource**: GPU resource management; descriptor pools, allocators,
   buffer/image abstractions. (Stub for MVP.)
 
 **Communication:**
 - Cross-layer communication MUST go through:
-  - EventBus (Qt Signals/Slots) for signals and commands
+  - UIEvents (Qt Signals/Slots) for UI↔Editor signals
+  - EventBus (typed EventPool) for Editor↔Renderer events
   - Context objects for data queries
 - Direct coupling across layers is forbidden.
 - Renderer must not include Editor or UI headers.
@@ -223,6 +225,12 @@ Neurus/
 │   │   ├── Swapchain.h/cpp
 │   │   └── VulkanContext.h/cpp
 │   ├── editor/             # Editor layer (logic, controllers)
+│   │   ├── events/          # Event system (UIEvents + typed EventBus)
+│   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor
+│   │   │   ├── EventBus.h        # Typed EventPool dispatcher (no Qt)
+│   │   │   └── EditorEvents.h    # Event type structs
+│   │   ├── EditorContext.h/cpp
+│   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager
 │   │   ├── VulkanWindow.h/cpp     # QVulkanWindow subclass
@@ -247,7 +255,7 @@ PRACTICAL GUIDANCE FOR AGENTS
 
 - Respect layer isolation; do not introduce cross-layer header includes where
   forbidden.
-- Prefer EventBus/Context-driven flows over direct calls across layers.
+- Prefer UIEvents/EventBus/Context-driven flows over direct calls across layers.
 - Do not add global state unless a file already uses it and there is no
   alternative.
 - When extending renderer behavior, keep GPU ownership inside Renderer or

@@ -2,14 +2,14 @@
 #define VK_USE_PLATFORM_WIN32_KHR
 
 #include "MainWindow.h"
-#include "editor/EventBus.h"
+#include "editor/events/UIEvents.h"
 
 #include <stdexcept>
 
 namespace neurus {
 
 MainWindow::MainWindow(const vk::raii::Instance& vulkanInstance,
-                       EventBus* bus,
+                       UIEvents* bus,
                        int width, int height,
                        const QString& title,
                        QObject* parent)

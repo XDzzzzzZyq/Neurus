@@ -12,7 +12,7 @@
 
 namespace neurus {
 
-class EventBus;
+class UIEvents;
 
 /**
  * @brief Main application window with Vulkan surface.
@@ -26,7 +26,7 @@ class MainWindow : public QObject
 
 public:
 	explicit MainWindow(const vk::raii::Instance& vulkanInstance,
-	                    EventBus* bus,
+	                    UIEvents* bus,
 	                    int width = 800, int height = 600,
 	                    const QString& title = "Neurus",
 	                    QObject* parent = nullptr);
@@ -42,7 +42,7 @@ public:
 	int getHeight() const { return m_height; }
 
 private:
-	EventBus* m_bus = nullptr;
+	UIEvents* m_bus = nullptr;
 
 	std::unique_ptr<vk::raii::SurfaceKHR> m_surface;
 	HWND m_hwnd = nullptr;

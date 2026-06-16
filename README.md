@@ -13,7 +13,7 @@ with modern rendering algorithms.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ UI Layer (Qt6 QML)                                          │
-│  owns: VkSurfaceKHR, QWindow, EventBus (QObject singleton)  │
+│  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
 └─────────────────────┬────────────────────────────────────────┘
                       │ Qt Signals/Slots
                       ▼
@@ -105,11 +105,12 @@ the full four-layer architecture:
 - Vulkan-HPP RAII instance, device, swapchain, pipeline
 - `VK_KHR_dynamic_rendering` for the triangle pass
 - Qt6 QML window (800×600, resizable, titled "Neurus")
-- Qt Signals/Slots EventBus singleton
+- Qt Signals/Slots UIEvents singleton (UI↔Editor)
+- Typed EventBus (EventPool) for Editor↔Renderer events
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
-- Non-GPU Google Test samples (EventBus, EditorContext)
+- Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
 
 ## Code Style
 

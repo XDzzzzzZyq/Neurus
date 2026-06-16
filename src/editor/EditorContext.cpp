@@ -1,5 +1,7 @@
 #include "EditorContext.h"
-#include "EventBus.h"
+#include "events/UIEvents.h"
+#include "events/EventBus.h"
+#include "events/EditorEvents.h"
 
 namespace neurus {
 
@@ -15,7 +17,7 @@ void EditorContext::SetScene(Scene* scene)
 
 void EditorContext::NotifySceneChanged(int status)
 {
-	EventBus::instance().sceneStatusChanged(status);
+	EventBus().enqueue(SceneStatusChanged{status});
 }
 
 } // namespace neurus

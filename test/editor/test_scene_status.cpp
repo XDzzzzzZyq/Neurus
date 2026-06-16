@@ -1,18 +1,19 @@
 #include <gtest/gtest.h>
 
-#include <QObject>
-#include <QSignalSpy>
+#include <memory>
 
 #include "editor/EditorContext.h"
-#include "editor/EventBus.h"
+#include "editor/events/EventBus.h"
+#include "editor/events/EditorEvents.h"
 #include "scene/Scene.h"
 
 using namespace neurus;
 
 /**
- * @brief Tests for SceneModifStatus propagation from EditorContext to EventBus.
+ * @brief Tests for SceneStatusChanged propagation from EditorContext
+ *        to the typed EventBus (EventPool).
  *
- * TDD: RED (test written first) → GREEN (after implementing signal + methods).
+ * TDD: RED (test written first) → GREEN (after implementing method).
  * All tests are pure CPU — no GPU required.
  */
 class SceneStatusTest : public ::testing::Test
@@ -22,49 +23,56 @@ protected:
 	{
 		m_context = std::make_unique<EditorContext>();
 		m_scene = std::make_unique<Scene>();
-		m_bus = &EventBus::instance();
+		m_pool = &EventBus();
+	}
+
+	void TearDown() override
+	{
+		// Process any remaining events
+		m_pool->Process();
 	}
 
 	std::unique_ptr<EditorContext> m_context;
 	std::unique_ptr<Scene> m_scene;
-	EventBus* m_bus = nullptr;
+	EventPool* m_pool = nullptr;
 };
 
 // -----------------------------------------------------------------------
-// NotifySceneChanged → EventBus::sceneStatusChanged propagation
+// NotifySceneChanged → EventPool::emit(SceneStatusChanged{...})
 // -----------------------------------------------------------------------
 
 TEST_F(SceneStatusTest, NotifySceneChanged_EmitsViaEventBus)
 {
-	QSignalSpy spy(m_bus, &EventBus::sceneStatusChanged);
+	int receivedStatus = -1;
 
-	// RED phase: expect no signals before triggering
-	EXPECT_EQ(spy.count(), 0);
+	m_pool->subscribe<SceneStatusChanged>(
+		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
 
 	m_context->NotifySceneChanged(Scene::SceneChanged);
 
-	// GREEN phase: exactly one emission with correct status
-	ASSERT_EQ(spy.count(), 1);
-	auto args = spy.takeFirst();
-	ASSERT_EQ(args.size(), 1);
-	EXPECT_EQ(args.at(0).toInt(), Scene::SceneChanged);
+	// Event is enqueued, not yet dispatched
+	m_pool->Process();
+
+	EXPECT_EQ(receivedStatus, Scene::SceneChanged);
 }
 
 TEST_F(SceneStatusTest, NotifySceneChanged_MultipleStatusValues)
 {
-	QSignalSpy spy(m_bus, &EventBus::sceneStatusChanged);
+	std::vector<int> receivedStatuses;
+
+	m_pool->subscribe<SceneStatusChanged>(
+		[&](const SceneStatusChanged& e) { receivedStatuses.push_back(e.status); });
 
 	m_context->NotifySceneChanged(Scene::ObjectTransChanged);
-	m_context->NotifySceneChanged(
-		Scene::LightChanged | Scene::CameraChanged);
+	m_context->NotifySceneChanged(Scene::LightChanged | Scene::CameraChanged);
 	m_context->NotifySceneChanged(Scene::NoChanges);
 
-	ASSERT_EQ(spy.count(), 3);
-	EXPECT_EQ(spy.at(0).at(0).toInt(), Scene::ObjectTransChanged);
-	EXPECT_EQ(
-		spy.at(1).at(0).toInt(),
-		Scene::LightChanged | Scene::CameraChanged);
-	EXPECT_EQ(spy.at(2).at(0).toInt(), Scene::NoChanges);
+	m_pool->Process();
+
+	ASSERT_EQ(receivedStatuses.size(), 3);
+	EXPECT_EQ(receivedStatuses[0], Scene::ObjectTransChanged);
+	EXPECT_EQ(receivedStatuses[1], Scene::LightChanged | Scene::CameraChanged);
+	EXPECT_EQ(receivedStatuses[2], Scene::NoChanges);
 }
 
 // -----------------------------------------------------------------------
@@ -82,19 +90,23 @@ TEST_F(SceneStatusTest, SetScene_Nullptr)
 }
 
 // -----------------------------------------------------------------------
-// Isolated channel — only sceneStatusChanged fires
+// Isolated channel — only SceneStatusChanged fires
 // -----------------------------------------------------------------------
 
 TEST_F(SceneStatusTest, NoCrossContaminationWithOtherSignals)
 {
-	QSignalSpy sceneSpy(m_bus, &EventBus::sceneStatusChanged);
-	QSignalSpy renderSpy(m_bus, &EventBus::renderRequested);
+	int sceneStatusCount = 0;
+	int objectSelectedCount = 0;
+
+	m_pool->subscribe<SceneStatusChanged>([&](const SceneStatusChanged&) { sceneStatusCount++; });
+	m_pool->subscribe<ObjectSelected>([&](const ObjectSelected&) { objectSelectedCount++; });
 
 	m_context->NotifySceneChanged(Scene::MaterialChanged);
 
-	// sceneStatusChanged should have fired
-	ASSERT_EQ(sceneSpy.count(), 1);
+	m_pool->Process();
 
-	// renderRequested should NOT have fired
-	EXPECT_EQ(renderSpy.count(), 0);
+	// SceneStatusChanged should have fired
+	EXPECT_EQ(sceneStatusCount, 1);
+	// ObjectSelected should NOT have fired
+	EXPECT_EQ(objectSelectedCount, 0);
 }
