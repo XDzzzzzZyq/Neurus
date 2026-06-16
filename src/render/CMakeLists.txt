@@ -13,6 +13,8 @@ add_library(neurus_render STATIC
 	VulkanImage.cpp
 	DescriptorManager.h
 	DescriptorManager.cpp
+	ComputePipelineBuilder.h
+	ComputePipelineBuilder.cpp
 	VulkanContext.h
 	VulkanContext.cpp
 	Swapchain.h
@@ -29,6 +31,8 @@ add_library(neurus_render STATIC
 	TextureLib.cpp
 	Renderer.h
 	Renderer.cpp
+	PipelineBuilder.h
+	PipelineBuilder.cpp
 	Material.h
 	Material.cpp
 	QVulkanRenderer.h

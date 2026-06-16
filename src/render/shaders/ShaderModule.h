@@ -62,6 +62,21 @@ public:
 	/** @brief The underlying vk::raii::ShaderModule handle. */
 	const vk::raii::ShaderModule& handle() const { return *m_module; }
 
+	/**
+	 * @brief Builds a VkPipelineShaderStageCreateInfo for this shader module.
+	 *
+	 * Convenience method for use with PipelineBuilder and other pipeline
+	 * construction paths. The caller specifies the stage flag and optional
+	 * entry point name.
+	 *
+	 * @param stage       Vulkan shader stage flag (e.g. eVertex, eFragment).
+	 * @param entryPoint  Entry-point function name (default "main").
+	 * @return Pre-filled VkPipelineShaderStageCreateInfo.
+	 */
+	vk::PipelineShaderStageCreateInfo GetStageInfo(
+		vk::ShaderStageFlagBits stage,
+		const char* entryPoint = "main") const;
+
 private:
 	std::unique_ptr<vk::raii::ShaderModule> m_module;
 };

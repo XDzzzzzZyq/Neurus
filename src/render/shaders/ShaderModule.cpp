@@ -49,4 +49,16 @@ ShaderModule ShaderModule::FromEmbedded(const vk::raii::Device& device, const ui
 	return ShaderModule(device, spirv);
 }
 
+vk::PipelineShaderStageCreateInfo ShaderModule::GetStageInfo(
+	vk::ShaderStageFlagBits stage,
+	const char* entryPoint) const
+{
+	return vk::PipelineShaderStageCreateInfo(
+		{},
+		stage,
+		**m_module,
+		entryPoint
+	);
+}
+
 } // namespace neurus
