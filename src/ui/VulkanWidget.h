@@ -2,6 +2,8 @@
 
 #include <QWidget>
 
+class QKeyEvent;
+
 namespace neurus {
 
 /**
@@ -73,6 +75,16 @@ protected:
 	 * @param event The resize event containing new dimensions.
 	 */
 	void resizeEvent(QResizeEvent* event) override;
+
+	/**
+	 * @brief Handles keyboard shortcuts for screenshot capture.
+	 * @param event The key event.
+	 *
+	 * F12       → Emits UIEvents::screenshotRequested() via event system.
+	 * Ctrl+F12  → Emits UIEvents::screenshotAllRequested() via event system.
+	 * All other keys are passed to the base class.
+	 */
+	void keyPressEvent(QKeyEvent* event) override;
 };
 
 } // namespace neurus

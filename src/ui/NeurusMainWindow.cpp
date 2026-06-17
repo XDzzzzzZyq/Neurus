@@ -1,5 +1,7 @@
 #include "NeurusMainWindow.h"
 
+#include "editor/events/UIEvents.h"
+
 #include <QApplication>
 #include <QFile>
 #include <QLabel>
@@ -54,6 +56,14 @@ void NeurusMainWindow::CreateMenus()
 
 	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
 	connect(resetLayoutAction, &QAction::triggered, this, &NeurusMainWindow::RestoreDefaultLayout);
+
+	auto* toolsMenu = menuBar()->addMenu("&Tools");
+
+	auto* screenshotAction = toolsMenu->addAction("Take &Screenshot");
+	screenshotAction->setShortcut(QKeySequence("F12"));
+	connect(screenshotAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestScreenshot();
+	});
 
 	auto* helpMenu = menuBar()->addMenu("&Help");
 	auto* aboutAction = helpMenu->addAction("&About Neurus");

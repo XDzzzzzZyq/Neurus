@@ -1,5 +1,9 @@
 #include "VulkanWidget.h"
 
+#include "core/Log.h"
+#include "editor/events/UIEvents.h"
+
+#include <QKeyEvent>
 #include <QPaintEvent>
 #include <QResizeEvent>
 
@@ -36,6 +40,30 @@ void VulkanWidget::resizeEvent(QResizeEvent* event)
 
 	// Chain to base class for standard Qt resize handling.
 	QWidget::resizeEvent(event);
+}
+
+void VulkanWidget::keyPressEvent(QKeyEvent* event)
+{
+	if (event->key() == Qt::Key_F12)
+	{
+		if (event->modifiers() == Qt::NoModifier)
+		{
+			// F12: capture swapchain screenshot via event system
+			NEURUS_LOG("[Screenshot] F12 pressed - requesting screenshot via UIEvents");
+			UIEvents::instance().requestScreenshot();
+			return;
+		}
+		else if (event->modifiers() == Qt::ControlModifier)
+		{
+			// Ctrl+F12: dump all G-Buffer attachments via event system
+			NEURUS_LOG("[Screenshot] Ctrl+F12 pressed - requesting attachment dump via UIEvents");
+			UIEvents::instance().requestScreenshotAll();
+			return;
+		}
+	}
+
+	// Pass all other keys to the base class.
+	QWidget::keyPressEvent(event);
 }
 
 } // namespace neurus

@@ -69,6 +69,28 @@ signals:
 	 *  @param height New viewport height in pixels. */
 	void viewportResized(int width, int height);
 
+	// --- Screenshot signals ---
+
+	/** @brief Emitted when a screenshot is requested (F12 or menu).
+	 *  Capture the current swapchain image to a PNG file. */
+	void screenshotRequested();
+
+	/** @brief Emitted when a full attachment dump is requested (Ctrl+F12).
+	 *  Capture all G-Buffer attachments to individual PNG files. */
+	void screenshotAllRequested();
+
+public:
+	/**
+	 * @brief Convenience method to emit screenshotRequested from any layer.
+	 * @note Prefer this over direct signal emission from outside the class.
+	 */
+	void requestScreenshot() { emit screenshotRequested(); }
+
+	/**
+	 * @brief Convenience method to emit screenshotAllRequested from any layer.
+	 */
+	void requestScreenshotAll() { emit screenshotAllRequested(); }
+
 private:
 	UIEvents() = default;
 
