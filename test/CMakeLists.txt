@@ -23,6 +23,8 @@ add_executable(neurus_test
 	render/test_lighting.cpp
 	render/test_model_render.cpp
 	render/test_screenshot.cpp
+	render/test_scene_wiring.cpp
+	data/test_gpu_resource_cache.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
 	editor/test_event_bus_typed.cpp
@@ -36,6 +38,7 @@ add_executable(neurus_test
 	scene/test_sprite.cpp
 	scene/test_scene.cpp
 	scene/test_scene_integration.cpp
+	scene/test_scene_const_access.cpp
 	scene/test_debug.cpp
 )
 
