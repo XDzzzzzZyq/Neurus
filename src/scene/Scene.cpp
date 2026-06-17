@@ -70,6 +70,25 @@ Camera* Scene::GetActiveCamera()
 	return nullptr;
 }
 
+const ObjectID* Scene::GetObjectID(int id) const
+{
+	auto it = obj_list.find(id);
+	if (it != obj_list.end())
+	{
+		return it->second.get();
+	}
+	return nullptr;
+}
+
+const Camera* Scene::GetActiveCamera() const
+{
+	if (!cam_list.empty())
+	{
+		return cam_list.begin()->second.get();
+	}
+	return nullptr;
+}
+
 // ---------------------------------------------------------------------------
 // Scene-wide operations
 // ---------------------------------------------------------------------------

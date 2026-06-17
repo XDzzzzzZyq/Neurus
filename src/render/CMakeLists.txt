@@ -36,6 +36,7 @@ add_library(neurus_render STATIC
 	PipelineBuilder.cpp
 	Material.h
 	Material.cpp
+	MeshBindings.cpp
 	RenderPassManager.h
 	RenderPassManager.cpp
 	GeometryPass.h
@@ -54,8 +55,8 @@ target_link_libraries(neurus_render PUBLIC
 	Qt6::Gui
 	glm
 	stb
-	neurus_editor
 	neurus_core
 )
 
 target_include_directories(neurus_render PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(neurus_render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)

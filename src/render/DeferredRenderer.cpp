@@ -298,6 +298,16 @@ void DeferredRenderer::WaitIdle()
 	m_device.waitIdle();
 }
 
+void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
+{
+	uint32_t oldGen = m_swapchain->generation();
+	m_swapchain->Recreate(width, height);
+	if (m_swapchain->generation() != oldGen)
+	{
+		recreateSwapchain();
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Swapchain recreation
 // ---------------------------------------------------------------------------

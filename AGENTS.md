@@ -142,6 +142,19 @@ ARCHITECTURE RULES (HARD REQUIREMENTS)
 - Future: Renderer may run on dedicated thread with proper synchronization.
 
 --------------------------------------------------------------------------------
+Development GUIDELINES (IMPORTANT)
+--------------------------------------------------------------------------------
+Follow Karpathy Guidelines. For each task:
+1. Think and plan. This project is complicated. System design should be highly decoupled and elegent
+2. Implement the plan. Do not hide the error, expose the error directly. Use debug printing and logging. Moreover, do not just focus and implement the testing, all feature should be wired immediately into the renderer and program.
+3. Test and Verify. Do not just focus on the test, launch `Neurus.exe` to check the terminal output and any runtime error. Also, use the screenshot to analyze the rendered result.
+```
+$output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
+``` 
+
+After the development of each phase, stop and wait for the verification from user. 
+
+--------------------------------------------------------------------------------
 CODE STYLE GUIDELINES
 --------------------------------------------------------------------------------
 

@@ -224,9 +224,17 @@ int main(int argc, char* argv[])
 	                     }
 	                 });
 
-	// Handle VulkanWidget resize
+	// Handle VulkanWidget resize - proactively recreate swapchain so the
+	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
+	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
 	QObject::connect(vulkanWidget, &neurus::VulkanWidget::resized,
-	                 [&renderer](int /*width*/, int /*height*/) {
+	                 [&renderer](int width, int height) {
+	                     if (renderer)
+	                     {
+	                         renderer->HandleResize(
+	                             static_cast<uint32_t>(width),
+	                             static_cast<uint32_t>(height));
+	                     }
 	                 });
 
 	// --- Timer-driven render loop ---

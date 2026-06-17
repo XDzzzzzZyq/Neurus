@@ -35,6 +35,7 @@ target_link_libraries(Neurus PRIVATE
 	neurus_editor
 	neurus_ui
 	neurus_data
+	neurus_scene
 	shader_headers
 	ads::qtadvanceddocking-qt6
 	Qt6::Core

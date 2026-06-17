@@ -254,6 +254,19 @@ public:
 	 */
 	Camera* GetActiveCamera();
 
+	/**
+	 * @brief Retrieves an object by its unique ID from the master pool (const).
+	 * @param id Unique object identifier.
+	 * @return Const pointer to ObjectID, or nullptr if not found.
+	 */
+	const ObjectID* GetObjectID(int id) const;
+
+	/**
+	 * @brief Returns the active camera (first in cam_list) (const).
+	 * @return Const pointer to Camera, or nullptr if no cameras.
+	 */
+	const Camera* GetActiveCamera() const;
+
 	// -------------------------------------------------------------------
 	// Scene-wide operations
 	// -------------------------------------------------------------------

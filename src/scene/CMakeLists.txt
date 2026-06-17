@@ -26,21 +26,16 @@
 	DebugPoints.cpp
 )
 
-target_link_libraries(neurus_scene PUBLIC
-	glm
-)
-
-target_include_directories(neurus_scene PUBLIC
+target_include_directories(neurus_scene PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
-target_link_libraries(neurus_scene PUBLIC glm Vulkan::Vulkan)
-
-target_compile_features(neurus_scene PUBLIC cxx_std_20)
-
-# Scene objects reference Material (render) and MeshData (data) types.
-# glm is required by Transform3D for matrix/vector math.
 target_link_libraries(neurus_scene PUBLIC
 	glm
+)
+
+target_link_libraries(neurus_scene PRIVATE
 	Vulkan::Vulkan
 )
+
+target_compile_features(neurus_scene PUBLIC cxx_std_20)

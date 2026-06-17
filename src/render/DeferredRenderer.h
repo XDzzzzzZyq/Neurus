@@ -142,6 +142,23 @@ public:
 	 */
 	int TakeScreenshotAllAttachments();
 
+	/**
+	 * @brief Handles window resize by proactively recreating swapchain and
+	 *        dependent resources.
+	 *
+	 * Calls Swapchain::Recreate() with the new dimensions, then rebuilds
+	 * attachments, semaphores, and command buffers. This avoids waiting for
+	 * VK_ERROR_OUT_OF_DATE_KHR on the next AcquireNextImage, preventing a
+	 * one-frame rendering glitch at the wrong size.
+	 *
+	 * Safe to call multiple times (idempotent for same dimensions).
+	 * No-op if the window is minimized (zero-area surface).
+	 *
+	 * @param width  New window width in pixels.
+	 * @param height New window height in pixels.
+	 */
+	void HandleResize(uint32_t width, uint32_t height);
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
