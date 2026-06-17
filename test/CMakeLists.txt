@@ -22,6 +22,7 @@ add_executable(neurus_test
 	render/test_gbuffer.cpp
 	render/test_lighting.cpp
 	render/test_model_render.cpp
+	render/test_golden_image.cpp
 	render/test_screenshot.cpp
 	render/test_scene_wiring.cpp
 	data/test_gpu_resource_cache.cpp

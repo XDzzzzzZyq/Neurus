@@ -65,6 +65,12 @@ void NeurusMainWindow::CreateMenus()
 		neurus::UIEvents::instance().requestScreenshot();
 	});
 
+	auto* screenshotAllAction = toolsMenu->addAction("Screenshot All &Passes");
+	screenshotAllAction->setShortcut(QKeySequence("Ctrl+F12"));
+	connect(screenshotAllAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestScreenshotAll();
+	});
+
 	auto* helpMenu = menuBar()->addMenu("&Help");
 	auto* aboutAction = helpMenu->addAction("&About Neurus");
 	connect(aboutAction, &QAction::triggered, this, [this]() {

@@ -17,16 +17,30 @@ VulkanImage::VulkanImage(const vk::raii::Device& device,
                          const vk::Format format,
                          const vk::ImageUsageFlags usage,
                          const uint32_t mipLevels,
-                         const ImageType imageType)
+                         const ImageType imageType,
+                         const char* debugName)
 	: m_extent(extent)
 	, m_format(format)
 	, m_usage(usage)
 	, m_mipLevels(mipLevels)
 	, m_imageType(imageType)
+	, m_currentLayout(vk::ImageLayout::eUndefined)
 {
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
 	createImageView(device);
+
+	// --- Set debug name in Debug builds ---
+#ifdef _DEBUG
+	if (debugName && *debugName)
+	{
+		const vk::DebugUtilsObjectNameInfoEXT nameInfo(
+			vk::ObjectType::eImage,
+			reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_image)),
+			debugName);
+		device.setDebugUtilsObjectNameEXT(nameInfo);
+	}
+#endif
 
 	{
 		const char* typeStr = (m_imageType == ImageType::e2D) ? "2D" :
@@ -36,7 +50,11 @@ VulkanImage::VulkanImage(const vk::raii::Device& device,
 		          << " mips=" << m_mipLevels
 		          << " type=" << typeStr
 		          << " format=" << vk::to_string(m_format)
-		          << " usage=" << vk::to_string(m_usage));
+		          << " usage=" << vk::to_string(m_usage)
+		          << " handle=0x" << std::hex << reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_image)) << std::dec
+		          << (debugName ? " name='" : "")
+		          << (debugName ? debugName : "")
+		          << (debugName ? "'" : ""));
 	}
 }
 
@@ -189,6 +207,8 @@ void VulkanImage::TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
 		{},
 		{},
 		{ barrier });
+
+	m_currentLayout = newLayout;
 }
 
 // ---------------------------------------------------------------------------

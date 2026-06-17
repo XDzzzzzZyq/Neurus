@@ -172,7 +172,8 @@ static float halfToFloat(uint16_t half)
 
 std::vector<uint8_t> Screenshot::convertHalfToU8(const void* data,
                                                   uint32_t width,
-                                                  uint32_t height)
+                                                  uint32_t height,
+                                                  bool remapSigned)
 {
 	const auto* src = static_cast<const uint16_t*>(data);
 	const size_t pixelCount = static_cast<size_t>(width) * height;
@@ -180,6 +181,14 @@ std::vector<uint8_t> Screenshot::convertHalfToU8(const void* data,
 
 	for (size_t i = 0; i < pixelCount; ++i)
 	{
+		// Detect background pixels: the geometry pass clear colour is (0,0,0,0).
+		// Pixels that are exactly zero in all three RGB channels are cleared
+		// background — leave them transparent black.
+		const bool isBackground = remapSigned
+			&& (src[i * 4 + 0] == 0)
+			&& (src[i * 4 + 1] == 0)
+			&& (src[i * 4 + 2] == 0);
+
 		for (int c = 0; c < 4; ++c)
 		{
 			// Read as raw uint16_t (little-endian ordering - GPU uses native endian)
@@ -189,10 +198,23 @@ std::vector<uint8_t> Screenshot::convertHalfToU8(const void* data,
 			// Convert to float
 			float val = halfToFloat(raw);
 
+			if (remapSigned && c < 3 && !isBackground)
+			{
+				// Remap [-1,1] → [0,1] for normal-map RGB channels
+				val = (val + 1.0f) * 0.5f;
+			}
+
 			// Clamp to [0, 1] and scale to [0, 255] for PNG
 			// For HDR values > 1, they clamp to white; negative values clamp to black.
 			val = (val < 0.0f) ? 0.0f : ((val > 1.0f) ? 1.0f : val);
 			result[i * 4 + c] = static_cast<uint8_t>(val * 255.0f + 0.5f);
+		}
+
+		// Force alpha to opaque for geometry pixels in signed-remap mode.
+		// Background stays transparent (alpha=0).
+		if (remapSigned && !isBackground)
+		{
+			result[i * 4 + 3] = 255;
 		}
 	}
 
@@ -443,7 +465,8 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
                                     vk::Queue queue,
                                     uint32_t queueFamilyIndex,
                                     VulkanImage& vulkanImage,
-                                    const std::string& path)
+                                    const std::string& path,
+                                    bool remapSigned)
 {
 	const vk::Image image = *vulkanImage.ImageHandle();
 	const vk::Format format = vulkanImage.Format();
@@ -455,7 +478,9 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 		return false;
 	}
 
-	// --- 1. Transition to TRANSFER_SRC_OPTIMAL ---
+	// --- 1. Query current layout and transition to TRANSFER_SRC_OPTIMAL ---
+	const vk::ImageLayout prevLayout = vulkanImage.CurrentLayout();
+
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
 		                                 queueFamilyIndex);
@@ -465,20 +490,27 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		// Transition SHADER_READ_ONLY → TRANSFER_SRC
-		// (image may also be in UNDEFINED or GENERAL; use oldLayout from VulkanImage? No - we
-		//  transition from UNDEFINED for simplicity; the real layout may be SHADER_READ_ONLY
-		//  after rendering. For a readback, transitioning from SHADER_READ_ONLY is safe.)
+		// Use the tracked layout as oldLayout so the barrier is always correct,
+		// regardless of whether the image is in SHADER_READ_ONLY, TRANSFER_SRC,
+		// UNDEFINED, or any other layout.
+		vk::AccessFlags srcAccess = {};
+		vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
+		if (prevLayout != vk::ImageLayout::eUndefined)
+		{
+			srcAccess = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
+			srcStage = vk::PipelineStageFlagBits::eAllCommands;
+		}
+
 		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eShaderRead,
+			srcAccess,
 			vk::AccessFlagBits::eTransferRead,
-			vk::ImageLayout::eShaderReadOnlyOptimal,
+			prevLayout,
 			vk::ImageLayout::eTransferSrcOptimal,
 			VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED,
 			image,
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eFragmentShader,
+		cmdBufs[0].pipelineBarrier(srcStage,
 		                           vk::PipelineStageFlagBits::eTransfer,
 		                           {}, {}, {}, barrier);
 
@@ -487,6 +519,9 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
 		queue.submit(submitInfo);
 		queue.waitIdle();
+
+		// Update our CPU-side layout tracking
+		vulkanImage.SetCurrentLayout(vk::ImageLayout::eTransferSrcOptimal);
 	}
 
 	// --- 2. Read image data to buffer ---
@@ -495,7 +530,11 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 	                                                  image, format, extent,
 	                                                  vk::ImageLayout::eTransferSrcOptimal);
 
-	// --- 3. Transition back to SHADER_READ_ONLY_OPTIMAL ---
+	// --- 3. Transition back to the original layout ---
+	// eUndefined is NOT a valid newLayout per Vulkan spec.  For images that
+	// were never written (SSAO, SSR — still in UNDEFINED), just leave them in
+	// TRANSFER_SRC_OPTIMAL; no pass accesses them so the layout is harmless.
+	if (prevLayout != vk::ImageLayout::eUndefined)
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
 		                                 queueFamilyIndex);
@@ -505,17 +544,22 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
+		const vk::AccessFlags dstAccess =
+			vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
+		constexpr vk::PipelineStageFlags dstStage =
+			vk::PipelineStageFlagBits::eAllCommands;
+
 		vk::ImageMemoryBarrier barrier(
 			vk::AccessFlagBits::eTransferRead,
-			vk::AccessFlagBits::eShaderRead,
+			dstAccess,
 			vk::ImageLayout::eTransferSrcOptimal,
-			vk::ImageLayout::eShaderReadOnlyOptimal,
+			prevLayout,
 			VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED,
 			image,
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 		cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-		                           vk::PipelineStageFlagBits::eFragmentShader,
+		                           dstStage,
 		                           {}, {}, {}, barrier);
 
 		cmdBufs[0].end();
@@ -523,6 +567,9 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
 		queue.submit(submitInfo);
 		queue.waitIdle();
+
+		// Update CPU-side layout tracking to reflect the restored layout
+		vulkanImage.SetCurrentLayout(prevLayout);
 	}
 
 	if (rawData.empty())
@@ -539,7 +586,7 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 	    format == vk::Format::eR16G16B16A16Snorm)
 	{
 		// Convert half-float → u8
-		pngData = convertHalfToU8(rawData.data(), extent.width, extent.height);
+		pngData = convertHalfToU8(rawData.data(), extent.width, extent.height, remapSigned);
 	}
 	else
 	{
@@ -601,8 +648,10 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 		const std::string fileName = timestampedFilename(
 			prefix + "_" + AttachmentNameToString(name), ".png");
 
-		if (CaptureAttachment(device, physicalDevice, queue, queueFamilyIndex,
-		                      image, fileName))
+		const bool remapSigned = (name == AttachmentName::Normal);
+		bool succeed = CaptureAttachment(device, physicalDevice, queue, queueFamilyIndex,
+			image, fileName, remapSigned);
+		if (succeed)
 		{
 			++capturedCount;
 		}

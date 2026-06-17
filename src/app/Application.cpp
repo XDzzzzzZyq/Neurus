@@ -25,7 +25,6 @@
 
 #include <QApplication>
 #include <QCoreApplication>
-#include <QDir>
 #include <QKeyEvent>
 #include <DockWidget.h>
 #include <QTimer>
@@ -59,19 +58,15 @@ namespace {
 /**
  * @brief Resolves a resource path relative to the executable directory.
  *
- * The executable is at build/debug/Debug/Neurus.exe.
- * This walks up 3 levels to the project root, then appends \p relativePath.
+ * The res/ folder is copied alongside the executable by CMake at build time.
+ * Resources are resolved as: {exeDir}/res/{relativePath}
  *
- * @param relativePath Path relative to the project root (e.g., "res/obj/sphere.obj").
+ * @param relativePath Path relative to res/ (e.g., "obj/sphere.obj").
  * @return Absolute path to the resource.
  */
 static QString resolveResourcePath(const char* relativePath)
 {
-	QDir dir(QCoreApplication::applicationDirPath());
-	dir.cdUp();  // Debug/
-	dir.cdUp();  // build/debug/
-	dir.cdUp();  // project root
-	return dir.absoluteFilePath(relativePath);
+	return QCoreApplication::applicationDirPath() + "/res/" + relativePath;
 }
 
 } // anonymous namespace
@@ -134,7 +129,7 @@ int Application::Run(int argc, char* argv[])
 	}
 
 	// --- Create default scene ---
-	const QString objPath = resolveResourcePath("res/obj/sphere.obj");
+	const QString objPath = resolveResourcePath("obj/sphere.obj");
 	auto scene = neurus::CreateDefaultScene(objPath.toStdString());
 	if (!scene)
 	{
@@ -144,7 +139,7 @@ int Application::Run(int argc, char* argv[])
 
 	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
 	{
-		const QString texPath = resolveResourcePath("res/tex/BAKED.png");
+		const QString texPath = resolveResourcePath("tex/BAKED.png");
 		auto bakedTex = neurus::Texture::FromFile(
 			m_vkContext->device(),
 			m_vkContext->physicalDevice(),

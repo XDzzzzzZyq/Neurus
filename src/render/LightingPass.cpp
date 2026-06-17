@@ -214,7 +214,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 
 		for (size_t i = 0; i < 4; ++i)
 		{
-			const auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+			auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
 			barriers[i] = vk::ImageMemoryBarrier2(
 				vk::PipelineStageFlagBits2::eColorAttachmentOutput,  // srcStage
 				vk::AccessFlagBits2::eColorAttachmentWrite,           // srcAccess
@@ -227,22 +227,33 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 				*attachment.ImageHandle(),
 				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
 				                          0, 1, 0, 1));
+
+			// Update CPU-side layout tracking
+			attachment.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 		}
 
-		// HDRColor: UNDEFINED → GENERAL
-		const auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+		// HDRColor: current layout → GENERAL
+		auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+		const vk::ImageLayout hdrOldLayout = hdrColor.CurrentLayout();
 		barriers[4] = vk::ImageMemoryBarrier2(
-			vk::PipelineStageFlagBits2::eTopOfPipe,               // srcStage
-			vk::AccessFlagBits2::eNone,                            // srcAccess
+			(hdrOldLayout == vk::ImageLayout::eUndefined)
+				? vk::PipelineStageFlagBits2::eTopOfPipe
+				: vk::PipelineStageFlagBits2::eAllCommands,            // srcStage
+			(hdrOldLayout == vk::ImageLayout::eUndefined)
+				? vk::AccessFlagBits2::eNone
+				: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
 			vk::PipelineStageFlagBits2::eComputeShader,             // dstStage
 			vk::AccessFlagBits2::eShaderWrite,                      // dstAccess
-			vk::ImageLayout::eUndefined,                            // oldLayout
+			hdrOldLayout,                                            // oldLayout — tracked, correct
 			vk::ImageLayout::eGeneral,                              // newLayout
 			VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED,
 			*hdrColor.ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
 			                          0, 1, 0, 1));
+
+		// Update CPU-side layout tracking (the barrier did this implicitly on GPU)
+		hdrColor.SetCurrentLayout(vk::ImageLayout::eGeneral);
 
 		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
 		cmdBuf.pipelineBarrier2(depInfo);

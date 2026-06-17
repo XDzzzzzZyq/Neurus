@@ -36,6 +36,8 @@ public:
 	 * @param usage         Usage flags (e.g. Sampled | TransferDst).
 	 * @param mipLevels     Number of mip levels (1 = no mip chain).
 	 * @param imageType     Image type (2D, Cube, Depth/Stencil).
+	 * @param debugName     Optional debug name for the image (set via VK_EXT_debug_utils in Debug builds).
+	 *                      The string is NOT retained; it is used immediately and may be a temporary.
 	 */
 	VulkanImage(const vk::raii::Device& device,
 	            const vk::raii::PhysicalDevice& physicalDevice,
@@ -43,7 +45,8 @@ public:
 	            vk::Format format,
 	            vk::ImageUsageFlags usage,
 	            uint32_t mipLevels = 1,
-	            ImageType imageType = ImageType::e2D);
+	            ImageType imageType = ImageType::e2D,
+	            const char* debugName = nullptr);
 
 	~VulkanImage() = default;
 
@@ -114,6 +117,25 @@ public:
 	/** @brief Image type. */
 	ImageType Type() const { return m_imageType; }
 
+	// --- Layout state ---
+
+	/**
+	 * @brief Returns the tracked current layout of the image.
+	 *
+	 * Updated by TransitionLayout() and SetCurrentLayout().  Initialised to
+	 * eUndefined.  This is a CPU-side convenience; the real layout is
+	 * maintained by Vulkan and the validation layer.
+	 */
+	vk::ImageLayout CurrentLayout() const { return m_currentLayout; }
+
+	/**
+	 * @brief Sets the tracked current layout to the given value.
+	 *
+	 * Call after recording barriers that do NOT go through TransitionLayout()
+	 * (e.g. pipelineBarrier2 or dynamic-rendering barriers in user code).
+	 */
+	void SetCurrentLayout(vk::ImageLayout layout) { m_currentLayout = layout; }
+
 private:
 	// --- Construction helpers ---
 	void createImage(const vk::raii::Device& device,
@@ -142,6 +164,9 @@ private:
 	uint32_t m_mipLevels = 1;
 	uint32_t m_arrayLayers = 1;
 	ImageType m_imageType = ImageType::e2D;
+
+	// --- Tracked current layout (CPU-side for convenience) ---
+	vk::ImageLayout m_currentLayout = vk::ImageLayout::eUndefined;
 };
 
 } // namespace neurus

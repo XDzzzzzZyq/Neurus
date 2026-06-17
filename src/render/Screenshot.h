@@ -87,11 +87,12 @@ public:
 	 * @brief Captures a VulkanImage attachment to a PNG file.
 	 *
 	 * Transitions the image to TRANSFER_SRC_OPTIMAL, copies to a staging buffer,
-	 * writes PNG, then transitions back to SHADER_READ_ONLY_OPTIMAL.
+	 * writes PNG, then transitions back to the original layout.
 	 *
 	 * Format handling:
 	 * - RGBA8 / BGRA8: direct pixel copy (BGRA is swizzled to RGBA).
 	 * - RGBA16F / RGBA16_SNORM: half-float values are converted to u8.
+	 *   Pass remapSigned=true to remap [-1,1]→[0,1] (for normal maps).
 	 * - R8_UNORM: expanded to single-channel grayscale PNG.
 	 *
 	 * @param device           Logical device (borrowed).
@@ -100,6 +101,7 @@ public:
 	 * @param queueFamilyIndex Queue family index for transient command pool.
 	 * @param vulkanImage      The VulkanImage to capture (non-const: layout is transitioned).
 	 * @param path             Output PNG file path (parent directories created).
+	 * @param remapSigned      If true, remap signed half-float data to [0,1] range.
 	 * @return true on success, false on failure.
 	 */
 	static bool CaptureAttachment(const vk::raii::Device& device,
@@ -107,7 +109,8 @@ public:
 	                              vk::Queue queue,
 	                              uint32_t queueFamilyIndex,
 	                              VulkanImage& vulkanImage,
-	                              const std::string& path);
+	                              const std::string& path,
+	                              bool remapSigned = false);
 
 	/**
 	 * @brief Captures all G-Buffer and post-FX attachments to timestamped PNG files.
@@ -170,17 +173,23 @@ private:
 	/**
 	 * @brief Converts RGBA16F half-float data to RGBA8 for PNG output.
 	 *
-	 * Each 4×16-bit half is converted to float, clamped to [0,1] or [-1,1]
-	 * range (user-selectable), then scaled to [0,255] uint8_t.
+	 * Each 4×16-bit half is converted to float.  When remapSigned is false
+	 * (default), values are clamped to [0,1] then scaled to [0,255].
+	 * When true, RGB channels are remapped from [-1,1] to [0,1] via
+	 * (v+1)*0.5, and the alpha channel is forced to 255 (opaque).
+	 * This is needed for normal-map attachments where the shader writes
+	 * signed view-space normals with alpha=0.
 	 *
-	 * @param data   Raw half-float pixel data (8 bytes per pixel).
-	 * @param width  Image width in pixels.
-	 * @param height Image height in pixels.
+	 * @param data        Raw half-float pixel data (8 bytes per pixel).
+	 * @param width       Image width in pixels.
+	 * @param height      Image height in pixels.
+	 * @param remapSigned If true, remap [-1,1] → [0,1] for RGB, alpha=255.
 	 * @return RGBA8 pixel data (4 bytes per pixel).
 	 */
 	static std::vector<uint8_t> convertHalfToU8(const void* data,
 	                                             uint32_t width,
-	                                             uint32_t height);
+	                                             uint32_t height,
+	                                             bool remapSigned = false);
 
 	/**
 	 * @brief Swizzles BGR→RGB in-place for BGRA pixel data.

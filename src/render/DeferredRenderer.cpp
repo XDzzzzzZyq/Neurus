@@ -26,6 +26,7 @@
 #include "scene/Scene.h"
 
 #include <array>
+#include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
@@ -125,6 +126,24 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 
 	vk::CommandBufferAllocateInfo cmdBufAlloc(*m_commandPool, vk::CommandBufferLevel::ePrimary, imageCount);
 	m_commandBuffers = vk::raii::CommandBuffers(device, cmdBufAlloc);
+
+	// --- Set debug names for command buffers ---
+#ifdef _DEBUG
+	for (uint32_t i = 0; i < imageCount; ++i)
+	{
+		char nameBuf[32];
+		snprintf(nameBuf, sizeof(nameBuf), "DeferredRenderer::FrameCmd[%u]", i);
+		const vk::DebugUtilsObjectNameInfoEXT nameInfo(
+			vk::ObjectType::eCommandBuffer,
+			reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*m_commandBuffers[i])),
+			nameBuf);
+		device.setDebugUtilsObjectNameEXT(nameInfo);
+		NEURUS_LOG("[DeferredRenderer] CmdBuf[" << i << "] handle=0x"
+		          << std::hex << reinterpret_cast<uint64_t>(
+		                 static_cast<VkCommandBuffer>(*m_commandBuffers[i]))
+		          << std::dec << " name='" << nameBuf << "'");
+	}
+#endif
 
 	// --- 10. Create sync objects ---
 	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
@@ -459,6 +478,23 @@ void DeferredRenderer::recreateSwapchain()
 		vk::CommandBufferAllocateInfo cmdBufAlloc(
 			*m_commandPool, vk::CommandBufferLevel::ePrimary, newImageCount);
 		m_commandBuffers = vk::raii::CommandBuffers(m_device, cmdBufAlloc);
+
+#ifdef _DEBUG
+		for (uint32_t i = 0; i < newImageCount; ++i)
+		{
+			char nameBuf[32];
+			snprintf(nameBuf, sizeof(nameBuf), "DeferredRenderer::FrameCmd[%u]", i);
+			const vk::DebugUtilsObjectNameInfoEXT nameInfo(
+				vk::ObjectType::eCommandBuffer,
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*m_commandBuffers[i])),
+				nameBuf);
+			m_device.setDebugUtilsObjectNameEXT(nameInfo);
+			NEURUS_LOG("[DeferredRenderer] CmdBuf[" << i << "] handle=0x"
+			          << std::hex << reinterpret_cast<uint64_t>(
+			                 static_cast<VkCommandBuffer>(*m_commandBuffers[i]))
+			          << std::dec << " name='" << nameBuf << "'");
+		}
+#endif
 	}
 
 	m_swapchainGeneration = m_swapchain->generation();
@@ -494,7 +530,7 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 
 		for (size_t i = 0; i < 4; ++i)
 		{
-			const auto& att = m_attachmentManager->GetAttachment(gBufferColors[i]);
+			auto& att = m_attachmentManager->GetAttachment(gBufferColors[i]);
 			preBarriers[i] = ImageBarrier(
 				*att.ImageHandle(),
 				vk::ImageLayout::eUndefined,
@@ -503,6 +539,7 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 				vk::AccessFlagBits2::eNone,
 				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
 				vk::AccessFlagBits2::eColorAttachmentWrite);
+			att.SetCurrentLayout(vk::ImageLayout::eColorAttachmentOptimal);
 		}
 
 		const auto& depthAtt = m_attachmentManager->GetAttachment(AttachmentName::Depth);
@@ -547,7 +584,7 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	// --- Phase 3: Blit HDRColor → swapchain image ---
 	// LightingPass leaves HDRColor in GENERAL layout.
 	// Transition to TRANSFER_SRC_OPTIMAL for the blit.
-	const auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+	auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
 	const vk::Image hdrImage = *hdrColor.ImageHandle();
 	const vk::Image swapchainImage = m_swapchain->images()[imageIndex];
 
@@ -575,6 +612,9 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 		const std::array<vk::ImageMemoryBarrier2, 2> barriers = { hdrBarrier, scBarrier };
 		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
 		cmdBuf.pipelineBarrier2(depInfo);
+
+		// Update CPU-side layout tracking
+		hdrColor.SetCurrentLayout(vk::ImageLayout::eTransferSrcOptimal);
 	}
 
 	// --- Blit: HDRColor → swapchain image ---

@@ -74,4 +74,13 @@ if(WIN32)
 			$<TARGET_FILE_DIR:Neurus>
 		COMMENT "Deploying Qt DLLs via windeployqt"
 	)
+
+	# Copy res/ folder to the output directory so resources resolve at runtime
+	# without walking up the source tree.
+	add_custom_command(TARGET Neurus POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+			"${CMAKE_SOURCE_DIR}/res"
+			"$<TARGET_FILE_DIR:Neurus>/res"
+		COMMENT "Copying res/ to output directory"
+	)
 endif()

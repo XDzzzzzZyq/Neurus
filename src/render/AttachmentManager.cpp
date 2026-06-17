@@ -62,7 +62,8 @@ void AttachmentManager::createAttachment(const AttachmentName name)
 	                  config.format,
 	                  config.usage,
 	                  1,                // mipLevels
-	                  config.imageType);
+	                  config.imageType,
+	                  AttachmentNameToString(name));  // debug name
 
 	m_attachments.emplace(name, std::move(image));
 }
