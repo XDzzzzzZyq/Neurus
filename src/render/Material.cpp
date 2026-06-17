@@ -98,7 +98,7 @@ void Material::SetMatParam(MatParaType _tar, const glm::vec3& _col)
 	is_mat_changed = true;
 }
 
-void Material::SetMatParam(MatParaType _tar, TextureLib::TextureRes _tex)
+void Material::SetMatParam(MatParaType _tar, TextureData::TextureRes _tex)
 {
 	auto it = mat_params.find(_tar);
 	if (it == mat_params.end())

@@ -131,7 +131,7 @@ public:
 	bool IsValid() const { return m_image != nullptr; }
 
 	/** @brief Underlying VulkanImage (nullptr if invalid). */
-	const VulkanImage* GetImage() const { return m_image.get(); }
+	VulkanImage* GetImage() const { return m_image.get(); }
 
 	/** @brief Underlying VkSampler handle. Only valid if HasSampler() is true. */
 	const vk::raii::Sampler& GetSampler() const { return m_sampler; }

@@ -284,6 +284,114 @@ void VulkanImage::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 }
 
 // ---------------------------------------------------------------------------
+// GPU readback
+// ---------------------------------------------------------------------------
+
+std::vector<uint8_t> VulkanImage::ReadImageToBuffer(
+	const vk::raii::Device& device,
+	const vk::raii::PhysicalDevice& physicalDevice,
+	vk::Queue queue,
+	uint32_t queueFamilyIndex,
+	vk::ImageLayout currentLayout) const
+{
+	// Delegate to the static overload using our own image handle, format and extent.
+	return ReadImageToBuffer(device, physicalDevice, queue, queueFamilyIndex,
+	                         *m_image, m_format, m_extent, currentLayout);
+}
+
+// ---------------------------------------------------------------------------
+// Static ReadImageToBuffer (raw VkImage overload)
+// ---------------------------------------------------------------------------
+
+std::vector<uint8_t> VulkanImage::ReadImageToBuffer(
+	const vk::raii::Device& device,
+	const vk::raii::PhysicalDevice& physicalDevice,
+	vk::Queue queue,
+	uint32_t queueFamilyIndex,
+	vk::Image image,
+	vk::Format format,
+	vk::Extent2D extent,
+	vk::ImageLayout currentLayout)
+{
+	// Shared implementation — refactor member version to delegate here later.
+	const uint32_t bytesPerPixel = [&]() -> uint32_t {
+		switch (format)
+		{
+		case vk::Format::eR8G8B8A8Unorm:
+		case vk::Format::eR8G8B8A8Srgb:
+		case vk::Format::eB8G8R8A8Unorm:
+		case vk::Format::eB8G8R8A8Srgb:
+			return 4;
+		case vk::Format::eR16G16B16A16Sfloat:
+		case vk::Format::eR16G16B16A16Unorm:
+		case vk::Format::eR16G16B16A16Snorm:
+			return 8;
+		case vk::Format::eR8Unorm:
+		case vk::Format::eR8Srgb:
+			return 1;
+		default:
+			return 0;
+		}
+	}();
+
+	if (bytesPerPixel == 0) return {};
+
+	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(extent.width) *
+	                                 extent.height * bytesPerPixel;
+
+	// --- Staging buffer ---
+	vk::BufferCreateInfo stagingCI({}, imageSize, vk::BufferUsageFlagBits::eTransferDst);
+	vk::raii::Buffer stagingBuffer(device, stagingCI);
+
+	auto stagingMemReqs = stagingBuffer.getMemoryRequirements();
+	uint32_t stagingMemType = FindMemoryType(physicalDevice,
+	                                         stagingMemReqs.memoryTypeBits,
+	                                         vk::MemoryPropertyFlagBits::eHostVisible |
+	                                         vk::MemoryPropertyFlagBits::eHostCoherent);
+	vk::MemoryAllocateInfo stagingAlloc(stagingMemReqs.size, stagingMemType);
+	vk::raii::DeviceMemory stagingMemory(device, stagingAlloc);
+	stagingBuffer.bindMemory(*stagingMemory, 0);
+
+	// --- Transient command buffer ---
+	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
+	                                 queueFamilyIndex);
+	vk::raii::CommandPool cmdPool(device, poolCI);
+	vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+	vk::raii::CommandBuffers cmdBufs(device, allocInfo);
+
+	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+	vk::BufferImageCopy copyRegion;
+	copyRegion.bufferOffset = 0;
+	copyRegion.bufferRowLength = 0;
+	copyRegion.bufferImageHeight = 0;
+	copyRegion.imageSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
+	copyRegion.imageExtent = vk::Extent3D(extent.width, extent.height, 1);
+
+	cmdBufs[0].copyImageToBuffer(image, currentLayout, *stagingBuffer, copyRegion);
+
+	vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite,
+	                          vk::AccessFlagBits::eHostRead);
+	cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+	                           vk::PipelineStageFlagBits::eHost,
+	                           {}, {barrier}, {}, {});
+
+	cmdBufs[0].end();
+
+	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+	queue.submit(submitInfo);
+	queue.waitIdle();
+
+	std::vector<uint8_t> pixelData(static_cast<size_t>(imageSize));
+	void* mapped = stagingMemory.mapMemory(0, imageSize);
+	std::memcpy(pixelData.data(), mapped, static_cast<size_t>(imageSize));
+	stagingMemory.unmapMemory();
+
+	return pixelData;
+}
+
+// ---------------------------------------------------------------------------
 // Static helpers
 // ---------------------------------------------------------------------------
 

@@ -30,8 +30,6 @@ add_library(neurus_render STATIC
 	shaders/ShaderLib.cpp
 	Texture.h
 	Texture.cpp
-	TextureLib.h
-	TextureLib.cpp
 	PipelineBuilder.h
 	PipelineBuilder.cpp
 	Material.h

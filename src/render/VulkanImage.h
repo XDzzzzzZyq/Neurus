@@ -91,6 +91,41 @@ public:
 	 */
 	void GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf);
 
+	// --- GPU readback ---
+
+	/**
+	 * @brief Reads image data from the GPU into a host‑side byte vector.
+	 *
+	 * Creates a transient command buffer, records vkCmdCopyImageToBuffer
+	 * from this image into a staging buffer, submits, waits for completion,
+	 * and returns the raw pixel data.  The image must be in a TRANSFER_SRC
+	 * compatible layout (typically eTransferSrcOptimal).
+	 *
+	 * @param currentLayout    Current layout of the image (must be transfer‑src compatible).
+	 * @return Raw pixel data (size = width × height × bytesPerPixel).
+	 */
+	std::vector<uint8_t> ReadImageToBuffer(const vk::raii::Device& device,
+	                                       const vk::raii::PhysicalDevice& physicalDevice,
+	                                       vk::Queue queue,
+	                                       uint32_t queueFamilyIndex,
+	                                       vk::ImageLayout currentLayout) const;
+
+	/**
+	 * @brief Static overload for raw VkImage handles (swapchain, etc.).
+	 *
+	 * Same behaviour as the member version but accepts an explicit image
+	 * handle, format, and extent.  Useful for swapchain screenshots where
+	 * no VulkanImage wrapper exists.
+	 */
+	static std::vector<uint8_t> ReadImageToBuffer(const vk::raii::Device& device,
+	                                               const vk::raii::PhysicalDevice& physicalDevice,
+	                                               vk::Queue queue,
+	                                               uint32_t queueFamilyIndex,
+	                                               vk::Image image,
+	                                               vk::Format format,
+	                                               vk::Extent2D extent,
+	                                               vk::ImageLayout currentLayout);
+
 	// --- Getters ---
 
 	/** @brief Underlying vk::raii::Image handle. */

@@ -5,6 +5,8 @@ add_library(neurus_data STATIC
 	GPUResource.cpp
 	GPUResourceCache.h
 	GPUResourceCache.cpp
+	TextureData.h
+	TextureData.cpp
 	MeshData.h
 	MeshData.cpp
 )
