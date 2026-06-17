@@ -15,12 +15,14 @@
 #include "VulkanBuffer.h"
 #include "buffers/VertexBuffer.h"
 #include "buffers/IndexBuffer.h"
+#include "data/GPUResourceCache.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Log.h"
 
 #include "scene/Camera.h"
+#include "scene/Mesh.h"
 #include "scene/Scene.h"
 
 #include <array>
@@ -35,23 +37,19 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 
 DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
-                                   const vk::raii::PhysicalDevice& physicalDevice,
-                                   vk::Queue graphicsQueue,
-                                   uint32_t queueFamilyIndex,
-                                   const vk::raii::SurfaceKHR& surface,
-                                   uint32_t width,
-                                   uint32_t height,
-                                   const float* vertexData,
-                                   uint32_t vertexCount,
-                                   const uint32_t* indexData,
-                                   uint32_t indexCount,
-                                   const PointLightGpu& light,
-                                   const uint32_t* gVertSpv,
-                                   size_t gVertSize,
-                                   const uint32_t* gFragSpv,
-                                   size_t gFragSize,
-                                   const uint32_t* lightCompSpv,
-                                   size_t lightCompSize)
+                                    const vk::raii::PhysicalDevice& physicalDevice,
+                                    vk::Queue graphicsQueue,
+                                    uint32_t queueFamilyIndex,
+                                    const vk::raii::SurfaceKHR& surface,
+                                    uint32_t width,
+                                    uint32_t height,
+                                    GPUResourceCache& resourceCache,
+                                    const uint32_t* gVertSpv,
+                                    size_t gVertSize,
+                                    const uint32_t* gFragSpv,
+                                    size_t gFragSize,
+                                    const uint32_t* lightCompSpv,
+                                    size_t lightCompSize)
 	: m_device(device)
 	, m_physicalDevice(physicalDevice)
 	, m_graphicsQueue(graphicsQueue)
@@ -59,7 +57,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	, m_surface(surface)
 	, m_width(width)
 	, m_height(height)
-	, m_indexCount(indexCount)
+	, m_resourceCache(&resourceCache)
 	, m_commandPool(createCommandPool(device, queueFamilyIndex))
 {
 	// --- 1. Create swapchain ---
@@ -75,28 +73,27 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 3. Create render pass manager ---
 	m_renderPassManager = std::make_unique<RenderPassManager>();
 
-	// --- 4. Upload mesh vertex / index data ---
-	const vk::DeviceSize vertexDataSize = static_cast<vk::DeviceSize>(vertexCount) * 8 * sizeof(float);
-	constexpr uint32_t kVertexStride = 8 * sizeof(float);  // pos(3) + normal(3) + uv(2)
+	// --- 4. Create fallback SSBO for zero-light scenes ---
+	//     LightingPass::Record needs a valid VulkanBuffer reference even when
+	//     no lights are present (the SSBO descriptor must be bound, even
+	//     though the shader won't read it when lightCount=0).
+	{
+		uint8_t zero[sizeof(PointLightGpu)] = {};
+		m_fallbackSSBO = std::make_unique<VulkanBuffer>(
+			device, physicalDevice, graphicsQueue, queueFamilyIndex,
+			sizeof(PointLightGpu),
+			vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+			vk::MemoryPropertyFlagBits::eDeviceLocal);
+		m_fallbackSSBO->Upload(zero, sizeof(PointLightGpu));
+		NEURUS_LOG("[DeferredRenderer] Created fallback SSBO (zero-light)");
+	}
 
-	m_vertexBuffer = std::make_unique<VertexBuffer>(
-		device, physicalDevice, graphicsQueue, queueFamilyIndex,
-		vertexData, vertexDataSize, kVertexStride, vertexCount);
+	// Mesh and light GPU buffers are owned by GPUResourceCache, not here.
+	// Application calls cache.UploadMesh(*mesh) and cache.UploadLights(scene)
+	// before constructing the renderer. At record time we query buffers from
+	// the cache via m_resourceCache.
 
-	const vk::DeviceSize indexDataSize = static_cast<vk::DeviceSize>(indexCount) * sizeof(uint32_t);
-	m_indexBuffer = std::make_unique<IndexBuffer>(
-		device, physicalDevice, graphicsQueue, queueFamilyIndex,
-		indexData, indexDataSize, indexCount);
-
-	// --- 5. Upload light SSBO ---
-	m_lightSSBO = std::make_unique<VulkanBuffer>(
-		device, physicalDevice, graphicsQueue, queueFamilyIndex,
-		sizeof(PointLightGpu),
-		vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-		vk::MemoryPropertyFlagBits::eDeviceLocal);
-	m_lightSSBO->Upload(&light, sizeof(PointLightGpu));
-
-	// --- 6. Create geometry pass ---
+	// --- 5. Create geometry pass ---
 	m_geometryPass = std::make_unique<GeometryPass>(
 		device, physicalDevice, graphicsQueue, queueFamilyIndex,
 		*m_attachmentManager, *m_renderPassManager,
@@ -142,10 +139,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 
 	NEURUS_LOG("[DeferredRenderer] " << m_width << "x" << m_height
 	          << " swapchainImages=" << imageCount
-	          << " vertices=" << vertexCount
-	          << " indices=" << indexCount
-	          << " lightPower=" << light.power
-	          << " lightRadius=" << light.radius
 	          << " transferDst=" << (hasTransferDst ? "yes" : "no"));
 }
 
@@ -189,12 +182,20 @@ CameraUBOData DeferredRenderer::computeCameraData(vk::Extent2D extent, const Cam
 // Render item construction
 // ---------------------------------------------------------------------------
 
-GeometryRenderItem DeferredRenderer::buildRenderItem() const
+GeometryRenderItem DeferredRenderer::buildRenderItem(int meshID) const
 {
-	GeometryRenderItem item;
-	item.vertexBuffer = m_vertexBuffer->buffer();
-	item.indexBuffer = m_indexBuffer->buffer();
-	item.indexCount = m_indexCount;
+	GeometryRenderItem item = {};
+
+	const VertexBuffer* vb = m_resourceCache->GetVertexBuffer(meshID);
+	const IndexBuffer* ib = m_resourceCache->GetIndexBuffer(meshID);
+	if (!vb || !ib)
+	{
+		return item;  // Not cached — return default (no draw will occur)
+	}
+
+	item.vertexBuffer = vb->buffer();
+	item.indexBuffer = ib->buffer();
+	item.indexCount = m_resourceCache->GetIndexCount(meshID);
 	item.indexType = vk::IndexType::eUint32;
 
 	// Identity model matrix (sphere at origin).
@@ -265,7 +266,10 @@ void DeferredRenderer::DrawFrame()
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
 
-	recordFrame(cmdBuf, imageIndex, fallbackCam);
+	// No-args DrawFrame is deprecated and used only as camera-fallback.
+	// Pass empty render items (no geometry drawn) — the fallback exists only
+	// to prevent a crash when no camera is configured.
+	recordFrame(cmdBuf, imageIndex, fallbackCam, {});
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -354,10 +358,27 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	// Only reset fence after successful acquire
 	m_device.resetFences(*fence);
 
+	// --- Build render items from scene meshes (using cache for GPU buffers) ---
+	std::vector<GeometryRenderItem> renderItems;
+	renderItems.reserve(scene.mesh_list.size());
+	for (const auto& [id, mesh] : scene.mesh_list)
+	{
+		if (!mesh || !mesh->o_mesh)
+		{
+			continue;  // No geometry data — skip
+		}
+		const int meshID = mesh->GetObjectID();
+		if (!m_resourceCache->GetVertexBuffer(meshID))
+		{
+			continue;  // Not uploaded to GPU — skip
+		}
+		renderItems.push_back(buildRenderItem(meshID));
+	}
+
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
 
-	recordFrame(cmdBuf, imageIndex, *activeCam);
+	recordFrame(cmdBuf, imageIndex, *activeCam, renderItems);
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -447,7 +468,9 @@ void DeferredRenderer::recreateSwapchain()
 // Frame recording
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex, const Camera& camera)
+void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex,
+                                   const Camera& camera,
+                                   const std::vector<GeometryRenderItem>& renderItems)
 {
 	const vk::Extent2D extent = m_swapchain->extent();
 
@@ -502,17 +525,20 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	const glm::mat4 viewMatrix = cameraData.view;
 	const glm::vec3 cameraPos = camera.GetPosition();
 
-	// --- Build render item (single sphere mesh) ---
-	const GeometryRenderItem renderItem = buildRenderItem();
-	const std::vector<GeometryRenderItem> renderItems = { renderItem };
-
-	// --- Phase 1: GeometryPass → G-Buffer MRT ---
+	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
 	m_geometryPass->Record(cmdBuf, cameraData, renderItems, extent);
 
-	// --- Phase 2: LightingPass → compute PBR → HDRColor ---
+	// --- Phase 2: LightingPass → compute PBR → HDRColor (using cache for light SSBO) ---
+	const VulkanBuffer* lightSSBO = m_resourceCache->GetLightSSBO();
+	uint32_t lightCount = m_resourceCache->GetLightCount();
+
+	// Fallback SSBO ensures LightingPass always has a valid VulkanBuffer reference
+	// for descriptor binding, even when the scene has zero lights.
+	const VulkanBuffer& ssboRef = lightSSBO ? *lightSSBO : *m_fallbackSSBO;
+
 	m_lightingPass->Record(cmdBuf,
-	                       *m_lightSSBO,
-	                       m_lightCount,
+	                       ssboRef,
+	                       lightCount,
 	                       cameraPos,
 	                       viewMatrix,
 	                       extent,

@@ -10,7 +10,7 @@
  *   5. Show main window - apply layout so widget has final size
  *   6. VkSurfaceKHR - created from VulkanWidget's native HWND
  *   7. VulkanContext (Phase 2) - logical device + queue selection
- *   8. Load scene assets (sphere.obj + BAKED.png)
+ *   8. CreateDefaultScene - scene factory (camera, sphere mesh, point light) + load BAKED.png texture
  *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
  *  10. QTimer-driven render loop - ~60 FPS
  *
@@ -45,9 +45,9 @@
 #include "render/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
-#include "data/MeshData.h"
+#include "data/GPUResourceCache.h"
 #include "scene/Scene.h"
-#include "scene/Camera.h"
+#include "scene/DefaultScene.h"
 
 // Generated SPIR-V shader headers
 #include "gbuffer.vert.h"
@@ -72,29 +72,6 @@ static QString resolveResourcePath(const char* relativePath)
 	dir.cdUp();  // build/debug/
 	dir.cdUp();  // project root
 	return dir.absoluteFilePath(relativePath);
-}
-
-/**
- * @brief Extracts the first 8 floats (pos+normal+uv) from each 14-float vertex
- *        in the MeshData interleaved array.
- *
- * @param dataArray Interleaved vertex data (14 floats per vertex).
- * @return Vector of 8-float vertices suitable for GeometryPass.
- */
-static std::vector<float> extractGeometryVertices(const std::vector<float>& dataArray)
-{
-	constexpr size_t kSrcStride = 14;  // pos(3) + normal(3) + uv(2) + tangent(3) + bitangent(3)
-	constexpr size_t kDstStride = 8;   // pos(3) + normal(3) + uv(2)
-	const size_t numVertices = dataArray.size() / kSrcStride;
-
-	std::vector<float> result(numVertices * kDstStride);
-	for (size_t i = 0; i < numVertices; ++i)
-	{
-		std::memcpy(&result[i * kDstStride],
-		            &dataArray[i * kSrcStride],
-		            kDstStride * sizeof(float));
-	}
-	return result;
 }
 
 } // anonymous namespace
@@ -156,16 +133,13 @@ int Application::Run(int argc, char* argv[])
 		return -1;
 	}
 
-	// --- Load scene assets ---
-	// Load sphere OBJ mesh
-	neurus::MeshData sphereMeshData;
+	// --- Create default scene ---
+	const QString objPath = resolveResourcePath("res/obj/sphere.obj");
+	auto scene = neurus::CreateDefaultScene(objPath.toStdString());
+	if (!scene)
 	{
-		const QString objPath = resolveResourcePath("res/obj/sphere.obj");
-		if (!sphereMeshData.LoadObj(objPath.toStdString()))
-		{
-			std::cerr << "Failed to load sphere mesh: " << objPath.toStdString() << "\n";
-			return -1;
-		}
+		std::cerr << "Failed to create default scene.\n";
+		return -1;
 	}
 
 	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
@@ -182,28 +156,27 @@ int Application::Run(int argc, char* argv[])
 		if (!bakedTex.IsValid())
 		{
 			std::cerr << "Warning: Failed to load texture: " << texPath.toStdString() << "\n";
-			// Non-fatal - gbuffer.frag uses hardcoded albedo for MVP.
 		}
 	}
 
-	// --- Extract vertex data for GeometryPass ---
-	const auto& meshData = sphereMeshData.GetMeshData();
-	const std::vector<float> gpuVertices = extractGeometryVertices(meshData.dataArray);
-	const uint32_t vertexCount = static_cast<uint32_t>(gpuVertices.size() / 8);
-	const uint32_t indexCount = static_cast<uint32_t>(meshData.indexArray.size());
+	// --- Initialize GPU resource cache and upload scene data ---
+	m_resourceCache = std::make_unique<neurus::GPUResourceCache>(
+		m_vkContext->device(),
+		m_vkContext->physicalDevice(),
+		m_vkContext->graphicsQueue(),
+		m_vkContext->graphicsQueueFamily());
 
-	// --- Build point light data (GPU-compatible) ---
-	neurus::PointLightGpu pointLight = {};
-	pointLight.posX = 3.0f;
-	pointLight.posY = 3.0f;
-	pointLight.posZ = 3.0f;
-	pointLight.colorR = 1.0f;
-	pointLight.colorG = 1.0f;
-	pointLight.colorB = 1.0f;
-	pointLight.power = 10.0f;
-	pointLight.radius = 0.05f;
+	// Upload each Mesh object directly (GPUResourceCache reads MeshData from mesh->o_mesh)
+	for (const auto& [id, mesh] : scene->mesh_list)
+	{
+		m_resourceCache->UploadMesh(*mesh);
+	}
 
-	// --- Create deferred renderer ---
+	// Upload lights (no guard — zero lights are handled gracefully by GPUResourceCache
+	// and LightingPass)
+	m_resourceCache->UploadLights(*scene);
+
+	// --- Create deferred renderer (uses cache for mesh/light buffers) ---
 	try
 	{
 		m_renderer = std::make_unique<neurus::DeferredRenderer>(
@@ -214,11 +187,7 @@ int Application::Run(int argc, char* argv[])
 			*surface,
 			vulkanWidget->width(),
 			vulkanWidget->height(),
-			gpuVertices.data(),
-			vertexCount,
-			meshData.indexArray.data(),
-			indexCount,
-			pointLight,
+			*m_resourceCache,
 			gbuffer_vert_spv, gbuffer_vert_spv_size,
 			gbuffer_frag_spv, gbuffer_frag_spv_size,
 			pbr_lighting_comp_spv, pbr_lighting_comp_spv_size
@@ -233,20 +202,12 @@ int Application::Run(int argc, char* argv[])
 	// Window was created hidden - show it now that the renderer is ready
 	mainWindow->show();
 
-	// --- Scene setup ---
-	// Create a camera with the same defaults as the old hardcoded values.
-	neurus::Scene scene;
-	auto defaultCamera = std::make_shared<neurus::Camera>();
-	defaultCamera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
-	defaultCamera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-	scene.UseCamera(defaultCamera);
-
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
-	                 [this, &scene]() {
+	                 [this, scene]() {
 	                     if (m_renderer)
 	                     {
-	                         try { m_renderer->DrawFrame(scene); }
+	                         try { m_renderer->DrawFrame(*scene); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
@@ -291,10 +252,10 @@ int Application::Run(int argc, char* argv[])
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [this, &scene]() {
+	QObject::connect(&renderTimer, &QTimer::timeout, [this, scene]() {
 		if (m_renderer)
 		{
-			try { m_renderer->DrawFrame(scene); }
+			try { m_renderer->DrawFrame(*scene); }
 			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}
 		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)
@@ -306,10 +267,11 @@ int Application::Run(int argc, char* argv[])
 	int result = qtApp.exec();
 
 	// --- Clean shutdown (CRITICAL: destroy surface BEFORE instance) ---
-	m_renderer.reset();      // 1. Destroy DeferredRenderer (swapchain, pipeline, etc.)
-	surface.reset();         // 2. Destroy VkSurfaceKHR
-	mainWindow.reset();      // 3. Destroy main window (deletes VulkanWidget)
-	m_vkContext.reset();     // 4. Destroy VkDevice + VkInstance
+	m_renderer.reset();         // 1. Destroy DeferredRenderer (swapchain, pipeline, etc.)
+	m_resourceCache.reset();    // 2. Destroy GPUResourceCache (vertex/index/light buffers)
+	surface.reset();            // 3. Destroy VkSurfaceKHR
+	mainWindow.reset();         // 4. Destroy main window (deletes VulkanWidget)
+	m_vkContext.reset();        // 5. Destroy VkDevice + VkInstance
 
 	return result;
 }

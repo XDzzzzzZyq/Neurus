@@ -9,6 +9,8 @@
 	add_library(neurus_scene STATIC
 	Camera.h
 	Camera.cpp
+	DefaultScene.h
+	DefaultScene.cpp
 	Mesh.h
 	Mesh.cpp
 	UID.h

@@ -8,6 +8,7 @@ namespace neurus {
 class VulkanContext;
 class DeferredRenderer;
 class EditorContext;
+class GPUResourceCache;
 
 /**
  * @brief Application lifecycle manager.
@@ -42,6 +43,7 @@ public:
 private:
 	std::unique_ptr<VulkanContext> m_vkContext;
 	std::unique_ptr<DeferredRenderer> m_renderer;
+	std::unique_ptr<GPUResourceCache> m_resourceCache;
 	std::unique_ptr<EditorContext> m_editorContext;
 };
 
