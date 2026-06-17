@@ -56,6 +56,7 @@ target_link_libraries(neurus_render PUBLIC
 	glm
 	stb
 	neurus_core
+	neurus_scene
 )
 
 target_include_directories(neurus_render PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

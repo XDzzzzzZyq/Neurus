@@ -37,6 +37,8 @@ class RenderPassManager;
 class VertexBuffer;
 class IndexBuffer;
 class VulkanBuffer;
+class Camera;
+class Scene;
 
 /**
  * @brief Deferred renderer orchestrating GeometryPass → LightingPass → composite.
@@ -111,10 +113,23 @@ public:
 	/**
 	 * @brief Draws a single frame: acquire → record → submit → present.
 	 *
+	 * Uses a fallback default camera (positioned at (0,2,5), looking at origin).
 	 * Handles swapchain recreation on VK_ERROR_OUT_OF_DATE_KHR.
 	 * Safe to call repeatedly (fence-guarded, max kMaxFramesInFlight in flight).
+	 *
+	 * @deprecated Use DrawFrame(const Scene&) to provide scene-defined camera.
 	 */
 	void DrawFrame();
+
+	/**
+	 * @brief Draws a single frame using the scene's active camera.
+	 *
+	 * Reads camera transform and projection from scene.GetActiveCamera().
+	 * Falls back to default camera if no active camera is set.
+	 *
+	 * @param scene Scene providing the active camera for this frame.
+	 */
+	void DrawFrame(const Scene& scene);
 
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
@@ -169,7 +184,7 @@ private:
 	 *   3. Blit HDRColor → swapchain image
 	 *   4. Transition swapchain image to present layout
 	 */
-	void recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex);
+	void recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex, const Camera& camera);
 
 	/** @brief Destroys and re-creates sync objects after swapchain resize. */
 	void recreateSwapchain();
@@ -177,7 +192,7 @@ private:
 	/**
 	 * @brief Computes and returns camera UBO data for the current frame.
 	 */
-	CameraUBOData computeCameraData(vk::Extent2D extent) const;
+	CameraUBOData computeCameraData(vk::Extent2D extent, const Camera& camera) const;
 
 	/**
 	 * @brief Builds a single GeometryRenderItem for the sphere mesh.
@@ -210,13 +225,6 @@ private:
 	uint32_t m_indexCount = 0;
 	std::unique_ptr<VulkanBuffer> m_lightSSBO;
 	uint32_t m_lightCount = 1;
-
-	// --- Camera state ---
-	glm::vec3 m_cameraPos    = glm::vec3(0.0f, 2.0f, 5.0f);
-	glm::vec3 m_cameraTarget = glm::vec3(0.0f, 0.0f, 0.0f);
-	float     m_cameraFov    = 60.0f;
-	float     m_cameraNear   = 0.1f;
-	float     m_cameraFar    = 100.0f;
 
 	// --- Command pool ---
 	vk::raii::CommandPool m_commandPool;

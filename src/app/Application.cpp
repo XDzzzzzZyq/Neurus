@@ -46,6 +46,8 @@
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
 #include "data/MeshData.h"
+#include "scene/Scene.h"
+#include "scene/Camera.h"
 
 // Generated SPIR-V shader headers
 #include "gbuffer.vert.h"
@@ -231,12 +233,20 @@ int Application::Run(int argc, char* argv[])
 	// Window was created hidden - show it now that the renderer is ready
 	mainWindow->show();
 
+	// --- Scene setup ---
+	// Create a camera with the same defaults as the old hardcoded values.
+	neurus::Scene scene;
+	auto defaultCamera = std::make_shared<neurus::Camera>();
+	defaultCamera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	defaultCamera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+	scene.UseCamera(defaultCamera);
+
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
-	                 [this]() {
+	                 [this, &scene]() {
 	                     if (m_renderer)
 	                     {
-	                         try { m_renderer->DrawFrame(); }
+	                         try { m_renderer->DrawFrame(scene); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
@@ -254,6 +264,7 @@ int Application::Run(int argc, char* argv[])
 	                     }
 	                 });
 
+	// TODO: decouple screenshot from DeferredRenderer, Isolate by Editor, Use EventBus as bridge.
 	// Handle screenshot requests (F12 / menu action) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotRequested,
 	                 [this]() {
@@ -280,10 +291,10 @@ int Application::Run(int argc, char* argv[])
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [this]() {
+	QObject::connect(&renderTimer, &QTimer::timeout, [this, &scene]() {
 		if (m_renderer)
 		{
-			try { m_renderer->DrawFrame(); }
+			try { m_renderer->DrawFrame(scene); }
 			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}
 		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)

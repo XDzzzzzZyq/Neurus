@@ -20,6 +20,9 @@
 
 #include "Log.h"
 
+#include "scene/Camera.h"
+#include "scene/Scene.h"
+
 #include <array>
 #include <cstring>
 #include <iostream>
@@ -169,12 +172,12 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 // Camera data computation
 // ---------------------------------------------------------------------------
 
-CameraUBOData DeferredRenderer::computeCameraData(vk::Extent2D extent) const
+CameraUBOData DeferredRenderer::computeCameraData(vk::Extent2D extent, const Camera& camera) const
 {
 	const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
 
-	const glm::mat4 view = glm::lookAt(m_cameraPos, m_cameraTarget, glm::vec3(0.0f, 1.0f, 0.0f));
-	const glm::mat4 proj = glm::perspective(glm::radians(m_cameraFov), aspect, m_cameraNear, m_cameraFar);
+	const glm::mat4 view = camera.GetViewMatrix();
+	const glm::mat4 proj = glm::perspective(glm::radians(camera.cam_pers), aspect, camera.cam_near, camera.cam_far);
 
 	CameraUBOData data;
 	data.viewProj = proj * view;
@@ -210,6 +213,11 @@ GeometryRenderItem DeferredRenderer::buildRenderItem() const
 
 void DeferredRenderer::DrawFrame()
 {
+	// Fallback camera matching the old hardcoded defaults.
+	Camera fallbackCam;
+	fallbackCam.SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	fallbackCam.cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+
 	auto& fence = m_inFlightFences[m_currentFrame];
 	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
 
@@ -257,7 +265,7 @@ void DeferredRenderer::DrawFrame()
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
 
-	recordFrame(cmdBuf, imageIndex);
+	recordFrame(cmdBuf, imageIndex, fallbackCam);
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -287,6 +295,97 @@ void DeferredRenderer::DrawFrame()
 	if (presentFailed)
 	{
 		// Don't advance frame - retry same slot next iteration
+		return;
+	}
+
+	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
+}
+
+void DeferredRenderer::DrawFrame(const Scene& scene)
+{
+	const Camera* activeCam = scene.GetActiveCamera();
+	if (!activeCam)
+	{
+		NEURUS_ERR("DrawFrame(Scene): No active camera in scene, falling back to default camera");
+		DrawFrame();
+		return;
+	}
+
+	auto& fence = m_inFlightFences[m_currentFrame];
+	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
+
+	// --- Wait for this frame slot's fence ---
+	if (m_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
+	{
+		return;  // Timeout - skip this frame
+	}
+
+	// --- Acquire next swapchain image ---
+	uint32_t imageIndex = 0;
+	bool skipFrame = false;
+	try
+	{
+		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
+		m_lastImageIndex = imageIndex;
+	}
+	catch (const vk::OutOfDateKHRError&)
+	{
+		NEURUS_ERR("AcquireNextImage: swapchain out of date");
+		skipFrame = true;
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("AcquireNextImage failed: " << e.what());
+		skipFrame = true;
+	}
+
+	// --- Handle swapchain recreation (from out-of-date acquire or external resize) ---
+	if (m_swapchain->generation() != m_swapchainGeneration)
+	{
+		recreateSwapchain();
+		skipFrame = true;
+	}
+
+	if (skipFrame)
+	{
+		return;
+	}
+
+	// Only reset fence after successful acquire
+	m_device.resetFences(*fence);
+
+	// --- Record and submit (reuse pre-allocated command buffer) ---
+	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
+
+	recordFrame(cmdBuf, imageIndex, *activeCam);
+
+	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
+	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+
+	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBuf, *renderFinished);
+	m_graphicsQueue.submit(submitInfo, *fence);
+
+	// --- Present ---
+	bool presentFailed = false;
+	try
+	{
+		m_swapchain->Present(renderFinished, imageIndex, m_graphicsQueue);
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("Present failed: " << e.what());
+		presentFailed = true;
+	}
+
+	// --- Handle swapchain recreation after present ---
+	if (m_swapchain->generation() != m_swapchainGeneration)
+	{
+		recreateSwapchain();
+		presentFailed = true;
+	}
+
+	if (presentFailed)
+	{
 		return;
 	}
 
@@ -348,7 +447,7 @@ void DeferredRenderer::recreateSwapchain()
 // Frame recording
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex)
+void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex, const Camera& camera)
 {
 	const vk::Extent2D extent = m_swapchain->extent();
 
@@ -399,8 +498,9 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	}
 
 	// --- Compute camera matrices for this frame ---
-	const CameraUBOData cameraData = computeCameraData(extent);
+	const CameraUBOData cameraData = computeCameraData(extent, camera);
 	const glm::mat4 viewMatrix = cameraData.view;
+	const glm::vec3 cameraPos = camera.GetPosition();
 
 	// --- Build render item (single sphere mesh) ---
 	const GeometryRenderItem renderItem = buildRenderItem();
@@ -413,7 +513,7 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	m_lightingPass->Record(cmdBuf,
 	                       *m_lightSSBO,
 	                       m_lightCount,
-	                       m_cameraPos,
+	                       cameraPos,
 	                       viewMatrix,
 	                       extent,
 	                       m_currentFrame);
