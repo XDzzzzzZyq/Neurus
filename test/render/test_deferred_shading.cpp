@@ -288,7 +288,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// Step 3: Create point light
 	// -------------------------------------------------------------------
 	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
-	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
+	light->SetPosition(glm::vec3(2.0f, 2.0f, 2.0f));
 	light->light_radius = 10.0f;
 
 	// -------------------------------------------------------------------
@@ -311,7 +311,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	{
 		const float* s = &srcVertexData[i * 14];
 		TestVertex& v = vertices[i];
-		v.posX = s[0]; v.posY = s[1]; v.posZ = s[2];
+		v.posX = s[0] * 0.25f; v.posY = s[1] * 0.25f; v.posZ = s[2] * 0.25f;
 		v.nrmX = s[3]; v.nrmY = s[4]; v.nrmZ = s[5];
 		v.uvX  = s[6]; v.uvY  = s[7];
 	}

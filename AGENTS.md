@@ -7,13 +7,13 @@ single source of truth for commands, architectural rules, and code style
 expectations.
 
 --------------------------------------------------------------------------------
-CURRENT SCOPE (Triangle MVP)
+CURRENT SCOPE
 --------------------------------------------------------------------------------
 
-The project is in its INITIALIZATION phase. The current deliverable is a
-working colored RGB triangle rendered via the full four-layer architecture.
+The project has completed its deferred-PBR MVP: a full G-Buffer → lighting
+compute → HDR output pipeline with reference-image regression tests.
 
-**In scope:**
+**In scope (implemented):**
 - Vulkan-HPP RAII instance, device, swapchain, pipeline
 - VK_KHR_dynamic_rendering for render passes
 - Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
@@ -26,11 +26,21 @@ working colored RGB triangle rendered via the full four-layer architecture.
 - Embedded SPIR-V shaders (compiled at CMake time)
 - Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
 - Dock layout persistence (save/restore via ADS serialization)
+- OBJ mesh loading with MeshData (icosphere, cube, etc.)
+- Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute) + composite blit
+- Cook-Torrance GGX BRDF in a compute shader (point lights)
+- PointLightGpu SSBO with std140-compatible struct layout
+- AttachmentManager for G-Buffer + HDRColor + post-FX attachments
+- Screenshot capture + TextureData PNG readback + half-float→U8 conversion
+- GPU tests with shared VulkanTestShared base class
+- Reference-image regression tests (capture → compare PNG at test/render/reference/)
+- Render caches: GpuResourceCache, DescriptorCache (per-frame descriptor pools)
+- RenderPassManager for dynamic rendering pass control
 
 **Out of scope (post-MVP):**
-- glTF/OBJ/PNG file loading, asset pipeline
-- PBR materials, multi-pass rendering, deferred shading
-- Compute shaders, ray tracing, mesh shaders
+- glTF/PNG file loading, asset pipeline (OBJ loading is in scope)
+- Multi-pass rendering (SSAO, SSR), IBL, shadows
+- Ray tracing, mesh shaders
 - Undo/redo, serialization, plugin system
 - Linux/macOS support
 - Threading, VMA, profilers, shader hot-reload
@@ -73,8 +83,9 @@ make test
 - Non-GPU tests run in CI (UIEvents, EventBus, EditorContext)
 - GPU tests require a Vulkan 1.4-capable device
 - Run all tests: `cd build/debug && ctest --output-on-failure`
-- Run a single test: `cd build/debug && ctest -R UIEvents_Singleton`
+- Run a single test: `cd build/debug && ctest -R DeferredShading`
 - On local machine, launch `Neurus.exe` to check the terminal output and any runtime error.
+- See `.github/instructions/test.instructions.md` for full testing standards and patterns.
 
 **Lint / format:**
 - No repo-wide formatter configured.
@@ -275,8 +286,12 @@ Neurus/
 │   ├── data/               # Data & Resource layer
 │   └── main.cpp            # Application entry point
 ├── test/
-│   ├── render/             # Renderer unit tests
-│   └── editor/             # Editor unit tests
+│   ├── render/             # Renderer GPU tests
+│   │   └── reference/      # Reference images for regression tests
+│   │       └── deferred/   # Deferred-pass reference PNGs
+│   ├── editor/             # Editor unit tests (run in CI, no GPU)
+│   └── shared/             # Test infrastructure
+│       └── TestVulkanShared.h/cpp  # GPU test fixture base class
 ├── AGENTS.md               # This file
 ├── CMakeLists.txt           # Root CMake build
 ├── CMakePresets.json        # CMake presets (default, release, vs2022)
@@ -301,6 +316,29 @@ PRACTICAL GUIDANCE FOR AGENTS
 - Vulkan-HPP vk::raii: never call raw vkDestroy. Let RAII handle cleanup.
 - Validation layers: test in Debug mode. Never suppress validation warnings
   without explicit justification in code comments.
+
+**GPU test patterns (established in this session):**
+- All GPU tests inherit `VulkanTestShared` (in `test/shared/TestVulkanShared.h`).
+  The base class bootstraps Instance → PhysicalDevice → Device → Queue → CommandPool.
+- `BeginCmd()` returns a one-shot command buffer; `EndSubmitWait(cmd)` submits and
+  waits-idle. Use these for every GPU command sequence.
+- Reference-image tests follow a "first-run-generates, second-run-compares" pattern:
+  on first run, the test captures each attachment as PNG into `reference/deferred/`
+  and SKIPs; on second run, it compares pixel-by-pixel against those references.
+- HDRColor is `R16G16B16A16_SFLOAT` → Screenshot converts via half→float→clamp→U8.
+  Normal attachments use signed remap `(val+1)*0.5` before clamp.
+- Test scenes (objects, lights, cameras) must use realistic scales. A sphere OBJ
+  may have radius ≈ 1 → after projection it can fill the entire screen if too
+  close/large. Scale vertices with `pos * 0.25f` or reposition the camera/light
+  as needed.
+- Light position matters: with inverse-square attenuation `1/d²`, a light at
+  distance 5 from the surface produces only 4% of the radiance vs distance 2.
+  Keep test lights close to the geometry for visible lighting.
+- When debugging black HDRColor output: first check that Position.w > 0 (the
+  early-out), then check attenuation distance, light power, and descriptor bindings.
+  Do NOT assume "zero lighting" means the compute shader is broken.
+- Reference images should be checked with Python (`PIL.Image`) for uniform values,
+  unique pixel counts, and histogram analysis before committing.
 
 --------------------------------------------------------------------------------
 END
