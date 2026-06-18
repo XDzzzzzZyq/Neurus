@@ -289,7 +289,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// -------------------------------------------------------------------
 	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-	light->light_radius = 0.05f;
+	light->light_radius = 10.0f;
 
 	// -------------------------------------------------------------------
 	// Step 4: Build mesh + material
