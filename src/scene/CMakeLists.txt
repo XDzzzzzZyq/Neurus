@@ -34,6 +34,7 @@ target_include_directories(neurus_scene PRIVATE
 
 target_link_libraries(neurus_scene PUBLIC
 	glm
+	cereal
 )
 
 target_link_libraries(neurus_scene PRIVATE

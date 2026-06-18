@@ -22,6 +22,8 @@
 #include <memory>
 #include <string>
 
+#include <cereal/types/base_class.hpp>
+
 #include "scene/UID.h"
 
 namespace neurus
@@ -111,6 +113,20 @@ public:
 	 * the deleter is type-erased at construction time, not destruction.
 	 */
 	~Sprite() override = default;
+
+	/**
+	 * @brief Cereal serialization for sprite.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 * @note spr_tex (shared_ptr<Texture>) is a GPU resource and is
+	 *       NOT serialized. It must be re-resolved after deserialization.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<ObjectID>(this),
+		   CEREAL_NVP(spr_opacity), CEREAL_NVP(spr_type));
+	}
 
 	// -------------------------------------------------------------------
 	// Type-to-path resolution

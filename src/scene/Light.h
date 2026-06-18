@@ -19,6 +19,8 @@
 
 #include "glm/glm.hpp"
 
+#include <cereal/types/base_class.hpp>
+
 #include "scene/Transform.h"
 #include "scene/UID.h"
 
@@ -128,6 +130,26 @@ public:
 
 	/** @brief Blur kernel size for soft area shadows. */
 	static constexpr float area_blur_range = 0.04f;
+
+public:
+	/**
+	 * @brief Cereal serialization for light.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 * @note Static constexpr shadow parameters are compile-time constants
+	 *       and are not serialized.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<ObjectID>(this),
+		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
+		   CEREAL_NVP(use_shadow), CEREAL_NVP(light_type),
+		   CEREAL_NVP(light_power), CEREAL_NVP(light_color),
+		   CEREAL_NVP(light_radius),
+		   CEREAL_NVP(spot_cutoff), CEREAL_NVP(spot_outer_cutoff),
+		   CEREAL_NVP(area_ratio));
+	}
 
 public:
 	/**

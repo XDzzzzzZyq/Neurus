@@ -31,6 +31,9 @@
 #include <memory>
 #include <unordered_map>
 
+#include <cereal/types/memory.hpp>
+#include <cereal/types/unordered_map.hpp>
+
 #include "UID.h"
 
 #include "Camera.h"
@@ -127,6 +130,21 @@ public:
 	 * @note GPU resources released via object destructors.
 	 */
 	~Scene();
+
+	/**
+	 * @brief Cereal serialization for scene pools.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 * @note Only typed pools are serialized. obj_list (master pool) is
+	 *       reconstructed from typed pools on deserialization.
+	 *       m_status (runtime state) is not serialized.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(CEREAL_NVP(cam_list), CEREAL_NVP(mesh_list), CEREAL_NVP(light_list),
+		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list));
+	}
 
 	// -------------------------------------------------------------------
 	// Status tracking

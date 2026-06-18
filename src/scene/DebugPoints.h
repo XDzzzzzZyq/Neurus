@@ -21,6 +21,9 @@
 
 #include <vector>
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/vector.hpp>
+
 #include "UID.h"
 #include "Transform.h"
 
@@ -80,6 +83,21 @@ public:
 	 * @brief Destroys the DebugPoints.
 	 */
 	~DebugPoints() override = default;
+
+	/**
+	 * @brief Cereal serialization for debug points.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<ObjectID>(this),
+		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
+		   CEREAL_NVP(m_pointType), CEREAL_NVP(m_color),
+		   CEREAL_NVP(m_scale), CEREAL_NVP(m_opacity),
+		   CEREAL_NVP(m_projectionMode), CEREAL_NVP(m_points));
+	}
 
 	// Non-copyable (UID semantics)
 	DebugPoints(const DebugPoints&) = delete;

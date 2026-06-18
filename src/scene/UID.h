@@ -18,6 +18,9 @@
 
 #include <string>
 
+#include <cereal/cereal.hpp>
+#include <cereal/types/string.hpp>
+
 namespace neurus
 {
 
@@ -179,6 +182,18 @@ public:
 	 * @brief Destroys the ObjectID.
 	 */
 	~ObjectID() override;
+
+	/**
+	 * @brief Cereal serialization for object identity and metadata.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(CEREAL_NVP(o_name), CEREAL_NVP(o_type),
+		   CEREAL_NVP(is_viewport), CEREAL_NVP(is_rendered));
+	}
 };
 
 } // namespace neurus

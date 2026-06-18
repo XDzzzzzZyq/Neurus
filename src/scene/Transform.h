@@ -25,6 +25,10 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+#include <cereal/cereal.hpp>
+
+#include "GlmSerialization.h"
+
 namespace neurus {
 
 /**
@@ -85,6 +89,19 @@ public:
 	 * @brief Destroys the Transform3D.
 	 */
 	~Transform3D() override = default;
+
+	/**
+	 * @brief Cereal serialization for TRS transform.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 * @note Only position/rotation/scale are serialized. Cached matrix
+	 *       and dirty flag are computed values, not persisted.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(CEREAL_NVP(m_position), CEREAL_NVP(m_rotation), CEREAL_NVP(m_scale));
+	}
 
 	/**
 	 * @brief Returns a typed pointer to this Transform3D.

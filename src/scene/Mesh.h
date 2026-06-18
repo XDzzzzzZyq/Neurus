@@ -24,6 +24,8 @@
 
 #include <glm/glm.hpp>
 
+#include <cereal/types/base_class.hpp>
+
 #include "UID.h"
 #include "Transform.h"
 
@@ -69,6 +71,9 @@ public:
 	bool using_sdf      = true;  ///< Include this mesh in SDF field generation
 	bool is_closure     = true;  ///< Mesh is closed/watertight (affects SDF and culling)
 
+	/// OBJ file path for serialization and asset recovery
+	std::string o_meshPath;
+
 	/**
 	 * @brief Constructs a default empty mesh.
 	 * @note Mesh has no geometry until o_mesh is assigned.
@@ -87,6 +92,23 @@ public:
 	 * @brief Virtual destructor.
 	 */
 	~Mesh() override = default;
+
+	/**
+	 * @brief Cereal serialization for mesh.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 * @note GPU resources (o_material, o_mesh, o_shader) are NOT serialized.
+	 *       Only o_meshPath stores the asset reference for recovery.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<ObjectID>(this),
+		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
+		   CEREAL_NVP(o_meshPath),
+		   CEREAL_NVP(using_shadow), CEREAL_NVP(using_material),
+		   CEREAL_NVP(using_sdf), CEREAL_NVP(is_closure));
+	}
 
 	// Non-copyable (UID base enforces this, but clarify for Mesh)
 	Mesh(const Mesh&) = delete;

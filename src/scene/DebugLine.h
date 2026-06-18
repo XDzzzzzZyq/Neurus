@@ -21,6 +21,9 @@
 
 #include <vector>
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/vector.hpp>
+
 #include "UID.h"
 #include "Transform.h"
 
@@ -65,6 +68,21 @@ public:
 	 * @brief Destroys the DebugLine.
 	 */
 	~DebugLine() override = default;
+
+	/**
+	 * @brief Cereal serialization for debug lines.
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<ObjectID>(this),
+		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
+		   CEREAL_NVP(m_color), CEREAL_NVP(m_width), CEREAL_NVP(m_opacity),
+		   CEREAL_NVP(m_stipple), CEREAL_NVP(m_smooth),
+		   CEREAL_NVP(m_vertices));
+	}
 
 	// Non-copyable (UID semantics)
 	DebugLine(const DebugLine&) = delete;

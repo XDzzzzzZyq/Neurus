@@ -23,6 +23,8 @@ Mesh::Mesh()
 Mesh::Mesh(const std::string& path)
 	: Mesh()
 {
+	o_meshPath = path;
+
 	if (path.empty())
 	{
 		return;
