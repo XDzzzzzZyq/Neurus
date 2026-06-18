@@ -23,7 +23,7 @@
  * - Shift held: 2x sensitivity
  * - Ctrl held: 0.25x sensitivity
  *
- * @note CameraController does not own the camera — it operates on a reference.
+ * @note CameraController does not own the camera - it operates on a reference.
  * @note Input system (T55) will provide IsMousePressed, GetDeltaMouse, GetScroll
  *       methods. InputState struct bridges until T55 is implemented.
  */
@@ -101,7 +101,7 @@ struct InputState
  *   controller.Update(*activeCamera, *scene, input);
  * @endcode
  *
- * @note CameraController does not own the camera — it operates on a reference.
+ * @note CameraController does not own the camera - it operates on a reference.
  * @note No renderer dependency. Uses only Camera, Scene, and glm.
  */
 class CameraController

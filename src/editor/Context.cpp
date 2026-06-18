@@ -1,6 +1,6 @@
 /**
  * @file Context.cpp
- * @brief Context system implementation — SceneContext accessors, EditorContext, Context constructor.
+ * @brief Context system implementation - SceneContext accessors, EditorContext, Context constructor.
  */
 
 #include "editor/Context.h"
@@ -14,7 +14,7 @@
 namespace neurus {
 
 // ===========================================================================
-// SceneContext — const accessors delegating to Scene
+// SceneContext - const accessors delegating to Scene
 // ===========================================================================
 
 const Camera* SceneContext::GetActiveCamera() const
@@ -83,7 +83,7 @@ const Scene* EditorContext::activeScene() const
 }
 
 // ===========================================================================
-// Context — aggregates sub-contexts, wires event subscriptions
+// Context - aggregates sub-contexts, wires event subscriptions
 // ===========================================================================
 
 Context::Context(EventPool& pool)

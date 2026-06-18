@@ -1,6 +1,6 @@
 /**
  * @file Project.cpp
- * @brief Project layer implementation — persistence via cereal JSON archives.
+ * @brief Project layer implementation - persistence via cereal JSON archives.
  */
 
 #include "Project.h"

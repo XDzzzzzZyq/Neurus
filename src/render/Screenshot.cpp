@@ -185,7 +185,7 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 		if (image.CurrentLayout() == vk::ImageLayout::eUndefined)
 		{
 			NEURUS_LOG("[Screenshot] Skipping " << AttachmentNameToString(name)
-			           << " — layout is UNDEFINED (not yet written)");
+			           << " - layout is UNDEFINED (not yet written)");
 			continue;
 		}
 

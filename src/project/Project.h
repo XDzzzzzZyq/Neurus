@@ -2,7 +2,7 @@
 
 /**
  * @file Project.h
- * @brief Project layer — the DNA/persistence layer for scene serialization.
+ * @brief Project layer - the DNA/persistence layer for scene serialization.
  *
  * Provides the Project class which encapsulates a Scene and its serialization
  * to/from .neurus.json files via cereal JSON archives. The Project is the
@@ -29,7 +29,7 @@ namespace neurus::project
 {
 
 /**
- * @brief Top-level project container — owns Scene and handles persistence.
+ * @brief Top-level project container - owns Scene and handles persistence.
  *
  * Project is the serialization root. It owns the Scene (all scene objects)
  * and tracks file path and dirty state. Factory methods New() and Open()
@@ -154,7 +154,7 @@ public:
 
 private:
 	/**
-	 * @brief Default constructor — private; use New() or Open().
+	 * @brief Default constructor - private; use New() or Open().
 	 *
 	 * Allocates the owned Scene via unique_ptr to enable move semantics,
 	 * which is required for the factory pattern (New/Open) since UID

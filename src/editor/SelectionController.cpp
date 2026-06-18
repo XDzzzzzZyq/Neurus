@@ -1,6 +1,6 @@
 /**
  * @file SelectionController.cpp
- * @brief Implementation of SelectionController — click-select via raycast.
+ * @brief Implementation of SelectionController - click-select via raycast.
  */
 
 #include "SelectionController.h"
@@ -200,7 +200,7 @@ std::vector<int> SelectionController::BoxSelect(
 	float /*x0*/, float /*y0*/, float /*x1*/, float /*y1*/,
 	int /*screenWidth*/, int /*screenHeight*/) const
 {
-	// Stub — full implementation deferred to Phase 6 (viewport integration)
+	// Stub - full implementation deferred to Phase 6 (viewport integration)
 	return {};
 }
 

@@ -19,7 +19,7 @@ class AttachmentManager;
  *
  * All operations are blocking (waits for queue idle).
  *
- * The constructor is deleted — this is a purely static utility class.
+ * The constructor is deleted - this is a purely static utility class.
  */
 class Screenshot
 {

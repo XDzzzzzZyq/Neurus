@@ -126,7 +126,7 @@ void LightingPass::UploadLights(const Scene& scene)
 	if (newCount == 0)
 	{
 		m_lightSSBO.reset();
-		NEURUS_LOG("[LightingPass] No point lights in scene — SSBO released (fallback preserved)");
+		NEURUS_LOG("[LightingPass] No point lights in scene - SSBO released (fallback preserved)");
 		return;
 	}
 
@@ -351,7 +351,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 				: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
 			vk::PipelineStageFlagBits2::eComputeShader,             // dstStage
 			vk::AccessFlagBits2::eShaderWrite,                      // dstAccess
-			hdrOldLayout,                                            // oldLayout — tracked, correct
+			hdrOldLayout,                                            // oldLayout - tracked, correct
 			vk::ImageLayout::eGeneral,                              // newLayout
 			VK_QUEUE_FAMILY_IGNORED,
 			VK_QUEUE_FAMILY_IGNORED,

@@ -241,6 +241,7 @@ CODE STYLE GUIDELINES
   ```
 - Inline comments follow Blender C/C++ style: `// comment` (space after //)
 - Non-trivial sections get `// --- Section Name ---` separators
+- Use a normal hyphen (`-`) instead of an em dash (`–` or `—`).
 
 **Shader conventions:**
 - GLSL source: `res/shaders/`

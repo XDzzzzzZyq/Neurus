@@ -415,7 +415,7 @@ bool Texture::SaveImage(Image& image,
 }
 
 // ===========================================================================
-// SaveTexture (convenience — delegates to SaveImage)
+// SaveTexture (convenience - delegates to SaveImage)
 // ===========================================================================
 
 bool Texture::SaveTexture(const vk::raii::Device& device,

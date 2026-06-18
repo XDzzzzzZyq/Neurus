@@ -1,6 +1,6 @@
 /**
  * @file Input.h
- * @brief Static input capture system — bridges Qt events to per-frame queryable state.
+ * @brief Static input capture system - bridges Qt events to per-frame queryable state.
  *
  * Input provides a unified, double-buffered interface for querying keyboard and
  * mouse state each frame. Qt events (pushed from VulkanWidget) write into a
@@ -8,7 +8,7 @@
  * enabling "clicked" / "released" transition detection.
  *
  * Architecture:
- * - Pure static utility — no QObject, no constructor, no instance.
+ * - Pure static utility - no QObject, no constructor, no instance.
  * - Three-stage buffer pipeline: pending → curr → prev.
  * - UpdateState() (called once per frame) performs the swap and computes
  *   per-frame mouse delta.
@@ -30,7 +30,7 @@
  * @endcode
  *
  * @note Editor Layer: Input is part of the Editor system, not UI or Renderer.
- * @note Not thread-safe — must be used from the main (Qt) thread only.
+ * @note Not thread-safe - must be used from the main (Qt) thread only.
  * @note Key codes follow Qt::Key values; mouse buttons use Input::MouseButton.
  */
 #pragma once
@@ -55,7 +55,7 @@ public:
 	};
 
 	// -----------------------------------------------------------------------
-	// Recording — called from VulkanWidget Qt event handlers
+	// Recording - called from VulkanWidget Qt event handlers
 	// -----------------------------------------------------------------------
 
 	/**
@@ -97,7 +97,7 @@ public:
 	static void RecordScroll(float delta);
 
 	// -----------------------------------------------------------------------
-	// Frame update — called once per frame before any input query
+	// Frame update - called once per frame before any input query
 	// -----------------------------------------------------------------------
 
 	/**
@@ -164,7 +164,7 @@ public:
 	static bool IsMouseButtonReleased(MouseButton button);
 
 	// -----------------------------------------------------------------------
-	// Convenience — fills the struct consumed by CameraController
+	// Convenience - fills the struct consumed by CameraController
 	// -----------------------------------------------------------------------
 
 	/**
@@ -195,7 +195,7 @@ private:
 	static bool s_currKeys[kMaxKeys];
 	static bool s_prevKeys[kMaxKeys];
 
-	// --- Modifier key flags (separate triple-buffer — Qt codes exceed kMaxKeys) ---
+	// --- Modifier key flags (separate triple-buffer - Qt codes exceed kMaxKeys) ---
 	static bool s_pendingShift;
 	static bool s_pendingCtrl;
 	static bool s_pendingAlt;

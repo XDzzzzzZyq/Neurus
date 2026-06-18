@@ -1,4 +1,4 @@
-#include "Image.h"
+#include "VulkanImage.h"
 
 #include "Log.h"
 
@@ -12,21 +12,19 @@ namespace neurus {
 // Construction
 // ---------------------------------------------------------------------------
 
-Image::Image(const vk::raii::Device& device,
-             const vk::raii::PhysicalDevice& physicalDevice,
-             const vk::Extent2D extent,
-             const vk::Format format,
-             const vk::ImageUsageFlags usage,
-             const uint32_t mipLevels,
-             const ImageType imageType,
-             const char* debugName,
-             const ImageData& imageData)
+VulkanImage::VulkanImage(const vk::raii::Device& device,
+                         const vk::raii::PhysicalDevice& physicalDevice,
+                         const vk::Extent2D extent,
+                         const vk::Format format,
+                         const vk::ImageUsageFlags usage,
+                         const uint32_t mipLevels,
+                         const ImageType imageType,
+                         const char* debugName)
 	: m_extent(extent)
 	, m_format(format)
 	, m_usage(usage)
 	, m_mipLevels(mipLevels)
 	, m_imageType(imageType)
-	, m_imageData(imageData)
 	, m_currentLayout(vk::ImageLayout::eUndefined)
 {
 	createImage(device, physicalDevice);
@@ -42,17 +40,6 @@ Image::Image(const vk::raii::Device& device,
 			reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_image)),
 			debugName);
 		device.setDebugUtilsObjectNameEXT(nameInfo);
-
-		// Name the device memory
-		{
-			std::string memName(debugName);
-			memName += "_Mem";
-			vk::DebugUtilsObjectNameInfoEXT memNameInfo(
-				vk::ObjectType::eDeviceMemory,
-				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*m_deviceMemory)),
-				memName.c_str());
-			device.setDebugUtilsObjectNameEXT(memNameInfo);
-		}
 	}
 #endif
 
@@ -60,7 +47,7 @@ Image::Image(const vk::raii::Device& device,
 		const char* typeStr = (m_imageType == ImageType::e2D) ? "2D" :
 		                      (m_imageType == ImageType::eCube) ? "Cube" :
 		                      (m_imageType == ImageType::eDepthStencil) ? "DepthStencil" : "Unknown";
-		NEURUS_LOG("[Image] " << m_extent.width << "x" << m_extent.height
+		NEURUS_LOG("[VulkanImage] " << m_extent.width << "x" << m_extent.height
 		          << " mips=" << m_mipLevels
 		          << " type=" << typeStr
 		          << " format=" << vk::to_string(m_format)
@@ -76,7 +63,7 @@ Image::Image(const vk::raii::Device& device,
 // Image creation
 // ---------------------------------------------------------------------------
 
-void Image::createImage(const vk::raii::Device& device,
+void VulkanImage::createImage(const vk::raii::Device& device,
                               const vk::raii::PhysicalDevice& /*physicalDevice*/)
 {
 	vk::ImageCreateFlags createFlags;
@@ -120,7 +107,7 @@ void Image::createImage(const vk::raii::Device& device,
 // Memory allocation & binding
 // ---------------------------------------------------------------------------
 
-void Image::allocateAndBindMemory(const vk::raii::Device& device,
+void VulkanImage::allocateAndBindMemory(const vk::raii::Device& device,
                                         const vk::raii::PhysicalDevice& physicalDevice)
 {
 	const auto memReqs = m_image.getMemoryRequirements();
@@ -138,7 +125,7 @@ void Image::allocateAndBindMemory(const vk::raii::Device& device,
 // Image view creation
 // ---------------------------------------------------------------------------
 
-void Image::createImageView(const vk::raii::Device& device, const char* debugName)
+void VulkanImage::createImageView(const vk::raii::Device& device, const char* debugName)
 {
 	vk::ImageViewType viewType;
 	vk::ImageAspectFlags aspect;
@@ -199,7 +186,7 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 // Layout transition
 // ---------------------------------------------------------------------------
 
-void Image::TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
+void VulkanImage::TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
                                    const vk::ImageLayout oldLayout,
                                    const vk::ImageLayout newLayout,
                                    const uint32_t baseMipLevel,
@@ -243,7 +230,7 @@ void Image::TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
 // Mipmap generation via vkCmdBlitImage
 // ---------------------------------------------------------------------------
 
-void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
+void VulkanImage::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 {
 	if (m_mipLevels <= 1)
 	{
@@ -315,7 +302,7 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 // GPU readback
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> Image::ReadImageToBuffer(
+std::vector<uint8_t> VulkanImage::ReadImageToBuffer(
 	const vk::raii::Device& device,
 	const vk::raii::PhysicalDevice& physicalDevice,
 	vk::Queue queue,
@@ -331,7 +318,7 @@ std::vector<uint8_t> Image::ReadImageToBuffer(
 // Static ReadImageToBuffer (raw VkImage overload)
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> Image::ReadImageToBuffer(
+std::vector<uint8_t> VulkanImage::ReadImageToBuffer(
 	const vk::raii::Device& device,
 	const vk::raii::PhysicalDevice& physicalDevice,
 	vk::Queue queue,
@@ -423,7 +410,7 @@ std::vector<uint8_t> Image::ReadImageToBuffer(
 // Static helpers
 // ---------------------------------------------------------------------------
 
-vk::AccessFlags Image::AccessFlagsForLayout(const vk::ImageLayout layout)
+vk::AccessFlags VulkanImage::AccessFlagsForLayout(const vk::ImageLayout layout)
 {
 	switch (layout)
 	{
@@ -449,7 +436,7 @@ vk::AccessFlags Image::AccessFlagsForLayout(const vk::ImageLayout layout)
 	}
 }
 
-vk::PipelineStageFlags Image::PipelineStageForLayout(const vk::ImageLayout layout)
+vk::PipelineStageFlags VulkanImage::PipelineStageForLayout(const vk::ImageLayout layout)
 {
 	switch (layout)
 	{
@@ -473,7 +460,7 @@ vk::PipelineStageFlags Image::PipelineStageForLayout(const vk::ImageLayout layou
 	}
 }
 
-vk::ImageAspectFlags Image::AspectFromFormat(const vk::Format format)
+vk::ImageAspectFlags VulkanImage::AspectFromFormat(const vk::Format format)
 {
 	switch (format)
 	{
@@ -499,7 +486,7 @@ vk::ImageAspectFlags Image::AspectFromFormat(const vk::Format format)
 	}
 }
 
-uint32_t Image::FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
+uint32_t VulkanImage::FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
                                      const uint32_t typeFilter,
                                      const vk::MemoryPropertyFlags properties)
 {
@@ -513,7 +500,7 @@ uint32_t Image::FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
 		}
 	}
 
-	throw std::runtime_error("Image: failed to find suitable memory type.");
+	throw std::runtime_error("VulkanImage: failed to find suitable memory type.");
 }
 
 } // namespace neurus

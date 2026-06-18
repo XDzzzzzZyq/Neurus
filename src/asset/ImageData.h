@@ -6,7 +6,7 @@
  * Provides static helpers for pixel‑byte queries, half‑float conversion,
  * BGR swizzle, and CPU‑side PNG output.
  *
- * Pure CPU data — no Vulkan/GPU resources.  Analogous to MeshData.
+ * Pure CPU data - no Vulkan/GPU resources.  Analogous to MeshData.
  */
 #pragma once
 
@@ -76,7 +76,7 @@ public:
 	/**
 	 * @brief Writes raw pixel data to a PNG file (CPU‑side only).
 	 *
-	 * No GPU readback — caller must provide already‑read pixel data.
+	 * No GPU readback - caller must provide already‑read pixel data.
 	 * Used for swapchain screenshots where no Image wrapper exists.
 	 */
 	static bool SavePixelData(const void* rawData,

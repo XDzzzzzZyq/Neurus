@@ -9,7 +9,7 @@
  * Architecture:
  * - SceneContext: Owns active Scene* pointer, provides const accessors
  * - EditorContext: Owns SelectionManager, editor state, dirty tracking (QObject with signals)
- * - RenderContext: Non-owning RenderConfigs* pointer (stub — T45 creates RenderConfigs)
+ * - RenderContext: Non-owning RenderConfigs* pointer (stub - T45 creates RenderConfigs)
  * - Context: Composite aggregating all three; subscribes to EventPool events
  */
 
@@ -30,7 +30,7 @@ class RenderConfigs;
 class EventPool;
 
 // ===========================================================================
-// SceneContext — read-only scene graph access
+// SceneContext - read-only scene graph access
 // ===========================================================================
 
 /**
@@ -81,7 +81,7 @@ private:
 };
 
 // ===========================================================================
-// EditorContext — editor state, selection, dirty tracking
+// EditorContext - editor state, selection, dirty tracking
 // ===========================================================================
 
 /**
@@ -158,7 +158,7 @@ private:
 };
 
 // ===========================================================================
-// RenderContext — render configuration access
+// RenderContext - render configuration access
 // ===========================================================================
 
 /**
@@ -190,7 +190,7 @@ private:
 };
 
 // ===========================================================================
-// Context — composite aggregating all sub-contexts
+// Context - composite aggregating all sub-contexts
 // ===========================================================================
 
 /**

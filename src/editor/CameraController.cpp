@@ -78,7 +78,7 @@ void CameraController::Orbit(Camera& camera, const InputState& input, float spee
 	glm::vec3 dir = pos - target;
 	const float radius = glm::length(dir);
 
-	// Degenerate: camera at target — cannot orbit
+	// Degenerate: camera at target - cannot orbit
 	if (radius < 1e-6f)
 	{
 		return;
@@ -108,7 +108,7 @@ void CameraController::Orbit(Camera& camera, const InputState& input, float spee
 	);
 
 	camera.SetCamPos(target + newDir * radius);
-	// Target stays fixed — camera continues looking at same point
+	// Target stays fixed - camera continues looking at same point
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ void CameraController::Pan(Camera& camera, const InputState& input, float speed)
 	}
 	right = glm::normalize(right);
 
-	// Up: cross(right, forward) — camera-local up (not world up)
+	// Up: cross(right, forward) - camera-local up (not world up)
 	const glm::vec3 up = glm::cross(right, forward);
 
 	// Compute translation: horizontal mouse = right, vertical mouse = up
@@ -164,7 +164,7 @@ void CameraController::Zoom(Camera& camera, const InputState& input, float speed
 	const glm::vec3 dir = pos - target;
 	const float radius = glm::length(dir);
 
-	// Degenerate: camera at target — cannot zoom
+	// Degenerate: camera at target - cannot zoom
 	if (radius < 1e-6f)
 	{
 		return;

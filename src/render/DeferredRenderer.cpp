@@ -214,7 +214,7 @@ GeometryRenderItem DeferredRenderer::buildRenderItem(const Mesh& mesh) const
 	const IndexBuffer* ib = mesh.GetIndexBuffer();
 	if (!vb || !ib)
 	{
-		return item;  // Not uploaded to GPU — return default (no draw will occur)
+		return item;  // Not uploaded to GPU - return default (no draw will occur)
 	}
 
 	item.vertexBuffer = vb->buffer();
@@ -223,7 +223,7 @@ GeometryRenderItem DeferredRenderer::buildRenderItem(const Mesh& mesh) const
 	item.indexType = vk::IndexType::eUint32;
 
 	// Identity model matrix (sphere at origin).
-	// The icosphere OBJ has radius ~7.44 — scale down to fit the view
+	// The icosphere OBJ has radius ~7.44 - scale down to fit the view
 	// frustum (camera at ~5 units from origin).
 	const glm::mat4 sphereScale = glm::scale(glm::mat4(1.0f), glm::vec3(0.12f));
 	item.pushConstants.model = sphereScale;
@@ -291,7 +291,7 @@ void DeferredRenderer::DrawFrame()
 	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
 
 	// No-args DrawFrame is deprecated and used only as camera-fallback.
-	// Pass empty render items (no geometry drawn) — the fallback exists only
+	// Pass empty render items (no geometry drawn) - the fallback exists only
 	// to prevent a crash when no camera is configured.
 	recordFrame(cmdBuf, imageIndex, fallbackCam, {});
 

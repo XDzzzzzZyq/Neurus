@@ -1,22 +1,22 @@
 /**
  * @file SelectionController.h
- * @brief Click-select via raycast — pure logic controller for object selection.
+ * @brief Click-select via raycast - pure logic controller for object selection.
  *
  * SelectionController tracks a set of selected object IDs and provides
  * raycast-based click-select through scene mesh objects. It emits
  * ObjectSelected / ObjectDeselected events via EventBus on selection changes.
  *
  * Architecture:
- * - Pure logic class — no Qt, no Vulkan, no viewport dependency
+ * - Pure logic class - no Qt, no Vulkan, no viewport dependency
  * - Owned by EditorContext
  * - Consumes Scene (read-only mesh iteraction) and Camera (for unproject)
  * - Emits typed events via EventBus singleton for Editor↔Renderer communication
  *
  * Selection Modes:
  * - Click-select: Raycast from screen coords through scene meshes (sphere test)
- * - Box-select: Stub — full implementation in Phase 6 with viewport
+ * - Box-select: Stub - full implementation in Phase 6 with viewport
  *
- * @note Editor Layer — owned by EditorContext, no viewport/rendering dependency.
+ * @note Editor Layer - owned by EditorContext, no viewport/rendering dependency.
  * @note Thread-safety: Not thread-safe. Must be used from main thread only.
  */
 
@@ -47,7 +47,7 @@ class Camera;
  *   if (hitId >= 0) sel.Select(hitId);
  * @endcode
  *
- * @note Box-select is a stub — returns empty vector until Phase 6.
+ * @note Box-select is a stub - returns empty vector until Phase 6.
  */
 class SelectionController
 {
@@ -133,7 +133,7 @@ public:
 	/**
 	 * @brief Box-select: selects all objects within a screen-space rectangle.
 	 *
-	 * Stub — full implementation deferred to Phase 6 (viewport integration).
+	 * Stub - full implementation deferred to Phase 6 (viewport integration).
 	 *
 	 * @param scene       Scene containing mesh objects to test against.
 	 * @param camera      Active camera for frustum construction.

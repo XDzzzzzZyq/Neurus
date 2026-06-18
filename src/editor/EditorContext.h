@@ -2,7 +2,7 @@
 
 /**
  * @file EditorContext.h
- * @brief Backward-compatibility header — includes the full Context system.
+ * @brief Backward-compatibility header - includes the full Context system.
  *
  * EditorContext was originally a standalone QObject with scene/selection state.
  * It has been refactored into a three-part Context system:

@@ -340,7 +340,7 @@ bool MeshData::LoadObj(const std::string& path)
 	{
 		NEURUS_LOG("[MeshData] loaded '" << m_meshData.name
 		          << "' from " << path
-		          << " — " << GetVertexCount() << " verts, "
+		          << " - " << GetVertexCount() << " verts, "
 		          << GetIndexCount() << " indices");
 	}
 	return ok;
@@ -487,7 +487,7 @@ bool MeshData::LoadObjFromString(const std::string& objContent)
 	ComputeCenter();
 
 	NEURUS_LOG("[MeshData] parsed '" << m_meshData.name
-	          << "' — " << GetVertexCount() << " verts, "
+	          << "' - " << GetVertexCount() << " verts, "
 	          << GetIndexCount() << " indices, "
 	          << "center=(" << m_meshData.center.x << ", "
 	          << m_meshData.center.y << ", " << m_meshData.center.z << ")");

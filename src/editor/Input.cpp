@@ -50,12 +50,12 @@ float Input::s_pendingScroll = 0.0f;
 float Input::s_currScroll    = 0.0f;
 
 // ---------------------------------------------------------------------------
-// Recording — write to pending buffer
+// Recording - write to pending buffer
 // ---------------------------------------------------------------------------
 
 void Input::RecordKeyPress(const int qtKey)
 {
-	// Modifier keys — their Qt codes exceed kMaxKeys, handle via dedicated flags
+	// Modifier keys - their Qt codes exceed kMaxKeys, handle via dedicated flags
 	if (qtKey == kQtKeyShift)   { s_pendingShift = true;  return; }
 	if (qtKey == kQtKeyControl) { s_pendingCtrl  = true;  return; }
 	if (qtKey == kQtKeyAlt)     { s_pendingAlt   = true;  return; }
@@ -66,7 +66,7 @@ void Input::RecordKeyPress(const int qtKey)
 
 void Input::RecordKeyRelease(const int qtKey)
 {
-	// Modifier keys — dedicated flags
+	// Modifier keys - dedicated flags
 	if (qtKey == kQtKeyShift)   { s_pendingShift = false; return; }
 	if (qtKey == kQtKeyControl) { s_pendingCtrl  = false; return; }
 	if (qtKey == kQtKeyAlt)     { s_pendingAlt   = false; return; }
@@ -101,7 +101,7 @@ void Input::RecordScroll(const float delta)
 }
 
 // ---------------------------------------------------------------------------
-// Frame update — swaps buffers and computes deltas
+// Frame update - swaps buffers and computes deltas
 // ---------------------------------------------------------------------------
 
 void Input::UpdateState()
@@ -136,7 +136,7 @@ void Input::UpdateState()
 }
 
 // ---------------------------------------------------------------------------
-// Keyboard queries — read from curr snapshot
+// Keyboard queries - read from curr snapshot
 // ---------------------------------------------------------------------------
 
 bool Input::IsKeyPressed(const int qtKey)
@@ -173,7 +173,7 @@ bool Input::IsAltHeld()
 }
 
 // ---------------------------------------------------------------------------
-// Mouse queries — read from curr snapshot
+// Mouse queries - read from curr snapshot
 // ---------------------------------------------------------------------------
 
 float Input::GetMouseX()       { return s_currMouseX; }
@@ -204,7 +204,7 @@ bool Input::IsMouseButtonReleased(const MouseButton button)
 }
 
 // ---------------------------------------------------------------------------
-// Convenience — CameraController InputState
+// Convenience - CameraController InputState
 // ---------------------------------------------------------------------------
 
 InputState Input::GetInputState()
