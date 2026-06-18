@@ -2,6 +2,10 @@
 
 #include <memory>
 
+namespace neurus::project {
+class Project;
+}
+
 namespace neurus {
 
 // Forward declarations
@@ -45,6 +49,7 @@ private:
 	std::unique_ptr<DeferredRenderer> m_renderer;
 	std::unique_ptr<GPUResourceCache> m_resourceCache;
 	std::unique_ptr<EditorContext> m_editorContext;
+	std::unique_ptr<neurus::project::Project> m_project;
 };
 
 } // namespace neurus

@@ -132,14 +132,14 @@ int Application::Run(int argc, char* argv[])
 	// --- Load or create project ---
 	const QString projectFilePath = resolveResourcePath("default.neurus.json");
 	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
-	auto project = neurus::project::Project::New();
+	m_project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
 	try
 	{
-		project = neurus::project::Project::Open(projectFilePath.toStdString());
+		*m_project = neurus::project::Project::Open(projectFilePath.toStdString());
 		NEURUS_LOG("[Application] Loaded project: " << projectFilePath.toStdString());
 
 		// Reload mesh geometry from OBJ paths (not stored in JSON)
-		auto& projectScene = project.GetScene();
+		auto& projectScene = m_project->GetScene();
 		for (auto& [id, mesh] : projectScene.mesh_list)
 		{
 			if (!mesh->o_mesh && !mesh->o_meshPath.empty())
@@ -157,18 +157,19 @@ int Application::Run(int argc, char* argv[])
 	catch (const std::exception& e)
 	{
 		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
-		project = neurus::project::Project::CreateDefault(objFilePath.toStdString());
+		m_project = std::make_unique<neurus::project::Project>(
+			neurus::project::Project::CreateDefault(objFilePath.toStdString()));
 		// Store relative paths in the project file for portability
-		for (auto& [id, mesh] : project.GetScene().mesh_list)
+		for (auto& [id, mesh] : m_project->GetScene().mesh_list)
 		{
 			mesh->o_meshPath = "obj/sphere.obj";
 		}
 		// Save for future runs
-		try { project.Save(projectFilePath.toStdString()); }
+		try { m_project->Save(projectFilePath.toStdString()); }
 		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
 	}
 
-	auto& scene = project.GetScene();
+	auto& scene = m_project->GetScene();
 
 	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
 	{
@@ -232,10 +233,10 @@ int Application::Run(int argc, char* argv[])
 
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
-	                 [this, &scene]() {
-	                     if (m_renderer)
+	                 [this]() {
+	                     if (m_renderer && m_project)
 	                     {
-	                         try { m_renderer->DrawFrame(scene); }
+	                         try { m_renderer->DrawFrame(m_project->GetScene()); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
@@ -272,6 +273,91 @@ int Application::Run(int argc, char* argv[])
 	                     }
 	                 });
 
+	// --- Project file signal wiring ---
+
+	// Handle New Project (Ctrl+N)
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectNewRequested,
+		[this]() {
+			try {
+				m_project = std::make_unique<neurus::project::Project>(
+					neurus::project::Project::New());
+				NEURUS_LOG("[Application] Created new project.");
+
+				if (m_resourceCache)
+				{
+					m_resourceCache->Clear();
+					auto& projectScene = m_project->GetScene();
+					for (const auto& [id, mesh] : projectScene.mesh_list)
+					{
+						m_resourceCache->UploadMesh(*mesh);
+					}
+					m_resourceCache->UploadLights(projectScene);
+				}
+			}
+			catch (const std::exception& e) {
+				NEURUS_ERR("Failed to create new project: " << e.what());
+			}
+		});
+
+	// Handle Open Project (Ctrl+O)
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectOpenRequested,
+		[this](const QString& path) {
+			try {
+				m_project = std::make_unique<neurus::project::Project>(
+					neurus::project::Project::Open(path.toStdString()));
+				NEURUS_LOG("[Application] Opened project: " << path.toStdString());
+
+				// Reload mesh geometry from OBJ paths
+				auto& projectScene = m_project->GetScene();
+				for (auto& [id, mesh] : projectScene.mesh_list)
+				{
+					if (!mesh->o_mesh && !mesh->o_meshPath.empty())
+					{
+						const QString fullPath = resolveResourcePath(mesh->o_meshPath.c_str());
+						auto meshData = std::make_shared<MeshData>();
+						if (meshData->LoadObj(fullPath.toStdString()))
+						{
+							mesh->o_mesh = meshData;
+						}
+					}
+				}
+
+				// Re-upload scene data to GPU
+				if (m_resourceCache)
+				{
+					m_resourceCache->Clear();
+					for (const auto& [id, mesh] : projectScene.mesh_list)
+					{
+						m_resourceCache->UploadMesh(*mesh);
+					}
+					m_resourceCache->UploadLights(projectScene);
+				}
+			}
+			catch (const std::exception& e) {
+				NEURUS_ERR("Failed to open project: " << e.what());
+			}
+		});
+
+	// Handle Save (Ctrl+S)
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveRequested,
+		[this]() {
+			if (m_project)
+			{
+				try { m_project->Save(); }
+				catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
+			}
+		});
+
+	// Handle Save As (Ctrl+Shift+S)
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveAsRequested,
+		[this](const QString& path) {
+			if (m_project)
+			{
+				try { m_project->Save(path.toStdString()); }
+				catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
+			}
+		});
+
 	// --- Editor Context (cross-layer event communication) ---
 	// EditorContext owns editor state and routes scene/selection events via EventBus.
 	// EventBus().Process() must be called each frame to dispatch queued events.
@@ -280,10 +366,10 @@ int Application::Run(int argc, char* argv[])
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [this, &scene]() {
-		if (m_renderer)
+	QObject::connect(&renderTimer, &QTimer::timeout, [this]() {
+		if (m_renderer && m_project)
 		{
-			try { m_renderer->DrawFrame(scene); }
+			try { m_renderer->DrawFrame(m_project->GetScene()); }
 			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}
 		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)

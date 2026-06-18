@@ -79,6 +79,22 @@ signals:
 	 *  Capture all G-Buffer attachments to individual PNG files. */
 	void screenshotAllRequested();
 
+	// --- Project file signals ---
+
+	/** @brief Emitted when a new project is requested (Ctrl+N). */
+	void projectNewRequested();
+
+	/** @brief Emitted when an existing project file should be opened (Ctrl+O).
+	 *  @param path Absolute path to the .neurus.json file. */
+	void projectOpenRequested(const QString& path);
+
+	/** @brief Emitted when the current project should be saved (Ctrl+S). */
+	void projectSaveRequested();
+
+	/** @brief Emitted when the current project should be saved to a new path (Ctrl+Shift+S).
+	 *  @param path Absolute path for the .neurus.json output file. */
+	void projectSaveAsRequested(const QString& path);
+
 public:
 	/**
 	 * @brief Convenience method to emit screenshotRequested from any layer.
@@ -90,6 +106,13 @@ public:
 	 * @brief Convenience method to emit screenshotAllRequested from any layer.
 	 */
 	void requestScreenshotAll() { emit screenshotAllRequested(); }
+
+	// --- Project file convenience methods ---
+
+	void requestProjectNew() { emit projectNewRequested(); }
+	void requestProjectOpen(const QString& path) { emit projectOpenRequested(path); }
+	void requestProjectSave() { emit projectSaveRequested(); }
+	void requestProjectSaveAs(const QString& path) { emit projectSaveAsRequested(path); }
 
 private:
 	UIEvents() = default;

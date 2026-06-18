@@ -4,6 +4,7 @@
 
 #include <QApplication>
 #include <QFile>
+#include <QFileDialog>
 #include <QLabel>
 #include <QMenuBar>
 #include <QMessageBox>
@@ -44,6 +45,39 @@ void NeurusMainWindow::setViewportWidget(QWidget* viewportWidget)
 void NeurusMainWindow::CreateMenus()
 {
 	auto* fileMenu = menuBar()->addMenu("&File");
+
+	auto* newAction = fileMenu->addAction("&New");
+	newAction->setShortcut(QKeySequence("Ctrl+N"));
+	connect(newAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestProjectNew();
+	});
+
+	auto* openAction = fileMenu->addAction("&Open...");
+	openAction->setShortcut(QKeySequence("Ctrl+O"));
+	connect(openAction, &QAction::triggered, []() {
+		QString path = QFileDialog::getOpenFileName(
+			nullptr, "Open Project", QString(), "Neurus Project (*.neurus.json)");
+		if (!path.isEmpty())
+			neurus::UIEvents::instance().requestProjectOpen(path);
+	});
+
+	auto* saveAction = fileMenu->addAction("&Save");
+	saveAction->setShortcut(QKeySequence("Ctrl+S"));
+	connect(saveAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestProjectSave();
+	});
+
+	auto* saveAsAction = fileMenu->addAction("Save &As...");
+	saveAsAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+	connect(saveAsAction, &QAction::triggered, []() {
+		QString path = QFileDialog::getSaveFileName(
+			nullptr, "Save Project As", QString(), "Neurus Project (*.neurus.json)");
+		if (!path.isEmpty())
+			neurus::UIEvents::instance().requestProjectSaveAs(path);
+	});
+
+	fileMenu->addSeparator();
+
 	auto* exitAction = fileMenu->addAction("E&xit");
 	exitAction->setShortcut(QKeySequence::Quit);
 	connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
@@ -51,7 +85,7 @@ void NeurusMainWindow::CreateMenus()
 	auto* viewMenu = menuBar()->addMenu("&View");
 
 	auto* saveLayoutAction = viewMenu->addAction("&Save Layout");
-	saveLayoutAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
+	saveLayoutAction->setShortcut(QKeySequence("Ctrl+Shift+L"));
 	connect(saveLayoutAction, &QAction::triggered, this, &NeurusMainWindow::SaveLayout);
 
 	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
