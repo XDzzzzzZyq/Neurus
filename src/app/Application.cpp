@@ -10,7 +10,7 @@
  *   5. Show main window - apply layout so widget has final size
  *   6. VkSurfaceKHR - created from VulkanWidget's native HWND
  *   7. VulkanContext (Phase 2) - logical device + queue selection
- *   8. CreateDefaultScene - scene factory (camera, sphere mesh, point light) + load BAKED.png texture
+ *   8. Project::Open/Project::CreateDefault - load or create project scene + load BAKED.png texture
  *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
  *  10. QTimer-driven render loop - ~60 FPS
  *
@@ -45,8 +45,9 @@
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
 #include "data/GPUResourceCache.h"
+#include "data/MeshData.h"
 #include "scene/Scene.h"
-#include "scene/DefaultScene.h"
+#include "project/Project.h"
 
 // Generated SPIR-V shader headers
 #include "gbuffer.vert.h"
@@ -128,14 +129,46 @@ int Application::Run(int argc, char* argv[])
 		return -1;
 	}
 
-	// --- Create default scene ---
-	const QString objPath = resolveResourcePath("obj/sphere.obj");
-	auto scene = neurus::CreateDefaultScene(objPath.toStdString());
-	if (!scene)
+	// --- Load or create project ---
+	const QString projectFilePath = resolveResourcePath("default.neurus.json");
+	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
+	auto project = neurus::project::Project::New();
+	try
 	{
-		std::cerr << "Failed to create default scene.\n";
-		return -1;
+		project = neurus::project::Project::Open(projectFilePath.toStdString());
+		NEURUS_LOG("[Application] Loaded project: " << projectFilePath.toStdString());
+
+		// Reload mesh geometry from OBJ paths (not stored in JSON)
+		auto& projectScene = project.GetScene();
+		for (auto& [id, mesh] : projectScene.mesh_list)
+		{
+			if (!mesh->o_mesh && !mesh->o_meshPath.empty())
+			{
+				// Resolve relative path (stored in JSON) to absolute resource path
+				const QString fullPath = resolveResourcePath(mesh->o_meshPath.c_str());
+				auto meshData = std::make_shared<MeshData>();
+				if (meshData->LoadObj(fullPath.toStdString()))
+				{
+					mesh->o_mesh = meshData;
+				}
+			}
+		}
 	}
+	catch (const std::exception& e)
+	{
+		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
+		project = neurus::project::Project::CreateDefault(objFilePath.toStdString());
+		// Store relative paths in the project file for portability
+		for (auto& [id, mesh] : project.GetScene().mesh_list)
+		{
+			mesh->o_meshPath = "obj/sphere.obj";
+		}
+		// Save for future runs
+		try { project.Save(projectFilePath.toStdString()); }
+		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
+	}
+
+	auto& scene = project.GetScene();
 
 	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
 	{
@@ -162,14 +195,14 @@ int Application::Run(int argc, char* argv[])
 		m_vkContext->graphicsQueueFamily());
 
 	// Upload each Mesh object directly (GPUResourceCache reads MeshData from mesh->o_mesh)
-	for (const auto& [id, mesh] : scene->mesh_list)
+	for (const auto& [id, mesh] : scene.mesh_list)
 	{
 		m_resourceCache->UploadMesh(*mesh);
 	}
 
 	// Upload lights (no guard — zero lights are handled gracefully by GPUResourceCache
 	// and LightingPass)
-	m_resourceCache->UploadLights(*scene);
+	m_resourceCache->UploadLights(scene);
 
 	// --- Create deferred renderer (uses cache for mesh/light buffers) ---
 	try
@@ -199,10 +232,10 @@ int Application::Run(int argc, char* argv[])
 
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
-	                 [this, scene]() {
+	                 [this, &scene]() {
 	                     if (m_renderer)
 	                     {
-	                         try { m_renderer->DrawFrame(*scene); }
+	                         try { m_renderer->DrawFrame(scene); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
@@ -247,10 +280,10 @@ int Application::Run(int argc, char* argv[])
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [this, scene]() {
+	QObject::connect(&renderTimer, &QTimer::timeout, [this, &scene]() {
 		if (m_renderer)
 		{
-			try { m_renderer->DrawFrame(*scene); }
+			try { m_renderer->DrawFrame(scene); }
 			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}
 		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)

@@ -10,6 +10,10 @@
 #include <fstream>
 #include <stdexcept>
 
+#include <glm/glm.hpp>
+
+#include "core/Log.h"
+
 namespace neurus::project
 {
 
@@ -72,6 +76,37 @@ void Project::Save()
 		throw std::runtime_error("No file path set. Use Save(path) first.");
 	}
 	Save(m_filePath);
+}
+
+// ---------------------------------------------------------------------------
+// CreateDefault factory
+// ---------------------------------------------------------------------------
+
+Project Project::CreateDefault(const std::string& objPath)
+{
+	NEURUS_LOG("[Project] Creating default project...");
+
+	Project project;
+
+	// --- Camera ---
+	// Default constructor: FOV 60°, near 0.1, far 100, pos(0,0,0), tar(0,0,0)
+	auto camera = std::make_shared<Camera>();
+	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+	project.m_scene->UseCamera(camera);
+
+	// --- Mesh ---
+	auto mesh = std::make_shared<Mesh>(objPath);
+	project.m_scene->UseMesh(mesh);
+
+	// --- Light ---
+	auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
+	light->SetRadius(0.05f);
+	project.m_scene->UseLight(light);
+
+	NEURUS_LOG("[Project] Default project created.");
+	return project;
 }
 
 } // namespace neurus::project

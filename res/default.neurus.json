@@ -1,0 +1,145 @@
+{
+    "project": {
+        "m_scene": {
+            "cam_list": [
+                {
+                    "key": 2,
+                    "value": {
+                        "polymorphic_id": 1073741824,
+                        "ptr_wrapper": {
+                            "id": 2147483649,
+                            "data": {
+                                "value0": {
+                                    "o_name": "",
+                                    "o_type": 0,
+                                    "is_viewport": true,
+                                    "is_rendered": true
+                                },
+                                "transform": {
+                                    "m_position": {
+                                        "x": 0.0,
+                                        "y": 2.0,
+                                        "z": 5.0
+                                    },
+                                    "m_rotation": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_scale": {
+                                        "x": 1.0,
+                                        "y": 1.0,
+                                        "z": 1.0
+                                    }
+                                },
+                                "cam_w": 1.0,
+                                "cam_h": 1.0,
+                                "cam_pers": 60.0,
+                                "cam_near": 0.10000000149011612,
+                                "cam_far": 100.0,
+                                "cam_tar": {
+                                    "x": 0.0,
+                                    "y": 0.0,
+                                    "z": 0.0
+                                },
+                                "cam_floatData": []
+                            }
+                        }
+                    }
+                }
+            ],
+            "mesh_list": [
+                {
+                    "key": 3,
+                    "value": {
+                        "polymorphic_id": 1073741824,
+                        "ptr_wrapper": {
+                            "id": 2147483650,
+                            "data": {
+                                "value0": {
+                                    "o_name": "Mesh",
+                                    "o_type": 1,
+                                    "is_viewport": true,
+                                    "is_rendered": true
+                                },
+                                "transform": {
+                                    "m_position": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_rotation": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_scale": {
+                                        "x": 1.0,
+                                        "y": 1.0,
+                                        "z": 1.0
+                                    }
+                                },
+                                "o_meshPath": "obj/sphere.obj",
+                                "using_shadow": true,
+                                "using_material": true,
+                                "using_sdf": true,
+                                "is_closure": true
+                            }
+                        }
+                    }
+                }
+            ],
+            "light_list": [
+                {
+                    "key": 4,
+                    "value": {
+                        "polymorphic_id": 1073741824,
+                        "ptr_wrapper": {
+                            "id": 2147483651,
+                            "data": {
+                                "value0": {
+                                    "o_name": "",
+                                    "o_type": 2,
+                                    "is_viewport": true,
+                                    "is_rendered": true
+                                },
+                                "transform": {
+                                    "m_position": {
+                                        "x": 3.0,
+                                        "y": 3.0,
+                                        "z": 3.0
+                                    },
+                                    "m_rotation": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_scale": {
+                                        "x": 1.0,
+                                        "y": 1.0,
+                                        "z": 1.0
+                                    }
+                                },
+                                "use_shadow": true,
+                                "light_type": 0,
+                                "light_power": 10.0,
+                                "light_color": {
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
+                                "light_radius": 0.05000000074505806,
+                                "spot_cutoff": 0.8999999761581421,
+                                "spot_outer_cutoff": 0.800000011920929,
+                                "area_ratio": 1.0
+                            }
+                        }
+                    }
+                }
+            ],
+            "sprite_list": [],
+            "dLine_list": [],
+            "dPoints_list": []
+        }
+    }
+}

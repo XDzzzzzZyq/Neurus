@@ -117,6 +117,20 @@ public:
 	Mesh& operator=(Mesh&&) = delete;
 
 	// -------------------------------------------------------------------
+	// OBJ reload (for after deserialization)
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Reloads mesh geometry from the stored o_meshPath.
+	 *
+	 * Cereal deserialization restores o_meshPath but not the loaded MeshData.
+	 * Call this after deserialization to reload vertex/index buffers from disk.
+	 *
+	 * @note No-op if o_meshPath is empty or o_mesh is already loaded.
+	 */
+	void ReloadMeshData();
+
+	// -------------------------------------------------------------------
 	// Shader
 	// -------------------------------------------------------------------
 

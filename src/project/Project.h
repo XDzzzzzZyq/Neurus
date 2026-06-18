@@ -70,6 +70,19 @@ public:
 	 */
 	static Project Open(const std::string& path);
 
+	/**
+	 * @brief Creates a default project with camera, sphere mesh, and point light.
+	 *
+	 * Constructs a pre-configured project matching the DefaultScene factory:
+	 *   - Camera: pos(0,2,5), target(0,0,0), FOV 60°, near 0.1, far 100
+	 *   - Mesh:   Loaded from the given OBJ path, default PBR material
+	 *   - Light:  Point light, pos(3,3,3), white, power 10, radius 0.05
+	 *
+	 * @param objPath Path to the sphere.obj file.
+	 * @return Project with a populated default scene.
+	 */
+	static Project CreateDefault(const std::string& objPath);
+
 	// --- Persistence ---
 
 	/**
