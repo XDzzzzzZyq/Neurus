@@ -47,7 +47,8 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	              vk::BufferUsageFlagBits::eUniformBuffer |
 	                  vk::BufferUsageFlagBits::eTransferDst,
 	              vk::MemoryPropertyFlagBits::eHostVisible |
-	                  vk::MemoryPropertyFlagBits::eHostCoherent)
+	                  vk::MemoryPropertyFlagBits::eHostCoherent,
+	              "CameraUBO")
 	// --- Descriptor pool (1 set, 1 UBO) ---
 	, m_descriptorPool(device,
 	                   1,

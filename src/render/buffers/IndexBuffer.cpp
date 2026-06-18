@@ -16,14 +16,16 @@ IndexBuffer::IndexBuffer(const vk::raii::Device& device,
                          uint32_t queueFamilyIndex,
                          const uint32_t* data,
                          vk::DeviceSize size,
-                         uint32_t indexCount)
+                         uint32_t indexCount,
+                         const char* debugName)
 	: m_buffer(device,
 	           physicalDevice,
 	           queue,
 	           queueFamilyIndex,
 	           size,
 	           vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	           vk::MemoryPropertyFlagBits::eDeviceLocal)
+	           vk::MemoryPropertyFlagBits::eDeviceLocal,
+	           debugName)
 	, m_indexCount(indexCount)
 {
 	if (data == nullptr && size > 0)
@@ -36,7 +38,10 @@ IndexBuffer::IndexBuffer(const vk::raii::Device& device,
 		m_buffer.Upload(data, size);
 	}
 
-	NEURUS_LOG("[IndexBuffer] " << indexCount << " indices, size=" << size << " bytes");
+	NEURUS_LOG("[IndexBuffer] " << indexCount << " indices, size=" << size << " bytes"
+	          << (debugName ? " name='" : "")
+	          << (debugName ? debugName : "")
+	          << (debugName ? "'" : ""));
 }
 
 } // namespace neurus

@@ -17,14 +17,16 @@ VertexBuffer::VertexBuffer(const vk::raii::Device& device,
                            const void* data,
                            vk::DeviceSize size,
                            uint32_t stride,
-                           uint32_t vertexCount)
+                           uint32_t vertexCount,
+                           const char* debugName)
 	: m_buffer(device,
 	           physicalDevice,
 	           queue,
 	           queueFamilyIndex,
 	           size,
 	           vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	           vk::MemoryPropertyFlagBits::eDeviceLocal)
+	           vk::MemoryPropertyFlagBits::eDeviceLocal,
+	           debugName)
 	, m_vertexCount(vertexCount)
 	, m_stride(stride)
 {
@@ -39,7 +41,10 @@ VertexBuffer::VertexBuffer(const vk::raii::Device& device,
 	}
 
 	NEURUS_LOG("[VertexBuffer] " << vertexCount << " verts, stride=" << stride
-	          << ", size=" << size << " bytes");
+	          << ", size=" << size << " bytes"
+	          << (debugName ? " name='" : "")
+	          << (debugName ? debugName : "")
+	          << (debugName ? "'" : ""));
 }
 
 } // namespace neurus

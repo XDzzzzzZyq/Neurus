@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <cstring>
+#include <string>
 
 namespace neurus {
 
@@ -46,7 +47,8 @@ VulkanBuffer::VulkanBuffer(const vk::raii::Device& device,
                            uint32_t queueFamilyIndex,
                            vk::DeviceSize size,
                            vk::BufferUsageFlags usageFlags,
-                           vk::MemoryPropertyFlags memoryProperties)
+                           vk::MemoryPropertyFlags memoryProperties,
+                           const char* debugName)
 	: m_device(&device)
 	, m_physicalDevice(&physicalDevice)
 	, m_queue(queue)
@@ -54,6 +56,7 @@ VulkanBuffer::VulkanBuffer(const vk::raii::Device& device,
 	, m_size(size)
 	, m_usageFlags(usageFlags)
 	, m_memoryProperties(memoryProperties)
+	, m_debugName(debugName ? debugName : "")
 {
 	// --- Create buffer ---
 	vk::BufferCreateInfo bufferCI({}, m_size, m_usageFlags);
@@ -75,9 +78,37 @@ VulkanBuffer::VulkanBuffer(const vk::raii::Device& device,
 	// --- Bind memory to buffer ---
 	m_buffer->bindMemory(**m_memory, 0);
 
+	// --- Set debug names (Debug builds only) ---
+#ifdef _DEBUG
+	if (!m_debugName.empty())
+	{
+		// Name the buffer
+		{
+			vk::DebugUtilsObjectNameInfoEXT nameInfo(
+				vk::ObjectType::eBuffer,
+				reinterpret_cast<uint64_t>(static_cast<VkBuffer>(**m_buffer)),
+				m_debugName.c_str());
+			m_device->setDebugUtilsObjectNameEXT(nameInfo);
+		}
+
+		// Name the device memory
+		{
+			std::string memName = m_debugName + "_Mem";
+			vk::DebugUtilsObjectNameInfoEXT nameInfo(
+				vk::ObjectType::eDeviceMemory,
+				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(**m_memory)),
+				memName.c_str());
+			m_device->setDebugUtilsObjectNameEXT(nameInfo);
+		}
+	}
+#endif
+
 	NEURUS_LOG("[VulkanBuffer] size=" << m_size
 	          << " usage=" << vk::to_string(m_usageFlags)
-	          << " memProps=" << vk::to_string(m_memoryProperties));
+	          << " memProps=" << vk::to_string(m_memoryProperties)
+	          << (!m_debugName.empty() ? " name='" : "")
+	          << (!m_debugName.empty() ? m_debugName : "")
+	          << (!m_debugName.empty() ? "'" : ""));
 }
 
 VulkanBuffer::~VulkanBuffer()
@@ -101,6 +132,7 @@ VulkanBuffer::VulkanBuffer(VulkanBuffer&& other) noexcept
 	, m_size(other.m_size)
 	, m_usageFlags(other.m_usageFlags)
 	, m_memoryProperties(other.m_memoryProperties)
+	, m_debugName(std::move(other.m_debugName))
 {
 	// Invalidate the moved-from object
 	other.m_bufferRaw = vk::Buffer{};
@@ -121,6 +153,7 @@ VulkanBuffer& VulkanBuffer::operator=(VulkanBuffer&& other) noexcept
 		m_size = other.m_size;
 		m_usageFlags = other.m_usageFlags;
 		m_memoryProperties = other.m_memoryProperties;
+		m_debugName = std::move(other.m_debugName);
 
 		// Invalidate the moved-from object
 		other.m_bufferRaw = vk::Buffer{};

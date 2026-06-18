@@ -42,6 +42,17 @@ Image::Image(const vk::raii::Device& device,
 			reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_image)),
 			debugName);
 		device.setDebugUtilsObjectNameEXT(nameInfo);
+
+		// Name the device memory
+		{
+			std::string memName(debugName);
+			memName += "_Mem";
+			vk::DebugUtilsObjectNameInfoEXT memNameInfo(
+				vk::ObjectType::eDeviceMemory,
+				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*m_deviceMemory)),
+				memName.c_str());
+			device.setDebugUtilsObjectNameEXT(memNameInfo);
+		}
 	}
 #endif
 

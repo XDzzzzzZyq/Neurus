@@ -39,6 +39,7 @@ public:
 	 * @param data             Pointer to host index data (uint32_t array).
 	 * @param size             Total byte size of index data (indexCount * sizeof(uint32_t)).
 	 * @param indexCount       Number of indices in the buffer.
+	 * @param debugName        Optional debug name (set via VK_EXT_debug_utils in Debug builds).
 	 */
 	IndexBuffer(const vk::raii::Device& device,
 	            const vk::raii::PhysicalDevice& physicalDevice,
@@ -46,7 +47,8 @@ public:
 	            uint32_t queueFamilyIndex,
 	            const uint32_t* data,
 	            vk::DeviceSize size,
-	            uint32_t indexCount);
+	            uint32_t indexCount,
+	            const char* debugName = nullptr);
 
 	// Non-copyable - owns GPU resources
 	IndexBuffer(const IndexBuffer&) = delete;

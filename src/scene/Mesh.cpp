@@ -73,10 +73,12 @@ void Mesh::UploadToGPU(const vk::raii::Device& device,
 
 	m_gpuVertices = std::make_unique<VertexBuffer>(
 		device, physicalDevice, queue, queueFamilyIndex,
-		strippedVertices.data(), vertexDataSize, kVertexStride, vertexCount);
+		strippedVertices.data(), vertexDataSize, kVertexStride, vertexCount,
+		("VBO_" + meshData.name).c_str());
 	m_gpuIndices = std::make_unique<IndexBuffer>(
 		device, physicalDevice, queue, queueFamilyIndex,
-		meshData.indexArray.data(), indexDataSize, indexCount);
+		meshData.indexArray.data(), indexDataSize, indexCount,
+		("IBO_" + meshData.name).c_str());
 	m_gpuIndexCount = indexCount;
 
 	NEURUS_LOG("[Mesh] Uploaded mesh " << GetObjectID()

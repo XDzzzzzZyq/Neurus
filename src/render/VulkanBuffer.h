@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include <memory>
+#include <string>
 
 namespace neurus {
 
@@ -38,6 +39,8 @@ public:
 	 * @param size            Buffer size in bytes.
 	 * @param usageFlags      Buffer usage flags (must include eTransferDst for Upload).
 	 * @param memoryProperties Memory property flags (e.g., eDeviceLocal).
+	 * @param debugName       Optional debug name (set via VK_EXT_debug_utils in Debug builds).
+	 *                        If non-null, both the buffer and device memory are named.
 	 */
 	VulkanBuffer(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
@@ -45,7 +48,8 @@ public:
 	             uint32_t queueFamilyIndex,
 	             vk::DeviceSize size,
 	             vk::BufferUsageFlags usageFlags,
-	             vk::MemoryPropertyFlags memoryProperties);
+	             vk::MemoryPropertyFlags memoryProperties,
+	             const char* debugName = nullptr);
 	~VulkanBuffer();
 
 	// Non-copyable - owns GPU resources
@@ -115,6 +119,7 @@ private:
 	vk::DeviceSize m_size;
 	vk::BufferUsageFlags m_usageFlags;
 	vk::MemoryPropertyFlags m_memoryProperties;
+	std::string m_debugName;
 };
 
 } // namespace neurus

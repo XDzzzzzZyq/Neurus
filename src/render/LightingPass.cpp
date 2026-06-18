@@ -66,7 +66,8 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
 			sizeof(PointLightGpu),
 			vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-			vk::MemoryPropertyFlagBits::eDeviceLocal);
+			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			"FallbackLightSSBO");
 		m_fallbackSSBO->Upload(zero, sizeof(PointLightGpu));
 		NEURUS_LOG("[LightingPass] Created fallback SSBO (zero-light)");
 	}
@@ -136,7 +137,8 @@ void LightingPass::UploadLights(const Scene& scene)
 		*m_device, *m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
 		bufferSize,
 		vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-		vk::MemoryPropertyFlagBits::eDeviceLocal);
+		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		"LightSSBO");
 	m_lightSSBO->Upload(gpuLights.data(), bufferSize);
 
 	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " point lights"

@@ -39,6 +39,7 @@ public:
 	 * @param size             Total byte size of vertex data (vertexCount * stride).
 	 * @param stride           Byte stride between consecutive vertices.
 	 * @param vertexCount      Number of vertices (must match size / stride).
+	 * @param debugName        Optional debug name (set via VK_EXT_debug_utils in Debug builds).
 	 */
 	VertexBuffer(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
@@ -47,7 +48,8 @@ public:
 	             const void* data,
 	             vk::DeviceSize size,
 	             uint32_t stride,
-	             uint32_t vertexCount);
+	             uint32_t vertexCount,
+	             const char* debugName = nullptr);
 
 	// Non-copyable - owns GPU resources
 	VertexBuffer(const VertexBuffer&) = delete;
