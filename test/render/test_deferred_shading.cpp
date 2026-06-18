@@ -1,11 +1,11 @@
 /**
- * @file test_golden_image.cpp
- * @brief Golden-image regression test for G-Buffer + HDR render passes.
+ * @file test_deferred_shading.cpp
+ * @brief Golden-image regression test for the deferred shading pipeline (G-Buffer + HDR passes).
  *
  * Renders a known scene (sphere OBJ + point light) at 256×256 through the
  * full deferred pipeline and captures Position, Normal, Albedo, MetallicRoughness
  * and HDRColor attachments as PNGs.  Each PNG is compared pixel‑wise against
- * a ground‑truth ("golden") image stored in test/data/golden/.
+ * a ground‑truth ("golden") image stored in test/render/golden/.
  *
  * On first run the golden images DO NOT exist — the test generates them
  * automatically and reports SKIPPED.  Subsequent runs compare and FAIL on
@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include "TestVulkanFixture.h"
+#include "shared/TestVulkanFixture.h"
 
 // --- Render layer ---
 #include "render/AttachmentManager.h"
@@ -73,7 +73,7 @@ struct TestVertex
 // Golden image directory.
 // ctest runs from build/debug/test/ → walk 3 levels to project root
 // ---------------------------------------------------------------------------
-static const char* kGoldenDir = "../../../test/data/golden/";
+static const char* kGoldenDir = "../../../test/render/golden/";
 
 // ---------------------------------------------------------------------------
 // Attachment list for golden comparison
@@ -92,7 +92,7 @@ static constexpr int kGoldenAttachmentCount = static_cast<int>(std::size(kGolden
 // Test fixture
 // ---------------------------------------------------------------------------
 
-class GoldenImageTest : public VulkanTestFixture
+class DeferredShadingTest : public VulkanTestFixture
 {
 protected:
 	static constexpr uint32_t kRenderWidth  = 256;
@@ -243,7 +243,7 @@ protected:
 // Golden Image Regression Test
 // ===========================================================================
 
-TEST_F(GoldenImageTest, GbufferAttachments_MatchGoldenImages)
+TEST_F(DeferredShadingTest, GbufferAttachments_MatchGoldenImages)
 {
 	if (!m_hasVulkan)
 	{

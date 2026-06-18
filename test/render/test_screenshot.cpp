@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "TestVulkanFixture.h"
+#include "shared/TestVulkanFixture.h"
 #include "render/Screenshot.h"
 #include "render/VulkanImage.h"
 

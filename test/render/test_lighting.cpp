@@ -14,7 +14,7 @@
 
 #include <gtest/gtest.h>
 
-#include "TestVulkanFixture.h"
+#include "shared/TestVulkanFixture.h"
 
 #include "render/AttachmentManager.h"
 #include "render/GeometryPass.h"

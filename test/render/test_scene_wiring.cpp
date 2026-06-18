@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-#include "TestVulkanFixture.h"
+#include "shared/TestVulkanFixture.h"
 
 #include "data/GPUResourceCache.h"
 #include "data/MeshData.h"

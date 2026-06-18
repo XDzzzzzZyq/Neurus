@@ -18,7 +18,7 @@
 
 #include <gtest/gtest.h>
 
-#include "TestVulkanFixture.h"
+#include "shared/TestVulkanFixture.h"
 
 // Render layer
 #include "render/AttachmentManager.h"

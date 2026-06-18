@@ -1,9 +1,9 @@
 # test/CMakeLists.txt - Unit Tests
 
 add_executable(neurus_test
-	TestVulkanFixture.cpp
-	TestVulkanFixture.h
-	test_main.cpp
+	shared/TestVulkanFixture.cpp
+	shared/TestVulkanFixture.h
+	shared/test_main.cpp
 	render/test_buffers.cpp
 	render/test_vulkan_buffer.cpp
 	render/test_vulkan_context.cpp
@@ -24,7 +24,7 @@ add_executable(neurus_test
 	render/test_gbuffer.cpp
 	render/test_lighting.cpp
 	render/test_model_render.cpp
-	render/test_golden_image.cpp
+	render/test_deferred_shading.cpp
 	render/test_screenshot.cpp
 	render/test_scene_wiring.cpp
 	data/test_gpu_resource_cache.cpp
