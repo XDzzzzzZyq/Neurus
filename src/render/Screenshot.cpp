@@ -1,7 +1,7 @@
 #include "Screenshot.h"
 #include "Image.h"
 #include "AttachmentManager.h"
-#include "data/ImageData.h"
+#include "asset/ImageData.h"
 #include "Texture.h"
 #include "Log.h"
 

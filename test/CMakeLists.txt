@@ -27,7 +27,6 @@ add_executable(neurus_test
 	render/test_deferred_shading.cpp
 	render/test_screenshot.cpp
 	render/test_scene_wiring.cpp
-	data/test_gpu_resource_cache.cpp
 	editor/test_camera_controller.cpp
 	editor/test_input.cpp
 	editor/test_event_bus.cpp
@@ -57,7 +56,7 @@ target_link_libraries(neurus_test PRIVATE
 	neurus_render
 	neurus_editor
 	neurus_ui
-	neurus_data
+	neurus_asset
 	shader_headers
 	gtest
 	Vulkan::Vulkan

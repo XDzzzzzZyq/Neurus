@@ -13,7 +13,7 @@
 #include "scene/Mesh.h"
 #include "scene/Transform.h"
 #include "scene/UID.h"
-#include "data/MeshData.h"
+#include "asset/MeshData.h"
 #include "render/Material.h"
 
 using namespace neurus;

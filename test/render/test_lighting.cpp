@@ -25,6 +25,9 @@
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
+#include "scene/Light.h"
+#include "scene/Scene.h"
+
 #include <gbuffer.vert.h>
 #include <gbuffer.frag.h>
 #include <pbr_lighting.comp.h>
@@ -97,6 +100,7 @@ protected:
 			*m_device, pd,
 			*m_attachmentManager,
 			2u,                          // numSets = kMaxFramesInFlight
+			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 	}
 
@@ -442,19 +446,20 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	// --- Step 1: Render test triangle into G-Buffer ---
 	const auto camera = RenderTestTriangle();
 
-	// --- Step 2: Create point light SSBO (light at (0, 0, 3), above triangle) ---
-	auto lightSSBO = CreateLightSSBO(
-		glm::vec3(0.0f, 0.0f, 3.0f),   // position
-		50.0f,                           // power
-		glm::vec3(1.0f, 1.0f, 1.0f));    // color
+	// --- Step 2: Upload point light to LightingPass ---
+	{
+		Scene scene;
+		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 50.0f, glm::vec3(1.0f, 1.0f, 1.0f));
+		light->SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));
+		scene.UseLight(light);
+		m_lightingPass->UploadLights(scene);
+	}
 
 	// --- Step 3: Record lighting pass ---
 	{
 		auto& cmd = BeginCmd();
 
 		m_lightingPass->Record(*cmd,
-		                       *lightSSBO,
-		                       1,                        // light count
 		                       glm::vec3(0.0f, 0.0f, 2.0f), // camera pos
 		                       MakeTestCamera().view,        // view matrix
 		                       {kRenderWidth, kRenderHeight},
@@ -514,21 +519,17 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 	// --- Render triangle ---
 	const auto camera = RenderTestTriangle();
 
-	// --- Create empty SSBO (0 lights) ---
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
-	VulkanBuffer emptySSBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                       sizeof(PointLightGpu), // minimum size
-	                       vk::BufferUsageFlagBits::eStorageBuffer |
-	                           vk::BufferUsageFlagBits::eTransferDst,
-	                       vk::MemoryPropertyFlagBits::eDeviceLocal);
+	// --- Upload zero lights (empty scene) ---
+	{
+		Scene emptyScene;
+		m_lightingPass->UploadLights(emptyScene);
+	}
 
 	// --- Record lighting pass with 0 lights ---
 	{
 		auto& cmd = BeginCmd();
 
 		m_lightingPass->Record(*cmd,
-		                       emptySSBO,
-		                       0,                        // zero lights
 		                       glm::vec3(0.0f, 0.0f, 2.0f),
 		                       MakeTestCamera().view,
 		                       {kRenderWidth, kRenderHeight},

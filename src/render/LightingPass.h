@@ -8,9 +8,9 @@
  * Uses a compute shader dispatched at 16×16 thread groups.
  *
  * Architecture:
- * - Owns the compute pipeline, descriptor sets, sampler, and descriptor pool.
+ * - Owns the compute pipeline, descriptor sets, sampler, descriptor pool,
+ *   and light SSBO (VulkanBuffer).
  * - Borrows AttachmentManager for G-Buffer and HDR colour image views.
- * - Receives a VulkanBuffer (SSBO) containing PointLightGpu data.
  * - Uses ComputePipelineBuilder for pipeline construction.
  *
  * @note Direct lighting only (no IBL, no shadows).
@@ -20,6 +20,7 @@
 #pragma once
 
 #include "DescriptorManager.h"
+#include "VulkanBuffer.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -31,7 +32,7 @@ namespace neurus {
 // --- Forward declarations ---
 class AttachmentManager;
 class ComputePipelineBuilder;
-class VulkanBuffer;
+class Scene;
 
 // ---------------------------------------------------------------------------
 // GPU-side data structures (std140-compatible)
@@ -86,7 +87,7 @@ static_assert(sizeof(LightingPushConstants) == 96, "LightingPushConstants must b
  * @brief PBR lighting compute pass.
  *
  * Reads the G-Buffer (Position, Normal, Albedo, MetallicRoughness) as
- * combined image samplers, iterates point lights from an SSBO, evaluates
+ * combined image samplers, iterates point lights from an own SSBO, evaluates
  * the Cook-Torrance GGX BRDF, and writes HDR colour to the output image.
  *
  * Non-copyable, movable.
@@ -103,6 +104,8 @@ public:
 	 * @param numSets           Number of descriptor sets to allocate (one per
 	 *                          in-flight frame). Must match kMaxFramesInFlight
 	 *                          in the renderer.
+	 * @param graphicsQueue     Graphics queue for light SSBO staging uploads.
+	 * @param queueFamilyIndex  Queue family index for staging command pool.
 	 * @param compSpv           Embedded compute shader SPIR-V data.
 	 * @param compSize          Compute shader SPIR-V size in bytes.
 	 *
@@ -112,6 +115,8 @@ public:
 	             const vk::raii::PhysicalDevice& physicalDevice,
 	             AttachmentManager& attachmentManager,
 	             uint32_t numSets,
+	             vk::Queue graphicsQueue,
+	             uint32_t queueFamilyIndex,
 	             const uint32_t* compSpv,
 	             size_t compSize);
 
@@ -122,6 +127,41 @@ public:
 	LightingPass& operator=(const LightingPass&) = delete;
 	LightingPass(LightingPass&&) noexcept = default;
 	LightingPass& operator=(LightingPass&&) noexcept = default;
+
+	// -------------------------------------------------------------------
+	// Light SSBO management
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Converts scene point lights to PointLightGpu and uploads as SSBO.
+	 *
+	 * Iterates scene.light_list, filters to POINTLIGHT type, converts
+	 * each Light to a PointLightGpu struct (std140, 48 bytes), and
+	 * uploads the array as a device-local storage buffer.
+	 *
+	 * If the scene has no point lights, a fallback single-element SSBO
+	 * is kept so that the descriptor binding remains valid. GetLightCount()
+	 * returns 0 in that case.
+	 *
+	 * @param scene Scene containing the light list.
+	 */
+	void UploadLights(const Scene& scene);
+
+	/**
+	 * @brief Returns the light SSBO (always valid, never nullptr).
+	 * @return Non-owning pointer to VulkanBuffer.
+	 */
+	const VulkanBuffer* GetLightSSBO() const;
+
+	/**
+	 * @brief Returns the number of point lights in the SSBO.
+	 * @return Light count (0 if no lights uploaded).
+	 */
+	uint32_t GetLightCount() const;
+
+	// -------------------------------------------------------------------
+	// Recording
+	// -------------------------------------------------------------------
 
 	/**
 	 * @brief Records the PBR lighting compute dispatch into a command buffer.
@@ -134,8 +174,6 @@ public:
 	 *   6. Inserts a memory barrier to make the output visible.
 	 *
 	 * @param cmdBuf          Command buffer in recording state.
-	 * @param lightSSBO       SSBO containing PointLightGpu data.
-	 * @param lightCount      Number of active lights in the SSBO.
 	 * @param cameraPos       Camera world-space position.
 	 * @param viewMatrix      View matrix (for normal VS→WS transform).
 	 * @param renderExtent    Render area dimensions.
@@ -144,8 +182,6 @@ public:
 	 *                        avoids updating a set while the GPU is reading it.
 	 */
 	void Record(vk::CommandBuffer cmdBuf,
-	            const VulkanBuffer& lightSSBO,
-	            uint32_t lightCount,
 	            const glm::vec3& cameraPos,
 	            const glm::mat4& viewMatrix,
 	            vk::Extent2D renderExtent,
@@ -185,14 +221,17 @@ private:
 	 * prevents updating a set while the GPU is still reading it.
 	 *
 	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
-	 * @param lightSSBO SSBO containing PointLightGpu data.
 	 */
-	void WriteDescriptors(uint32_t setIndex, const VulkanBuffer& lightSSBO);
+	void WriteDescriptors(uint32_t setIndex);
 
 	// --- References (non-owning) ---
 	const vk::raii::Device* m_device;
 	const vk::raii::PhysicalDevice* m_physicalDevice;
 	AttachmentManager* m_attachmentManager;
+
+	// --- Queue handles for SSBO creation ---
+	vk::Queue m_graphicsQueue;
+	uint32_t m_queueFamilyIndex;
 
 	// --- Sampler ---
 	vk::raii::Sampler m_sampler;
@@ -205,5 +244,10 @@ private:
 	// --- Pipeline ---
 	std::unique_ptr<ComputePipelineBuilder> m_pipelineBuilder;  // must outlive pipeline
 	vk::raii::Pipeline m_pipeline;
+
+	// --- Owned light SSBO ---
+	std::unique_ptr<VulkanBuffer> m_lightSSBO;
+	uint32_t m_lightCount = 0;
+	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
 };
 } // namespace neurus

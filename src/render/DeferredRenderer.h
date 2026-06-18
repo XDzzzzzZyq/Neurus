@@ -37,9 +37,9 @@ class RenderPassManager;
 class VertexBuffer;
 class IndexBuffer;
 class VulkanBuffer;
-class GPUResourceCache;
 class Camera;
 class Scene;
+class Mesh;
 
 /**
  * @brief Deferred renderer orchestrating GeometryPass → LightingPass → composite.
@@ -60,11 +60,11 @@ class DeferredRenderer
 {
 public:
 	/**
-	 * @brief Creates the full deferred pipeline with GPU resource cache.
+	 * @brief Creates the full deferred pipeline.
 	 *
 	 * Construction order: Swapchain → AttachmentManager → RenderPassManager →
-	 * GeometryPass → LightingPass → sync objects. GPU mesh and light buffers
-	 * are owned by GPUResourceCache, which must outlive this renderer.
+	 * GeometryPass → LightingPass → sync objects. Mesh buffers are uploaded
+	 * directly to GPU by Mesh objects. LightingPass owns its own light SSBO.
 	 *
 	 * @param device           Logical device (borrowed, must outlive this object).
 	 * @param physicalDevice   Physical device (borrowed).
@@ -73,7 +73,6 @@ public:
 	 * @param surface          Presentation surface (borrowed, must outlive swapchain).
 	 * @param width            Initial window width.
 	 * @param height           Initial window height.
-	 * @param resourceCache    GPU resource cache holding mesh and light buffers (borrowed).
 	 * @param gVertSpv         G-Buffer vertex shader SPIR-V data.
 	 * @param gVertSize        G-Buffer vertex shader SPIR-V size.
 	 * @param gFragSpv         G-Buffer fragment shader SPIR-V data.
@@ -88,7 +87,6 @@ public:
 	                 const vk::raii::SurfaceKHR& surface,
 	                 uint32_t width,
 	                 uint32_t height,
-	                 GPUResourceCache& resourceCache,
 	                 const uint32_t* gVertSpv,
 	                 size_t gVertSize,
 	                 const uint32_t* gFragSpv,
@@ -124,6 +122,17 @@ public:
 	 * @param scene Scene providing the active camera for this frame.
 	 */
 	void DrawFrame(const Scene& scene);
+
+	/**
+	 * @brief Uploads scene point lights to the LightingPass SSBO.
+	 *
+	 * Converts scene.light_list to GPU-compatible PointLightGpu structs
+	 * and uploads them as a storage buffer. Must be called before the
+	 * first DrawFrame() and after any scene light changes.
+	 *
+	 * @param scene Scene containing the light list.
+	 */
+	void UploadLights(const Scene& scene);
 
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
@@ -174,7 +183,7 @@ private:
 	 *
 	 * Sequence:
 	 *   1. GeometryPass::Record(renderItems) → G-Buffer MRT
-	 *   2. LightingPass::Record() → compute PBR → HDRColor (uses cache for light SSBO)
+	 *   2. LightingPass::Record() → compute PBR → HDRColor (uses own light SSBO)
 	 *   3. Blit HDRColor → swapchain image
 	 *   4. Transition swapchain image to present layout
 	 *
@@ -193,11 +202,11 @@ private:
 	CameraUBOData computeCameraData(vk::Extent2D extent, const Camera& camera) const;
 
 	/**
-	 * @brief Builds a GeometryRenderItem for the specified mesh from the cache.
-	 * @param meshID Mesh UID to look up in GPUResourceCache.
-	 * @return GeometryRenderItem with buffers from cache, or default item if mesh not cached.
+	 * @brief Builds a GeometryRenderItem for the specified mesh from its GPU buffers.
+	 * @param mesh Mesh providing GPU vertex/index buffers via GetVertexBuffer/GetIndexBuffer.
+	 * @return GeometryRenderItem with buffers from mesh, or default item if mesh GPU buffers unavailable.
 	 */
-	GeometryRenderItem buildRenderItem(int meshID) const;
+	GeometryRenderItem buildRenderItem(const Mesh& mesh) const;
 
 	/** @brief Creates the command pool (static helper for init-list use). */
 	static vk::raii::CommandPool createCommandPool(const vk::raii::Device& device,
@@ -218,9 +227,6 @@ private:
 	std::unique_ptr<RenderPassManager> m_renderPassManager;
 	std::unique_ptr<GeometryPass> m_geometryPass;
 	std::unique_ptr<LightingPass> m_lightingPass;
-
-	// --- Borrowed GPU resource cache (holds mesh + light buffers) ---
-	GPUResourceCache* m_resourceCache;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;

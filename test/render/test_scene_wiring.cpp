@@ -15,8 +15,7 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "data/GPUResourceCache.h"
-#include "data/MeshData.h"
+#include "asset/MeshData.h"
 #include "render/DeferredRenderer.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
@@ -63,7 +62,7 @@ static const char* kTriangleObj =
  * @brief GPU test fixture for Scene-driven DeferredRenderer rendering.
  *
  * Creates a headless Vulkan device, a hidden Win32 window + surface,
- * GPUResourceCache, and the shader SPIR-V is embedded via generated headers.
+ * and the shader SPIR-V is embedded via generated headers.
  *
  * Uses VulkanTestShared for member variables (m_instance, m_physicalDevices,
  * m_device, m_queue, etc.) but overrides SetUp/TearDown entirely because
@@ -174,10 +173,6 @@ protected:
 			vk::Win32SurfaceCreateInfoKHR surfaceCI({}, hInst, m_hwnd);
 			m_surface = std::make_unique<vk::raii::SurfaceKHR>(*m_instance, surfaceCI);
 
-			// --- GPUResourceCache ---
-			m_resourceCache = std::make_unique<GPUResourceCache>(
-				*m_device, pd, m_queue, m_graphicsQueueFamily);
-
 			m_hasVulkan = true;
 		}
 		catch (...)
@@ -190,7 +185,6 @@ protected:
 	{
 		// Destroy DeferredRenderer before device
 		m_renderer.reset();
-		m_resourceCache.reset();
 		m_surface.reset();
 		if (m_hwnd)
 		{
@@ -212,14 +206,13 @@ protected:
 			m_graphicsQueueFamily,
 			*m_surface,
 			width, height,
-			*m_resourceCache,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv),
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 	}
 
 	/**
-	 * @brief Creates a triangle Mesh and uploads it to the resource cache.
+	 * @brief Creates a triangle Mesh and uploads it to the GPU.
 	 */
 	std::shared_ptr<Mesh> CreateAndUploadTriangleMesh()
 	{
@@ -228,7 +221,8 @@ protected:
 
 		auto mesh = std::make_shared<Mesh>();
 		mesh->o_mesh = md;
-		m_resourceCache->UploadMesh(*mesh);
+		mesh->UploadToGPU(*m_device, m_physicalDevices[m_selectedPdIndex],
+		                  m_queue, m_graphicsQueueFamily);
 		return mesh;
 	}
 
@@ -250,7 +244,6 @@ protected:
 	HWND m_hwnd = nullptr;
 	std::unique_ptr<vk::raii::SurfaceKHR> m_surface;
 
-	std::unique_ptr<GPUResourceCache> m_resourceCache;
 	std::unique_ptr<DeferredRenderer> m_renderer;
 };
 
@@ -340,8 +333,8 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 	light->SetPosition(glm::vec3(2.0f, 5.0f, 2.0f));
 	scene.UseLight(light);
 
-	// Upload lights to resource cache
-	m_resourceCache->UploadLights(scene);
+	// Upload lights to renderer
+	m_renderer->UploadLights(scene);
 
 	// Draw a frame
 	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));

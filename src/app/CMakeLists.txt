@@ -14,7 +14,7 @@ target_link_libraries(neurus_app PRIVATE
 	neurus_render
 	neurus_editor
 	neurus_ui
-	neurus_data
+	neurus_asset
 	neurus_scene
 	neurus_project
 )

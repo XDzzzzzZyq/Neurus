@@ -15,7 +15,6 @@
 #include "VulkanBuffer.h"
 #include "buffers/VertexBuffer.h"
 #include "buffers/IndexBuffer.h"
-#include "data/GPUResourceCache.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -44,7 +43,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
                                     const vk::raii::SurfaceKHR& surface,
                                     uint32_t width,
                                     uint32_t height,
-                                    GPUResourceCache& resourceCache,
                                     const uint32_t* gVertSpv,
                                     size_t gVertSize,
                                     const uint32_t* gFragSpv,
@@ -58,7 +56,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	, m_surface(surface)
 	, m_width(width)
 	, m_height(height)
-	, m_resourceCache(&resourceCache)
 	, m_commandPool(createCommandPool(device, queueFamilyIndex))
 {
 	// --- 1. Create swapchain ---
@@ -89,11 +86,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] Created fallback SSBO (zero-light)");
 	}
 
-	// Mesh and light GPU buffers are owned by GPUResourceCache, not here.
-	// Application calls cache.UploadMesh(*mesh) and cache.UploadLights(scene)
-	// before constructing the renderer. At record time we query buffers from
-	// the cache via m_resourceCache.
-
 	// --- 5. Create geometry pass ---
 	m_geometryPass = std::make_unique<GeometryPass>(
 		device, physicalDevice, graphicsQueue, queueFamilyIndex,
@@ -106,6 +98,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		device, physicalDevice,
 		*m_attachmentManager,
 		kMaxFramesInFlight,
+		m_graphicsQueue, m_queueFamilyIndex,
 		lightCompSpv, lightCompSize);
 
 	// --- 8. Create command pool ---
@@ -170,6 +163,18 @@ DeferredRenderer::~DeferredRenderer()
 }
 
 // ---------------------------------------------------------------------------
+// Light upload delegation
+// ---------------------------------------------------------------------------
+
+void DeferredRenderer::UploadLights(const Scene& scene)
+{
+	if (m_lightingPass)
+	{
+		m_lightingPass->UploadLights(scene);
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Static helpers
 // ---------------------------------------------------------------------------
 
@@ -201,20 +206,20 @@ CameraUBOData DeferredRenderer::computeCameraData(vk::Extent2D extent, const Cam
 // Render item construction
 // ---------------------------------------------------------------------------
 
-GeometryRenderItem DeferredRenderer::buildRenderItem(int meshID) const
+GeometryRenderItem DeferredRenderer::buildRenderItem(const Mesh& mesh) const
 {
 	GeometryRenderItem item = {};
 
-	const VertexBuffer* vb = m_resourceCache->GetVertexBuffer(meshID);
-	const IndexBuffer* ib = m_resourceCache->GetIndexBuffer(meshID);
+	const VertexBuffer* vb = mesh.GetVertexBuffer();
+	const IndexBuffer* ib = mesh.GetIndexBuffer();
 	if (!vb || !ib)
 	{
-		return item;  // Not cached — return default (no draw will occur)
+		return item;  // Not uploaded to GPU — return default (no draw will occur)
 	}
 
 	item.vertexBuffer = vb->buffer();
 	item.indexBuffer = ib->buffer();
-	item.indexCount = m_resourceCache->GetIndexCount(meshID);
+	item.indexCount = mesh.GetGPUIndexCount();
 	item.indexType = vk::IndexType::eUint32;
 
 	// Identity model matrix (sphere at origin).
@@ -377,21 +382,20 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	// Only reset fence after successful acquire
 	m_device.resetFences(*fence);
 
-	// --- Build render items from scene meshes (using cache for GPU buffers) ---
+	// --- Build render items from scene meshes (querying mesh GPU buffers directly) ---
 	std::vector<GeometryRenderItem> renderItems;
 	renderItems.reserve(scene.mesh_list.size());
 	for (const auto& [id, mesh] : scene.mesh_list)
 	{
 		if (!mesh || !mesh->o_mesh)
 		{
-			continue;  // No geometry data — skip
+			continue;
 		}
-		const int meshID = mesh->GetObjectID();
-		if (!m_resourceCache->GetVertexBuffer(meshID))
+		if (!mesh->GetVertexBuffer())
 		{
-			continue;  // Not uploaded to GPU — skip
+			continue;
 		}
-		renderItems.push_back(buildRenderItem(meshID));
+		renderItems.push_back(buildRenderItem(*mesh));
 	}
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---
@@ -565,17 +569,11 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
 	m_geometryPass->Record(cmdBuf, cameraData, renderItems, extent);
 
-	// --- Phase 2: LightingPass → compute PBR → HDRColor (using cache for light SSBO) ---
-	const VulkanBuffer* lightSSBO = m_resourceCache->GetLightSSBO();
-	uint32_t lightCount = m_resourceCache->GetLightCount();
-
-	// Fallback SSBO ensures LightingPass always has a valid VulkanBuffer reference
-	// for descriptor binding, even when the scene has zero lights.
-	const VulkanBuffer& ssboRef = lightSSBO ? *lightSSBO : *m_fallbackSSBO;
-
+	// --- Phase 2: LightingPass → compute PBR → HDRColor ---
+	//     Light SSBO is owned and managed by LightingPass internally.
+	//     UploadLights() should be called before the first DrawFrame()
+	//     to populate the SSBO from the scene (handled by T9).
 	m_lightingPass->Record(cmdBuf,
-	                       ssboRef,
-	                       lightCount,
 	                       cameraPos,
 	                       viewMatrix,
 	                       extent,

@@ -65,10 +65,13 @@ public:
 	/**
 	 * @brief Opens an existing project from a .neurus.json file.
 	 * @param path Filesystem path to the .neurus.json file.
-	 * @return Project deserialized from the file.
+	 * @param assetDir Optional base directory for resolving OBJ mesh paths.
+	 *                 After deserialization, all meshes have ReloadMeshData(assetDir) called
+	 *                 to reload vertex/index buffers from disk. If empty, o_meshPath is used as-is.
+	 * @return Project deserialized from the file with mesh geometry reloaded.
 	 * @throws std::runtime_error if the file cannot be opened.
 	 */
-	static Project Open(const std::string& path);
+	static Project Open(const std::string& path, const std::string& assetDir = "");
 
 	/**
 	 * @brief Creates a default project with camera, sphere mesh, and point light.

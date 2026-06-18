@@ -7,15 +7,18 @@
 
 #include "AttachmentManager.h"
 #include "ComputePipelineBuilder.h"
-#include "VulkanBuffer.h"
 #include "Image.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"
 
+#include "scene/Light.h"
+#include "scene/Scene.h"
+
 #include <array>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace neurus {
 
@@ -27,11 +30,15 @@ LightingPass::LightingPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            AttachmentManager& attachmentManager,
                            uint32_t numSets,
+                           vk::Queue graphicsQueue,
+                           uint32_t queueFamilyIndex,
                            const uint32_t* compSpv,
                            size_t compSize)
 	: m_device(&device)
 	, m_physicalDevice(&physicalDevice)
 	, m_attachmentManager(&attachmentManager)
+	, m_graphicsQueue(graphicsQueue)
+	, m_queueFamilyIndex(queueFamilyIndex)
 	// --- Nearest-neighbour sampler for G-Buffer reads ---
 	, m_sampler(CreateSampler(device, physicalDevice))
 	// --- Descriptor set layout ---
@@ -46,7 +53,23 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
-	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets);
+	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets
+	           << " qfi=" << queueFamilyIndex);
+
+	// --- Create fallback SSBO for zero-light scenes ---
+	//     The SSBO descriptor (binding 5) must always reference a valid buffer,
+	//     even when the scene has no point lights. This fallback is a single
+	//     zero-filled element that the shader never reads (lightCount=0).
+	{
+		uint8_t zero[sizeof(PointLightGpu)] = {};
+		m_fallbackSSBO = std::make_unique<VulkanBuffer>(
+			device, physicalDevice, graphicsQueue, queueFamilyIndex,
+			sizeof(PointLightGpu),
+			vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+			vk::MemoryPropertyFlagBits::eDeviceLocal);
+		m_fallbackSSBO->Upload(zero, sizeof(PointLightGpu));
+		NEURUS_LOG("[LightingPass] Created fallback SSBO (zero-light)");
+	}
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -58,6 +81,81 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 }
 
 LightingPass::~LightingPass() = default;
+
+// ---------------------------------------------------------------------------
+// Light SSBO management
+// ---------------------------------------------------------------------------
+
+void LightingPass::UploadLights(const Scene& scene)
+{
+	// Collect only point lights
+	std::vector<PointLightGpu> gpuLights;
+	gpuLights.reserve(scene.light_list.size());
+
+	for (const auto& [id, light] : scene.light_list)
+	{
+		if (light->light_type != LightType::POINTLIGHT)
+		{
+			continue;
+		}
+
+		PointLightGpu gpu = {};
+		const auto& pos = light->GetPosition();
+
+		// Position (world-space, from Transform3D)
+		gpu.posX = pos.x;
+		gpu.posY = pos.y;
+		gpu.posZ = pos.z;
+
+		// Color (linear RGB)
+		gpu.colorR = light->light_color.r;
+		gpu.colorG = light->light_color.g;
+		gpu.colorB = light->light_color.b;
+
+		// Lighting parameters
+		gpu.power = light->light_power;
+		gpu.radius = light->light_radius;
+
+		gpuLights.push_back(gpu);
+	}
+
+	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
+	m_lightCount = newCount;
+
+	if (newCount == 0)
+	{
+		m_lightSSBO.reset();
+		NEURUS_LOG("[LightingPass] No point lights in scene — SSBO released (fallback preserved)");
+		return;
+	}
+
+	// Create or re-create the SSBO
+	const vk::DeviceSize bufferSize = newCount * sizeof(PointLightGpu);
+
+	m_lightSSBO = std::make_unique<VulkanBuffer>(
+		*m_device, *m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
+		bufferSize,
+		vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
+		vk::MemoryPropertyFlagBits::eDeviceLocal);
+	m_lightSSBO->Upload(gpuLights.data(), bufferSize);
+
+	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " point lights"
+	           << " (" << bufferSize << " bytes)");
+}
+
+const VulkanBuffer* LightingPass::GetLightSSBO() const
+{
+	return m_lightSSBO ? m_lightSSBO.get() : m_fallbackSSBO.get();
+}
+
+uint32_t LightingPass::GetLightCount() const
+{
+	return m_lightCount;
+}
+
+// ---------------------------------------------------------------------------
+// Descriptor set layout
+// ---------------------------------------------------------------------------
 
 DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Device& device)
 {
@@ -145,7 +243,7 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 // Descriptor writes
 // ---------------------------------------------------------------------------
 
-void LightingPass::WriteDescriptors(uint32_t setIndex, const VulkanBuffer& lightSSBO)
+void LightingPass::WriteDescriptors(uint32_t setIndex)
 {
 	DescriptorSet& dstSet = m_descriptorSets[setIndex];
 
@@ -185,9 +283,9 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, const VulkanBuffer& light
 		                  vk::DescriptorType::eStorageImage);
 	}
 
-	// --- Write light SSBO ---
+	// --- Write light SSBO (uses fallback when no lights present) ---
 	{
-		dstSet.WriteBuffer(5, lightSSBO.GetDescriptorInfo(),
+		dstSet.WriteBuffer(5, GetLightSSBO()->GetDescriptorInfo(),
 		                   vk::DescriptorType::eStorageBuffer);
 	}
 }
@@ -197,15 +295,13 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, const VulkanBuffer& light
 // ---------------------------------------------------------------------------
 
 void LightingPass::Record(vk::CommandBuffer cmdBuf,
-                          const VulkanBuffer& lightSSBO,
-                          uint32_t lightCount,
                           const glm::vec3& cameraPos,
                           const glm::mat4& viewMatrix,
                           vk::Extent2D renderExtent,
                           uint32_t frameIndex)
 {
 	// --- 1. Write descriptor set for this frame slot ---
-	WriteDescriptors(frameIndex, lightSSBO);
+	WriteDescriptors(frameIndex);
 
 	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
 	//     and HDRColor to GENERAL for compute write.
@@ -281,7 +377,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 	// --- 5. Push constants ---
 	{
 		LightingPushConstants pc = {};
-		pc.lightCount = static_cast<int32_t>(lightCount);
+		pc.lightCount = static_cast<int32_t>(m_lightCount);
 		pc.camX = cameraPos.x;
 		pc.camY = cameraPos.y;
 		pc.camZ = cameraPos.z;

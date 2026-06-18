@@ -7,10 +7,10 @@
 # Core Types (header-only, no dependencies)
 add_subdirectory(core)
 
-# Data & Resource Layer (built first - no internal dependencies)
-add_subdirectory(data)
+# Asset Layer (CPU-side data only - no internal dependencies)
+add_subdirectory(asset)
 
-# Renderer Layer (depends on: data)
+# Renderer Layer (depends on: asset)
 add_subdirectory(render)
 
 # Editor Layer (depends on: nothing from src/)
@@ -25,7 +25,7 @@ add_subdirectory(scene)
 # Project Layer (depends on: scene for serializable types)
 add_subdirectory(project)
 
-# Application Layer (depends on: render, editor, ui, data, scene)
+# Application Layer (depends on: render, editor, ui, asset, scene)
 add_subdirectory(app)
 
 # ---------------------------------------------------------------------------
@@ -42,7 +42,7 @@ target_link_libraries(Neurus PRIVATE
 	neurus_render
 	neurus_editor
 	neurus_ui
-	neurus_data
+	neurus_asset
 	neurus_scene
 	shader_headers
 	ads::qtadvanceddocking-qt6

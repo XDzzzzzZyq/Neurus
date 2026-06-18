@@ -35,7 +35,7 @@ Project Project::New()
 	return {};
 }
 
-Project Project::Open(const std::string& path)
+Project Project::Open(const std::string& path, const std::string& assetDir)
 {
 	std::ifstream is(path);
 	if (!is.is_open())
@@ -48,6 +48,13 @@ Project Project::Open(const std::string& path)
 	archive(cereal::make_nvp("project", project));
 	project.m_filePath = path;
 	project.m_dirty = false;
+
+	// Reload mesh geometry from OBJ paths (not stored in JSON)
+	for (auto& [id, mesh] : project.m_scene->mesh_list)
+	{
+		mesh->ReloadMeshData(assetDir);
+	}
+
 	return project;
 }
 

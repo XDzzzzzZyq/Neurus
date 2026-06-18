@@ -31,12 +31,13 @@
 #include "render/Texture.h"
 
 // --- Data layer ---
-#include "data/MeshData.h"
+#include "asset/MeshData.h"
 
 // --- Scene layer ---
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
+#include "scene/Scene.h"
 
 // --- Embedded shaders ---
 #include <gbuffer.vert.h>
@@ -129,6 +130,7 @@ protected:
 			*m_device, pd,
 			*m_attachmentManager,
 			2u,
+			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 	}
 
@@ -353,28 +355,15 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// -------------------------------------------------------------------
 	// Step 8: Upload light SSBO & record lighting pass
 	// -------------------------------------------------------------------
-	const auto& lightPos = light->GetPosition();
-	PointLightGpu gpuLight = {};
-	gpuLight.posX   = lightPos.x;
-	gpuLight.posY   = lightPos.y;
-	gpuLight.posZ   = lightPos.z;
-	gpuLight.colorR = light->light_color.r;
-	gpuLight.colorG = light->light_color.g;
-	gpuLight.colorB = light->light_color.b;
-	gpuLight.power  = light->light_power;
-	gpuLight.radius = light->light_radius;
-
-	auto lightSSBO = std::make_unique<VulkanBuffer>(
-		*m_device, pd, m_queue, m_graphicsQueueFamily,
-		sizeof(PointLightGpu),
-		vk::BufferUsageFlagBits::eStorageBuffer |
-		    vk::BufferUsageFlagBits::eTransferDst,
-		vk::MemoryPropertyFlagBits::eDeviceLocal);
-	lightSSBO->Upload(&gpuLight, sizeof(PointLightGpu));
+	{
+		Scene scene;
+		scene.UseLight(light);
+		m_lightingPass->UploadLights(scene);
+	}
 
 	{
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, *lightSSBO, 1,
+		m_lightingPass->Record(*cmd,
 		                       camera->GetPosition(),
 		                       camUBO.view,
 		                       {kRenderWidth, kRenderHeight},

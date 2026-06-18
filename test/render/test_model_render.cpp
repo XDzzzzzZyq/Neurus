@@ -27,7 +27,7 @@
 #include "render/Material.h"
 #include "render/RenderPassManager.h"
 #include "render/Texture.h"
-#include "data/ImageData.h"
+#include "asset/ImageData.h"
 #include "render/Texture.h"
 #include "render/VulkanBuffer.h"
 #include "render/buffers/BufferLayout.h"
@@ -35,7 +35,7 @@
 #include "render/buffers/VertexBuffer.h"
 
 // Data layer
-#include "data/MeshData.h"
+#include "asset/MeshData.h"
 
 // Scene layer
 #include "scene/Camera.h"
@@ -117,6 +117,7 @@ protected:
 			*m_device, pd,
 			*m_attachmentManager,
 			2u,                          // numSets = kMaxFramesInFlight
+			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 	}
 
@@ -480,36 +481,15 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	}
 
 	// -----------------------------------------------------------------------
-	// Step 13: Build PointLightGpu SSBO and record lighting pass
+	// Step 13: Upload light to LightingPass and record lighting pass
 	// -----------------------------------------------------------------------
-	const auto& lightPos = light->GetPosition();
-
-	PointLightGpu gpuLight = {};
-	gpuLight.posX   = lightPos.x;
-	gpuLight.posY   = lightPos.y;
-	gpuLight.posZ   = lightPos.z;
-	gpuLight.colorR = light->light_color.r;
-	gpuLight.colorG = light->light_color.g;
-	gpuLight.colorB = light->light_color.b;
-	gpuLight.power  = light->light_power;
-	gpuLight.radius = light->light_radius;
-
-	auto lightSSBO = std::make_unique<VulkanBuffer>(
-		*m_device, pd, m_queue, m_graphicsQueueFamily,
-		sizeof(PointLightGpu),
-		vk::BufferUsageFlagBits::eStorageBuffer |
-		    vk::BufferUsageFlagBits::eTransferDst,
-		vk::MemoryPropertyFlagBits::eDeviceLocal);
-
-	lightSSBO->Upload(&gpuLight, sizeof(PointLightGpu));
+	m_lightingPass->UploadLights(scene);
 
 	// Record lighting compute pass
 	{
 		auto& cmd = BeginCmd();
 
 		m_lightingPass->Record(*cmd,
-		                       *lightSSBO,
-		                       1,                                      // light count
 		                       camera->GetPosition(),                 // camera world pos
 		                       camUBO.view,                           // view matrix
 		                       {kRenderWidth, kRenderHeight},
@@ -542,8 +522,9 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 
 	EXPECT_TRUE(foundNonZero)
 		<< "No non-zero pixel found in HDR output after deferred PBR pipeline. "
-		<< "The sphere should be illuminated by the point light at (" << lightPos.x
-		<< ", " << lightPos.y << ", " << lightPos.z << ") with power "
+		<< "The sphere should be illuminated by the point light at ("
+		<< light->GetPosition().x << ", " << light->GetPosition().y
+		<< ", " << light->GetPosition().z << ") with power "
 		<< light->light_power << ".";
 
 	if (!foundNonZero)

@@ -35,10 +35,11 @@ target_include_directories(neurus_scene PRIVATE
 target_link_libraries(neurus_scene PUBLIC
 	glm
 	cereal
+	Vulkan::Vulkan
 )
 
 target_link_libraries(neurus_scene PRIVATE
-	Vulkan::Vulkan
+	neurus_render
 )
 
 target_compile_features(neurus_scene PUBLIC cxx_std_20)

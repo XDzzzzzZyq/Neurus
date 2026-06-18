@@ -45,8 +45,7 @@
 #include "render/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
-#include "data/GPUResourceCache.h"
-#include "data/MeshData.h"
+#include "asset/MeshData.h"
 #include "scene/Scene.h"
 #include "project/Project.h"
 
@@ -136,24 +135,9 @@ int Application::Run(int argc, char* argv[])
 	m_project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
 	try
 	{
-		*m_project = neurus::project::Project::Open(projectFilePath.toStdString());
+		*m_project = neurus::project::Project::Open(projectFilePath.toStdString(),
+		                                          resolveResourcePath("").toStdString());
 		NEURUS_LOG("[Application] Loaded project: " << projectFilePath.toStdString());
-
-		// Reload mesh geometry from OBJ paths (not stored in JSON)
-		auto& projectScene = m_project->GetScene();
-		for (auto& [id, mesh] : projectScene.mesh_list)
-		{
-			if (!mesh->o_mesh && !mesh->o_meshPath.empty())
-			{
-				// Resolve relative path (stored in JSON) to absolute resource path
-				const QString fullPath = resolveResourcePath(mesh->o_meshPath.c_str());
-				auto meshData = std::make_shared<MeshData>();
-				if (meshData->LoadObj(fullPath.toStdString()))
-				{
-					mesh->o_mesh = meshData;
-				}
-			}
-		}
 	}
 	catch (const std::exception& e)
 	{
@@ -189,24 +173,14 @@ int Application::Run(int argc, char* argv[])
 		}
 	}
 
-	// --- Initialize GPU resource cache and upload scene data ---
-	m_resourceCache = std::make_unique<neurus::GPUResourceCache>(
-		m_vkContext->device(),
-		m_vkContext->physicalDevice(),
-		m_vkContext->graphicsQueue(),
-		m_vkContext->graphicsQueueFamily());
-
-	// Upload each Mesh object directly (GPUResourceCache reads MeshData from mesh->o_mesh)
+	// --- Upload each Mesh object directly to GPU ---
 	for (const auto& [id, mesh] : scene.mesh_list)
 	{
-		m_resourceCache->UploadMesh(*mesh);
+		mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
+		                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
 	}
 
-	// Upload lights (no guard — zero lights are handled gracefully by GPUResourceCache
-	// and LightingPass)
-	m_resourceCache->UploadLights(scene);
-
-	// --- Create deferred renderer (uses cache for mesh/light buffers) ---
+	// --- Create deferred renderer ---
 	try
 	{
 		m_renderer = std::make_unique<neurus::DeferredRenderer>(
@@ -217,7 +191,6 @@ int Application::Run(int argc, char* argv[])
 			*surface,
 			vulkanWidget->width(),
 			vulkanWidget->height(),
-			*m_resourceCache,
 			gbuffer_vert_spv, gbuffer_vert_spv_size,
 			gbuffer_frag_spv, gbuffer_frag_spv_size,
 			pbr_lighting_comp_spv, pbr_lighting_comp_spv_size
@@ -228,6 +201,9 @@ int Application::Run(int argc, char* argv[])
 		NEURUS_ERR("DeferredRenderer initialization failed: " << e.what());
 		return -1;
 	}
+
+	// --- Upload scene lights to GPU (via LightingPass) ---
+	m_renderer->UploadLights(scene);
 
 	// Window was created hidden - show it now that the renderer is ready
 	mainWindow->show();
@@ -285,15 +261,16 @@ int Application::Run(int argc, char* argv[])
 					neurus::project::Project::New());
 				NEURUS_LOG("[Application] Created new project.");
 
-				if (m_resourceCache)
+				// Upload scene data to GPU
+				auto& projectScene = m_project->GetScene();
+				for (const auto& [id, mesh] : projectScene.mesh_list)
 				{
-					m_resourceCache->Clear();
-					auto& projectScene = m_project->GetScene();
-					for (const auto& [id, mesh] : projectScene.mesh_list)
-					{
-						m_resourceCache->UploadMesh(*mesh);
-					}
-					m_resourceCache->UploadLights(projectScene);
+					mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
+					                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
+				}
+				if (m_renderer)
+				{
+					m_renderer->UploadLights(projectScene);
 				}
 
 				if (m_context)
@@ -311,33 +288,20 @@ int Application::Run(int argc, char* argv[])
 		[this](const QString& path) {
 			try {
 				m_project = std::make_unique<neurus::project::Project>(
-					neurus::project::Project::Open(path.toStdString()));
+					neurus::project::Project::Open(path.toStdString(),
+					                               resolveResourcePath("").toStdString()));
 				NEURUS_LOG("[Application] Opened project: " << path.toStdString());
 
-				// Reload mesh geometry from OBJ paths
-				auto& projectScene = m_project->GetScene();
-				for (auto& [id, mesh] : projectScene.mesh_list)
-				{
-					if (!mesh->o_mesh && !mesh->o_meshPath.empty())
-					{
-						const QString fullPath = resolveResourcePath(mesh->o_meshPath.c_str());
-						auto meshData = std::make_shared<MeshData>();
-						if (meshData->LoadObj(fullPath.toStdString()))
-						{
-							mesh->o_mesh = meshData;
-						}
-					}
-				}
-
 				// Re-upload scene data to GPU
-				if (m_resourceCache)
+				auto& projectScene = m_project->GetScene();
+				for (const auto& [id, mesh] : projectScene.mesh_list)
 				{
-					m_resourceCache->Clear();
-					for (const auto& [id, mesh] : projectScene.mesh_list)
-					{
-						m_resourceCache->UploadMesh(*mesh);
-					}
-					m_resourceCache->UploadLights(projectScene);
+					mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
+					                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
+				}
+				if (m_renderer)
+				{
+					m_renderer->UploadLights(projectScene);
 				}
 
 				if (m_context)
@@ -397,10 +361,9 @@ int Application::Run(int argc, char* argv[])
 
 	// --- Clean shutdown (CRITICAL: destroy surface BEFORE instance) ---
 	m_renderer.reset();         // 1. Destroy DeferredRenderer (swapchain, pipeline, etc.)
-	m_resourceCache.reset();    // 2. Destroy GPUResourceCache (vertex/index/light buffers)
-	surface.reset();            // 3. Destroy VkSurfaceKHR
-	mainWindow.reset();         // 4. Destroy main window (deletes VulkanWidget)
-	m_vkContext.reset();        // 5. Destroy VkDevice + VkInstance
+	surface.reset();            // 2. Destroy VkSurfaceKHR
+	mainWindow.reset();         // 3. Destroy main window (deletes VulkanWidget)
+	m_vkContext.reset();        // 4. Destroy VkDevice + VkInstance
 
 	return result;
 }
