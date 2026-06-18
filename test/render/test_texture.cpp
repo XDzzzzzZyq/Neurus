@@ -9,7 +9,7 @@
 using namespace neurus;
 
 /**
- * @brief Tests for Texture - RAII texture wrapping VulkanImage + Sampler.
+ * @brief Tests for Texture - RAII texture wrapping Image + Sampler.
  *
  * Creates Vulkan instance and device without a surface (graphics queue
  * without present support is sufficient for texture operations).

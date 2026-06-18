@@ -7,15 +7,15 @@
 namespace neurus {
 
 // --- Forward declarations ---
-class VulkanImage;
+class Image;
 class AttachmentManager;
 
 /**
  * @brief Static utility for capturing Vulkan images to PNG files.
  *
  * Orchestrates GPU-side layout transitions and delegates GPU readback to
- * VulkanImage::ReadImageToBuffer() and CPU-side conversion / PNG writing
- * to TextureData.
+ * Image::ReadImageToBuffer() and CPU-side conversion / PNG writing
+ * to ImageData.
  *
  * All operations are blocking (waits for queue idle).
  *
@@ -66,21 +66,21 @@ public:
 	                             const std::string& path);
 
 	/**
-	 * @brief Captures a VulkanImage attachment to a PNG file.
+	 * @brief Captures an Image attachment to a PNG file.
 	 *
 	 * 1. Transitions image to TRANSFER_SRC_OPTIMAL.
 	 * 2. Calls vulkanImage.ReadImageToBuffer() for GPU readback.
 	 * 3. Transitions back to the original layout.
- * 4. Delegates to TextureData::SaveImage() for conversion + PNG write.
- *
- * @param remapSigned Passed to TextureData for normal‑map [-1,1]→[0,1] remap.
+	 * 4. Delegates to Texture::SaveImage() for conversion + PNG write.
+	 *
+	 * @param remapSigned Passed to ImageData for normal‑map [-1,1]→[0,1] remap.
 	 * @return true on success.
 	 */
 	static bool CaptureAttachment(const vk::raii::Device& device,
 	                              const vk::raii::PhysicalDevice& physicalDevice,
 	                              vk::Queue queue,
 	                              uint32_t queueFamilyIndex,
-	                              VulkanImage& vulkanImage,
+	                              Image& vulkanImage,
 	                              const std::string& path,
 	                              bool remapSigned = false);
 

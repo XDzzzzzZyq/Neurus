@@ -3,19 +3,19 @@
 
 #include <gtest/gtest.h>
 
-#include "render/VulkanImage.h"
+#include "render/Image.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
 using namespace neurus;
 
 /**
- * @brief Tests for VulkanImage - RAII image creation, layout transition, and mipmap generation.
+ * @brief Tests for Image - RAII image creation, layout transition, and mipmap generation.
  *
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class VulkanImageTest : public ::testing::Test
+class ImageTest : public ::testing::Test
 {
 protected:
 	void SetUp() override
@@ -143,7 +143,7 @@ protected:
 // Construction
 // ---------------------------------------------------------------------------
 
-TEST_F(VulkanImageTest, Create2D_ValidHandles)
+TEST_F(ImageTest, Create2D_ValidHandles)
 {
 	if (!m_hasVulkan)
 	{
@@ -153,7 +153,7 @@ TEST_F(VulkanImageTest, Create2D_ValidHandles)
 	const vk::Extent2D extent(256, 256);
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
 	                  1);
 
@@ -166,7 +166,7 @@ TEST_F(VulkanImageTest, Create2D_ValidHandles)
 	EXPECT_EQ(image.ArrayLayers(), 1u);
 }
 
-TEST_F(VulkanImageTest, Create2D_WithMipLevels)
+TEST_F(ImageTest, Create2D_WithMipLevels)
 {
 	if (!m_hasVulkan)
 	{
@@ -177,7 +177,7 @@ TEST_F(VulkanImageTest, Create2D_WithMipLevels)
 	const uint32_t mipLevels = 4;
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -187,7 +187,7 @@ TEST_F(VulkanImageTest, Create2D_WithMipLevels)
 	EXPECT_EQ(image.MipLevels(), mipLevels);
 }
 
-TEST_F(VulkanImageTest, CreateCube_ValidHandles)
+TEST_F(ImageTest, CreateCube_ValidHandles)
 {
 	if (!m_hasVulkan)
 	{
@@ -197,15 +197,15 @@ TEST_F(VulkanImageTest, CreateCube_ValidHandles)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(128, 128);
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
 	                  1,
-	                  VulkanImage::ImageType::eCube);
+	                  Image::ImageType::eCube);
 
 	EXPECT_EQ(image.ArrayLayers(), 6u);
 }
 
-TEST_F(VulkanImageTest, CreateDepthStencil_ValidHandles)
+TEST_F(ImageTest, CreateDepthStencil_ValidHandles)
 {
 	if (!m_hasVulkan)
 	{
@@ -222,11 +222,11 @@ TEST_F(VulkanImageTest, CreateDepthStencil_ValidHandles)
 		GTEST_SKIP() << "D32_SFLOAT depth attachment not supported.";
 	}
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eD32Sfloat,
+	Image image(*m_device, pd, extent, vk::Format::eD32Sfloat,
 	                  vk::ImageUsageFlagBits::eDepthStencilAttachment |
 	                      vk::ImageUsageFlagBits::eSampled,
 	                  1,
-	                  VulkanImage::ImageType::eDepthStencil);
+	                  Image::ImageType::eDepthStencil);
 
 	EXPECT_TRUE(*image.ImageHandle());
 	EXPECT_TRUE(*image.ImageViewHandle());
@@ -238,7 +238,7 @@ TEST_F(VulkanImageTest, CreateDepthStencil_ValidHandles)
 // Layout transitions
 // ---------------------------------------------------------------------------
 
-TEST_F(VulkanImageTest, TransitionLayout_Basic)
+TEST_F(ImageTest, TransitionLayout_Basic)
 {
 	if (!m_hasVulkan)
 	{
@@ -248,7 +248,7 @@ TEST_F(VulkanImageTest, TransitionLayout_Basic)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(64, 64);
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eColorAttachment |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -267,7 +267,7 @@ TEST_F(VulkanImageTest, TransitionLayout_Basic)
 	SUCCEED();
 }
 
-TEST_F(VulkanImageTest, TransitionLayout_MipLevels)
+TEST_F(ImageTest, TransitionLayout_MipLevels)
 {
 	if (!m_hasVulkan)
 	{
@@ -277,7 +277,7 @@ TEST_F(VulkanImageTest, TransitionLayout_MipLevels)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(256, 256);
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -294,7 +294,7 @@ TEST_F(VulkanImageTest, TransitionLayout_MipLevels)
 	SUCCEED();
 }
 
-TEST_F(VulkanImageTest, TransitionLayout_SingleMipLevel)
+TEST_F(ImageTest, TransitionLayout_SingleMipLevel)
 {
 	if (!m_hasVulkan)
 	{
@@ -304,7 +304,7 @@ TEST_F(VulkanImageTest, TransitionLayout_SingleMipLevel)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(128, 128);
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -325,7 +325,7 @@ TEST_F(VulkanImageTest, TransitionLayout_SingleMipLevel)
 // Mipmap generation
 // ---------------------------------------------------------------------------
 
-TEST_F(VulkanImageTest, GenerateMipmaps_Completes)
+TEST_F(ImageTest, GenerateMipmaps_Completes)
 {
 	if (!m_hasVulkan)
 	{
@@ -344,7 +344,7 @@ TEST_F(VulkanImageTest, GenerateMipmaps_Completes)
 
 	const vk::Extent2D extent(256, 256);
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -367,20 +367,20 @@ TEST_F(VulkanImageTest, GenerateMipmaps_Completes)
 // Non-copyable, movable
 // ---------------------------------------------------------------------------
 
-TEST_F(VulkanImageTest, NonCopyable)
+TEST_F(ImageTest, NonCopyable)
 {
-	static_assert(!std::is_copy_constructible_v<VulkanImage>,
-	              "VulkanImage must not be copy-constructible");
-	static_assert(!std::is_copy_assignable_v<VulkanImage>,
-	              "VulkanImage must not be copy-assignable");
+	static_assert(!std::is_copy_constructible_v<Image>,
+	              "Image must not be copy-constructible");
+	static_assert(!std::is_copy_assignable_v<Image>,
+	              "Image must not be copy-assignable");
 	SUCCEED();
 }
 
-TEST_F(VulkanImageTest, Movable)
+TEST_F(ImageTest, Movable)
 {
-	static_assert(std::is_move_constructible_v<VulkanImage>,
-	              "VulkanImage must be move-constructible");
-	static_assert(std::is_move_assignable_v<VulkanImage>,
-	              "VulkanImage must be move-assignable");
+	static_assert(std::is_move_constructible_v<Image>,
+	              "Image must be move-constructible");
+	static_assert(std::is_move_assignable_v<Image>,
+	              "Image must be move-assignable");
 	SUCCEED();
 }

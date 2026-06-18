@@ -9,8 +9,8 @@ add_library(neurus_render STATIC
 	buffers/VertexBuffer.cpp
 	VulkanBuffer.h
 	VulkanBuffer.cpp
-	VulkanImage.h
-	VulkanImage.cpp
+	Image.h
+	Image.cpp
 	AttachmentManager.h
 	AttachmentManager.cpp
 	DescriptorManager.h

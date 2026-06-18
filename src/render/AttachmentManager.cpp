@@ -56,7 +56,7 @@ void AttachmentManager::createAttachment(const AttachmentName name)
 {
 	const auto config = ConfigFor(name);
 
-	VulkanImage image(*m_device,
+	Image image(*m_device,
 	                  *m_physicalDevice,
 	                  m_extent,
 	                  config.format,
@@ -72,7 +72,7 @@ void AttachmentManager::createAttachment(const AttachmentName name)
 // Accessors
 // ---------------------------------------------------------------------------
 
-VulkanImage& AttachmentManager::GetAttachment(const AttachmentName name)
+Image& AttachmentManager::GetAttachment(const AttachmentName name)
 {
 	const auto it = m_attachments.find(name);
 	if (it == m_attachments.end())
@@ -82,7 +82,7 @@ VulkanImage& AttachmentManager::GetAttachment(const AttachmentName name)
 	return it->second;
 }
 
-const VulkanImage& AttachmentManager::GetAttachment(const AttachmentName name) const
+const Image& AttachmentManager::GetAttachment(const AttachmentName name) const
 {
 	const auto it = m_attachments.find(name);
 	if (it == m_attachments.end())
@@ -119,8 +119,8 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 		vk::ImageUsageFlagBits::eDepthStencilAttachment |
 		vk::ImageUsageFlagBits::eSampled;
 
-	constexpr auto e2D = VulkanImage::ImageType::e2D;
-	constexpr auto eDS = VulkanImage::ImageType::eDepthStencil;
+	constexpr auto e2D = Image::ImageType::e2D;
+	constexpr auto eDS = Image::ImageType::eDepthStencil;
 
 	switch (name)
 	{

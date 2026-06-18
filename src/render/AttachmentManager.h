@@ -1,6 +1,6 @@
 #pragma once
 
-#include "VulkanImage.h"
+#include "Image.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -29,9 +29,9 @@ enum class AttachmentName
 };
 
 /**
- * @brief Manages G-Buffer and post-FX framebuffer attachments as VulkanImage instances.
+ * @brief Manages G-Buffer and post-FX framebuffer attachments as Image instances.
  *
- * Each attachment is a VulkanImage with a preconfigured format and usage flags.
+ * Each attachment is an Image with a preconfigured format and usage flags.
  * Attachments are created via Create() and can be resized via Resize().
  * Individual attachments are accessed by their AttachmentName.
  *
@@ -79,16 +79,16 @@ public:
 	void Resize(vk::Extent2D extent);
 
 	/**
-	 * @brief Returns the VulkanImage for a named attachment.
+	 * @brief Returns the Image for a named attachment.
 	 *
 	 * @param name Attachment identifier.
 	 * @return Non-owning reference to the attachment image.
 	 * @throws std::out_of_range if the attachment has not been created.
 	 */
-	VulkanImage& GetAttachment(AttachmentName name);
+	Image& GetAttachment(AttachmentName name);
 
 	/** @brief const overload of GetAttachment(). */
-	const VulkanImage& GetAttachment(AttachmentName name) const;
+	const Image& GetAttachment(AttachmentName name) const;
 
 	/**
 	 * @brief Checks whether the specified attachment has been created.
@@ -104,7 +104,7 @@ private:
 	{
 		vk::Format format;
 		vk::ImageUsageFlags usage;
-		VulkanImage::ImageType imageType;
+		Image::ImageType imageType;
 	};
 
 	/** @brief Returns the preconfigured format, usage, and type for a named attachment. */
@@ -119,7 +119,7 @@ private:
 
 	// --- State ---
 	vk::Extent2D m_extent{};
-	std::unordered_map<AttachmentName, VulkanImage> m_attachments;
+	std::unordered_map<AttachmentName, Image> m_attachments;
 };
 
 /**

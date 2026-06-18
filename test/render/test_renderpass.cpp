@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "render/RenderPassManager.h"
-#include "render/VulkanImage.h"
+#include "render/Image.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -129,20 +129,20 @@ protected:
 	}
 
 	/** Helper: create a simple color attachment image for testing. */
-	VulkanImage CreateColorAttachment(uint32_t width, uint32_t height, vk::Format format)
+	Image CreateColorAttachment(uint32_t width, uint32_t height, vk::Format format)
 	{
 		auto& pd = m_physicalDevices[m_selectedPdIndex];
-		return VulkanImage(*m_device, pd, vk::Extent2D(width, height), format,
+		return Image(*m_device, pd, vk::Extent2D(width, height), format,
 		                   vk::ImageUsageFlagBits::eColorAttachment, 1);
 	}
 
 	/** Helper: create a simple depth attachment image for testing. */
-	VulkanImage CreateDepthAttachment(uint32_t width, uint32_t height, vk::Format format)
+	Image CreateDepthAttachment(uint32_t width, uint32_t height, vk::Format format)
 	{
 		auto& pd = m_physicalDevices[m_selectedPdIndex];
-		return VulkanImage(*m_device, pd, vk::Extent2D(width, height), format,
+		return Image(*m_device, pd, vk::Extent2D(width, height), format,
 		                   vk::ImageUsageFlagBits::eDepthStencilAttachment, 1,
-		                   VulkanImage::ImageType::eDepthStencil);
+		                   Image::ImageType::eDepthStencil);
 	}
 
 	bool m_hasVulkan = false;
@@ -410,12 +410,12 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 		vk::Format::eR8G8B8A8Unorm,       // MetallicRoughness
 	};
 
-	std::vector<VulkanImage> colorAttachments;
+	std::vector<Image> colorAttachments;
 	colorAttachments.reserve(gbufferColorFormats.size());
 	for (const auto& fmt : gbufferColorFormats)
 	{
 		colorAttachments.push_back(
-			VulkanImage(*m_device, pd, vk::Extent2D(128, 128), fmt,
+			Image(*m_device, pd, vk::Extent2D(128, 128), fmt,
 			            vk::ImageUsageFlagBits::eColorAttachment, 1));
 	}
 

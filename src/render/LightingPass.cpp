@@ -8,7 +8,7 @@
 #include "AttachmentManager.h"
 #include "ComputePipelineBuilder.h"
 #include "VulkanBuffer.h"
-#include "VulkanImage.h"
+#include "Image.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"

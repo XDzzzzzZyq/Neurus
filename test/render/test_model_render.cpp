@@ -27,7 +27,8 @@
 #include "render/Material.h"
 #include "render/RenderPassManager.h"
 #include "render/Texture.h"
-#include "data/TextureData.h"
+#include "data/ImageData.h"
+#include "render/Texture.h"
 #include "render/VulkanBuffer.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"
@@ -369,7 +370,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 
 	if (albedoTexture.IsValid())
 	{
-		// Wrap in shared_ptr for TextureData::TextureRes
+			// Wrap in shared_ptr for Texture::TextureRes
 		auto texRes = std::make_shared<Texture>(std::move(albedoTexture));
 		material->SetMatParam(Material::MAT_ALBEDO, texRes);
 	}

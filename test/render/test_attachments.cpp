@@ -3,7 +3,7 @@
 #include "shared/TestVulkanShared.h"
 
 #include "render/AttachmentManager.h"
-#include "render/VulkanImage.h"
+#include "render/Image.h"
 
 using namespace neurus;
 
@@ -50,7 +50,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 		EXPECT_EQ(attachment.Format(), vk::Format::eR16G16B16A16Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
 		EXPECT_EQ(attachment.ArrayLayers(), 1u);
-		EXPECT_NE(attachment.Type(), VulkanImage::ImageType::eDepthStencil);
+		EXPECT_NE(attachment.Type(), Image::ImageType::eDepthStencil);
 	}
 
 	// --- Normal (RGBA16_SFLOAT) ---
@@ -83,7 +83,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eD32Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
-		EXPECT_EQ(attachment.Type(), VulkanImage::ImageType::eDepthStencil);
+		EXPECT_EQ(attachment.Type(), Image::ImageType::eDepthStencil);
 	}
 }
 

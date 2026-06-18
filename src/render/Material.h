@@ -1,6 +1,6 @@
 #pragma once
 
-#include "data/TextureData.h"
+#include "render/Texture.h"
 
 #include <glm/glm.hpp>
 
@@ -86,7 +86,7 @@ public:
 	 *
 	 * Only the member corresponding to the current MatDataType is meaningful.
 	 */
-	using MatParamData = std::tuple<MatDataType, float, glm::vec3, TextureData::TextureRes>;
+	using MatParamData = std::tuple<MatDataType, float, glm::vec3, Texture::TextureRes>;
 
 	/** @brief Shared pointer to a Material. */
 	using MaterialRes = std::shared_ptr<Material>;
@@ -182,7 +182,7 @@ public:
 	 * @param _tar Target parameter.
 	 * @param _tex Shared pointer to the Texture.
 	 */
-	void SetMatParam(MatParaType _tar, TextureData::TextureRes _tex);
+	void SetMatParam(MatParaType _tar, Texture::TextureRes _tex);
 
 	// ---------------------------------------------------------------------------
 	// Configuration loading

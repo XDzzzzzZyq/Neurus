@@ -2,7 +2,7 @@
 
 #include "shared/TestVulkanShared.h"
 #include "render/Screenshot.h"
-#include "render/VulkanImage.h"
+#include "render/Image.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -17,7 +17,7 @@ using namespace neurus;
 /**
  * @brief Tests for Screenshot - GPU image capture to PNG via staging buffer.
  *
- * Creates a VulkanImage, uploads known pixel data, captures to PNG,
+ * Creates an Image, uploads known pixel data, captures to PNG,
  * and verifies file existence and non-zero size.
  *
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
@@ -51,7 +51,7 @@ protected:
 	}
 
 	/**
-	 * @brief Uploads pixel data into a VulkanImage via staging buffer.
+	 * @brief Uploads pixel data into an Image via staging buffer.
 	 *
 	 * Creates a staging buffer, copies data via vkCmdCopyBufferToImage,
 	 * then transitions the image to TRANSFER_SRC_OPTIMAL for readback.
@@ -148,8 +148,8 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(64, 64);
 
-	// --- Create a VulkanImage with TRANSFER_SRC | TRANSFER_DST | SAMPLED ---
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	// --- Create an Image with TRANSFER_SRC | TRANSFER_DST | SAMPLED ---
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -203,8 +203,8 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 
 	const vk::Extent2D extent(32, 32);
 
-	// --- Create a VulkanImage with RGBA16F format ---
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR16G16B16A16Sfloat,
+	// --- Create an Image with RGBA16F format ---
+	Image image(*m_device, pd, extent, vk::Format::eR16G16B16A16Sfloat,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,
@@ -255,7 +255,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(16, 16);
 
-	VulkanImage image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
+	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
 	                      vk::ImageUsageFlagBits::eTransferSrc |
 	                      vk::ImageUsageFlagBits::eTransferDst,

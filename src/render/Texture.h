@@ -1,10 +1,13 @@
 #pragma once
 
-#include "VulkanImage.h"
+#include "Image.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace neurus {
 
@@ -24,7 +27,7 @@ struct SamplerConfig
 };
 
 /**
- * @brief RAII texture wrapping a VulkanImage and a matching vk::raii::Sampler.
+ * @brief RAII texture wrapping an Image and a matching vk::raii::Sampler.
  *
  * Supports loading from file (via STB), from raw pixel data, and creating
  * images suitable for framebuffer attachments. Mipmaps are generated
@@ -50,6 +53,13 @@ public:
 	Texture& operator=(const Texture&) = delete;
 	Texture(Texture&&) noexcept = default;
 	Texture& operator=(Texture&&) noexcept = default;
+
+	// -------------------------------------------------------------------
+	// Type alias
+	// -------------------------------------------------------------------
+
+	/** @brief Shared pointer to a Texture. */
+	using TextureRes = std::shared_ptr<Texture>;
 
 	// --- Factory methods ---
 
@@ -78,7 +88,7 @@ public:
 	 * @brief Creates a Texture from raw in-memory pixel data.
 	 *
 	 * Allocates a staging buffer, uploads the pixel data, copies it to a
-	 * device-local VulkanImage, generates mipmaps, and transitions the layout
+	 * device-local Image, generates mipmaps, and transitions the layout
 	 * to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
 	 *
 	 * @param device           Logical device.
@@ -127,11 +137,11 @@ public:
 
 	// --- Queries ---
 
-	/** @brief True if the Texture contains a valid VulkanImage. */
+	/** @brief True if the Texture contains a valid Image. */
 	bool IsValid() const { return m_image != nullptr; }
 
-	/** @brief Underlying VulkanImage (nullptr if invalid). */
-	VulkanImage* GetImage() const { return m_image.get(); }
+	/** @brief Underlying Image (nullptr if invalid). */
+	Image* GetImage() const { return m_image.get(); }
 
 	/** @brief Underlying VkSampler handle. Only valid if HasSampler() is true. */
 	const vk::raii::Sampler& GetSampler() const { return m_sampler; }
@@ -148,9 +158,74 @@ public:
 	/** @brief Number of mip levels. Returns 0 if invalid. */
 	uint32_t MipLevels() const { return m_image ? m_image->MipLevels() : 0; }
 
+	// -------------------------------------------------------------------
+	// Texture loading (cached)
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Loads (or retrieves from cache) a texture from a file path.
+	 * @return Shared pointer; may be invalid if loading fails.
+	 */
+	static TextureRes LoadTexture(const vk::raii::Device& device,
+	                              const vk::raii::PhysicalDevice& physicalDevice,
+	                              vk::Queue queue,
+	                              uint32_t queueFamilyIndex,
+	                              const char* path,
+	                              vk::Format format,
+	                              const SamplerConfig& config = {});
+
+	/** @brief Removes a texture from the cache by path. */
+	static void UnloadTexture(const std::string& path);
+
+	/** @brief Clears all cached textures. */
+	static void ClearCache();
+
+	/** @brief Returns the number of cached textures. */
+	static size_t CacheSize();
+
+	// -------------------------------------------------------------------
+	// Texture saving (GPU readback → PNG)
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Reads back a Texture from the GPU and writes it as PNG.
+	 *
+	 * Convenience wrapper that delegates to SaveImage() via texture.GetImage().
+	 * @return true on success.
+	 */
+	static bool SaveTexture(const vk::raii::Device& device,
+	                        const vk::raii::PhysicalDevice& physicalDevice,
+	                        vk::Queue queue,
+	                        uint32_t queueFamilyIndex,
+	                        Texture& texture,
+	                        const std::string& path,
+	                        bool remapSigned = false);
+
+	// -------------------------------------------------------------------
+	// Image saving (GPU readback → PNG)
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Reads back an Image from the GPU and writes it as PNG.
+	 *
+	 * Handles layout transitions, GPU readback, format conversion,
+	 * and PNG output.  The image is left in the layout it was found in.
+	 *
+	 * @param image       Image to capture (layout is temporarily transitioned).
+	 * @param remapSigned Passed to ConvertHalfToU8 for normal‑map data.
+	 * @return true on success.
+	 */
+	static bool SaveImage(Image& image,
+	                      const vk::raii::Device& device,
+	                      const vk::raii::PhysicalDevice& physicalDevice,
+	                      vk::Queue queue,
+	                      uint32_t queueFamilyIndex,
+	                      const std::string& path,
+	                      bool remapSigned = false);
+
 private:
 	/**
-	 * @brief Internal helper: creates the VulkanImage, uploads data, generates
+	 * @brief Internal helper: creates the Image, uploads data, generates
 	 *        mipmaps, creates the sampler, and transitions to SHADER_READ_ONLY.
 	 */
 	static Texture createFromPixelData(const vk::raii::Device& device,
@@ -170,8 +245,11 @@ private:
 	 */
 	static uint32_t computeMipLevels(uint32_t width, uint32_t height);
 
-	std::unique_ptr<VulkanImage> m_image;
+	std::unique_ptr<Image> m_image;
 	vk::raii::Sampler m_sampler = nullptr;
+
+	// --- Texture cache ---
+	static std::unordered_map<std::string, TextureRes> s_cache;
 };
 
 } // namespace neurus

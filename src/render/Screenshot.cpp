@@ -1,7 +1,8 @@
 #include "Screenshot.h"
-#include "VulkanImage.h"
+#include "Image.h"
 #include "AttachmentManager.h"
-#include "data/TextureData.h"
+#include "data/ImageData.h"
+#include "Texture.h"
 #include "Log.h"
 
 #include <chrono>
@@ -44,7 +45,7 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
                                    vk::Extent2D extent,
                                    const std::string& path)
 {
-	if (TextureData::PixelByteSize(format) == 0)
+	if (ImageData::PixelByteSize(format) == 0)
 	{
 		return false;
 	}
@@ -79,8 +80,8 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
 		queue.waitIdle();
 	}
 
-	// --- 2. Read back via VulkanImage static helper ---
-	std::vector<uint8_t> rawData = VulkanImage::ReadImageToBuffer(
+	// --- 2. Read back via Image static helper ---
+	std::vector<uint8_t> rawData = Image::ReadImageToBuffer(
 		device, physicalDevice, queue, queueFamilyIndex,
 		image, format, extent, vk::ImageLayout::eTransferSrcOptimal);
 
@@ -119,8 +120,8 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
 		queue.waitIdle();
 	}
 
-	// --- 4. Delegate PNG write to TextureData ---
-	return TextureData::SavePixelData(rawData.data(), format, extent, path);
+	// --- 4. Delegate PNG write to ImageData ---
+	return ImageData::SavePixelData(rawData.data(), format, extent, path);
 }
 
 // ===========================================================================
@@ -131,18 +132,18 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
                                     const vk::raii::PhysicalDevice& physicalDevice,
                                     vk::Queue queue,
                                     uint32_t queueFamilyIndex,
-                                    VulkanImage& vulkanImage,
+                                     Image& vulkanImage,
                                     const std::string& path,
                                     bool remapSigned)
 {
-	if (TextureData::PixelByteSize(vulkanImage.Format()) == 0)
+	if (ImageData::PixelByteSize(vulkanImage.Format()) == 0)
 	{
 		return false;
 	}
 
 	// All GPU operations (layout transitions, readback) and CPU operations
-	// (format conversion, PNG write) are handled by TextureData::SaveImage.
-	return TextureData::SaveImage(vulkanImage, device, physicalDevice,
+	// (format conversion, PNG write) are handled by Texture::SaveImage.
+	return Texture::SaveImage(vulkanImage, device, physicalDevice,
 	                               queue, queueFamilyIndex, path, remapSigned);
 }
 
@@ -176,7 +177,7 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 			continue;
 		}
 
-		VulkanImage& image = attachmentManager.GetAttachment(name);
+		Image& image = attachmentManager.GetAttachment(name);
 
 		// Skip attachments that have never been written (current layout UNDEFINED).
 		// Capturing them would leave them in TRANSFER_SRC_OPTIMAL, causing

@@ -145,7 +145,7 @@ TEST(MaterialTest, SetMatParam_Texture)
 	Material mat;
 
 	// Use a default-constructed shared_ptr (nullptr) - no GPU needed
-	TextureData::TextureRes tex = std::make_shared<Texture>();
+	Texture::TextureRes tex = std::make_shared<Texture>();
 
 	mat.SetMatParam(Material::MAT_NORMAL, tex);
 

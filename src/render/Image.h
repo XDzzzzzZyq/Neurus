@@ -1,5 +1,7 @@
 #pragma once
 
+#include "data/ImageData.h"
+
 #include <vulkan/vulkan_raii.hpp>
 
 #include <memory>
@@ -13,9 +15,12 @@ namespace neurus {
  * Owns image creation, memory allocation/binding, and view creation.
  * Provides helpers for layout transitions and mipmap generation via blit.
  *
+ * Holds an ImageData member that records the CPU-side pixel data used to
+ * create the image (analogous to Mesh::o_mesh holding MeshData).
+ *
  * Non-copyable, movable.
  */
-class VulkanImage
+class Image
 {
 public:
 	/** @brief Type of image being created (determines view type and create flags). */
@@ -38,23 +43,25 @@ public:
 	 * @param imageType     Image type (2D, Cube, Depth/Stencil).
 	 * @param debugName     Optional debug name for the image (set via VK_EXT_debug_utils in Debug builds).
 	 *                      The string is NOT retained; it is used immediately and may be a temporary.
+	 * @param imageData     Optional CPU-side pixel data (stored for reference, not uploaded).
 	 */
-	VulkanImage(const vk::raii::Device& device,
-	            const vk::raii::PhysicalDevice& physicalDevice,
-	            vk::Extent2D extent,
-	            vk::Format format,
-	            vk::ImageUsageFlags usage,
-	            uint32_t mipLevels = 1,
-	            ImageType imageType = ImageType::e2D,
-	            const char* debugName = nullptr);
+	Image(const vk::raii::Device& device,
+	      const vk::raii::PhysicalDevice& physicalDevice,
+	      vk::Extent2D extent,
+	      vk::Format format,
+	      vk::ImageUsageFlags usage,
+	      uint32_t mipLevels = 1,
+	      ImageType imageType = ImageType::e2D,
+	      const char* debugName = nullptr,
+	      const ImageData& imageData = {});
 
-	~VulkanImage() = default;
+	~Image() = default;
 
 	// --- Non-copyable, movable ---
-	VulkanImage(const VulkanImage&) = delete;
-	VulkanImage& operator=(const VulkanImage&) = delete;
-	VulkanImage(VulkanImage&&) noexcept = default;
-	VulkanImage& operator=(VulkanImage&&) noexcept = default;
+	Image(const Image&) = delete;
+	Image& operator=(const Image&) = delete;
+	Image(Image&&) noexcept = default;
+	Image& operator=(Image&&) noexcept = default;
 
 	// --- Layout transitions ---
 
@@ -115,7 +122,7 @@ public:
 	 *
 	 * Same behaviour as the member version but accepts an explicit image
 	 * handle, format, and extent.  Useful for swapchain screenshots where
-	 * no VulkanImage wrapper exists.
+	 * no Image wrapper exists.
 	 */
 	static std::vector<uint8_t> ReadImageToBuffer(const vk::raii::Device& device,
 	                                               const vk::raii::PhysicalDevice& physicalDevice,
@@ -151,6 +158,9 @@ public:
 
 	/** @brief Image type. */
 	ImageType Type() const { return m_imageType; }
+
+	/** @brief CPU-side pixel data used to create this image (may be default-constructed). */
+	const ImageData& GetImageData() const { return m_imageData; }
 
 	// --- Layout state ---
 
@@ -199,6 +209,9 @@ private:
 	uint32_t m_mipLevels = 1;
 	uint32_t m_arrayLayers = 1;
 	ImageType m_imageType = ImageType::e2D;
+
+	// --- CPU-side data (optional, stored for reference) ---
+	ImageData m_imageData;
 
 	// --- Tracked current layout (CPU-side for convenience) ---
 	vk::ImageLayout m_currentLayout = vk::ImageLayout::eUndefined;

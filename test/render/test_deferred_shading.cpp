@@ -411,7 +411,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 		// Temp path next to the reference image
 		const std::string tmpPath = refPath + ".tmp";
 
-		VulkanImage& attachment = m_attachmentManager->GetAttachment(name);
+		Image& attachment = m_attachmentManager->GetAttachment(name);
 		const bool captured = Screenshot::CaptureAttachment(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			attachment, tmpPath, isNormal);
