@@ -1,12 +1,9 @@
-// Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
+
+#include "TestVulkanFixture.h"
 
 #include "render/AttachmentManager.h"
 #include "render/VulkanImage.h"
-
-#include <vulkan/vulkan_raii.hpp>
 
 using namespace neurus;
 
@@ -16,90 +13,10 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class AttachmentManagerTest : public ::testing::Test
+class AttachmentManagerTest : public VulkanTestFixture
 {
 protected:
-	void SetUp() override
-	{
-		try
-		{
-			// --- Instance ---
-			vk::ApplicationInfo appInfo("NeurusTest_Attach", VK_MAKE_VERSION(0, 1, 0),
-			                            "NeurusTest_Attach", VK_MAKE_VERSION(0, 1, 0),
-			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
-			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
-
-			// --- Physical device ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// Pick discrete GPU if available, otherwise first
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				if (m_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_graphicsQueueFamily = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		// RAII handles cleanup in reverse declaration order
-	}
-
-	bool m_hasVulkan = false;
-
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_graphicsQueueFamily = 0;
+	// SetUp/TearDown inherited from VulkanTestFixture
 };
 
 // ---------------------------------------------------------------------------
@@ -108,13 +25,13 @@ protected:
 
 TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndExtent)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
 	const vk::Extent2D extent(1920, 1080);
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	// Depth format support check
 	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
@@ -176,13 +93,13 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 
 TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExtent)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
 	const vk::Extent2D extent(1920, 1080);
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	AttachmentManager manager(*m_device, pd);
 	manager.Create(extent);
@@ -218,12 +135,12 @@ TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExt
 
 TEST_F(AttachmentManagerTest, Resize_AllAttachmentsHaveNewExtent)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
 	if (!(depthFmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
@@ -261,12 +178,12 @@ TEST_F(AttachmentManagerTest, Resize_AllAttachmentsHaveNewExtent)
 
 TEST_F(AttachmentManagerTest, GetAllAttachments_ByEnumAndString)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
 	if (!(depthFmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
@@ -319,12 +236,12 @@ TEST_F(AttachmentManagerTest, Movable)
 
 TEST_F(AttachmentManagerTest, HasAttachment_TrueForCreatedAttachments)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
 	if (!(depthFmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))

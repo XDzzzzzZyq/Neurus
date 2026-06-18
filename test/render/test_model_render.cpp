@@ -16,9 +16,9 @@
  * @note Asset paths are relative to the test executable directory (build/debug/).
  */
 
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
+
+#include "TestVulkanFixture.h"
 
 // Render layer
 #include "render/AttachmentManager.h"
@@ -69,34 +69,6 @@ struct TestVertex
 };
 
 // ---------------------------------------------------------------------------
-// Asset paths (relative to build/debug/ where ctest runs)
-// ---------------------------------------------------------------------------
-
-/**
- * Helper: resolve an asset path relative to the project root.
- *
- * CTest runs from the test executable directory (build/debug/Debug/ for MSVC).
- * This tries multiple relative paths, falling back to workspace-root-relative.
- */
-static std::string ResolveAssetPath(const char* assetRelative)
-{
-	// Try: relative from build/debug/Debug/ (MSVC multi-config layout)
-	std::string path1 = std::string("../../../") + assetRelative;
-	{
-		std::ifstream f(path1);
-		if (f.good()) return path1;
-	}
-	// Try: relative from build/debug/ (single-config layout)
-	std::string path2 = std::string("../../") + assetRelative;
-	{
-		std::ifstream f(path2);
-		if (f.good()) return path2;
-	}
-	// Fallback: return the primary path and let the caller handle failure
-	return path1;
-}
-
-// ---------------------------------------------------------------------------
 // Test fixture
 // ---------------------------------------------------------------------------
 
@@ -106,164 +78,45 @@ static std::string ResolveAssetPath(const char* assetRelative)
  * Creates a headless Vulkan device, G-Buffer + HDR colour attachments,
  * GeometryPass, LightingPass, Camera, Light, and Scene.
  */
-class ModelRenderTest : public ::testing::Test
+class ModelRenderTest : public VulkanTestFixture
 {
 protected:
 	void SetUp() override
 	{
-		try
-		{
-			// --- Instance ---
-			vk::ApplicationInfo appInfo("NeurusTest_ModelRender",
-			                            VK_MAKE_VERSION(0, 3, 0),
-			                            "NeurusTest_ModelRender",
-			                            VK_MAKE_VERSION(0, 3, 0),
-			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
-			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
+		VulkanTestFixture::SetUp();
+		if (!m_hasVulkan) return;
 
-			// --- Physical device ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
+		auto& pd = PhysicalDevice();
 
-			// Pick discrete GPU if available
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				const auto props = m_physicalDevices[i].getProperties();
-				if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_graphicsQueueFamily = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Check push-constant size support ---
-			const auto& limits = pd.getProperties().limits;
-			if (limits.maxPushConstantsSize < sizeof(PushConstants))
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-			m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
-
-			// --- Command pool ---
-			vk::CommandPoolCreateInfo poolCI(
-				vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-				m_graphicsQueueFamily);
-			m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
-
-			// --- Command buffers ---
-			vk::CommandBufferAllocateInfo allocInfo(
-				*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
-			m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
-
-			// --- Attachment manager (G-Buffer + HDR color + depth) ---
-			m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
-			m_attachmentManager->Create({kRenderWidth, kRenderHeight});
-
-			// --- Render pass manager ---
-			m_renderPassManager = std::make_unique<RenderPassManager>();
-
-			// --- Geometry pass ---
-			m_geometryPass = std::make_unique<GeometryPass>(
-				*m_device, pd, m_queue, m_graphicsQueueFamily,
-				*m_attachmentManager,
-				*m_renderPassManager,
-				gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-				gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
-
-			// --- Lighting pass ---
-			m_lightingPass = std::make_unique<LightingPass>(
-				*m_device, pd,
-				*m_attachmentManager,
-				2u,                          // numSets = kMaxFramesInFlight
-				pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
-
-			m_hasVulkan = true;
-		}
-		catch (const std::exception& e)
-		{
-			std::cerr << "[ModelRenderTest::SetUp] Exception: " << e.what() << std::endl;
-			m_hasVulkan = false;
-		}
-		catch (...)
+		// --- Check push-constant size support ---
+		const auto& limits = pd.getProperties().limits;
+		if (limits.maxPushConstantsSize < sizeof(PushConstants))
 		{
 			m_hasVulkan = false;
+			return;
 		}
-	}
 
-	void TearDown() override
-	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-	}
+		// --- Attachment manager (G-Buffer + HDR color + depth) ---
+		m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
+		m_attachmentManager->Create({kRenderWidth, kRenderHeight});
 
-	// --- Helpers ---
+		// --- Render pass manager ---
+		m_renderPassManager = std::make_unique<RenderPassManager>();
 
-	/** Begin a one-shot command buffer. */
-	vk::raii::CommandBuffer& BeginCmd()
-	{
-		auto& cmd = m_commandBuffers[0];
-		cmd.begin(vk::CommandBufferBeginInfo(
-			vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-		return cmd;
-	}
+		// --- Geometry pass ---
+		m_geometryPass = std::make_unique<GeometryPass>(
+			*m_device, pd, m_queue, m_graphicsQueueFamily,
+			*m_attachmentManager,
+			*m_renderPassManager,
+			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
+			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
-	/** End, submit, and wait for a command buffer. */
-	void EndSubmitWait(vk::raii::CommandBuffer& cmd)
-	{
-		cmd.end();
-		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		m_queue.submit(submitInfo, nullptr);
-		m_device->waitIdle();
-	}
-
-	/**
-	 * @brief Creates a CameraUBOData from a neurus::Camera object.
-	 */
-	static CameraUBOData MakeCameraUBO(Camera& cam)
-	{
-		CameraUBOData ubo;
-		ubo.view = cam.GetViewMatrix();
-		ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
-		return ubo;
+		// --- Lighting pass ---
+		m_lightingPass = std::make_unique<LightingPass>(
+			*m_device, pd,
+			*m_attachmentManager,
+			2u,                          // numSets = kMaxFramesInFlight
+			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 	}
 
 	/**
@@ -312,6 +165,17 @@ protected:
 	}
 
 	/**
+	 * @brief Creates a CameraUBOData from a neurus::Camera object.
+	 */
+	static CameraUBOData MakeCameraUBO(Camera& cam)
+	{
+		CameraUBOData ubo;
+		ubo.view = cam.GetViewMatrix();
+		ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
+		return ubo;
+	}
+
+	/**
 	 * @brief Reads back HDR colour output into a float array.
 	 *
 	 * Assumes RGBA16F format (8 bytes per pixel). Converts half-floats to
@@ -319,7 +183,7 @@ protected:
 	 */
 	std::vector<float> ReadbackHdrOutput()
 	{
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
+		auto& pd = PhysicalDevice();
 		const vk::DeviceSize imageByteSize = kRenderWidth * kRenderHeight * 8; // RGBA16F
 
 		// Staging buffer: host-visible, TRANSFER_DST
@@ -412,18 +276,6 @@ protected:
 	// --- Constants ---
 	static constexpr uint32_t kRenderWidth  = 256;
 	static constexpr uint32_t kRenderHeight = 256;
-
-	// --- Vulkan state ---
-	bool m_hasVulkan = false;
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_graphicsQueueFamily = 0;
-	vk::Queue m_queue = nullptr;
-	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
-	vk::raii::CommandBuffers m_commandBuffers = nullptr;
 
 	// --- Render pass infrastructure ---
 	std::unique_ptr<AttachmentManager>  m_attachmentManager;

@@ -11,9 +11,9 @@
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
  */
 
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
+
+#include "TestVulkanFixture.h"
 
 #include "render/AttachmentManager.h"
 #include "render/GeometryPass.h"
@@ -53,65 +53,21 @@ struct TestVertex
  *
  * Creates a headless Vulkan device, G-Buffer attachments, and a
  * GeometryPass instance with embedded shaders.
+ *
+ * Uses VulkanTestFixture for standard Vulkan bootstrap (instance, device,
+ * queue, command pool/buffers) and adds GeometryPass-specific setup.
  */
-class GeometryPassTest : public ::testing::Test
+class GeometryPassTest : public VulkanTestFixture
 {
 protected:
 	void SetUp() override
 	{
+		VulkanTestFixture::SetUp();
+		if (!HasVulkan()) return;
+
 		try
 		{
-			// --- Instance ---
-			vk::ApplicationInfo appInfo("NeurusTest_GPass",
-			                            VK_MAKE_VERSION(0, 1, 0),
-			                            "NeurusTest_GPass",
-			                            VK_MAKE_VERSION(0, 1, 0),
-			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
-			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
-
-			// --- Physical device ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// Pick discrete GPU if available
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				const auto props = m_physicalDevices[i].getProperties();
-				if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_graphicsQueueFamily = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
+			auto& pd = PhysicalDevice();
 
 			// --- Check push-constant size support ---
 			const auto& limits = pd.getProperties().limits;
@@ -120,25 +76,6 @@ protected:
 				m_hasVulkan = false;
 				return;
 			}
-
-			// --- Device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-			m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
-
-			// --- Command pool ---
-			vk::CommandPoolCreateInfo poolCI(
-				vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-				m_graphicsQueueFamily);
-			m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
-
-			// --- Command buffers ---
-			vk::CommandBufferAllocateInfo allocInfo(
-				*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
-			m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
 
 			// --- Attachment manager (G-Buffer + depth) ---
 			m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
@@ -159,7 +96,6 @@ protected:
 		}
 		catch (const std::exception& e)
 		{
-			// Print the error for debugging
 			std::cerr << "[GeometryPassTest::SetUp] Exception: " << e.what() << std::endl;
 			m_hasVulkan = false;
 		}
@@ -175,28 +111,12 @@ protected:
 		{
 			m_device->waitIdle();
 		}
-		// RAII cleanup in reverse declaration order
+		m_geometryPass.reset();
+		m_attachmentManager.reset();
+		VulkanTestFixture::TearDown();
 	}
 
-	// --- Helpers ---
-
-	/** Begin a one-shot command buffer. */
-	vk::raii::CommandBuffer& BeginCmd()
-	{
-		auto& cmd = m_commandBuffers[0];
-		cmd.begin(vk::CommandBufferBeginInfo(
-			vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-		return cmd;
-	}
-
-	/** End, submit, and wait for a command buffer. */
-	void EndSubmitWait(vk::raii::CommandBuffer& cmd)
-	{
-		cmd.end();
-		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		m_queue.submit(submitInfo, nullptr);
-		m_device->waitIdle();
-	}
+	// --- Helpers (BeginCmd/EndSubmitWait inherited from VulkanTestFixture) ---
 
 	/**
 	 * @brief Creates a default camera looking at a triangle at the origin.
@@ -238,7 +158,6 @@ protected:
 	void TransitionGbufferAttachments()
 	{
 		auto& cmd = BeginCmd();
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
 
 		const std::array<AttachmentName, 4> colorAtts = {
 			AttachmentName::Position,
@@ -265,18 +184,6 @@ protected:
 	static constexpr uint32_t kRenderWidth  = 128;
 	static constexpr uint32_t kRenderHeight = 128;
 
-	// --- Vulkan state ---
-	bool m_hasVulkan = false;
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_graphicsQueueFamily = 0;
-	vk::Queue m_queue = nullptr;
-	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
-	vk::raii::CommandBuffers m_commandBuffers = nullptr;
-
 	// --- Render pass infrastructure ---
 	std::unique_ptr<AttachmentManager>  m_attachmentManager;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
@@ -295,7 +202,7 @@ protected:
 
 TEST_F(GeometryPassTest, Constructor_CreatesValidPipeline)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -311,12 +218,12 @@ TEST_F(GeometryPassTest, Constructor_CreatesValidPipeline)
 
 TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	// --- Transition attachments to renderable layouts ---
 	TransitionGbufferAttachments();
@@ -365,12 +272,12 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 
 TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	TransitionGbufferAttachments();
 
@@ -419,7 +326,7 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 
 TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}

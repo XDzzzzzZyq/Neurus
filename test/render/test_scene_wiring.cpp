@@ -11,9 +11,9 @@
  * @note Creates a hidden Win32 window for the presentation surface.
  */
 
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
+
+#include "TestVulkanFixture.h"
 
 #include "data/GPUResourceCache.h"
 #include "data/MeshData.h"
@@ -64,15 +64,19 @@ static const char* kTriangleObj =
  *
  * Creates a headless Vulkan device, a hidden Win32 window + surface,
  * GPUResourceCache, and the shader SPIR-V is embedded via generated headers.
+ *
+ * Uses VulkanTestFixture for member variables (m_instance, m_physicalDevices,
+ * m_device, m_queue, etc.) but overrides SetUp/TearDown entirely because
+ * this test needs a device with VK_KHR_swapchain enabled and a Win32 surface.
  */
-class SceneWiringTest : public ::testing::Test
+class SceneWiringTest : public VulkanTestFixture
 {
 protected:
 	void SetUp() override
 	{
 		try
 		{
-			// --- Instance ---
+			// --- Instance (via base class pattern) ---
 			vk::ApplicationInfo appInfo("NeurusTest_SceneWiring",
 			                            VK_MAKE_VERSION(0, 4, 5),
 			                            "NeurusTest_SceneWiring",
@@ -80,7 +84,10 @@ protected:
 			                            VK_API_VERSION_1_4);
 			std::vector<const char*> instanceExts = {
 				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
+				VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+#ifdef _DEBUG
+				VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
 			};
 			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
 			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
@@ -108,17 +115,16 @@ protected:
 
 			// --- Queue family ---
 			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
+			m_graphicsQueueFamily = UINT32_MAX;
 			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
 			{
 				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
 				{
-					m_queueFamilyIndex = i;
-					foundGraphics = true;
+					m_graphicsQueueFamily = i;
 					break;
 				}
 			}
-			if (!foundGraphics)
+			if (m_graphicsQueueFamily == UINT32_MAX)
 			{
 				m_hasVulkan = false;
 				return;
@@ -139,11 +145,11 @@ protected:
 			}
 
 			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
+			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
 			vk::PhysicalDeviceFeatures features;
 			vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features);
 			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
+			m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
 
 			// --- Hidden window + surface ---
 			HINSTANCE hInst = GetModuleHandle(nullptr);
@@ -170,7 +176,7 @@ protected:
 
 			// --- GPUResourceCache ---
 			m_resourceCache = std::make_unique<GPUResourceCache>(
-				*m_device, pd, m_queue, m_queueFamilyIndex);
+				*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 			m_hasVulkan = true;
 		}
@@ -191,9 +197,7 @@ protected:
 			DestroyWindow(m_hwnd);
 			m_hwnd = nullptr;
 		}
-		m_device.reset();
-		m_physicalDevices.clear();
-		m_instance.reset();
+		VulkanTestFixture::TearDown();
 	}
 
 	/**
@@ -205,7 +209,7 @@ protected:
 			*m_device,
 			m_physicalDevices[m_selectedPdIndex],
 			m_queue,
-			m_queueFamilyIndex,
+			m_graphicsQueueFamily,
 			*m_surface,
 			width, height,
 			*m_resourceCache,
@@ -242,16 +246,6 @@ protected:
 
 	static constexpr uint32_t kRenderWidth = 800;
 	static constexpr uint32_t kRenderHeight = 600;
-
-	bool m_hasVulkan = false;
-
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_queueFamilyIndex = 0;
-	vk::Queue m_queue = nullptr;
 
 	HWND m_hwnd = nullptr;
 	std::unique_ptr<vk::raii::SurfaceKHR> m_surface;

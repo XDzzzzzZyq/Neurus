@@ -13,17 +13,14 @@
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
  */
 
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
 
+#include "TestVulkanFixture.h"
 #include "data/GPUResourceCache.h"
 #include "data/MeshData.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 #include "scene/Light.h"
-
-#include <vulkan/vulkan_raii.hpp>
 
 #include <memory>
 #include <string>
@@ -55,88 +52,22 @@ static const char* kTriangleObj =
  * Creates a headless Vulkan device and queue on SetUp, then constructs
  * GPUResourceCache with borrowed device handles. No surface or swapchain needed.
  */
-class GPUResourceCacheTest : public ::testing::Test
+class GPUResourceCacheTest : public VulkanTestFixture
 {
 protected:
 	void SetUp() override
 	{
-		try
-		{
-			// --- Instance ---
-			vk::ApplicationInfo appInfo("NeurusTest_ResCache",
-			                            VK_MAKE_VERSION(0, 4, 5),
-			                            "NeurusTest_ResCache",
-			                            VK_MAKE_VERSION(0, 4, 5),
-			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
-			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
+		VulkanTestFixture::SetUp();
+		if (!m_hasVulkan) return;
 
-			// --- Physical device ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// Pick discrete GPU if available
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				const auto props = m_physicalDevices[i].getProperties();
-				if (props.deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
+		// GPUResourceCache is created lazily by individual tests
 	}
 
 	void TearDown() override
 	{
 		// GPUResourceCache must be destroyed before device
 		m_cache.reset();
-		m_device.reset();
-		m_physicalDevices.clear();
-		m_instance.reset();
+		VulkanTestFixture::TearDown();
 	}
 
 	/**
@@ -148,7 +79,7 @@ protected:
 			*m_device,
 			m_physicalDevices[m_selectedPdIndex],
 			m_queue,
-			m_queueFamilyIndex);
+			m_graphicsQueueFamily);
 	}
 
 	/**
@@ -176,17 +107,7 @@ protected:
 		return scene;
 	}
 
-	bool m_hasVulkan = false;
-
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_queueFamilyIndex = 0;
-	vk::Queue m_queue = nullptr;
-
 	std::unique_ptr<GPUResourceCache> m_cache;
-	vk::raii::Context m_context;
 };
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 # test/CMakeLists.txt - Unit Tests
 
 add_executable(neurus_test
+	TestVulkanFixture.cpp
+	TestVulkanFixture.h
 	test_main.cpp
 	render/test_buffers.cpp
 	render/test_vulkan_buffer.cpp
@@ -60,6 +62,7 @@ target_link_libraries(neurus_test PRIVATE
 
 target_include_directories(neurus_test PRIVATE
 	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/test
 	${CMAKE_BINARY_DIR}/generated/shaders
 )
 

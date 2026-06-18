@@ -1,11 +1,8 @@
-// Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
 
+#include "TestVulkanFixture.h"
 #include "render/Screenshot.h"
 #include "render/VulkanImage.h"
-#include "render/VulkanContext.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -26,77 +23,12 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class ScreenshotTest : public ::testing::Test
+class ScreenshotTest : public VulkanTestFixture
 {
 protected:
 	void SetUp() override
 	{
-		try
-		{
-			// --- Create instance ---
-			m_instance = std::make_unique<vk::raii::Instance>(VulkanContext::CreateInstance());
-
-			// --- Enumerate physical devices ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// Pick discrete GPU if available, otherwise first
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				if (m_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
-
-			// --- Command pool ---
-			vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			                                 m_queueFamilyIndex);
-			m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
-
-			// --- Command buffers ---
-			vk::CommandBufferAllocateInfo allocInfo(*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
-			m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
+		VulkanTestFixture::SetUp();
 	}
 
 	void TearDown() override
@@ -106,32 +38,16 @@ protected:
 		{
 			std::filesystem::remove(m_testOutputPath);
 		}
-	}
-
-	/** Helper: begin one-shot command buffer. */
-	vk::raii::CommandBuffer& beginCmd()
-	{
-		auto& cmd = m_commandBuffers[0];
-		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-		return cmd;
-	}
-
-	/** Helper: end and submit one-shot command buffer, then wait. */
-	void endCmd(vk::raii::CommandBuffer& cmd)
-	{
-		cmd.end();
-		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		m_queue.submit(submitInfo, nullptr);
-		m_queue.waitIdle();
+		VulkanTestFixture::TearDown();
 	}
 
 	/** Shortcut: record commands inside a one-shot buffer. */
 	template <typename F>
-	void oneShotSubmit(F&& recordFn)
+	void OneShotSubmit(F&& recordFn)
 	{
-		auto& cmd = beginCmd();
+		auto& cmd = BeginCmd();
 		recordFn(cmd);
-		endCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	/**
@@ -161,7 +77,7 @@ protected:
 		std::memcpy(mapped, data, dataSize);
 		stagingMemory.unmapMemory();
 
-		oneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
+		OneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
 			// Transition image to TRANSFER_DST
 			vk::ImageMemoryBarrier barrier1(
 				vk::AccessFlagBits::eNone,
@@ -215,18 +131,6 @@ protected:
 		throw std::runtime_error("No suitable memory type found");
 	}
 
-	bool m_hasVulkan = false;
-	uint32_t m_selectedPdIndex = 0;
-	uint32_t m_queueFamilyIndex = 0;
-	vk::Queue m_queue = nullptr;
-
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	std::unique_ptr<vk::raii::Device> m_device;
-	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
-	vk::raii::CommandBuffers m_commandBuffers = nullptr;
-
 	std::string m_testOutputPath;
 };
 
@@ -267,7 +171,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 	// --- Capture to PNG ---
 	m_testOutputPath = "screenshots/test_rgba8.png";
 	bool result = Screenshot::CaptureAttachment(*m_device, pd,
-	                                             m_queue, m_queueFamilyIndex,
+	                                             m_queue, m_graphicsQueueFamily,
 	                                             image, m_testOutputPath);
 	EXPECT_TRUE(result);
 
@@ -327,7 +231,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 	// --- Capture to PNG ---
 	m_testOutputPath = "screenshots/test_rgba16f.png";
 	bool result = Screenshot::CaptureAttachment(*m_device, pd,
-	                                             m_queue, m_queueFamilyIndex,
+	                                             m_queue, m_graphicsQueueFamily,
 	                                             image, m_testOutputPath);
 	EXPECT_TRUE(result);
 
@@ -373,7 +277,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 
 	m_testOutputPath = nestedPath;
 	bool result = Screenshot::CaptureAttachment(*m_device, pd,
-	                                             m_queue, m_queueFamilyIndex,
+	                                             m_queue, m_graphicsQueueFamily,
 	                                             image, nestedPath);
 	EXPECT_TRUE(result);
 	EXPECT_TRUE(std::filesystem::exists(nestedPath));

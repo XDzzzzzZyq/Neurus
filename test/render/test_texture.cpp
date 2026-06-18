@@ -1,13 +1,10 @@
-// Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
+
+#include "TestVulkanFixture.h"
+#include "render/Texture.h"
 
 #include <array>
 #include <cstring>
-
-#include "render/Texture.h"
-#include "render/VulkanContext.h"
 
 using namespace neurus;
 
@@ -20,77 +17,9 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class TextureTest : public ::testing::Test
+class TextureTest : public VulkanTestFixture
 {
 protected:
-	void SetUp() override
-	{
-		try
-		{
-			// --- Create instance ---
-			m_instance = std::make_unique<vk::raii::Instance>(VulkanContext::CreateInstance());
-
-			// --- Enumerate physical devices ---
-			m_physicalDevices = std::make_unique<vk::raii::PhysicalDevices>(*m_instance);
-			if (m_physicalDevices->empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Find a queue family with graphics bit (no surface needed) ---
-			auto qfProps = (*m_physicalDevices)[0].getQueueFamilyProperties();
-			m_queueFamilyIndex = UINT32_MAX;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					break;
-				}
-			}
-
-			if (m_queueFamilyIndex == UINT32_MAX)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Create logical device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
-			vk::DeviceCreateInfo devCI({}, qCI);
-
-			m_device = std::make_unique<vk::raii::Device>(
-				(*m_physicalDevices)[0], devCI);
-
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-		// vk::raii handles cleanup in reverse order
-		m_device.reset();
-		m_physicalDevices.reset();
-		m_instance.reset();
-	}
-
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	std::unique_ptr<vk::raii::PhysicalDevices> m_physicalDevices;
-	std::unique_ptr<vk::raii::Device> m_device;
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
-	bool m_hasVulkan = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -121,9 +50,9 @@ TEST_F(TextureTest, FromData_4x4_RGBA8_Valid)
 	ASSERT_NO_THROW({
 		texture = Texture::FromData(
 			*m_device,
-			(*m_physicalDevices)[0],
+			PhysicalDevice(),
 			m_queue,
-			m_queueFamilyIndex,
+			m_graphicsQueueFamily,
 			kWidth,
 			kHeight,
 			pixels.data(),
@@ -164,9 +93,9 @@ TEST_F(TextureTest, FromData_2x2_HDR_Valid)
 	ASSERT_NO_THROW({
 		texture = Texture::FromData(
 			*m_device,
-			(*m_physicalDevices)[0],
+			PhysicalDevice(),
 			m_queue,
-			m_queueFamilyIndex,
+			m_graphicsQueueFamily,
 			kWidth,
 			kHeight,
 			pixels.data(),
@@ -196,7 +125,7 @@ TEST_F(TextureTest, ForAttachment_64x64_Color)
 	ASSERT_NO_THROW({
 		texture = Texture::ForAttachment(
 			*m_device,
-			(*m_physicalDevices)[0],
+			PhysicalDevice(),
 			vk::Extent2D{kSize, kSize},
 			vk::Format::eR8G8B8A8Unorm,
 			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled);
@@ -236,9 +165,9 @@ TEST_F(TextureTest, FromData_CustomSampler)
 	ASSERT_NO_THROW({
 		texture = Texture::FromData(
 			*m_device,
-			(*m_physicalDevices)[0],
+			PhysicalDevice(),
 			m_queue,
-			m_queueFamilyIndex,
+			m_graphicsQueueFamily,
 			kSize,
 			kSize,
 			pixels.data(),
