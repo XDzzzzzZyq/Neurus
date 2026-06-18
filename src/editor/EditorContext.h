@@ -1,54 +1,16 @@
 #pragma once
 
-#include <QObject>
-
-namespace neurus {
-
-class Scene;
-
 /**
- * @brief Container for editor and scene state.
+ * @file EditorContext.h
+ * @brief Backward-compatibility header — includes the full Context system.
  *
- * Provides immutable scene data to the Renderer layer and mutable
- * editor state (selections, active tool, etc.) to the UI layer.
+ * EditorContext was originally a standalone QObject with scene/selection state.
+ * It has been refactored into a three-part Context system:
+ *   - SceneContext: active scene pointer + const accessors
+ *   - EditorContext: QObject with signals, SelectionManager, dirty tracking
+ *   - RenderContext: non-owning RenderConfigs* (stub)
  *
- * For the Triangle MVP, this is a stub - no scene graph exists yet.
+ * All three are aggregated in the composite Context class.
  */
-class EditorContext : public QObject
-{
-	Q_OBJECT
 
-public:
-	explicit EditorContext(QObject* parent = nullptr);
-	~EditorContext() override = default;
-
-	// Prevent copies
-	EditorContext(const EditorContext&) = delete;
-	EditorContext& operator=(const EditorContext&) = delete;
-
-	// --- Scene state (future) ---
-	// const Scene& activeScene() const;
-
-	/** @brief Stores a pointer to the active scene. */
-	void SetScene(Scene* scene);
-
-	/** @brief Notifies that scene modification status changed.
-	 *  @param status Bitfield of SceneModifStatus flags indicating what changed.
-	 *  @note Emits sceneStatusChanged signal on EventBus. */
-	void NotifySceneChanged(int status);
-
-	// --- Editor state (future) ---
-	// SelectionManager& selection();
-
-signals:
-	/** @brief Emitted when the scene state changes. UI should refresh. */
-	void sceneChanged();
-
-	/** @brief Emitted when the editor selection changes. */
-	void selectionChanged();
-
-private:
-	Scene* m_scene = nullptr;
-};
-
-} // namespace neurus
+#include "editor/Context.h"

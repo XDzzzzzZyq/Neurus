@@ -251,6 +251,7 @@ CODE STYLE GUIDELINES
 - Prefer Git submodule.
 - For the renaming and moving, use `git mv` to track the history.
 - Complete and Double check all aspects (tests, coding style, document) of the current task before commit.
+- Only master agent can commit and merge. If the tasks of subagents may have code overlaps, then use Branches and Git Worktree for parallelism and isolation. Don't forget to remove the branch and worktree after the task completed.
  
 --------------------------------------------------------------------------------
 FILE LAYOUT

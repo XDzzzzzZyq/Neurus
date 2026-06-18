@@ -1,23 +1,10 @@
-#include "EditorContext.h"
-#include "events/UIEvents.h"
-#include "events/EventBus.h"
-#include "events/EditorEvents.h"
+/**
+ * @file EditorContext.cpp
+ * @brief Backward-compatibility stub — implementations moved to Context.cpp.
+ *
+ * All EditorContext method implementations now live in Context.cpp as part
+ * of the Context system refactoring. This file exists only to keep the build
+ * system happy (neurus_editor target still lists EditorContext.cpp).
+ */
 
-namespace neurus {
-
-EditorContext::EditorContext(QObject* parent)
-	: QObject(parent)
-{
-}
-
-void EditorContext::SetScene(Scene* scene)
-{
-	m_scene = scene;
-}
-
-void EditorContext::NotifySceneChanged(int status)
-{
-	EventBus().enqueue(SceneStatusChanged{status});
-}
-
-} // namespace neurus
+#include "editor/EditorContext.h"

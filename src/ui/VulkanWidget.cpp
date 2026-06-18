@@ -1,11 +1,14 @@
 #include "VulkanWidget.h"
 
 #include "core/Log.h"
+#include "editor/Input.h"
 #include "editor/events/UIEvents.h"
 
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPaintEvent>
 #include <QResizeEvent>
+#include <QWheelEvent>
 
 namespace neurus {
 
@@ -22,6 +25,9 @@ VulkanWidget::VulkanWidget(QWidget* parent)
 
 	// Enable keyboard focus for input handling
 	setFocusPolicy(Qt::StrongFocus);
+
+	// Enable mouse tracking so mouseMoveEvent fires even without a button held
+	setMouseTracking(true);
 }
 
 VulkanWidget::~VulkanWidget() = default;
@@ -44,6 +50,9 @@ void VulkanWidget::resizeEvent(QResizeEvent* event)
 
 void VulkanWidget::keyPressEvent(QKeyEvent* event)
 {
+	// Forward all key presses to the Input system for per-frame querying
+	Input::RecordKeyPress(event->key());
+
 	if (event->key() == Qt::Key_F12)
 	{
 		if (event->modifiers() == Qt::NoModifier)
@@ -64,6 +73,54 @@ void VulkanWidget::keyPressEvent(QKeyEvent* event)
 
 	// Pass all other keys to the base class.
 	QWidget::keyPressEvent(event);
+}
+
+void VulkanWidget::keyReleaseEvent(QKeyEvent* event)
+{
+	Input::RecordKeyRelease(event->key());
+	QWidget::keyReleaseEvent(event);
+}
+
+void VulkanWidget::mouseMoveEvent(QMouseEvent* event)
+{
+	const QPointF pos = event->position();
+	Input::RecordMouseMove(static_cast<float>(pos.x()), static_cast<float>(pos.y()));
+	QWidget::mouseMoveEvent(event);
+}
+
+void VulkanWidget::mousePressEvent(QMouseEvent* event)
+{
+	const auto button = event->button();
+	if (button == Qt::LeftButton)
+		Input::RecordMousePress(Input::MouseButton::Left);
+	else if (button == Qt::RightButton)
+		Input::RecordMousePress(Input::MouseButton::Right);
+	else if (button == Qt::MiddleButton)
+		Input::RecordMousePress(Input::MouseButton::Middle);
+
+	QWidget::mousePressEvent(event);
+}
+
+void VulkanWidget::mouseReleaseEvent(QMouseEvent* event)
+{
+	const auto button = event->button();
+	if (button == Qt::LeftButton)
+		Input::RecordMouseRelease(Input::MouseButton::Left);
+	else if (button == Qt::RightButton)
+		Input::RecordMouseRelease(Input::MouseButton::Right);
+	else if (button == Qt::MiddleButton)
+		Input::RecordMouseRelease(Input::MouseButton::Middle);
+
+	QWidget::mouseReleaseEvent(event);
+}
+
+void VulkanWidget::wheelEvent(QWheelEvent* event)
+{
+	// angleDelta().y() is typically ±120 per notch → divide by 120 for
+	// notches, then by 8 for the common "lines per notch" factor ≈ ±1.
+	const float notches = event->angleDelta().y() / 120.0f;
+	Input::RecordScroll(notches);
+	QWidget::wheelEvent(event);
 }
 
 } // namespace neurus

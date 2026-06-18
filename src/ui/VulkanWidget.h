@@ -3,6 +3,8 @@
 #include <QWidget>
 
 class QKeyEvent;
+class QMouseEvent;
+class QWheelEvent;
 
 namespace neurus {
 
@@ -77,14 +79,60 @@ protected:
 	void resizeEvent(QResizeEvent* event) override;
 
 	/**
-	 * @brief Handles keyboard shortcuts for screenshot capture.
+	 * @brief Handles keyboard input.
 	 * @param event The key event.
 	 *
-	 * F12       → Emits UIEvents::screenshotRequested() via event system.
-	 * Ctrl+F12  → Emits UIEvents::screenshotAllRequested() via event system.
-	 * All other keys are passed to the base class.
+	 * All key presses are forwarded to Input::RecordKeyPress() for the
+	 * Editor input system. F12/Ctrl+F12 additionally trigger screenshot
+	 * actions via UIEvents.
 	 */
 	void keyPressEvent(QKeyEvent* event) override;
+
+	/**
+	 * @brief Handles key release events.
+	 * @param event The key event.
+	 *
+	 * Forwards to Input::RecordKeyRelease() so the Input system can
+	 * detect key releases and compute "clicked" / "released" transitions.
+	 */
+	void keyReleaseEvent(QKeyEvent* event) override;
+
+	/**
+	 * @brief Handles mouse movement.
+	 * @param event The mouse event.
+	 *
+	 * Forwards cursor position to Input::RecordMouseMove(). Mouse
+	 * tracking is enabled so movement is captured even without a
+	 * button held.
+	 */
+	void mouseMoveEvent(QMouseEvent* event) override;
+
+	/**
+	 * @brief Handles mouse button presses.
+	 * @param event The mouse event.
+	 *
+	 * Maps Qt::MouseButton → Input::MouseButton and forwards to
+	 * Input::RecordMousePress().
+	 */
+	void mousePressEvent(QMouseEvent* event) override;
+
+	/**
+	 * @brief Handles mouse button releases.
+	 * @param event The mouse event.
+	 *
+	 * Maps Qt::MouseButton → Input::MouseButton and forwards to
+	 * Input::RecordMouseRelease().
+	 */
+	void mouseReleaseEvent(QMouseEvent* event) override;
+
+	/**
+	 * @brief Handles mouse wheel scrolling.
+	 * @param event The wheel event.
+	 *
+	 * Converts angleDelta to notches (~±1 per detent) and forwards to
+	 * Input::RecordScroll().
+	 */
+	void wheelEvent(QWheelEvent* event) override;
 };
 
 } // namespace neurus

@@ -28,11 +28,15 @@ add_executable(neurus_test
 	render/test_screenshot.cpp
 	render/test_scene_wiring.cpp
 	data/test_gpu_resource_cache.cpp
+	editor/test_camera_controller.cpp
+	editor/test_input.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_expanded.cpp
 	editor/test_event_bus_typed.cpp
 	editor/test_editor_context.cpp
 	editor/test_scene_status.cpp
+	editor/test_context.cpp
+	editor/test_selection.cpp
 	scene/test_camera.cpp
 	scene/test_mesh.cpp
 	scene/test_uid.cpp

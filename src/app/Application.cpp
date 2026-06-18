@@ -36,7 +36,8 @@
 #include <cstring>
 
 #include "core/Log.h"
-#include "editor/EditorContext.h"
+#include "editor/Context.h"
+#include "editor/Input.h"
 #include "editor/events/UIEvents.h"
 #include "editor/events/EventBus.h"
 #include "ui/NeurusMainWindow.h"
@@ -236,6 +237,7 @@ int Application::Run(int argc, char* argv[])
 	                 [this]() {
 	                     if (m_renderer && m_project)
 	                     {
+	                         Input::UpdateState();
 	                         try { m_renderer->DrawFrame(m_project->GetScene()); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
@@ -293,6 +295,11 @@ int Application::Run(int argc, char* argv[])
 					}
 					m_resourceCache->UploadLights(projectScene);
 				}
+
+				if (m_context)
+				{
+					m_context->editor.SetScene(&m_project->GetScene());
+				}
 			}
 			catch (const std::exception& e) {
 				NEURUS_ERR("Failed to create new project: " << e.what());
@@ -332,6 +339,11 @@ int Application::Run(int argc, char* argv[])
 					}
 					m_resourceCache->UploadLights(projectScene);
 				}
+
+				if (m_context)
+				{
+					m_context->editor.SetScene(&m_project->GetScene());
+				}
 			}
 			catch (const std::exception& e) {
 				NEURUS_ERR("Failed to open project: " << e.what());
@@ -358,15 +370,18 @@ int Application::Run(int argc, char* argv[])
 			}
 		});
 
-	// --- Editor Context (cross-layer event communication) ---
-	// EditorContext owns editor state and routes scene/selection events via EventBus.
-	// EventBus().Process() must be called each frame to dispatch queued events.
-	m_editorContext = std::make_unique<neurus::EditorContext>();
+	// --- Context (cross-layer state aggregation + event communication) ---
+	// Context owns SceneContext (scene pointer), EditorContext (selections, signals, dirty
+	// tracking), and RenderContext (render configs stub). It subscribes to EventBus events
+	// to keep sub-contexts in sync with scene modifications.
+	m_context = std::make_unique<neurus::Context>(neurus::EventBus());
+	m_context->editor.SetScene(&scene);
 
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
 	QObject::connect(&renderTimer, &QTimer::timeout, [this]() {
+		Input::UpdateState();
 		if (m_renderer && m_project)
 		{
 			try { m_renderer->DrawFrame(m_project->GetScene()); }
