@@ -43,9 +43,12 @@ add_executable(neurus_test
 	scene/test_scene_integration.cpp
 	scene/test_scene_const_access.cpp
 	scene/test_debug.cpp
+	project/test_project_roundtrip.cpp
+	project/test_default_project.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE
+	neurus_project
 	neurus_scene
 	neurus_render
 	neurus_editor
@@ -64,6 +67,10 @@ target_include_directories(neurus_test PRIVATE
 	${CMAKE_SOURCE_DIR}/src
 	${CMAKE_SOURCE_DIR}/test
 	${CMAKE_BINARY_DIR}/generated/shaders
+)
+
+target_compile_definitions(neurus_test PRIVATE
+	TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 
 # Enable Qt MOC for test files containing QObject subclasses
