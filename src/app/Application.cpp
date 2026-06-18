@@ -334,6 +334,61 @@ int Application::Run(int argc, char* argv[])
 			}
 		});
 
+	// --- Mesh import signal wiring ---
+
+	// Handle mesh import (Edit → Add → Mesh...)
+	QObject::connect(&uiEvents, &neurus::UIEvents::meshImportRequested,
+		[this](const QString& path) {
+			try {
+				auto mesh = std::make_shared<neurus::Mesh>(path.toStdString());
+				mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
+				                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
+				m_project->GetScene().UseMesh(mesh);
+				m_project->MarkDirty();
+				NEURUS_LOG("[Application] Imported mesh: " << path.toStdString());
+			}
+			catch (const std::exception& e) {
+				NEURUS_ERR("Failed to import mesh: " << e.what());
+			}
+		});
+
+	// Handle camera add (Edit → Add → Camera)
+	QObject::connect(&uiEvents, &neurus::UIEvents::cameraAddRequested,
+		[this]() {
+			try {
+				auto camera = std::make_shared<neurus::Camera>();
+				camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+				camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+				m_project->GetScene().UseCamera(camera);
+				m_project->MarkDirty();
+				NEURUS_LOG("[Application] Added camera at (0, 2, 5)");
+			}
+			catch (const std::exception& e) {
+				NEURUS_ERR("Failed to add camera: " << e.what());
+			}
+		});
+
+	// Handle light add (Edit → Add → Light)
+	QObject::connect(&uiEvents, &neurus::UIEvents::lightAddRequested,
+		[this]() {
+			try {
+				auto light = std::make_shared<neurus::Light>(
+					neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
+				light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
+				light->SetRadius(0.05f);
+				m_project->GetScene().UseLight(light);
+				if (m_renderer)
+				{
+					m_renderer->UploadLights(m_project->GetScene());
+				}
+				m_project->MarkDirty();
+				NEURUS_LOG("[Application] Added point light at (3, 3, 3)");
+			}
+			catch (const std::exception& e) {
+				NEURUS_ERR("Failed to add light: " << e.what());
+			}
+		});
+
 	// --- Context (cross-layer state aggregation + event communication) ---
 	// Context owns SceneContext (scene pointer), EditorContext (selections, signals, dirty
 	// tracking), and RenderContext (render configs stub). It subscribes to EventBus events

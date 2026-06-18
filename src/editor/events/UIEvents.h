@@ -95,6 +95,18 @@ signals:
 	 *  @param path Absolute path for the .neurus.json output file. */
 	void projectSaveAsRequested(const QString& path);
 
+	// --- Mesh import signals ---
+
+	/** @brief Emitted when a mesh file is selected for import (Edit → Add → Mesh...).
+	 *  @param path Absolute path to the OBJ file. */
+	void meshImportRequested(const QString& path);
+
+	/** @brief Emitted when a new camera should be added to the scene (Edit → Add → Camera). */
+	void cameraAddRequested();
+
+	/** @brief Emitted when a new light should be added to the scene (Edit → Add → Light). */
+	void lightAddRequested();
+
 public:
 	/**
 	 * @brief Convenience method to emit screenshotRequested from any layer.
@@ -113,6 +125,13 @@ public:
 	void requestProjectOpen(const QString& path) { emit projectOpenRequested(path); }
 	void requestProjectSave() { emit projectSaveRequested(); }
 	void requestProjectSaveAs(const QString& path) { emit projectSaveAsRequested(path); }
+
+	// --- Mesh import convenience method ---
+
+	void requestMeshImport(const QString& path) { emit meshImportRequested(path); }
+
+	void requestCameraAdd() { emit cameraAddRequested(); }
+	void requestLightAdd() { emit lightAddRequested(); }
 
 private:
 	UIEvents() = default;

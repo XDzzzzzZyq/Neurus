@@ -91,6 +91,29 @@ void NeurusMainWindow::CreateMenus()
 	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
 	connect(resetLayoutAction, &QAction::triggered, this, &NeurusMainWindow::RestoreDefaultLayout);
 
+	auto* editMenu = menuBar()->addMenu("&Edit");
+
+	auto* addMenu = editMenu->addMenu("&Add");
+
+	auto* meshAction = addMenu->addAction("&Mesh...");
+	meshAction->setShortcut(QKeySequence("Ctrl+Shift+M"));
+	connect(meshAction, &QAction::triggered, []() {
+		QString path = QFileDialog::getOpenFileName(
+			nullptr, "Import Mesh", QString(), "OBJ Files (*.obj)");
+		if (!path.isEmpty())
+			neurus::UIEvents::instance().requestMeshImport(path);
+	});
+
+	auto* cameraAction = addMenu->addAction("&Camera");
+	connect(cameraAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestCameraAdd();
+	});
+
+	auto* lightAction = addMenu->addAction("&Light");
+	connect(lightAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestLightAdd();
+	});
+
 	auto* toolsMenu = menuBar()->addMenu("&Tools");
 
 	auto* screenshotAction = toolsMenu->addAction("Take &Screenshot");
