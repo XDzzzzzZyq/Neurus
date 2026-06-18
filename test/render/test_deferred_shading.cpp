@@ -1,13 +1,13 @@
 /**
  * @file test_deferred_shading.cpp
- * @brief Golden-image regression test for the deferred shading pipeline (G-Buffer + HDR passes).
+ * @brief Reference-image regression test for the deferred shading pipeline (G-Buffer + HDR passes).
  *
  * Renders a known scene (sphere OBJ + point light) at 256×256 through the
  * full deferred pipeline and captures Position, Normal, Albedo, MetallicRoughness
  * and HDRColor attachments as PNGs.  Each PNG is compared pixel‑wise against
- * a ground‑truth ("golden") image stored in test/render/golden/.
+ * a ground‑truth reference image stored in test/render/reference/.
  *
- * On first run the golden images DO NOT exist — the test generates them
+ * On first run the reference images DO NOT exist — the test generates them
  * automatically and reports SKIPPED.  Subsequent runs compare and FAIL on
  * any pixel difference exceeding the allowed tolerance.
  *
@@ -16,7 +16,7 @@
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 
 // --- Render layer ---
 #include "render/AttachmentManager.h"
@@ -70,15 +70,15 @@ struct TestVertex
 };
 
 // ---------------------------------------------------------------------------
-// Golden image directory.
+// Reference image directory.
 // ctest runs from build/debug/test/ → walk 3 levels to project root
 // ---------------------------------------------------------------------------
-static const char* kGoldenDir = "../../../test/render/golden/";
+static const char* kReferenceDir = "../../../test/render/reference/";
 
 // ---------------------------------------------------------------------------
-// Attachment list for golden comparison
+// Attachment list for reference comparison
 // ---------------------------------------------------------------------------
-static constexpr AttachmentName kGoldenAttachments[] = {
+static constexpr AttachmentName kReferenceAttachments[] = {
 	AttachmentName::Position,
 	AttachmentName::Normal,
 	AttachmentName::Albedo,
@@ -86,13 +86,13 @@ static constexpr AttachmentName kGoldenAttachments[] = {
 	AttachmentName::HDRColor,
 };
 
-static constexpr int kGoldenAttachmentCount = static_cast<int>(std::size(kGoldenAttachments));
+static constexpr int kReferenceAttachmentCount = static_cast<int>(std::size(kReferenceAttachments));
 
 // ---------------------------------------------------------------------------
 // Test fixture
 // ---------------------------------------------------------------------------
 
-class DeferredShadingTest : public VulkanTestFixture
+class DeferredShadingTest : public VulkanTestShared
 {
 protected:
 	static constexpr uint32_t kRenderWidth  = 256;
@@ -100,7 +100,7 @@ protected:
 
 	void SetUp() override
 	{
-		VulkanTestFixture::SetUp();
+		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 
 		auto& pd = PhysicalDevice();
@@ -134,7 +134,7 @@ protected:
 
 	void TearDown() override
 	{
-		VulkanTestFixture::TearDown();
+		VulkanTestShared::TearDown();
 	}
 
 	// --- Camera UBO ---
@@ -174,7 +174,7 @@ protected:
 		EndSubmitWait(cmd);
 	}
 
-	// --- Golden image comparison ---
+	// --- Reference image comparison ---
 
 	/**
 	 * @brief Loads a PNG into RGBA8 pixels, returns true on success.
@@ -225,11 +225,12 @@ protected:
 	}
 
 	/**
-	 * @brief Returns the golden PNG path for a given attachment name.
+	 * @brief Returns the reference PNG path for a given attachment name.
+	 * All deferred-shading references live under reference/deferred/.
 	 */
-	static std::string GoldenPath(AttachmentName name)
+	static std::string ReferencePath(AttachmentName name)
 	{
-		return std::string(kGoldenDir) + AttachmentNameToString(name) + ".png";
+		return std::string(kReferenceDir) + "deferred/" + AttachmentNameToString(name) + ".png";
 	}
 
 	// --- Render pass infrastructure ---
@@ -240,17 +241,17 @@ protected:
 };
 
 // ===========================================================================
-// Golden Image Regression Test
+// Deferred Shading Reference Image Regression Test
 // ===========================================================================
 
-TEST_F(DeferredShadingTest, GbufferAttachments_MatchGoldenImages)
+TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 {
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	const auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	// -------------------------------------------------------------------
 	// Step 1: Load sphere OBJ
@@ -382,32 +383,33 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchGoldenImages)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 9: Capture attachment screenshots & compare with golden images
+	// Step 9: Capture attachment screenshots & compare with reference images
 	// -------------------------------------------------------------------
-	const std::string tmpDir = std::string(kGoldenDir);
-
-	bool allGoldenExist = true;
-	for (int i = 0; i < kGoldenAttachmentCount; ++i)
+	bool allReferenceExist = true;
+	for (int i = 0; i < kReferenceAttachmentCount; ++i)
 	{
-		if (!std::ifstream(GoldenPath(kGoldenAttachments[i])).good())
+		if (!std::ifstream(ReferencePath(kReferenceAttachments[i])).good())
 		{
-			allGoldenExist = false;
+			allReferenceExist = false;
 			break;
 		}
 	}
 
-	// Create golden directory if needed
+	// Create reference sub-directory if needed
 	{
-		std::filesystem::create_directories(kGoldenDir);
+		std::filesystem::create_directories(
+			std::string(kReferenceDir) + "deferred/");
 	}
 
-	for (int i = 0; i < kGoldenAttachmentCount; ++i)
+	for (int i = 0; i < kReferenceAttachmentCount; ++i)
 	{
-		const AttachmentName name = kGoldenAttachments[i];
+		const AttachmentName name = kReferenceAttachments[i];
 		const bool isNormal = (name == AttachmentName::Normal);
 
-		// Screenshot path (temporary, next to golden)
-		const std::string tmpPath = tmpDir + AttachmentNameToString(name) + ".tmp.png";
+		const std::string refPath = ReferencePath(name);
+
+		// Temp path next to the reference image
+		const std::string tmpPath = refPath + ".tmp";
 
 		VulkanImage& attachment = m_attachmentManager->GetAttachment(name);
 		const bool captured = Screenshot::CaptureAttachment(
@@ -417,28 +419,26 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchGoldenImages)
 		ASSERT_TRUE(captured) << "Failed to capture attachment: "
 		                      << AttachmentNameToString(name);
 
-		const std::string goldenPath = GoldenPath(name);
-
-		if (!allGoldenExist)
+		if (!allReferenceExist)
 		{
-			// First run — rename .tmp.png → .png to generate golden image
-			std::rename(tmpPath.c_str(), goldenPath.c_str());
+			// First run — rename .tmp → .png to generate reference image
+			std::rename(tmpPath.c_str(), refPath.c_str());
 		}
 		else
 		{
-			// Compare against golden image
-			std::vector<uint8_t> tmpPixels, goldenPixels;
-			int tmpW, tmpH, tmpC, goldW, goldH, goldC;
+			// Compare against reference image
+			std::vector<uint8_t> tmpPixels, refPixels;
+			int tmpW, tmpH, tmpC, refW, refH, refC;
 
 			const bool tmpLoaded = LoadPng(tmpPath, tmpPixels, tmpW, tmpH, tmpC);
-			const bool goldLoaded = LoadPng(goldenPath, goldenPixels, goldW, goldH, goldC);
+			const bool refLoaded = LoadPng(refPath, refPixels, refW, refH, refC);
 
 			ASSERT_TRUE(tmpLoaded) << "Failed to load captured PNG: " << tmpPath;
-			ASSERT_TRUE(goldLoaded) << "Failed to load golden PNG: " << goldenPath;
-			ASSERT_EQ(tmpW, goldW) << "Width mismatch for " << AttachmentNameToString(name);
-			ASSERT_EQ(tmpH, goldH) << "Height mismatch for " << AttachmentNameToString(name);
+			ASSERT_TRUE(refLoaded) << "Failed to load reference PNG: " << refPath;
+			ASSERT_EQ(tmpW, refW) << "Width mismatch for " << AttachmentNameToString(name);
+			ASSERT_EQ(tmpH, refH) << "Height mismatch for " << AttachmentNameToString(name);
 
-			const int badPixels = ComparePixels(tmpPixels, goldenPixels, tmpW, tmpH, 2);
+			const int badPixels = ComparePixels(tmpPixels, refPixels, tmpW, tmpH, 2);
 
 			// Clean up temp file
 			std::remove(tmpPath.c_str());
@@ -449,8 +449,8 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchGoldenImages)
 		}
 	}
 
-	if (!allGoldenExist)
+	if (!allReferenceExist)
 	{
-		GTEST_SKIP() << "Golden images generated.  Re-run the test to compare.";
+		GTEST_SKIP() << "Reference images generated.  Re-run the test to compare.";
 	}
 }

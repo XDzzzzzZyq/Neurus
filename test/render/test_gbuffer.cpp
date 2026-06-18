@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 
 #include "render/AttachmentManager.h"
 #include "render/GeometryPass.h"
@@ -54,15 +54,15 @@ struct TestVertex
  * Creates a headless Vulkan device, G-Buffer attachments, and a
  * GeometryPass instance with embedded shaders.
  *
- * Uses VulkanTestFixture for standard Vulkan bootstrap (instance, device,
+ * Uses VulkanTestShared for standard Vulkan bootstrap (instance, device,
  * queue, command pool/buffers) and adds GeometryPass-specific setup.
  */
-class GeometryPassTest : public VulkanTestFixture
+class GeometryPassTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		VulkanTestFixture::SetUp();
+		VulkanTestShared::SetUp();
 		if (!HasVulkan()) return;
 
 		try
@@ -113,10 +113,10 @@ protected:
 		}
 		m_geometryPass.reset();
 		m_attachmentManager.reset();
-		VulkanTestFixture::TearDown();
+		VulkanTestShared::TearDown();
 	}
 
-	// --- Helpers (BeginCmd/EndSubmitWait inherited from VulkanTestFixture) ---
+	// --- Helpers (BeginCmd/EndSubmitWait inherited from VulkanTestShared) ---
 
 	/**
 	 * @brief Creates a default camera looking at a triangle at the origin.

@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 
 #include "render/AttachmentManager.h"
 #include "render/VulkanImage.h"
@@ -13,10 +13,10 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class AttachmentManagerTest : public VulkanTestFixture
+class AttachmentManagerTest : public VulkanTestShared
 {
 protected:
-	// SetUp/TearDown inherited from VulkanTestFixture
+	// SetUp/TearDown inherited from VulkanTestShared
 };
 
 // ---------------------------------------------------------------------------

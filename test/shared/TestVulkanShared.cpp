@@ -1,9 +1,9 @@
 /**
- * @file TestVulkanFixture.cpp
+ * @file TestVulkanShared.cpp
  * @brief Implementation of the shared GPU test fixture base class.
  */
 
-#include "TestVulkanFixture.h"
+#include "TestVulkanShared.h"
 
 #include <iostream>
 
@@ -11,7 +11,7 @@
 // SetUp — standard Vulkan bootstrap
 // ===========================================================================
 
-void VulkanTestFixture::SetUp()
+void VulkanTestShared::SetUp()
 {
 	try
 	{
@@ -92,7 +92,7 @@ void VulkanTestFixture::SetUp()
 	}
 	catch (const std::exception& e)
 	{
-		std::cerr << "[VulkanTestFixture::SetUp] " << e.what() << std::endl;
+		std::cerr << "[VulkanTestShared::SetUp] " << e.what() << std::endl;
 		m_hasVulkan = false;
 	}
 	catch (...)
@@ -105,7 +105,7 @@ void VulkanTestFixture::SetUp()
 // TearDown
 // ===========================================================================
 
-void VulkanTestFixture::TearDown()
+void VulkanTestShared::TearDown()
 {
 	if (m_device)
 	{
@@ -117,7 +117,7 @@ void VulkanTestFixture::TearDown()
 // Command buffer helpers
 // ===========================================================================
 
-vk::raii::CommandBuffer& VulkanTestFixture::BeginCmd()
+vk::raii::CommandBuffer& VulkanTestShared::BeginCmd()
 {
 	auto& cmd = m_commandBuffers[0];
 	cmd.begin(
@@ -125,7 +125,7 @@ vk::raii::CommandBuffer& VulkanTestFixture::BeginCmd()
 	return cmd;
 }
 
-void VulkanTestFixture::EndSubmitWait(vk::raii::CommandBuffer& cmd)
+void VulkanTestShared::EndSubmitWait(vk::raii::CommandBuffer& cmd)
 {
 	cmd.end();
 	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
@@ -137,7 +137,7 @@ void VulkanTestFixture::EndSubmitWait(vk::raii::CommandBuffer& cmd)
 // Asset path resolution
 // ===========================================================================
 
-std::string VulkanTestFixture::ResolveAssetPath(const char* assetRelative)
+std::string VulkanTestShared::ResolveAssetPath(const char* assetRelative)
 {
 	// Try: relative from build/debug/Debug/ (MSVC multi-config layout)
 	std::string path1 = std::string("../../../") + assetRelative;

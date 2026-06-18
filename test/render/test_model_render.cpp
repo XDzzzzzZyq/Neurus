@@ -18,7 +18,7 @@
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 
 // Render layer
 #include "render/AttachmentManager.h"
@@ -78,12 +78,12 @@ struct TestVertex
  * Creates a headless Vulkan device, G-Buffer + HDR colour attachments,
  * GeometryPass, LightingPass, Camera, Light, and Scene.
  */
-class ModelRenderTest : public VulkanTestFixture
+class ModelRenderTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		VulkanTestFixture::SetUp();
+		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 
 		auto& pd = PhysicalDevice();

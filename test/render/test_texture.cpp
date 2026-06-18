@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 #include "render/Texture.h"
 
 #include <array>
@@ -17,7 +17,7 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class TextureTest : public VulkanTestFixture
+class TextureTest : public VulkanTestShared
 {
 protected:
 };

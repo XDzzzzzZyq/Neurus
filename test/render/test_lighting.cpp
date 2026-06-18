@@ -14,7 +14,7 @@
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 
 #include "render/AttachmentManager.h"
 #include "render/GeometryPass.h"
@@ -59,12 +59,12 @@ struct TestVertex
  * via GeometryPass, then dispatches the PBR lighting compute shader and
  * reads back the HDR colour output.
  */
-class LightingPassTest : public VulkanTestFixture
+class LightingPassTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		VulkanTestFixture::SetUp();
+		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 
 		auto& pd = PhysicalDevice();

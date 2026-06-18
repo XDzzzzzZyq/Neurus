@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 
 #include "data/GPUResourceCache.h"
 #include "data/MeshData.h"
@@ -65,11 +65,11 @@ static const char* kTriangleObj =
  * Creates a headless Vulkan device, a hidden Win32 window + surface,
  * GPUResourceCache, and the shader SPIR-V is embedded via generated headers.
  *
- * Uses VulkanTestFixture for member variables (m_instance, m_physicalDevices,
+ * Uses VulkanTestShared for member variables (m_instance, m_physicalDevices,
  * m_device, m_queue, etc.) but overrides SetUp/TearDown entirely because
  * this test needs a device with VK_KHR_swapchain enabled and a Win32 surface.
  */
-class SceneWiringTest : public VulkanTestFixture
+class SceneWiringTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
@@ -197,7 +197,7 @@ protected:
 			DestroyWindow(m_hwnd);
 			m_hwnd = nullptr;
 		}
-		VulkanTestFixture::TearDown();
+		VulkanTestShared::TearDown();
 	}
 
 	/**

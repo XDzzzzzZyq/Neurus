@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 #include "render/Screenshot.h"
 #include "render/VulkanImage.h"
 
@@ -23,12 +23,12 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class ScreenshotTest : public VulkanTestFixture
+class ScreenshotTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		VulkanTestFixture::SetUp();
+		VulkanTestShared::SetUp();
 	}
 
 	void TearDown() override
@@ -38,7 +38,7 @@ protected:
 		{
 			std::filesystem::remove(m_testOutputPath);
 		}
-		VulkanTestFixture::TearDown();
+		VulkanTestShared::TearDown();
 	}
 
 	/** Shortcut: record commands inside a one-shot buffer. */

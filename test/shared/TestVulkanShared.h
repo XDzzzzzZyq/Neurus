@@ -1,5 +1,5 @@
 /**
- * @file TestVulkanFixture.h
+ * @file TestVulkanShared.h
  * @brief Shared test fixture base class for GPU-dependent tests.
  *
  * Consolidates ~60 lines of duplicated Vulkan bootstrap (Instance → PhysicalDevice
@@ -36,11 +36,11 @@
  *
  * TearDown calls m_device->waitIdle().
  *
- * Inheriting test fixtures SHOULD call VulkanTestFixture::SetUp() in their
+ * Inheriting test fixtures SHOULD call VulkanTestShared::SetUp() in their
  * own SetUp when they want the standard bootstrap, and
- * VulkanTestFixture::TearDown() in their TearDown.
+ * VulkanTestShared::TearDown() in their TearDown.
  */
-class VulkanTestFixture : public ::testing::Test
+class VulkanTestShared : public ::testing::Test
 {
 protected:
 	void SetUp() override;

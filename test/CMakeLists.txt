@@ -1,8 +1,8 @@
 # test/CMakeLists.txt - Unit Tests
 
 add_executable(neurus_test
-	shared/TestVulkanFixture.cpp
-	shared/TestVulkanFixture.h
+	shared/TestVulkanShared.cpp
+	shared/TestVulkanShared.h
 	shared/test_main.cpp
 	render/test_buffers.cpp
 	render/test_vulkan_buffer.cpp

@@ -15,7 +15,7 @@
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanFixture.h"
+#include "shared/TestVulkanShared.h"
 #include "data/GPUResourceCache.h"
 #include "data/MeshData.h"
 #include "scene/Mesh.h"
@@ -52,12 +52,12 @@ static const char* kTriangleObj =
  * Creates a headless Vulkan device and queue on SetUp, then constructs
  * GPUResourceCache with borrowed device handles. No surface or swapchain needed.
  */
-class GPUResourceCacheTest : public VulkanTestFixture
+class GPUResourceCacheTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		VulkanTestFixture::SetUp();
+		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 
 		// GPUResourceCache is created lazily by individual tests
@@ -67,7 +67,7 @@ protected:
 	{
 		// GPUResourceCache must be destroyed before device
 		m_cache.reset();
-		VulkanTestFixture::TearDown();
+		VulkanTestShared::TearDown();
 	}
 
 	/**
