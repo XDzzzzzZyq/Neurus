@@ -39,6 +39,10 @@ target_include_directories(glm INTERFACE dep/glm)
 add_library(stb INTERFACE)
 target_include_directories(stb INTERFACE dep/stb)
 
+# Cereal (header-only serialization library)
+add_library(cereal INTERFACE)
+target_include_directories(cereal INTERFACE dep/cereal/include)
+
 # Vulkan (from SDK)
 find_package(Vulkan REQUIRED)
 if(NOT Vulkan_FOUND)

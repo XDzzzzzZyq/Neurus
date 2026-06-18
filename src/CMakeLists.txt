@@ -22,6 +22,9 @@ add_subdirectory(ui)
 # Scene Layer (base types for scene graph - no internal deps)
 add_subdirectory(scene)
 
+# Project Layer (depends on: scene for serializable types)
+add_subdirectory(project)
+
 # Application Layer (depends on: render, editor, ui, data, scene)
 add_subdirectory(app)
 
@@ -35,6 +38,7 @@ add_executable(Neurus
 
 target_link_libraries(Neurus PRIVATE
 	neurus_app
+	neurus_project
 	neurus_render
 	neurus_editor
 	neurus_ui

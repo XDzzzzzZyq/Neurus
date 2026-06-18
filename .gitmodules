@@ -13,3 +13,6 @@
 [submodule "dep/qtadvanceddocking"]
 	path = dep/qtadvanceddocking
 	url = https://github.com/githubuser0xFFFF/Qt-Advanced-Docking-System.git
+[submodule "dep/cereal"]
+	path = dep/cereal
+	url = https://github.com/USCiLab/cereal.git
