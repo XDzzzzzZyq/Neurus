@@ -62,6 +62,10 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	m_cameraDescriptorSet.WriteBuffer(0, m_cameraUBO.GetDescriptorInfo(),
 	                                  vk::DescriptorType::eUniformBuffer);
 
+#ifdef _DEBUG
+	m_cameraDescriptorSet.SetDebugName("GeometryPass_CameraSet");
+#endif
+
 	// --- Build vertex input layout ---
 	m_vertexLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);   // pos @ 0
 	m_vertexLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // normal @ 12

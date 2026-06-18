@@ -177,7 +177,7 @@ private:
 	                 const vk::raii::PhysicalDevice& physicalDevice);
 	void allocateAndBindMemory(const vk::raii::Device& device,
 	                           const vk::raii::PhysicalDevice& physicalDevice);
-	void createImageView(const vk::raii::Device& device);
+	void createImageView(const vk::raii::Device& device, const char* debugName);
 
 	// --- Layout helpers ---
 	static vk::AccessFlags AccessFlagsForLayout(vk::ImageLayout layout);

@@ -89,6 +89,22 @@ void DescriptorSet::WriteImage(uint32_t binding,
 	m_device->updateDescriptorSets(write, nullptr);
 }
 
+#ifdef _DEBUG
+void DescriptorSet::SetDebugName(const char* name)
+{
+	if (!name || !*name)
+	{
+		return;
+	}
+
+	const vk::DebugUtilsObjectNameInfoEXT nameInfo(
+		vk::ObjectType::eDescriptorSet,
+		reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(*m_set)),
+		name);
+	m_device->setDebugUtilsObjectNameEXT(nameInfo);
+}
+#endif
+
 // ---------------------------------------------------------------------------
 // DescriptorPool
 // ---------------------------------------------------------------------------

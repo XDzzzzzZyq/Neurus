@@ -2,6 +2,7 @@
 #include "VulkanImage.h"
 #include "AttachmentManager.h"
 #include "data/TextureData.h"
+#include "Log.h"
 
 #include <chrono>
 #include <cstring>
@@ -176,6 +177,17 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 		}
 
 		VulkanImage& image = attachmentManager.GetAttachment(name);
+
+		// Skip attachments that have never been written (current layout UNDEFINED).
+		// Capturing them would leave them in TRANSFER_SRC_OPTIMAL, causing
+		// validation errors when a subsequent render pass expects a usable layout.
+		if (image.CurrentLayout() == vk::ImageLayout::eUndefined)
+		{
+			NEURUS_LOG("[Screenshot] Skipping " << AttachmentNameToString(name)
+			           << " — layout is UNDEFINED (not yet written)");
+			continue;
+		}
+
 		const std::string fileName = timestampedFilename(
 			prefix + "_" + AttachmentNameToString(name), ".png");
 

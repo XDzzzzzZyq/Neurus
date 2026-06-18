@@ -15,6 +15,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <string>
 
 namespace neurus {
 
@@ -46,6 +47,14 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
 	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets);
+
+#ifdef _DEBUG
+	for (uint32_t i = 0; i < numSets; ++i)
+	{
+		const std::string dsName = "LightingPass_Set" + std::to_string(i);
+		m_descriptorSets[i].SetDebugName(dsName.c_str());
+	}
+#endif
 }
 
 LightingPass::~LightingPass() = default;

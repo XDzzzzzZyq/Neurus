@@ -4,6 +4,7 @@
 
 #include <stdexcept>
 #include <algorithm>
+#include <string>
 
 namespace neurus {
 
@@ -28,7 +29,7 @@ VulkanImage::VulkanImage(const vk::raii::Device& device,
 {
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
-	createImageView(device);
+	createImageView(device, debugName);
 
 	// --- Set debug name in Debug builds ---
 #ifdef _DEBUG
@@ -124,7 +125,7 @@ void VulkanImage::allocateAndBindMemory(const vk::raii::Device& device,
 // Image view creation
 // ---------------------------------------------------------------------------
 
-void VulkanImage::createImageView(const vk::raii::Device& device)
+void VulkanImage::createImageView(const vk::raii::Device& device, const char* debugName)
 {
 	vk::ImageViewType viewType;
 	vk::ImageAspectFlags aspect;
@@ -165,6 +166,20 @@ void VulkanImage::createImageView(const vk::raii::Device& device)
 		subresourceRange);
 
 	m_imageView = vk::raii::ImageView(device, viewCI);
+
+	// --- Set debug name on image view in Debug builds ---
+#ifdef _DEBUG
+	if (debugName && *debugName)
+	{
+		std::string viewName(debugName);
+		viewName += "_View";
+		vk::DebugUtilsObjectNameInfoEXT nameInfo(
+			vk::ObjectType::eImageView,
+			reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_imageView)),
+			viewName.c_str());
+		device.setDebugUtilsObjectNameEXT(nameInfo);
+	}
+#endif
 }
 
 // ---------------------------------------------------------------------------

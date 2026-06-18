@@ -180,6 +180,14 @@ public:
 	/** @brief Raw VkDescriptorSet handle for binding in command recording. */
 	vk::DescriptorSet handle() const { return *m_set; }
 
+#ifdef _DEBUG
+	/**
+	 * @brief Sets a debug name on the underlying VkDescriptorSet for RenderDoc / validation.
+	 * @param name Debug name string (must be null-terminated, not retained).
+	 */
+	void SetDebugName(const char* name);
+#endif
+
 private:
 	vk::raii::DescriptorSet m_set = nullptr;
 	const vk::raii::Device* m_device;
