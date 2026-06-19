@@ -84,3 +84,6 @@ temp/
 graphify-out/cache/
 graphify-out/.graphify_python
 graphify-out/.graphify_root
+
+# Graphify timestamped backups
+/graphify-out/20*/

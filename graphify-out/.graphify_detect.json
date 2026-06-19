@@ -1,8 +1,6 @@
 {
   "files": {
     "code": [
-      "D:\\Projects\\Neurus\\CMakePresets.json",
-      "D:\\Projects\\Neurus\\setup.ps1",
       "D:\\Projects\\Neurus\\src\\app\\Application.cpp",
       "D:\\Projects\\Neurus\\src\\app\\Application.h",
       "D:\\Projects\\Neurus\\src\\asset\\ImageData.cpp",
@@ -105,16 +103,6 @@
       "D:\\Projects\\Neurus\\src\\ui\\VulkanWidget.h"
     ],
     "document": [
-      "D:\\Projects\\Neurus\\.github\\instructions\\architecture.instructions.md",
-      "D:\\Projects\\Neurus\\.github\\instructions\\data-resource.instructions.md",
-      "D:\\Projects\\Neurus\\.github\\instructions\\editor.instructions.md",
-      "D:\\Projects\\Neurus\\.github\\instructions\\renderer.instructions.md",
-      "D:\\Projects\\Neurus\\.github\\instructions\\test.instructions.md",
-      "D:\\Projects\\Neurus\\.github\\instructions\\ui-system.instructions.md",
-      "D:\\Projects\\Neurus\\.github\\workflows\\ci.yml",
-      "D:\\Projects\\Neurus\\AGENTS.md",
-      "D:\\Projects\\Neurus\\CMakeLists.txt",
-      "D:\\Projects\\Neurus\\README.md",
       "D:\\Projects\\Neurus\\src\\CMakeLists.txt",
       "D:\\Projects\\Neurus\\src\\app\\CMakeLists.txt",
       "D:\\Projects\\Neurus\\src\\asset\\CMakeLists.txt",
@@ -129,10 +117,11 @@
     "image": [],
     "video": []
   },
-  "total_files": 121,
-  "total_words": 63087,
+  "total_files": 109,
+  "total_words": 53947,
   "needs_graph": true,
+  "warning": null,
   "skipped_sensitive": [],
-  "graphifyignore_patterns": 61,
-  "scan_root": "D:\\Projects\\Neurus"
+  "graphifyignore_patterns": 63,
+  "scan_root": "D:\\Projects\\Neurus\\src"
 }

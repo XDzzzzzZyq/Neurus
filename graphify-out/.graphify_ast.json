@@ -1,14 +1,6 @@
 {
   "nodes": [
     {
-      "id": "setup",
-      "label": "setup.ps1",
-      "file_type": "code",
-      "source_file": "setup.ps1",
-      "source_location": "L1",
-      "_origin": "ast"
-    },
-    {
       "id": "src_app_application_cpp_app_application",
       "label": "Application.cpp",
       "file_type": "code",

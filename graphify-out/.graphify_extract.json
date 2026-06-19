@@ -1,14 +1,6 @@
 {
   "nodes": [
     {
-      "id": "setup",
-      "label": "setup.ps1",
-      "file_type": "code",
-      "source_file": "setup.ps1",
-      "source_location": "L1",
-      "_origin": "ast"
-    },
-    {
       "id": "src_app_application_cpp_app_application",
       "label": "Application.cpp",
       "file_type": "code",
@@ -59,6 +51,14 @@
     {
       "id": "app_application_project",
       "label": "project()",
+      "file_type": "code",
+      "source_file": "src/app/Application.h",
+      "source_location": "L5",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_app_application_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/app/Application.h",
       "source_location": "L5",
@@ -187,6 +187,14 @@
     {
       "id": "asset_imagedata_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/asset/ImageData.h",
+      "source_location": "L19",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_asset_imagedata_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/asset/ImageData.h",
       "source_location": "L19",
@@ -353,6 +361,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_asset_meshdata_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L10",
+      "_origin": "ast"
+    },
+    {
       "id": "core_log",
       "label": "Log.h",
       "file_type": "code",
@@ -377,6 +393,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_core_parameters_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/core/Parameters.h",
+      "source_location": "L22",
+      "_origin": "ast"
+    },
+    {
       "id": "core_types",
       "label": "Types.h",
       "file_type": "code",
@@ -387,6 +411,14 @@
     {
       "id": "core_types_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/core/Types.h",
+      "source_location": "L16",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_core_types_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/core/Types.h",
       "source_location": "L16",
@@ -475,6 +507,14 @@
     {
       "id": "editor_cameracontroller_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/editor/CameraController.h",
+      "source_location": "L34",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_editor_cameracontroller_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/editor/CameraController.h",
       "source_location": "L34",
@@ -611,6 +651,14 @@
     {
       "id": "editor_context_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/editor/Context.h",
+      "source_location": "L23",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_editor_context_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/editor/Context.h",
       "source_location": "L23",
@@ -881,6 +929,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_editor_input_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/editor/Input.h",
+      "source_location": "L40",
+      "_origin": "ast"
+    },
+    {
       "id": "src_editor_selectioncontroller_cpp_editor_selectioncontroller",
       "label": "SelectionController.cpp",
       "file_type": "code",
@@ -1017,6 +1073,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_editor_selectioncontroller_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/editor/SelectionController.h",
+      "source_location": "L30",
+      "_origin": "ast"
+    },
+    {
       "id": "editor_selectionmanager",
       "label": "SelectionManager.h",
       "file_type": "code",
@@ -1057,6 +1121,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_editor_events_editorevents_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/editor/events/EditorEvents.h",
+      "source_location": "L5",
+      "_origin": "ast"
+    },
+    {
       "id": "events_eventbus",
       "label": "EventBus.h",
       "file_type": "code",
@@ -1067,6 +1139,14 @@
     {
       "id": "events_eventbus_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L14",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_editor_events_eventbus_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/editor/events/EventBus.h",
       "source_location": "L14",
@@ -1131,6 +1211,14 @@
     {
       "id": "events_uievents_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/editor/events/UIEvents.h",
+      "source_location": "L6",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_editor_events_uievents_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/editor/events/UIEvents.h",
       "source_location": "L6",
@@ -1219,6 +1307,14 @@
     {
       "id": "src_project_project_h_project_project_project",
       "label": "project()",
+      "file_type": "code",
+      "source_file": "src/project/Project.h",
+      "source_location": "L28",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_project_project_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/project/Project.h",
       "source_location": "L28",
@@ -1353,6 +1449,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_attachmentmanager_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L11",
+      "_origin": "ast"
+    },
+    {
       "id": "render_commandbuffer",
       "label": "CommandBuffer.h",
       "file_type": "code",
@@ -1363,6 +1467,14 @@
     {
       "id": "render_commandbuffer_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/CommandBuffer.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_commandbuffer_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/CommandBuffer.h",
       "source_location": "L8",
@@ -1451,6 +1563,14 @@
     {
       "id": "render_computepipelinebuilder_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/ComputePipelineBuilder.h",
+      "source_location": "L9",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_computepipelinebuilder_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/ComputePipelineBuilder.h",
       "source_location": "L9",
@@ -1681,6 +1801,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_deferredrenderer_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L32",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_descriptormanager_cpp_render_descriptormanager",
       "label": "DescriptorManager.cpp",
       "file_type": "code",
@@ -1849,6 +1977,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_descriptormanager_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/DescriptorManager.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_geometrypass_cpp_render_geometrypass",
       "label": "GeometryPass.cpp",
       "file_type": "code",
@@ -1995,6 +2131,14 @@
     {
       "id": "render_geometrypass_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L32",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_geometrypass_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/GeometryPass.h",
       "source_location": "L32",
@@ -2233,6 +2377,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_image_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/Image.h",
+      "source_location": "L10",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_lightingpass_cpp_render_lightingpass",
       "label": "LightingPass.cpp",
       "file_type": "code",
@@ -2427,6 +2579,14 @@
     {
       "id": "render_lightingpass_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L30",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_lightingpass_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/LightingPass.h",
       "source_location": "L30",
@@ -2641,6 +2801,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_pipelinebuilder_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/PipelineBuilder.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_renderpassmanager_cpp_render_renderpassmanager",
       "label": "RenderPassManager.cpp",
       "file_type": "code",
@@ -2809,6 +2977,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_renderpassmanager_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/RenderPassManager.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_screenshot_cpp_render_screenshot",
       "label": "Screenshot.cpp",
       "file_type": "code",
@@ -2923,6 +3099,14 @@
     {
       "id": "render_screenshot_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/Screenshot.h",
+      "source_location": "L7",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_screenshot_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/Screenshot.h",
       "source_location": "L7",
@@ -3113,6 +3297,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_swapchain_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/Swapchain.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
       "id": "render_syncobjects",
       "label": "SyncObjects.h",
       "file_type": "code",
@@ -3123,6 +3315,14 @@
     {
       "id": "render_syncobjects_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/SyncObjects.h",
+      "source_location": "L7",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_syncobjects_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/SyncObjects.h",
       "source_location": "L7",
@@ -3409,6 +3609,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_texture_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L12",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_vulkanbuffer_cpp_render_vulkanbuffer",
       "label": "VulkanBuffer.cpp",
       "file_type": "code",
@@ -3531,6 +3739,14 @@
     {
       "id": "render_vulkanbuffer_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/VulkanBuffer.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_vulkanbuffer_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/VulkanBuffer.h",
       "source_location": "L8",
@@ -3667,6 +3883,14 @@
     {
       "id": "render_vulkancontext_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/VulkanContext.h",
+      "source_location": "L9",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_vulkancontext_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/VulkanContext.h",
       "source_location": "L9",
@@ -3961,6 +4185,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_buffers_bufferlayout_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/buffers/BufferLayout.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_buffers_indexbuffer_cpp_buffers_indexbuffer",
       "label": "IndexBuffer.cpp",
       "file_type": "code",
@@ -4025,6 +4257,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_buffers_indexbuffer_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/buffers/IndexBuffer.h",
+      "source_location": "L7",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_buffers_vertexbuffer_cpp_buffers_vertexbuffer",
       "label": "VertexBuffer.cpp",
       "file_type": "code",
@@ -4083,6 +4323,14 @@
     {
       "id": "buffers_vertexbuffer_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/buffers/VertexBuffer.h",
+      "source_location": "L7",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_buffers_vertexbuffer_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/buffers/VertexBuffer.h",
       "source_location": "L7",
@@ -4155,6 +4403,14 @@
     {
       "id": "shaders_shaderlib_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/shaders/ShaderLib.h",
+      "source_location": "L9",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_shaders_shaderlib_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/shaders/ShaderLib.h",
       "source_location": "L9",
@@ -4257,6 +4513,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_render_shaders_shadermodule_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L10",
+      "_origin": "ast"
+    },
+    {
       "id": "src_render_shaders_shaderprogram_cpp_shaders_shaderprogram",
       "label": "ShaderProgram.cpp",
       "file_type": "code",
@@ -4299,6 +4563,14 @@
     {
       "id": "shaders_shaderprogram_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/render/shaders/ShaderProgram.h",
+      "source_location": "L8",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_render_shaders_shaderprogram_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/render/shaders/ShaderProgram.h",
       "source_location": "L8",
@@ -4411,6 +4683,14 @@
     {
       "id": "scene_camera_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L28",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_scene_camera_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/scene/Camera.h",
       "source_location": "L28",
@@ -4721,6 +5001,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_scene_defaultscene_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/scene/DefaultScene.h",
+      "source_location": "L20",
+      "_origin": "ast"
+    },
+    {
       "id": "scene_glmserialization",
       "label": "GlmSerialization.h",
       "file_type": "code",
@@ -4731,6 +5019,14 @@
     {
       "id": "scene_glmserialization_cereal",
       "label": "cereal()",
+      "file_type": "code",
+      "source_file": "src/scene/GlmSerialization.h",
+      "source_location": "L14",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_scene_glmserialization_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/scene/GlmSerialization.h",
       "source_location": "L14",
@@ -4969,6 +5265,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_scene_mesh_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L33",
+      "_origin": "ast"
+    },
+    {
       "id": "src_scene_scene_cpp_scene_scene",
       "label": "Scene.cpp",
       "file_type": "code",
@@ -5081,6 +5385,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_scene_scene_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L46",
+      "_origin": "ast"
+    },
+    {
       "id": "src_scene_sprite_cpp_scene_sprite",
       "label": "Sprite.cpp",
       "file_type": "code",
@@ -5123,6 +5435,14 @@
     {
       "id": "scene_sprite_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/scene/Sprite.h",
+      "source_location": "L29",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_scene_sprite_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/scene/Sprite.h",
       "source_location": "L29",
@@ -5265,6 +5585,14 @@
       "_origin": "ast"
     },
     {
+      "id": "src_scene_uid_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/scene/UID.h",
+      "source_location": "L24",
+      "_origin": "ast"
+    },
+    {
       "id": "src_ui_mainwindow_cpp_ui_mainwindow",
       "label": "MainWindow.cpp",
       "file_type": "code",
@@ -5323,6 +5651,14 @@
     {
       "id": "ui_mainwindow_neurus",
       "label": "neurus()",
+      "file_type": "code",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L13",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_ui_mainwindow_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/ui/MainWindow.h",
       "source_location": "L13",
@@ -5427,6 +5763,14 @@
     {
       "id": "ui_neurusmainwindow_ads",
       "label": "ads()",
+      "file_type": "code",
+      "source_file": "src/ui/NeurusMainWindow.h",
+      "source_location": "L7",
+      "_origin": "ast"
+    },
+    {
+      "id": "src_ui_neurusmainwindow_h_namespace",
+      "label": "namespace",
       "file_type": "code",
       "source_file": "src/ui/NeurusMainWindow.h",
       "source_location": "L7",
@@ -5583,9 +5927,47 @@
       "source_file": "src/ui/VulkanWidget.h",
       "source_location": "L9",
       "_origin": "ast"
+    },
+    {
+      "id": "src_ui_vulkanwidget_h_namespace",
+      "label": "namespace",
+      "file_type": "code",
+      "source_file": "src/ui/VulkanWidget.h",
+      "source_location": "L9",
+      "_origin": "ast"
     }
   ],
   "edges": [
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "application",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "qapplication",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "qcoreapplication",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L27",
+      "weight": 1.0
+    },
     {
       "source": "src_app_application_cpp_app_application",
       "target": "qkeyevent",
@@ -5594,6 +5976,96 @@
       "confidence": "EXTRACTED",
       "source_file": "src/app/Application.cpp",
       "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "dockwidget",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "qtimer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "windows",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "iostream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L36",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "context",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "input",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L40",
       "weight": 1.0
     },
     {
@@ -5608,12 +6080,122 @@
     },
     {
       "source": "src_app_application_cpp_app_application",
+      "target": "eventbus",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "neurusmainwindow",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "vulkanwidget",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "vulkancontext",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L45",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "deferredrenderer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
       "target": "texture",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/app/Application.cpp",
       "source_location": "L47",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "meshdata",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L48",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "scene",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L49",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "project",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L50",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "gbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L53",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "gbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L54",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_cpp_app_application",
+      "target": "pbr_lighting",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.cpp",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -5674,12 +6256,32 @@
     },
     {
       "source": "src_app_application_h_app_application",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_app_application_h_app_application",
       "target": "app_application_project",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/app/Application.h",
       "source_location": "L5",
       "weight": 1.0
+    },
+    {
+      "source": "app_application_project",
+      "target": "src_app_application_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.h",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_app_application_h_app_application",
@@ -5691,6 +6293,26 @@
       "weight": 1.0
     },
     {
+      "source": "app_application_neurus",
+      "target": "src_app_application_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/app/Application.h",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_asset_imagedata_cpp_asset_imagedata",
+      "target": "stb_image_write",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.cpp",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
       "source": "src_asset_imagedata_cpp_asset_imagedata",
       "target": "src_asset_imagedata_cpp_asset_imagedata",
       "relation": "imports",
@@ -5698,6 +6320,36 @@
       "confidence": "EXTRACTED",
       "source_file": "src/asset/ImageData.cpp",
       "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_cpp_asset_imagedata",
+      "target": "cmath",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_cpp_asset_imagedata",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.cpp",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_cpp_asset_imagedata",
+      "target": "filesystem",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.cpp",
+      "source_location": "L8",
       "weight": 1.0
     },
     {
@@ -5924,12 +6576,62 @@
     },
     {
       "source": "src_asset_imagedata_h_asset_imagedata",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.h",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_h_asset_imagedata",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.h",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_h_asset_imagedata",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.h",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_h_asset_imagedata",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.h",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_imagedata_h_asset_imagedata",
       "target": "asset_imagedata_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/asset/ImageData.h",
       "source_location": "L19",
       "weight": 1.0
+    },
+    {
+      "source": "asset_imagedata_neurus",
+      "target": "src_asset_imagedata_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/ImageData.h",
+      "source_location": "L19",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_asset_meshdata_cpp_asset_meshdata",
@@ -5943,12 +6645,72 @@
     },
     {
       "source": "src_asset_meshdata_cpp_asset_meshdata",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_cpp_asset_meshdata",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_cpp_asset_meshdata",
+      "target": "cmath",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_cpp_asset_meshdata",
+      "target": "fstream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.cpp",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_cpp_asset_meshdata",
+      "target": "sstream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_cpp_asset_meshdata",
       "target": "src_asset_meshdata_cpp_string",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/asset/MeshData.cpp",
       "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_cpp_asset_meshdata",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.cpp",
+      "source_location": "L10",
       "weight": 1.0
     },
     {
@@ -6440,11 +7202,101 @@
     },
     {
       "source": "src_asset_meshdata_h_asset_meshdata",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_h_asset_meshdata",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_h_asset_meshdata",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_h_asset_meshdata",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_h_asset_meshdata",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_asset_meshdata_h_asset_meshdata",
       "target": "asset_meshdata_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/asset/MeshData.h",
       "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "asset_meshdata_neurus",
+      "target": "src_asset_meshdata_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/asset/MeshData.h",
+      "source_location": "L10",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "core_log",
+      "target": "iostream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/core/Log.h",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "core_parameters",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/core/Parameters.h",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "core_parameters",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/core/Parameters.h",
+      "source_location": "L20",
       "weight": 1.0
     },
     {
@@ -6457,12 +7309,52 @@
       "weight": 1.0
     },
     {
+      "source": "core_parameters_neurus",
+      "target": "src_core_parameters_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/core/Parameters.h",
+      "source_location": "L22",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "core_types",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/core/Types.h",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
       "source": "core_types",
       "target": "core_types_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/core/Types.h",
       "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "core_types_neurus",
+      "target": "src_core_types_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/core/Types.h",
+      "source_location": "L16",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_editor_cameracontroller_cpp_editor_cameracontroller",
+      "target": "cameracontroller",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/CameraController.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -6483,6 +7375,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/editor/CameraController.cpp",
       "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_cameracontroller_cpp_editor_cameracontroller",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/CameraController.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_cameracontroller_cpp_editor_cameracontroller",
+      "target": "cmath",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/CameraController.cpp",
+      "source_location": "L11",
       "weight": 1.0
     },
     {
@@ -6672,11 +7584,41 @@
     },
     {
       "source": "src_editor_cameracontroller_h_editor_cameracontroller",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/CameraController.h",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_cameracontroller_h_editor_cameracontroller",
       "target": "editor_cameracontroller_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/editor/CameraController.h",
       "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "editor_cameracontroller_neurus",
+      "target": "src_editor_cameracontroller_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/CameraController.h",
+      "source_location": "L34",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_editor_context_cpp_editor_context",
+      "target": "context",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -6697,6 +7639,36 @@
       "confidence": "EXTRACTED",
       "source_file": "src/editor/Context.cpp",
       "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_context_cpp_editor_context",
+      "target": "uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_context_cpp_editor_context",
+      "target": "eventbus",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_context_cpp_editor_context",
+      "target": "editorevents",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.cpp",
+      "source_location": "L12",
       "weight": 1.0
     },
     {
@@ -6853,6 +7825,26 @@
     },
     {
       "source": "src_editor_context_h_editor_context",
+      "target": "qobject",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.h",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_context_h_editor_context",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.h",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_context_h_editor_context",
       "target": "editor_selectionmanager",
       "relation": "imports",
       "context": "import",
@@ -6869,6 +7861,16 @@
       "source_file": "src/editor/Context.h",
       "source_location": "L23",
       "weight": 1.0
+    },
+    {
+      "source": "editor_context_neurus",
+      "target": "src_editor_context_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Context.h",
+      "source_location": "L23",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_editor_context_h_editor_context",
@@ -6926,6 +7928,46 @@
       "source_location": "L207",
       "weight": 1.0,
       "context": "return_type"
+    },
+    {
+      "source": "src_editor_editorcontext_cpp_editor_editorcontext",
+      "target": "editorcontext",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/EditorContext.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_editorcontext_h_editor_editorcontext",
+      "target": "context",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/EditorContext.h",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_input_cpp_editor_input",
+      "target": "input",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Input.cpp",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_input_cpp_editor_input",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Input.cpp",
+      "source_location": "L9",
+      "weight": 1.0
     },
     {
       "source": "src_editor_input_cpp_editor_input",
@@ -7207,12 +8249,32 @@
     },
     {
       "source": "src_editor_input_h_editor_input",
+      "target": "cameracontroller",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Input.h",
+      "source_location": "L38",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_input_h_editor_input",
       "target": "editor_input_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/editor/Input.h",
       "source_location": "L40",
       "weight": 1.0
+    },
+    {
+      "source": "editor_input_neurus",
+      "target": "src_editor_input_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/Input.h",
+      "source_location": "L40",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_editor_selectioncontroller_cpp_editor_selectioncontroller",
@@ -7222,6 +8284,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/editor/SelectionController.cpp",
       "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_selectioncontroller_cpp_editor_selectioncontroller",
+      "target": "cmath",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionController.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_selectioncontroller_cpp_editor_selectioncontroller",
+      "target": "matrix_inverse",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionController.cpp",
+      "source_location": "L10",
       "weight": 1.0
     },
     {
@@ -7477,11 +8559,81 @@
     },
     {
       "source": "src_editor_selectioncontroller_h_editor_selectioncontroller",
+      "target": "set",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionController.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_selectioncontroller_h_editor_selectioncontroller",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionController.h",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_selectioncontroller_h_editor_selectioncontroller",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionController.h",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_selectioncontroller_h_editor_selectioncontroller",
       "target": "editor_selectioncontroller_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/editor/SelectionController.h",
       "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "editor_selectioncontroller_neurus",
+      "target": "src_editor_selectioncontroller_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionController.h",
+      "source_location": "L30",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "editor_selectionmanager",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionManager.h",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "editor_selectionmanager",
+      "target": "unordered_set",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionManager.h",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "editor_selectionmanager",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/SelectionManager.h",
+      "source_location": "L28",
       "weight": 1.0
     },
     {
@@ -7505,11 +8657,81 @@
     },
     {
       "source": "events_editorevents",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EditorEvents.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "events_editorevents",
       "target": "events_editorevents_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/editor/events/EditorEvents.h",
       "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "events_editorevents_neurus",
+      "target": "src_editor_events_editorevents_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EditorEvents.h",
+      "source_location": "L5",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "events_eventbus",
+      "target": "functional",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "events_eventbus",
+      "target": "queue",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "events_eventbus",
+      "target": "typeindex",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "events_eventbus",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "events_eventbus",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L7",
       "weight": 1.0
     },
     {
@@ -7520,6 +8742,16 @@
       "source_file": "src/editor/events/EventBus.h",
       "source_location": "L14",
       "weight": 1.0
+    },
+    {
+      "source": "events_eventbus_neurus",
+      "target": "src_editor_events_eventbus_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/EventBus.h",
+      "source_location": "L14",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "events_eventbus",
@@ -7590,11 +8822,51 @@
     },
     {
       "source": "src_editor_events_uievents_h_events_uievents",
+      "target": "qobject",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/UIEvents.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_events_uievents_h_events_uievents",
+      "target": "qstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/UIEvents.h",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_editor_events_uievents_h_events_uievents",
       "target": "events_uievents_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/editor/events/UIEvents.h",
       "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "events_uievents_neurus",
+      "target": "src_editor_events_uievents_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/editor/events/UIEvents.h",
+      "source_location": "L6",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_main",
+      "target": "app_application",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.cpp",
+      "source_location": "L9",
       "weight": 1.0
     },
     {
@@ -7614,6 +8886,56 @@
       "confidence": "EXTRACTED",
       "source_file": "src/project/Project.cpp",
       "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_cpp_project_project",
+      "target": "json",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_cpp_project_project",
+      "target": "fstream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_cpp_project_project",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_cpp_project_project",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_cpp_project_project",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.cpp",
+      "source_location": "L15",
       "weight": 1.0
     },
     {
@@ -7742,11 +9064,111 @@
     },
     {
       "source": "src_project_project_h_project_project",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.h",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_h_project_project",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_h_project_project",
+      "target": "cereal",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.h",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_h_project_project",
+      "target": "scene",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.h",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_h_project_project",
       "target": "src_project_project_h_project_project_project",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/project/Project.h",
       "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_project_project_h_project_project_project",
+      "target": "src_project_project_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/Project.h",
+      "source_location": "L28",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "project_typeregistration",
+      "target": "polymorphic",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "project_typeregistration",
+      "target": "camera",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "project_typeregistration",
+      "target": "debugline",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "project_typeregistration",
+      "target": "debugpoints",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "project_typeregistration",
+      "target": "light",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L18",
       "weight": 1.0
     },
     {
@@ -7760,6 +9182,26 @@
       "weight": 1.0
     },
     {
+      "source": "project_typeregistration",
+      "target": "sprite",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "project_typeregistration",
+      "target": "uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/project/TypeRegistration.cpp",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
       "source": "src_render_attachmentmanager_cpp_render_attachmentmanager",
       "target": "src_render_attachmentmanager_cpp_render_attachmentmanager",
       "relation": "imports",
@@ -7767,6 +9209,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/AttachmentManager.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_cpp_render_attachmentmanager",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_cpp_render_attachmentmanager",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.cpp",
+      "source_location": "L5",
       "weight": 1.0
     },
     {
@@ -7964,11 +9426,101 @@
     },
     {
       "source": "src_render_attachmentmanager_h_render_attachmentmanager",
+      "target": "render_image",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_h_render_attachmentmanager",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_h_render_attachmentmanager",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_h_render_attachmentmanager",
+      "target": "string_view",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_h_render_attachmentmanager",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_attachmentmanager_h_render_attachmentmanager",
       "target": "render_attachmentmanager_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/AttachmentManager.h",
       "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "render_attachmentmanager_neurus",
+      "target": "src_render_attachmentmanager_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/AttachmentManager.h",
+      "source_location": "L11",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "render_commandbuffer",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/CommandBuffer.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "render_commandbuffer",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/CommandBuffer.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "render_commandbuffer",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/CommandBuffer.h",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -7979,6 +9531,16 @@
       "source_file": "src/render/CommandBuffer.h",
       "source_location": "L8",
       "weight": 1.0
+    },
+    {
+      "source": "render_commandbuffer_neurus",
+      "target": "src_render_commandbuffer_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/CommandBuffer.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "render_commandbuffer",
@@ -8039,6 +9601,26 @@
     },
     {
       "source": "src_render_computepipelinebuilder_cpp_render_computepipelinebuilder",
+      "target": "shaders_shadermodule",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.cpp",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_computepipelinebuilder_cpp_render_computepipelinebuilder",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.cpp",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_computepipelinebuilder_cpp_render_computepipelinebuilder",
       "target": "render_computepipelinebuilder_computepipelinebuilder",
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -8077,12 +9659,62 @@
     },
     {
       "source": "src_render_computepipelinebuilder_h_render_computepipelinebuilder",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_computepipelinebuilder_h_render_computepipelinebuilder",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_computepipelinebuilder_h_render_computepipelinebuilder",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_computepipelinebuilder_h_render_computepipelinebuilder",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_computepipelinebuilder_h_render_computepipelinebuilder",
       "target": "render_computepipelinebuilder_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/ComputePipelineBuilder.h",
       "source_location": "L9",
       "weight": 1.0
+    },
+    {
+      "source": "render_computepipelinebuilder_neurus",
+      "target": "src_render_computepipelinebuilder_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/ComputePipelineBuilder.h",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
@@ -8096,12 +9728,122 @@
     },
     {
       "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_attachmentmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_geometrypass",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_lightingpass",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_renderpassmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_screenshot",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_swapchain",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
       "target": "render_syncobjects",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/render/DeferredRenderer.cpp",
       "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "render_vulkanbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "buffers_vertexbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "buffers_indexbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "matrix_transform",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L21",
       "weight": 1.0
     },
     {
@@ -8132,6 +9874,56 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/DeferredRenderer.cpp",
       "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "array",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "cstdio",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "iostream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_cpp_render_deferredrenderer",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.cpp",
+      "source_location": "L31",
       "weight": 1.0
     },
     {
@@ -8492,12 +10284,92 @@
     },
     {
       "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "render_geometrypass",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "render_lightingpass",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "render_swapchain",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_deferredrenderer_h_render_deferredrenderer",
       "target": "render_deferredrenderer_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/DeferredRenderer.h",
       "source_location": "L32",
       "weight": 1.0
+    },
+    {
+      "source": "render_deferredrenderer_neurus",
+      "target": "src_render_deferredrenderer_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DeferredRenderer.h",
+      "source_location": "L32",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_descriptormanager_cpp_render_descriptormanager",
@@ -8507,6 +10379,16 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/DescriptorManager.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_descriptormanager_cpp_render_descriptormanager",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DescriptorManager.cpp",
+      "source_location": "L3",
       "weight": 1.0
     },
     {
@@ -8811,12 +10693,52 @@
     },
     {
       "source": "src_render_descriptormanager_h_render_descriptormanager",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DescriptorManager.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_descriptormanager_h_render_descriptormanager",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DescriptorManager.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_descriptormanager_h_render_descriptormanager",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DescriptorManager.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_descriptormanager_h_render_descriptormanager",
       "target": "render_descriptormanager_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/DescriptorManager.h",
       "source_location": "L8",
       "weight": 1.0
+    },
+    {
+      "source": "render_descriptormanager_neurus",
+      "target": "src_render_descriptormanager_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/DescriptorManager.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_geometrypass_cpp_render_geometrypass",
@@ -8826,6 +10748,86 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/GeometryPass.cpp",
       "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "render_attachmentmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "render_pipelinebuilder",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "render_renderpassmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "shaders_shadermodule",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "array",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_cpp_render_geometrypass",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.cpp",
+      "source_location": "L17",
       "weight": 1.0
     },
     {
@@ -9026,12 +11028,82 @@
     },
     {
       "source": "src_render_geometrypass_h_render_geometrypass",
+      "target": "render_descriptormanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_h_render_geometrypass",
+      "target": "render_vulkanbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_h_render_geometrypass",
+      "target": "buffers_bufferlayout",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_h_render_geometrypass",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_h_render_geometrypass",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_h_render_geometrypass",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_geometrypass_h_render_geometrypass",
       "target": "render_geometrypass_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/GeometryPass.h",
       "source_location": "L32",
       "weight": 1.0
+    },
+    {
+      "source": "render_geometrypass_neurus",
+      "target": "src_render_geometrypass_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/GeometryPass.h",
+      "source_location": "L32",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_image_cpp_render_image",
@@ -9041,6 +11113,46 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/Image.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_cpp_render_image",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_cpp_render_image",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_cpp_render_image",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_cpp_render_image",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.cpp",
+      "source_location": "L7",
       "weight": 1.0
     },
     {
@@ -9643,12 +11755,52 @@
     },
     {
       "source": "src_render_image_h_render_image",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_h_render_image",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_h_render_image",
+      "target": "type_traits",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.h",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_image_h_render_image",
       "target": "render_image_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/Image.h",
       "source_location": "L10",
       "weight": 1.0
+    },
+    {
+      "source": "render_image_neurus",
+      "target": "src_render_image_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Image.h",
+      "source_location": "L10",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_lightingpass_cpp_render_lightingpass",
@@ -9662,12 +11814,112 @@
     },
     {
       "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "render_attachmentmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "render_computepipelinebuilder",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "render_image",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "shaders_shadermodule",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "light",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
       "target": "src_render_lightingpass_cpp_scene",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/render/LightingPass.cpp",
       "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "array",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_cpp_render_lightingpass",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.cpp",
+      "source_location": "L21",
       "weight": 1.0
     },
     {
@@ -9962,12 +12214,72 @@
     },
     {
       "source": "src_render_lightingpass_h_render_lightingpass",
+      "target": "render_descriptormanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_h_render_lightingpass",
+      "target": "render_vulkanbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_h_render_lightingpass",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_h_render_lightingpass",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_h_render_lightingpass",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_lightingpass_h_render_lightingpass",
       "target": "render_lightingpass_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/LightingPass.h",
       "source_location": "L30",
       "weight": 1.0
+    },
+    {
+      "source": "render_lightingpass_neurus",
+      "target": "src_render_lightingpass_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/LightingPass.h",
+      "source_location": "L30",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_material_cpp_render_material",
@@ -10192,6 +12504,66 @@
     },
     {
       "source": "src_render_material_h_render_material",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Material.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_material_h_render_material",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Material.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_material_h_render_material",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Material.h",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_material_h_render_material",
+      "target": "tuple",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Material.h",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_material_h_render_material",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Material.h",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_material_h_render_material",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Material.h",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_material_h_render_material",
       "target": "render_material_is_mat_changed",
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -10207,6 +12579,16 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/MeshBindings.cpp",
       "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "render_meshbindings",
+      "target": "material",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/MeshBindings.cpp",
+      "source_location": "L16",
       "weight": 1.0
     },
     {
@@ -10268,6 +12650,36 @@
     },
     {
       "source": "src_render_pipelinebuilder_cpp_render_pipelinebuilder",
+      "target": "buffers_bufferlayout",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_pipelinebuilder_cpp_render_pipelinebuilder",
+      "target": "shaders_shadermodule",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.cpp",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_pipelinebuilder_cpp_render_pipelinebuilder",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_pipelinebuilder_cpp_render_pipelinebuilder",
       "target": "render_pipelinebuilder_buildgraphicspipeline",
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -10297,12 +12709,52 @@
     },
     {
       "source": "src_render_pipelinebuilder_h_render_pipelinebuilder",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_pipelinebuilder_h_render_pipelinebuilder",
+      "target": "optional",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_pipelinebuilder_h_render_pipelinebuilder",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_pipelinebuilder_h_render_pipelinebuilder",
       "target": "render_pipelinebuilder_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/PipelineBuilder.h",
       "source_location": "L8",
       "weight": 1.0
+    },
+    {
+      "source": "render_pipelinebuilder_neurus",
+      "target": "src_render_pipelinebuilder_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/PipelineBuilder.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_renderpassmanager_cpp_render_renderpassmanager",
@@ -10312,6 +12764,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/RenderPassManager.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_renderpassmanager_cpp_render_renderpassmanager",
+      "target": "cassert",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/RenderPassManager.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_renderpassmanager_cpp_render_renderpassmanager",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/RenderPassManager.cpp",
+      "source_location": "L4",
       "weight": 1.0
     },
     {
@@ -10697,6 +13169,16 @@
     },
     {
       "source": "src_render_renderpassmanager_h_render_renderpassmanager",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/RenderPassManager.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_renderpassmanager_h_render_renderpassmanager",
       "target": "span",
       "relation": "imports",
       "context": "import",
@@ -10707,12 +13189,32 @@
     },
     {
       "source": "src_render_renderpassmanager_h_render_renderpassmanager",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/RenderPassManager.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_renderpassmanager_h_render_renderpassmanager",
       "target": "render_renderpassmanager_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/RenderPassManager.h",
       "source_location": "L8",
       "weight": 1.0
+    },
+    {
+      "source": "render_renderpassmanager_neurus",
+      "target": "src_render_renderpassmanager_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/RenderPassManager.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_screenshot_cpp_render_screenshot",
@@ -10726,12 +13228,102 @@
     },
     {
       "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "render_image",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "render_attachmentmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
       "target": "imagedata",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/render/Screenshot.cpp",
       "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "render_texture",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "chrono",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "ctime",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "iomanip",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_cpp_render_screenshot",
+      "target": "sstream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.cpp",
+      "source_location": "L12",
       "weight": 1.0
     },
     {
@@ -11002,12 +13594,42 @@
     },
     {
       "source": "src_render_screenshot_h_render_screenshot",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_h_render_screenshot",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_screenshot_h_render_screenshot",
       "target": "render_screenshot_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/Screenshot.h",
       "source_location": "L7",
       "weight": 1.0
+    },
+    {
+      "source": "render_screenshot_neurus",
+      "target": "src_render_screenshot_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Screenshot.h",
+      "source_location": "L7",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_swapchain_cpp_render_swapchain",
@@ -11017,6 +13639,36 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/Swapchain.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_swapchain_cpp_render_swapchain",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_swapchain_cpp_render_swapchain",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_swapchain_cpp_render_swapchain",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -11392,11 +14044,71 @@
     },
     {
       "source": "src_render_swapchain_h_render_swapchain",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_swapchain_h_render_swapchain",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_swapchain_h_render_swapchain",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_swapchain_h_render_swapchain",
       "target": "render_swapchain_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/Swapchain.h",
       "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "render_swapchain_neurus",
+      "target": "src_render_swapchain_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Swapchain.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "render_syncobjects",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/SyncObjects.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "render_syncobjects",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/SyncObjects.h",
+      "source_location": "L5",
       "weight": 1.0
     },
     {
@@ -11407,6 +14119,16 @@
       "source_file": "src/render/SyncObjects.h",
       "source_location": "L7",
       "weight": 1.0
+    },
+    {
+      "source": "render_syncobjects_neurus",
+      "target": "src_render_syncobjects_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/SyncObjects.h",
+      "source_location": "L7",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "render_syncobjects",
@@ -11487,12 +14209,92 @@
     },
     {
       "source": "src_render_texture_cpp_render_texture",
+      "target": "render_vulkanbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
       "target": "imagedata",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/render/Texture.cpp",
       "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "stb_image",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "cmath",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_cpp_render_texture",
+      "target": "filesystem",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.cpp",
+      "source_location": "L14",
       "weight": 1.0
     },
     {
@@ -12194,12 +14996,82 @@
     },
     {
       "source": "src_render_texture_h_render_texture",
+      "target": "render_image",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_h_render_texture",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_h_render_texture",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_h_render_texture",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_h_render_texture",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_h_render_texture",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_texture_h_render_texture",
       "target": "render_texture_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/Texture.h",
       "source_location": "L12",
       "weight": 1.0
+    },
+    {
+      "source": "render_texture_neurus",
+      "target": "src_render_texture_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/Texture.h",
+      "source_location": "L12",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_vulkanbuffer_cpp_render_vulkanbuffer",
@@ -12209,6 +15081,46 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/VulkanBuffer.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_cpp_render_vulkanbuffer",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_cpp_render_vulkanbuffer",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_cpp_render_vulkanbuffer",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_cpp_render_vulkanbuffer",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.cpp",
+      "source_location": "L7",
       "weight": 1.0
     },
     {
@@ -12435,12 +15347,52 @@
     },
     {
       "source": "src_render_vulkanbuffer_h_render_vulkanbuffer",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_h_render_vulkanbuffer",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_h_render_vulkanbuffer",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkanbuffer_h_render_vulkanbuffer",
       "target": "render_vulkanbuffer_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/VulkanBuffer.h",
       "source_location": "L8",
       "weight": 1.0
+    },
+    {
+      "source": "render_vulkanbuffer_neurus",
+      "target": "src_render_vulkanbuffer_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanBuffer.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_vulkancontext_cpp_render_vulkancontext",
@@ -12450,6 +15402,46 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/VulkanContext.cpp",
       "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_cpp_render_vulkancontext",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_cpp_render_vulkancontext",
+      "target": "set",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.cpp",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_cpp_render_vulkancontext",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_cpp_render_vulkancontext",
+      "target": "iostream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.cpp",
+      "source_location": "L9",
       "weight": 1.0
     },
     {
@@ -12646,11 +15638,111 @@
     },
     {
       "source": "src_render_vulkancontext_h_render_vulkancontext",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_h_render_vulkancontext",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_h_render_vulkancontext",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_h_render_vulkancontext",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_vulkancontext_h_render_vulkancontext",
       "target": "render_vulkancontext_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/VulkanContext.h",
       "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "render_vulkancontext_neurus",
+      "target": "src_render_vulkancontext_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanContext.h",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "render_vulkanimage",
+      "target": "vulkanimage",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanImage.cpp",
+      "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "render_vulkanimage",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanImage.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "render_vulkanimage",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanImage.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "render_vulkanimage",
+      "target": "algorithm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanImage.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "render_vulkanimage",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/VulkanImage.cpp",
+      "source_location": "L7",
       "weight": 1.0
     },
     {
@@ -13329,12 +16421,52 @@
     },
     {
       "source": "src_render_buffers_bufferlayout_h_buffers_bufferlayout",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/BufferLayout.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_bufferlayout_h_buffers_bufferlayout",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/BufferLayout.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_bufferlayout_h_buffers_bufferlayout",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/BufferLayout.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_bufferlayout_h_buffers_bufferlayout",
       "target": "buffers_bufferlayout_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/buffers/BufferLayout.h",
       "source_location": "L8",
       "weight": 1.0
+    },
+    {
+      "source": "buffers_bufferlayout_neurus",
+      "target": "src_render_buffers_bufferlayout_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/BufferLayout.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_buffers_indexbuffer_cpp_buffers_indexbuffer",
@@ -13344,6 +16476,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/buffers/IndexBuffer.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_indexbuffer_cpp_buffers_indexbuffer",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/IndexBuffer.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_indexbuffer_cpp_buffers_indexbuffer",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/IndexBuffer.cpp",
+      "source_location": "L5",
       "weight": 1.0
     },
     {
@@ -13407,12 +16559,32 @@
     },
     {
       "source": "src_render_buffers_indexbuffer_h_buffers_indexbuffer",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/IndexBuffer.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_indexbuffer_h_buffers_indexbuffer",
       "target": "buffers_indexbuffer_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/buffers/IndexBuffer.h",
       "source_location": "L7",
       "weight": 1.0
+    },
+    {
+      "source": "buffers_indexbuffer_neurus",
+      "target": "src_render_buffers_indexbuffer_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/IndexBuffer.h",
+      "source_location": "L7",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_buffers_vertexbuffer_cpp_buffers_vertexbuffer",
@@ -13422,6 +16594,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/buffers/VertexBuffer.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_vertexbuffer_cpp_buffers_vertexbuffer",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/VertexBuffer.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_vertexbuffer_cpp_buffers_vertexbuffer",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/VertexBuffer.cpp",
+      "source_location": "L5",
       "weight": 1.0
     },
     {
@@ -13485,12 +16677,32 @@
     },
     {
       "source": "src_render_buffers_vertexbuffer_h_buffers_vertexbuffer",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/VertexBuffer.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_buffers_vertexbuffer_h_buffers_vertexbuffer",
       "target": "buffers_vertexbuffer_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/buffers/VertexBuffer.h",
       "source_location": "L7",
       "weight": 1.0
+    },
+    {
+      "source": "buffers_vertexbuffer_neurus",
+      "target": "src_render_buffers_vertexbuffer_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/buffers/VertexBuffer.h",
+      "source_location": "L7",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_shaders_shaderlib_cpp_shaders_shaderlib",
@@ -13562,12 +16774,62 @@
     },
     {
       "source": "src_render_shaders_shaderlib_h_shaders_shaderlib",
+      "target": "shaders_shadermodule",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderLib.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderlib_h_shaders_shaderlib",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderLib.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderlib_h_shaders_shaderlib",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderLib.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderlib_h_shaders_shaderlib",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderLib.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderlib_h_shaders_shaderlib",
       "target": "shaders_shaderlib_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/shaders/ShaderLib.h",
       "source_location": "L9",
       "weight": 1.0
+    },
+    {
+      "source": "shaders_shaderlib_neurus",
+      "target": "src_render_shaders_shaderlib_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderLib.h",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_shaders_shadermodule_cpp_shaders_shadermodule",
@@ -13577,6 +16839,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/shaders/ShaderModule.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_cpp_shaders_shadermodule",
+      "target": "fstream",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_cpp_shaders_shadermodule",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.cpp",
+      "source_location": "L4",
       "weight": 1.0
     },
     {
@@ -13746,12 +17028,72 @@
     },
     {
       "source": "src_render_shaders_shadermodule_h_shaders_shadermodule",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_h_shaders_shadermodule",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_h_shaders_shadermodule",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_h_shaders_shadermodule",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_h_shaders_shadermodule",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shadermodule_h_shaders_shadermodule",
       "target": "shaders_shadermodule_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/shaders/ShaderModule.h",
       "source_location": "L10",
       "weight": 1.0
+    },
+    {
+      "source": "shaders_shadermodule_neurus",
+      "target": "src_render_shaders_shadermodule_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderModule.h",
+      "source_location": "L10",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_render_shaders_shaderprogram_cpp_shaders_shaderprogram",
@@ -13761,6 +17103,16 @@
       "confidence": "EXTRACTED",
       "source_file": "src/render/shaders/ShaderProgram.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderprogram_cpp_shaders_shaderprogram",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderProgram.cpp",
+      "source_location": "L3",
       "weight": 1.0
     },
     {
@@ -13803,11 +17155,61 @@
     },
     {
       "source": "src_render_shaders_shaderprogram_h_shaders_shaderprogram",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderProgram.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderprogram_h_shaders_shaderprogram",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderProgram.h",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderprogram_h_shaders_shaderprogram",
+      "target": "cstdint",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderProgram.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_render_shaders_shaderprogram_h_shaders_shaderprogram",
       "target": "shaders_shaderprogram_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/render/shaders/ShaderProgram.h",
       "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "shaders_shaderprogram_neurus",
+      "target": "src_render_shaders_shaderprogram_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/render/shaders/ShaderProgram.h",
+      "source_location": "L8",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_scene_camera_cpp_scene_camera",
+      "target": "camera",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -13952,12 +17354,72 @@
     },
     {
       "source": "src_scene_camera_h_scene_camera",
+      "target": "transform",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_camera_h_scene_camera",
+      "target": "uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_camera_h_scene_camera",
+      "target": "base_class",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_camera_h_scene_camera",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_camera_h_scene_camera",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_camera_h_scene_camera",
       "target": "scene_camera_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/scene/Camera.h",
       "source_location": "L28",
       "weight": 1.0
+    },
+    {
+      "source": "scene_camera_neurus",
+      "target": "src_scene_camera_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Camera.h",
+      "source_location": "L28",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_scene_debugline_cpp_scene_debugline",
@@ -14043,6 +17505,46 @@
       "confidence": "EXTRACTED",
       "source_file": "src/scene/DebugLine.cpp",
       "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugline_h_scene_debugline",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugLine.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugline_h_scene_debugline",
+      "target": "base_class",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugLine.h",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugline_h_scene_debugline",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugLine.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugline_h_scene_debugline",
+      "target": "scene_uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugLine.h",
+      "source_location": "L27",
       "weight": 1.0
     },
     {
@@ -14197,6 +17699,46 @@
     },
     {
       "source": "src_scene_debugpoints_h_scene_debugpoints",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugPoints.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugpoints_h_scene_debugpoints",
+      "target": "base_class",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugPoints.h",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugpoints_h_scene_debugpoints",
+      "target": "vector",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugPoints.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugpoints_h_scene_debugpoints",
+      "target": "scene_uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DebugPoints.h",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_debugpoints_h_scene_debugpoints",
       "target": "scene_transform",
       "relation": "imports",
       "context": "import",
@@ -14281,12 +17823,72 @@
     },
     {
       "source": "src_scene_defaultscene_cpp_scene_defaultscene",
+      "target": "defaultscene",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.cpp",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_cpp_scene_defaultscene",
+      "target": "camera",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_cpp_scene_defaultscene",
+      "target": "light",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.cpp",
+      "source_location": "L12",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_cpp_scene_defaultscene",
       "target": "mesh",
       "relation": "imports",
       "context": "import",
       "confidence": "EXTRACTED",
       "source_file": "src/scene/DefaultScene.cpp",
       "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_cpp_scene_defaultscene",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.cpp",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_cpp_scene_defaultscene",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.cpp",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_cpp_scene_defaultscene",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.cpp",
+      "source_location": "L17",
       "weight": 1.0
     },
     {
@@ -14330,11 +17932,71 @@
     },
     {
       "source": "src_scene_defaultscene_h_scene_defaultscene",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.h",
+      "source_location": "L15",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_h_scene_defaultscene",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.h",
+      "source_location": "L16",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_h_scene_defaultscene",
+      "target": "scene_scene",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.h",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_defaultscene_h_scene_defaultscene",
       "target": "scene_defaultscene_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/scene/DefaultScene.h",
       "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_defaultscene_neurus",
+      "target": "src_scene_defaultscene_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/DefaultScene.h",
+      "source_location": "L20",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "scene_glmserialization",
+      "target": "cereal",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/GlmSerialization.h",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_glmserialization",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/GlmSerialization.h",
+      "source_location": "L12",
       "weight": 1.0
     },
     {
@@ -14344,6 +18006,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/scene/GlmSerialization.h",
       "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_glmserialization_cereal",
+      "target": "src_scene_glmserialization_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/GlmSerialization.h",
+      "source_location": "L14",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_scene_light_cpp_scene_light",
+      "target": "light",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -14508,6 +18190,66 @@
     },
     {
       "source": "src_scene_light_h_scene_light",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.h",
+      "source_location": "L17",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_light_h_scene_light",
+      "target": "utility",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.h",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_light_h_scene_light",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.h",
+      "source_location": "L20",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_light_h_scene_light",
+      "target": "base_class",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_light_h_scene_light",
+      "target": "transform",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.h",
+      "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_light_h_scene_light",
+      "target": "uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Light.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_light_h_scene_light",
       "target": "scene_light_spot_outer_cutoff",
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -14523,6 +18265,56 @@
       "confidence": "EXTRACTED",
       "source_file": "src/scene/Mesh.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_cpp_scene_mesh",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.cpp",
+      "source_location": "L2",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_cpp_scene_mesh",
+      "target": "meshdata",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_cpp_scene_mesh",
+      "target": "indexbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.cpp",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_cpp_scene_mesh",
+      "target": "vertexbuffer",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_cpp_scene_mesh",
+      "target": "cstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -14640,6 +18432,66 @@
     },
     {
       "source": "src_scene_mesh_h_scene_mesh",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_h_scene_mesh",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_h_scene_mesh",
+      "target": "glm",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_h_scene_mesh",
+      "target": "base_class",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_h_scene_mesh",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L28",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_h_scene_mesh",
+      "target": "scene_uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L30",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_mesh_h_scene_mesh",
       "target": "scene_transform",
       "relation": "imports",
       "context": "import",
@@ -14656,6 +18508,16 @@
       "source_file": "src/scene/Mesh.h",
       "source_location": "L33",
       "weight": 1.0
+    },
+    {
+      "source": "scene_mesh_neurus",
+      "target": "src_scene_mesh_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Mesh.h",
+      "source_location": "L33",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_scene_scene_cpp_scene_scene",
@@ -14818,11 +18680,141 @@
     },
     {
       "source": "src_scene_scene_h_scene_scene",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L31",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L32",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L34",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "unordered_map",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L35",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_camera",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L39",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_debugline",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L40",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_debugpoints",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L41",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_light",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L42",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_mesh",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L43",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
+      "target": "scene_sprite",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L44",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_scene_h_scene_scene",
       "target": "scene_scene_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/scene/Scene.h",
       "source_location": "L46",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_scene_neurus",
+      "target": "src_scene_scene_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Scene.h",
+      "source_location": "L46",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
+      "source": "src_scene_sprite_cpp_scene_sprite",
+      "target": "sprite",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Sprite.cpp",
+      "source_location": "L6",
       "weight": 1.0
     },
     {
@@ -14855,12 +18847,62 @@
     },
     {
       "source": "src_scene_sprite_h_scene_sprite",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Sprite.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_sprite_h_scene_sprite",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Sprite.h",
+      "source_location": "L23",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_sprite_h_scene_sprite",
+      "target": "base_class",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Sprite.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_sprite_h_scene_sprite",
+      "target": "uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Sprite.h",
+      "source_location": "L27",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_sprite_h_scene_sprite",
       "target": "scene_sprite_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/scene/Sprite.h",
       "source_location": "L29",
       "weight": 1.0
+    },
+    {
+      "source": "scene_sprite_neurus",
+      "target": "src_scene_sprite_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Sprite.h",
+      "source_location": "L29",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "scene_transform",
@@ -14870,6 +18912,36 @@
       "confidence": "EXTRACTED",
       "source_file": "src/scene/Transform.h",
       "source_location": "L24",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_transform",
+      "target": "matrix_transform",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Transform.h",
+      "source_location": "L25",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_transform",
+      "target": "type_ptr",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Transform.h",
+      "source_location": "L26",
+      "weight": 1.0
+    },
+    {
+      "source": "scene_transform",
+      "target": "cereal",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/Transform.h",
+      "source_location": "L28",
       "weight": 1.0
     },
     {
@@ -15026,6 +19098,16 @@
     },
     {
       "source": "src_scene_uid_cpp_scene_uid",
+      "target": "uid",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/UID.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_uid_cpp_scene_uid",
       "target": "scene_uid_uid",
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -15053,12 +19135,52 @@
     },
     {
       "source": "src_scene_uid_h_scene_uid",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/UID.h",
+      "source_location": "L19",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_uid_h_scene_uid",
+      "target": "cereal",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/UID.h",
+      "source_location": "L21",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_uid_h_scene_uid",
+      "target": "string",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/UID.h",
+      "source_location": "L22",
+      "weight": 1.0
+    },
+    {
+      "source": "src_scene_uid_h_scene_uid",
       "target": "scene_uid_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/scene/UID.h",
       "source_location": "L24",
       "weight": 1.0
+    },
+    {
+      "source": "scene_uid_neurus",
+      "target": "src_scene_uid_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/scene/UID.h",
+      "source_location": "L24",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_ui_mainwindow_cpp_ui_mainwindow",
@@ -15078,6 +19200,16 @@
       "confidence": "EXTRACTED",
       "source_file": "src/ui/MainWindow.cpp",
       "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_mainwindow_cpp_ui_mainwindow",
+      "target": "stdexcept",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.cpp",
+      "source_location": "L7",
       "weight": 1.0
     },
     {
@@ -15140,12 +19272,72 @@
     },
     {
       "source": "src_ui_mainwindow_h_ui_mainwindow",
+      "target": "qobject",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_mainwindow_h_ui_mainwindow",
+      "target": "qstring",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L4",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_mainwindow_h_ui_mainwindow",
+      "target": "vulkan_raii",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_mainwindow_h_ui_mainwindow",
+      "target": "windows",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_mainwindow_h_ui_mainwindow",
+      "target": "memory",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_mainwindow_h_ui_mainwindow",
       "target": "ui_mainwindow_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ui/MainWindow.h",
       "source_location": "L13",
       "weight": 1.0
+    },
+    {
+      "source": "ui_mainwindow_neurus",
+      "target": "src_ui_mainwindow_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/MainWindow.h",
+      "source_location": "L13",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
@@ -15165,6 +19357,106 @@
       "confidence": "EXTRACTED",
       "source_file": "src/ui/NeurusMainWindow.cpp",
       "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qapplication",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L5",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qfile",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L6",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qfiledialog",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L7",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qlabel",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L8",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qmenubar",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L9",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qmessagebox",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L10",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "qvboxlayout",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "dockmanager",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L13",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "dockwidget",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L14",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_cpp_ui_neurusmainwindow",
+      "target": "dockareawidget",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.cpp",
+      "source_location": "L15",
       "weight": 1.0
     },
     {
@@ -15350,12 +19642,32 @@
     },
     {
       "source": "src_ui_neurusmainwindow_h_ui_neurusmainwindow",
+      "target": "qmainwindow",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_neurusmainwindow_h_ui_neurusmainwindow",
       "target": "ui_neurusmainwindow_ads",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ui/NeurusMainWindow.h",
       "source_location": "L7",
       "weight": 1.0
+    },
+    {
+      "source": "ui_neurusmainwindow_ads",
+      "target": "src_ui_neurusmainwindow_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.h",
+      "source_location": "L7",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "src_ui_neurusmainwindow_h_ui_neurusmainwindow",
@@ -15367,6 +19679,16 @@
       "weight": 1.0
     },
     {
+      "source": "ui_neurusmainwindow_neurus",
+      "target": "src_ui_neurusmainwindow_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/NeurusMainWindow.h",
+      "source_location": "L12",
+      "weight": 1.0,
+      "context": "return_type"
+    },
+    {
       "source": "src_ui_vulkanwidget_cpp_ui_vulkanwidget",
       "target": "src_ui_vulkanwidget_cpp_ui_vulkanwidget",
       "relation": "imports",
@@ -15374,6 +19696,26 @@
       "confidence": "EXTRACTED",
       "source_file": "src/ui/VulkanWidget.cpp",
       "source_location": "L1",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_vulkanwidget_cpp_ui_vulkanwidget",
+      "target": "log",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/VulkanWidget.cpp",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_vulkanwidget_cpp_ui_vulkanwidget",
+      "target": "input",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/VulkanWidget.cpp",
+      "source_location": "L4",
       "weight": 1.0
     },
     {
@@ -15618,12 +19960,32 @@
     },
     {
       "source": "src_ui_vulkanwidget_h_ui_vulkanwidget",
+      "target": "qwidget",
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/VulkanWidget.h",
+      "source_location": "L3",
+      "weight": 1.0
+    },
+    {
+      "source": "src_ui_vulkanwidget_h_ui_vulkanwidget",
       "target": "ui_vulkanwidget_neurus",
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "src/ui/VulkanWidget.h",
       "source_location": "L9",
       "weight": 1.0
+    },
+    {
+      "source": "ui_vulkanwidget_neurus",
+      "target": "src_ui_vulkanwidget_h_namespace",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "source_file": "src/ui/VulkanWidget.h",
+      "source_location": "L9",
+      "weight": 1.0,
+      "context": "return_type"
     },
     {
       "source": "editor_context_notifyscenechanged",
