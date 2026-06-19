@@ -53,6 +53,7 @@
 #include "gbuffer.vert.h"
 #include "gbuffer.frag.h"
 #include "pbr_lighting.comp.h"
+#include "ssao.comp.h"
 
 namespace {
 
@@ -130,7 +131,7 @@ int Application::Run(int argc, char* argv[])
 	}
 
 	// --- Load or create project ---
-	const QString projectFilePath = resolveResourcePath("default.neurus.json");
+	const QString projectFilePath = resolveResourcePath("shadow.neurus.json"); // Temporarily used for Rendering development and test.
 	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
 	m_project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
 	try
@@ -193,7 +194,8 @@ int Application::Run(int argc, char* argv[])
 			vulkanWidget->height(),
 			gbuffer_vert_spv, gbuffer_vert_spv_size,
 			gbuffer_frag_spv, gbuffer_frag_spv_size,
-			pbr_lighting_comp_spv, pbr_lighting_comp_spv_size
+			pbr_lighting_comp_spv, pbr_lighting_comp_spv_size,
+			ssao_comp_spv, ssao_comp_spv_size
 		);
 	}
 	catch (const std::exception& e)

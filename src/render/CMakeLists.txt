@@ -41,6 +41,8 @@ add_library(neurus_render STATIC
 	GeometryPass.cpp
 	LightingPass.h
 	LightingPass.cpp
+	SSAOPass.h
+	SSAOPass.cpp
 	DeferredRenderer.h
 	DeferredRenderer.cpp
 	SyncObjects.h

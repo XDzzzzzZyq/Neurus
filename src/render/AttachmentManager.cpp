@@ -142,7 +142,8 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 		return { vk::Format::eR16G16B16A16Sfloat,
 		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
 	case AttachmentName::SSAO:
-		return { vk::Format::eR8Unorm, kColorAttachmentUsage, e2D };
+		return { vk::Format::eR8Unorm,
+		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
 	case AttachmentName::SSR:
 		return { vk::Format::eR16G16B16A16Sfloat, kColorAttachmentUsage, e2D };
 	}

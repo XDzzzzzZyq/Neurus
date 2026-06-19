@@ -10,6 +10,7 @@
 #include "LightingPass.h"
 #include "RenderPassManager.h"
 #include "Screenshot.h"
+#include "SSAOPass.h"
 #include "Swapchain.h"
 #include "SyncObjects.h"
 #include "VulkanBuffer.h"
@@ -48,7 +49,9 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
                                     const uint32_t* gFragSpv,
                                     size_t gFragSize,
                                     const uint32_t* lightCompSpv,
-                                    size_t lightCompSize)
+                                    size_t lightCompSize,
+                                    const uint32_t* ssaoCompSpv,
+                                    size_t ssaoCompSize)
 	: m_device(device)
 	, m_physicalDevice(physicalDevice)
 	, m_graphicsQueue(graphicsQueue)
@@ -100,6 +103,14 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		kMaxFramesInFlight,
 		m_graphicsQueue, m_queueFamilyIndex,
 		lightCompSpv, lightCompSize);
+
+	// --- 7b. Create SSAO pass ---
+	m_ssaoPass = std::make_unique<SSAOPass>(
+		device, physicalDevice,
+		*m_attachmentManager,
+		kMaxFramesInFlight,
+		m_graphicsQueue, m_queueFamilyIndex,
+		ssaoCompSpv, ssaoCompSize);
 
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
@@ -565,11 +576,19 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	const CameraUBOData cameraData = computeCameraData(extent, camera);
 	const glm::mat4 viewMatrix = cameraData.view;
 	const glm::vec3 cameraPos = camera.GetPosition();
+	const glm::mat4 viewProj = cameraData.viewProj;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
 	m_geometryPass->Record(cmdBuf, cameraData, renderItems, extent);
 
-	// --- Phase 2: LightingPass → compute PBR → HDRColor ---
+	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
+	if (m_ssaoPass)
+	{
+		m_ssaoPass->UpdateParams(viewProj, viewMatrix, cameraPos);
+		m_ssaoPass->Record(cmdBuf, extent, m_currentFrame);
+	}
+
+	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
 	//     Light SSBO is owned and managed by LightingPass internally.
 	//     UploadLights() should be called before the first DrawFrame()
 	//     to populate the SSBO from the scene (handled by T9).
@@ -579,7 +598,7 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	                       extent,
 	                       m_currentFrame);
 
-	// --- Phase 3: Blit HDRColor → swapchain image ---
+	// --- Phase 4: Blit HDRColor → swapchain image ---
 	// LightingPass leaves HDRColor in GENERAL layout.
 	// Transition to TRANSFER_SRC_OPTIMAL for the blit.
 	auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);

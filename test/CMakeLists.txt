@@ -27,6 +27,7 @@ add_executable(neurus_test
 	render/test_lighting.cpp
 	render/test_model_render.cpp
 	render/test_deferred_shading.cpp
+	render/test_ssao.cpp
 	render/test_screenshot.cpp
 	render/test_scene_wiring.cpp
 	editor/test_camera_controller.cpp

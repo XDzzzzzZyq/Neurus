@@ -322,13 +322,19 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 		for (size_t i = 0; i < 4; ++i)
 		{
 			auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+			const vk::ImageLayout oldLayout = attachment.CurrentLayout();
+
 			barriers[i] = vk::ImageMemoryBarrier2(
-				vk::PipelineStageFlagBits2::eColorAttachmentOutput,  // srcStage
-				vk::AccessFlagBits2::eColorAttachmentWrite,           // srcAccess
-				vk::PipelineStageFlagBits2::eComputeShader,            // dstStage
-				vk::AccessFlagBits2::eShaderRead,                      // dstAccess
-				vk::ImageLayout::eColorAttachmentOptimal,              // oldLayout
-				vk::ImageLayout::eShaderReadOnlyOptimal,               // newLayout
+				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
+					? vk::PipelineStageFlagBits2::eColorAttachmentOutput
+					: vk::PipelineStageFlagBits2::eComputeShader,         // srcStage
+				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
+					? vk::AccessFlagBits2::eColorAttachmentWrite
+					: vk::AccessFlagBits2::eShaderWrite,                  // srcAccess
+				vk::PipelineStageFlagBits2::eComputeShader,               // dstStage
+				vk::AccessFlagBits2::eShaderRead,                         // dstAccess
+				oldLayout,                                                 // oldLayout (actual)
+				vk::ImageLayout::eShaderReadOnlyOptimal,                  // newLayout
 				VK_QUEUE_FAMILY_IGNORED,
 				VK_QUEUE_FAMILY_IGNORED,
 				*attachment.ImageHandle(),

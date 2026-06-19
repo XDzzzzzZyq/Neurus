@@ -20,6 +20,7 @@
 
 #include "GeometryPass.h"
 #include "LightingPass.h"
+#include "SSAOPass.h"
 #include "Swapchain.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -79,6 +80,8 @@ public:
 	 * @param gFragSize        G-Buffer fragment shader SPIR-V size.
 	 * @param lightCompSpv     PBR lighting compute shader SPIR-V data.
 	 * @param lightCompSize    PBR lighting compute shader SPIR-V size.
+	 * @param ssaoCompSpv      SSAO compute shader SPIR-V data.
+	 * @param ssaoCompSize     SSAO compute shader SPIR-V size.
 	 */
 	DeferredRenderer(const vk::raii::Device& device,
 	                 const vk::raii::PhysicalDevice& physicalDevice,
@@ -92,7 +95,9 @@ public:
 	                 const uint32_t* gFragSpv,
 	                 size_t gFragSize,
 	                 const uint32_t* lightCompSpv,
-	                 size_t lightCompSize);
+	                 size_t lightCompSize,
+	                 const uint32_t* ssaoCompSpv,
+	                 size_t ssaoCompSize);
 
 	~DeferredRenderer();
 
@@ -227,6 +232,7 @@ private:
 	std::unique_ptr<RenderPassManager> m_renderPassManager;
 	std::unique_ptr<GeometryPass> m_geometryPass;
 	std::unique_ptr<LightingPass> m_lightingPass;
+	std::unique_ptr<SSAOPass> m_ssaoPass;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;

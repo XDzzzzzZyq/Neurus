@@ -1,0 +1,527 @@
+/**
+ * @file SSAOPass.cpp
+ * @brief Screen-Space Ambient Occlusion compute pass implementation.
+ */
+
+#include "SSAOPass.h"
+
+#include "AttachmentManager.h"
+#include "ComputePipelineBuilder.h"
+#include "Image.h"
+#include "SyncObjects.h"
+#include "shaders/ShaderModule.h"
+
+#include "Log.h"
+
+#include <array>
+#include <cstring>
+#include <stdexcept>
+#include <string>
+
+namespace neurus {
+
+// ---------------------------------------------------------------------------
+// Random number helpers (inline, local to this TU)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/**
+ * @brief Simple deterministic random number generator (xorshift32).
+ *
+ * Used to produce reproducible kernel samples and noise vectors
+ * so that reference-image regression tests are deterministic.
+ */
+class DeterministicRNG
+{
+public:
+	explicit DeterministicRNG(uint32_t seed = 0xDEADBEEF) : m_state(seed) {}
+
+	float rand01()
+	{
+		m_state ^= m_state << 13;
+		m_state ^= m_state >> 17;
+		m_state ^= m_state << 5;
+		return static_cast<float>(m_state) / static_cast<float>(UINT32_MAX);
+	}
+
+	float rand11()
+	{
+		return rand01() * 2.0f - 1.0f;
+	}
+
+	glm::vec3 rand3n()
+	{
+		return glm::normalize(glm::vec3(rand11(), rand11(), rand11()));
+	}
+
+	/**
+	 * @brief Random unit hemisphere direction biased toward the normal (z > 0).
+	 */
+	glm::vec3 rand3nh()
+	{
+		glm::vec3 v(rand11(), rand11(), rand11());
+		v.z = v.z * 0.5f + 0.5f;  // bias z toward [0, 1]
+		return glm::normalize(v);
+	}
+
+private:
+	uint32_t m_state;
+};
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Construction
+// ---------------------------------------------------------------------------
+
+SSAOPass::SSAOPass(const vk::raii::Device& device,
+                   const vk::raii::PhysicalDevice& physicalDevice,
+                   AttachmentManager& attachmentManager,
+                   uint32_t numSets,
+                   vk::Queue graphicsQueue,
+                   uint32_t queueFamilyIndex,
+                   const uint32_t* compSpv,
+                   size_t compSize)
+	: m_device(&device)
+	, m_attachmentManager(&attachmentManager)
+	// --- Nearest-neighbour sampler for G-Buffer reads ---
+	, m_sampler(CreateSampler(device, physicalDevice))
+	// --- Descriptor set layout ---
+	, m_descriptorSetLayout(CreateDescriptorSetLayout(device))
+	// --- Descriptor pool (numSets sets, pool sizes from layout × numSets) ---
+	, m_descriptorPool(device,
+	                   numSets,
+	                   DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, numSets))
+	// --- Descriptor sets (one per in-flight frame) ---
+	, m_descriptorSets(m_descriptorPool.Allocate(m_descriptorSetLayout, numSets))
+	// --- Pipeline builder (must outlive pipeline) ---
+	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
+	, m_pipeline(CreatePipeline(device, compSpv, compSize))
+{
+	NEURUS_LOG("[SSAOPass] compSize=" << compSize << " numSets=" << numSets
+	           << " kernelLength=" << kDefaultKernelLength
+	           << " qfi=" << queueFamilyIndex);
+
+	// --- Generate and upload kernel + initial camera data ---
+	{
+		const auto kernel = GenerateKernel();
+		SSAOParamsGpu initialParams = {};
+		for (size_t i = 0; i < kMaxKernelSamples; ++i)
+		{
+			initialParams.kernelSamples[i] = kernel[i];
+		}
+
+		m_paramsUBO = std::make_unique<VulkanBuffer>(
+			device, physicalDevice,
+			graphicsQueue, queueFamilyIndex,
+			sizeof(SSAOParamsGpu),
+			vk::BufferUsageFlagBits::eUniformBuffer,
+			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
+			"SSAOParamsUBO");
+
+		// Map and write initial data
+		void* mapped = m_paramsUBO->Map();
+		std::memcpy(mapped, &initialParams, sizeof(SSAOParamsGpu));
+		m_paramsUBO->Unmap();
+
+		NEURUS_LOG("[SSAOPass] Created params UBO (" << sizeof(SSAOParamsGpu) << " bytes, "
+		           << kMaxKernelSamples << " kernel samples)");
+	}
+
+	// --- Generate and upload noise rotation vectors ---
+	{
+		const auto noise = GenerateNoise();
+
+		m_noiseUBO = std::make_unique<VulkanBuffer>(
+			device, physicalDevice,
+			graphicsQueue, queueFamilyIndex,
+			sizeof(noise),
+			vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
+			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			"SSAONoiseUBO");
+
+		// Upload noise data via staging
+		m_noiseUBO->Upload(noise.data(), sizeof(noise));
+
+		NEURUS_LOG("[SSAOPass] Created noise UBO (" << sizeof(noise) << " bytes, "
+		           << kNoiseEntryCount << " entries)");
+	}
+
+#ifdef _DEBUG
+	for (uint32_t i = 0; i < numSets; ++i)
+	{
+		const std::string dsName = "SSAOPass_Set" + std::to_string(i);
+		m_descriptorSets[i].SetDebugName(dsName.c_str());
+	}
+#endif
+}
+
+SSAOPass::~SSAOPass() = default;
+// ---------------------------------------------------------------------------
+
+std::array<KernelSampleGpu, SSAOPass::kMaxKernelSamples> SSAOPass::GenerateKernel()
+{
+	DeterministicRNG rng(0xDEADBEEF);
+	std::array<KernelSampleGpu, kMaxKernelSamples> kernel;
+
+	// Generate hemisphere samples with increasing radius:
+	//   scale = lerp(0.1, 1.0, (i / (N-1))²)
+	// This clusters samples near the centre for fine detail and spreads
+	// far samples for large-scale occlusion.
+	for (uint32_t i = 0; i < kMaxKernelSamples; ++i)
+	{
+		const float t = static_cast<float>(i) / static_cast<float>(kMaxKernelSamples - 1);
+		const float scale = 0.1f + 0.9f * t * t;
+
+		const glm::vec3 dir = scale * rng.rand3nh();
+
+		kernel[i].x   = dir.x;
+		kernel[i].y   = dir.y;
+		kernel[i].z   = dir.z;
+		kernel[i]._pad = 0.0f;
+	}
+
+	NEURUS_LOG("[SSAOPass] Generated " << kMaxKernelSamples << " hemisphere kernel samples");
+	return kernel;
+}
+
+// ---------------------------------------------------------------------------
+// Noise generation
+// ---------------------------------------------------------------------------
+
+std::array<NoiseEntryGpu, SSAOPass::kNoiseEntryCount> SSAOPass::GenerateNoise()
+{
+	DeterministicRNG rng(0xCAFEBABE);
+	std::array<NoiseEntryGpu, kNoiseEntryCount> noise;
+
+	for (uint32_t i = 0; i < kNoiseEntryCount; ++i)
+	{
+		// Random unit direction — used to rotate the tangent plane
+		const glm::vec3 dir = rng.rand3n();
+
+		noise[i].x   = dir.x;
+		noise[i].y   = dir.y;
+		noise[i].z   = dir.z;
+		noise[i]._pad = 0.0f;
+	}
+
+	NEURUS_LOG("[SSAOPass] Generated " << kNoiseEntryCount << " noise rotation entries");
+	return noise;
+}
+
+// ---------------------------------------------------------------------------
+// Parameter update
+// ---------------------------------------------------------------------------
+
+void SSAOPass::UpdateParams(const glm::mat4& viewProj,
+                            const glm::mat4& view,
+                            const glm::vec3& cameraPos)
+{
+	if (!m_paramsUBO)
+	{
+		return;
+	}
+
+	// Map the host-visible UBO and update camera matrices in-place.
+	// Kernel samples are static — only the first 128 bytes (viewProj + view + cameraPos) change.
+	void* mapped = m_paramsUBO->Map();
+	auto* params = static_cast<SSAOParamsGpu*>(mapped);
+
+	// View-projection matrix (column-major)
+	const float* vp = &viewProj[0][0];
+	for (int i = 0; i < 16; ++i) params->viewProj[i] = vp[i];
+
+	// View matrix
+	const float* vm = &view[0][0];
+	for (int i = 0; i < 16; ++i) params->view[i] = vm[i];
+
+	// Camera position
+	params->camX = cameraPos.x;
+	params->camY = cameraPos.y;
+	params->camZ = cameraPos.z;
+	params->camW = 0.0f;
+
+	// Kernel samples are NOT touched — they remain from construction
+
+	m_paramsUBO->Unmap();
+}
+
+// ---------------------------------------------------------------------------
+// Descriptor set layout
+// ---------------------------------------------------------------------------
+
+DescriptorSetLayout SSAOPass::CreateDescriptorSetLayout(const vk::raii::Device& device)
+{
+	auto bindings = BuildLayout()
+		// G-Buffer inputs (combined image samplers)
+		.AddBinding(0,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		.AddBinding(1,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		.AddBinding(2,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		// SSAO output (storage image)
+		.AddBinding(3,
+		            vk::DescriptorType::eStorageImage,
+		            vk::ShaderStageFlagBits::eCompute)
+		// SSAO params UBO (camera + kernel)
+		.AddBinding(4,
+		            vk::DescriptorType::eUniformBuffer,
+		            vk::ShaderStageFlagBits::eCompute)
+		// Noise UBO
+		.AddBinding(5,
+		            vk::DescriptorType::eUniformBuffer,
+		            vk::ShaderStageFlagBits::eCompute)
+		.Build();
+
+	return DescriptorSetLayout(device, bindings);
+}
+
+// ---------------------------------------------------------------------------
+// Sampler factory
+// ---------------------------------------------------------------------------
+
+vk::raii::Sampler SSAOPass::CreateSampler(const vk::raii::Device& device,
+                                           const vk::raii::PhysicalDevice& /*physicalDevice*/)
+{
+	vk::SamplerCreateInfo samplerCI(
+		{},                                         // flags
+		vk::Filter::eNearest,                       // magFilter
+		vk::Filter::eNearest,                       // minFilter
+		vk::SamplerMipmapMode::eNearest,             // mipmapMode
+		vk::SamplerAddressMode::eClampToEdge,        // addressModeU
+		vk::SamplerAddressMode::eClampToEdge,        // addressModeV
+		vk::SamplerAddressMode::eClampToEdge,        // addressModeW
+		0.0f,                                        // mipLodBias
+		VK_FALSE,                                    // anisotropyEnable
+		0.0f,                                        // maxAnisotropy
+		VK_FALSE,                                    // compareEnable
+		vk::CompareOp::eAlways,                      // compareOp
+		0.0f,                                        // minLod
+		0.0f,                                        // maxLod
+		vk::BorderColor::eFloatTransparentBlack,      // borderColor
+		VK_FALSE                                     // unnormalizedCoordinates
+	);
+
+	return vk::raii::Sampler(device, samplerCI);
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline creation
+// ---------------------------------------------------------------------------
+
+vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
+                                             const uint32_t* compSpv,
+                                             size_t compSize)
+{
+	// --- Create compute shader module from embedded SPIR-V ---
+	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
+
+	// --- Push constant range (4 ints = 16 bytes) ---
+	vk::PushConstantRange pushRange(
+		vk::ShaderStageFlagBits::eCompute,
+		0,
+		4 * sizeof(int32_t));  // kernelLength, radius (float), noiseSize, frameIndex
+
+	// --- Build compute pipeline ---
+	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
+		.AddPushConstantRange(pushRange)
+		.BuildComputePipeline();
+}
+
+// ---------------------------------------------------------------------------
+// Descriptor writes
+// ---------------------------------------------------------------------------
+
+void SSAOPass::WriteDescriptors(uint32_t setIndex)
+{
+	DescriptorSet& dstSet = m_descriptorSets[setIndex];
+
+	// --- Write G-Buffer input descriptors (combined image samplers) ---
+	{
+		const std::array<AttachmentName, 3> gBufferInputs = {
+			AttachmentName::Position,
+			AttachmentName::Normal,
+			AttachmentName::Albedo,   // alpha stored in albedo.a or separate?
+		};
+
+		for (uint32_t i = 0; i < 3; ++i)
+		{
+			const auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+
+			vk::DescriptorImageInfo imageInfo(
+				*m_sampler,                              // sampler
+				*attachment.ImageViewHandle(),           // imageView
+				vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
+			);
+
+			dstSet.WriteImage(i, imageInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
+		}
+	}
+
+	// --- Write SSAO output (storage image) ---
+	{
+		const auto& ssaoAtt = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+
+		vk::DescriptorImageInfo imageInfo(
+			nullptr,                              // sampler (not used for storage images)
+			*ssaoAtt.ImageViewHandle(),           // imageView
+			vk::ImageLayout::eGeneral             // imageLayout
+		);
+
+		dstSet.WriteImage(3, imageInfo,
+		                  vk::DescriptorType::eStorageImage);
+	}
+
+	// --- Write SSAO params UBO ---
+	{
+		dstSet.WriteBuffer(4, m_paramsUBO->GetDescriptorInfo(),
+		                   vk::DescriptorType::eUniformBuffer);
+	}
+
+	// --- Write noise UBO ---
+	{
+		dstSet.WriteBuffer(5, m_noiseUBO->GetDescriptorInfo(),
+		                   vk::DescriptorType::eUniformBuffer);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Record
+// ---------------------------------------------------------------------------
+
+void SSAOPass::Record(vk::CommandBuffer cmdBuf,
+                      vk::Extent2D renderExtent,
+                      uint32_t frameIndex)
+{
+	// --- 1. Write descriptor set for this frame slot ---
+	WriteDescriptors(frameIndex);
+
+	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
+	//     and SSAO attachment to GENERAL for compute write.
+	{
+		const std::array<AttachmentName, 3> gBufferInputs = {
+			AttachmentName::Position,
+			AttachmentName::Normal,
+			AttachmentName::Albedo,
+		};
+
+		std::array<vk::ImageMemoryBarrier2, 4> barriers;
+
+		for (size_t i = 0; i < 3; ++i)
+		{
+			auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+			const vk::ImageLayout oldLayout = attachment.CurrentLayout();
+
+			barriers[i] = vk::ImageMemoryBarrier2(
+				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
+					? vk::PipelineStageFlagBits2::eColorAttachmentOutput
+					: vk::PipelineStageFlagBits2::eAllCommands,              // srcStage
+				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
+					? vk::AccessFlagBits2::eColorAttachmentWrite
+					: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
+				vk::PipelineStageFlagBits2::eComputeShader,                  // dstStage
+				vk::AccessFlagBits2::eShaderRead,                            // dstAccess
+				oldLayout,                                                    // oldLayout
+				vk::ImageLayout::eShaderReadOnlyOptimal,                     // newLayout
+				VK_QUEUE_FAMILY_IGNORED,
+				VK_QUEUE_FAMILY_IGNORED,
+				*attachment.ImageHandle(),
+				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+				                          0, 1, 0, 1));
+
+			attachment.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+		}
+
+		// SSAO attachment: current layout → GENERAL
+		auto& ssaoAtt = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		const vk::ImageLayout ssaoOldLayout = ssaoAtt.CurrentLayout();
+		barriers[3] = vk::ImageMemoryBarrier2(
+			(ssaoOldLayout == vk::ImageLayout::eUndefined)
+				? vk::PipelineStageFlagBits2::eTopOfPipe
+				: vk::PipelineStageFlagBits2::eAllCommands,                  // srcStage
+			(ssaoOldLayout == vk::ImageLayout::eUndefined)
+				? vk::AccessFlagBits2::eNone
+				: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
+			vk::PipelineStageFlagBits2::eComputeShader,                      // dstStage
+			vk::AccessFlagBits2::eShaderWrite,                               // dstAccess
+			ssaoOldLayout,                                                    // oldLayout
+			vk::ImageLayout::eGeneral,                                       // newLayout
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*ssaoAtt.ImageHandle(),
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                          0, 1, 0, 1));
+
+		ssaoAtt.SetCurrentLayout(vk::ImageLayout::eGeneral);
+
+		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
+		cmdBuf.pipelineBarrier2(depInfo);
+	}
+
+	// --- 3. Bind compute pipeline ---
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
+
+	// --- 4. Bind descriptor set ---
+	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+	                          *m_pipelineBuilder->pipelineLayout(),
+	                          0,                                    // firstSet
+	                          {m_descriptorSets[frameIndex].handle()},
+	                          {});
+
+	// --- 5. Push constants ---
+	{
+		struct SSAOPushConstants
+		{
+			int32_t kernelLength;
+			float   radius;
+			int32_t noiseSize;
+			int32_t frameIndex;
+		};
+
+		SSAOPushConstants pc = {};
+		pc.kernelLength = m_kernelLength;
+		pc.radius       = m_radius;
+		pc.noiseSize    = m_noiseSize;
+		pc.frameIndex   = static_cast<int32_t>(frameIndex);
+
+		cmdBuf.pushConstants<SSAOPushConstants>(
+			*m_pipelineBuilder->pipelineLayout(),
+			vk::ShaderStageFlagBits::eCompute,
+			0,
+			pc);
+	}
+
+	// --- 6. Dispatch ---
+	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
+	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+	cmdBuf.dispatch(groupCountX, groupCountY, 1);
+
+	// --- 7. Memory barrier: make SSAO output visible for lighting pass ---
+	{
+		const auto& ssaoAtt = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		const vk::ImageMemoryBarrier2 barrier(
+			vk::PipelineStageFlagBits2::eComputeShader,          // srcStage
+			vk::AccessFlagBits2::eShaderWrite,                    // srcAccess
+			vk::PipelineStageFlagBits2::eComputeShader,            // dstStage
+			vk::AccessFlagBits2::eShaderRead,                      // dstAccess
+			vk::ImageLayout::eGeneral,                             // oldLayout
+			vk::ImageLayout::eGeneral,                             // newLayout
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*ssaoAtt.ImageHandle(),
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                          0, 1, 0, 1));
+
+		const vk::DependencyInfo depInfo({}, {}, {}, barrier);
+		cmdBuf.pipelineBarrier2(depInfo);
+	}
+}
+
+} // namespace neurus
