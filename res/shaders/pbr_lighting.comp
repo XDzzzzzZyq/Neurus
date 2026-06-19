@@ -21,6 +21,9 @@ layout(binding = 3) uniform sampler2D gMetallicRoughness;
 // --- HDR colour output ---
 layout(rgba16f, binding = 4) uniform writeonly image2D outputImage;
 
+// --- SSAO input (combined image sampler) ---
+layout(binding = 6) uniform sampler2D U_AO;
+
 // --- Point light SSBO (std140) ---
 struct PointLight
 {
@@ -213,7 +216,8 @@ void main()
 	}
 
 	// --- Write output ---
-	vec3 ambient = vec3(0.03) * albedo;   // minimal ambient for pure black avoidance
+	float ao = texture(U_AO, uv).r;       // ambient occlusion factor [0,1]
+	vec3 ambient = vec3(0.03) * albedo * ao;
 	vec3 colour = ambient + Lo;
 
 	imageStore(outputImage, pixelCoord, vec4(colour, 1.0));

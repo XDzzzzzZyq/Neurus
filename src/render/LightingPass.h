@@ -14,7 +14,7 @@
  * - Uses ComputePipelineBuilder for pipeline construction.
  *
  * @note Direct lighting only (no IBL, no shadows).
- * @note Descriptor set layout: 6 bindings (4 sampled images, 1 storage image, 1 SSBO).
+ * @note Descriptor set layout: 7 bindings (5 sampled images, 1 storage image, 1 SSBO).
  */
 
 #pragma once
@@ -189,15 +189,16 @@ public:
 
 private:
 	/**
-	 * @brief Creates the descriptor set layout (6 bindings).
+	 * @brief Creates the descriptor set layout (7 bindings).
 	 *
 	 * Bindings:
-	 *   0: gPosition       (combined image sampler)
-	 *   1: gNormal          (combined image sampler)
-	 *   2: gAlbedo          (combined image sampler)
-	 *   3: gMetallicRoughness (combined image sampler)
-	 *   4: outputImage      (storage image)
-	 *   5: LightBuffer      (storage buffer / SSBO)
+	 *   0: gPosition           (combined image sampler)
+	 *   1: gNormal              (combined image sampler)
+	 *   2: gAlbedo              (combined image sampler)
+	 *   3: gMetallicRoughness   (combined image sampler)
+	 *   4: outputImage          (storage image)
+	 *   5: LightBuffer          (storage buffer / SSBO)
+	 *   6: U_AO                 (combined image sampler, SSAO occlusion)
 	 */
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 

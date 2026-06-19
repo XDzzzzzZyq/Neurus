@@ -2,8 +2,8 @@
  * @file test_ssao.cpp
  * @brief Reference-image regression test for the SSAO pass.
  *
- * Renders a known scene (sphere OBJ + point light) through geometry pass
- * and SSAO pass at 256×256, then captures the SSAO attachment as a PNG.
+ * Renders the Cornell Box scene through geometry pass and SSAO pass at
+ * 256×256, then captures the SSAO attachment as a PNG.
  * On first run the reference image does not exist — the test generates it
  * automatically and reports SKIPPED.  Subsequent runs compare pixel-wise
  * and FAIL on any pixel difference exceeding the allowed tolerance.
@@ -14,25 +14,14 @@
 #include <gtest/gtest.h>
 
 #include "shared/TestVulkanShared.h"
+#include "shared/TestCornellBox.h"
 
 // --- Render layer ---
 #include "render/AttachmentManager.h"
 #include "render/GeometryPass.h"
-#include "render/Material.h"
 #include "render/RenderPassManager.h"
 #include "render/Screenshot.h"
 #include "render/SSAOPass.h"
-#include "render/VulkanBuffer.h"
-#include "render/buffers/IndexBuffer.h"
-#include "render/buffers/VertexBuffer.h"
-
-// --- Data layer ---
-#include "asset/MeshData.h"
-
-// --- Scene layer ---
-#include "scene/Camera.h"
-#include "scene/Light.h"
-#include "scene/Mesh.h"
 
 // --- Embedded shaders ---
 #include <gbuffer.vert.h>
@@ -41,8 +30,6 @@
 
 // --- STB image load ---
 #include <stb_image.h>
-
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <array>
@@ -54,16 +41,6 @@
 #include <vector>
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-struct TestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
 
 // ---------------------------------------------------------------------------
 // Reference image directory
@@ -217,103 +194,41 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	auto& pd = PhysicalDevice();
 
 	// -------------------------------------------------------------------
-	// Step 1: Load sphere OBJ
 	// -------------------------------------------------------------------
-	std::string objPath = ResolveAssetPath("res/obj/sphere.obj");
-
-	auto meshData = std::make_shared<MeshData>();
-	const bool loaded = meshData->LoadObj(objPath);
-	ASSERT_TRUE(loaded) << "Failed to load OBJ: " << objPath;
-
-	const auto& rawMesh = meshData->GetMeshData();
-	const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
-	const size_t indexCount = rawMesh.indexArray.size();
-	ASSERT_GT(srcVertexCount, 0u);
-	ASSERT_GT(indexCount, 0u);
-
-	std::vector<float>    srcVertexData = rawMesh.dataArray;
-	std::vector<uint32_t> srcIndexData  = rawMesh.indexArray;
-
+	// Step 1: Load Cornell Box scene
 	// -------------------------------------------------------------------
-	// Step 2: Create camera (default: pos (0,2,5), target origin)
-	// -------------------------------------------------------------------
-	auto camera = std::make_shared<Camera>(
+	auto cb = test::LoadCornellBox(*m_device, pd, m_queue, m_graphicsQueueFamily);
+	ASSERT_GT(cb.renderItems.size(), 0u) << "No meshes loaded for Cornell Box";
+
+	// Adjust camera aspect ratio to match the render target
+	cb.camera->ChangeCamRatio(
 		static_cast<float>(kRenderWidth),
-		static_cast<float>(kRenderHeight),
-		60.0f, 0.1f, 100.0f);
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
-	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+		static_cast<float>(kRenderHeight));
 
-	const CameraUBOData camUBO = ComputeCameraUBO(*camera);
+	const CameraUBOData camUBO = ComputeCameraUBO(*cb.camera);
 
 	// -------------------------------------------------------------------
-	// Step 3: Build mesh
-	// -------------------------------------------------------------------
-	auto material = std::make_shared<Material>();
-	material->SetMatParam(Material::MAT_METAL, 0.0f);
-	material->SetMatParam(Material::MAT_ROUGH, 0.5f);
-	material->SetMatParam(Material::MAT_ALBEDO, glm::vec3(1.0f, 1.0f, 1.0f));
-
-	auto mesh = std::make_shared<Mesh>();
-	mesh->o_mesh = meshData;
-	mesh->o_material = material;
-
-	// -------------------------------------------------------------------
-	// Step 4: Convert vertex data (14 floats → 8: pos+normal+uv)
-	// -------------------------------------------------------------------
-	std::vector<TestVertex> vertices(srcVertexCount);
-	for (size_t i = 0; i < srcVertexCount; ++i)
-	{
-		const float* s = &srcVertexData[i * 14];
-		TestVertex& v = vertices[i];
-		v.posX = s[0] * 0.25f; v.posY = s[1] * 0.25f; v.posZ = s[2] * 0.25f;
-		v.nrmX = s[3]; v.nrmY = s[4]; v.nrmZ = s[5];
-		v.uvX  = s[6]; v.uvY  = s[7];
-	}
-
-	std::vector<uint32_t> indices = srcIndexData;
-
-	// -------------------------------------------------------------------
-	// Step 5: Upload vertex + index buffers to GPU
-	// -------------------------------------------------------------------
-	VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                 vertices.data(), vertices.size() * sizeof(TestVertex),
-	                 sizeof(TestVertex), static_cast<uint32_t>(vertices.size()));
-
-	IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(), indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
-
-	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = vbo.buffer();
-	renderItem.indexBuffer  = ibo.buffer();
-	renderItem.indexCount   = ibo.GetIndexCount();
-	renderItem.indexType    = ibo.GetIndexType();
-	renderItem.pushConstants.model = glm::mat4(1.0f);
-	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-	// -------------------------------------------------------------------
-	// Step 6: Transition G-Buffer & record geometry pass
+	// Step 2: Transition G-Buffer & record geometry pass
 	// -------------------------------------------------------------------
 	TransitionGbufferToColorAttachment();
 
 	{
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, camUBO,
-		                       { renderItem },
+		                       cb.renderItems,
 		                       { kRenderWidth, kRenderHeight });
 		EndSubmitWait(cmd);
 	}
 
 	// -------------------------------------------------------------------
-	// Step 7: Run SSAO pass
+	// Step 3: Run SSAO pass
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
 
 		const glm::mat4 viewProj = camUBO.viewProj;
 		const glm::mat4 view     = camUBO.view;
-		const glm::vec3 camPos   = camera->GetPosition();
+		const glm::vec3 camPos   = cb.camera->GetPosition();
 
 		m_ssaoPass->UpdateParams(viewProj, view, camPos);
 		m_ssaoPass->Record(*cmd, {kRenderWidth, kRenderHeight}, 0);
@@ -322,7 +237,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 8: Capture SSAO attachment & compare with reference
+	// Step 4: Capture SSAO attachment & compare with reference
 	// -------------------------------------------------------------------
 	const std::string refPath = ReferencePath();
 	const bool refExists = std::ifstream(refPath).good();

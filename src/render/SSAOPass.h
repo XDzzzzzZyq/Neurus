@@ -252,7 +252,7 @@ private:
 
 	// --- Push constant data ---
 	int32_t m_kernelLength = kDefaultKernelLength;
-	float   m_radius       = 0.5f;
+	float   m_radius       = 0.15f;
 	int32_t m_noiseSize    = kNoiseSize;
 };
 
