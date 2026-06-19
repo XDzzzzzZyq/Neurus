@@ -23,7 +23,7 @@ set(SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/generated/shaders")
 file(MAKE_DIRECTORY ${SHADER_OUTPUT_DIR})
 
 # Collect shader sources
-file(GLOB SHADER_SOURCES "${SHADER_SOURCE_DIR}/*.vert" "${SHADER_SOURCE_DIR}/*.frag" "${SHADER_SOURCE_DIR}/*.comp")
+file(GLOB_RECURSE SHADER_SOURCES "${SHADER_SOURCE_DIR}/*.vert" "${SHADER_SOURCE_DIR}/*.frag" "${SHADER_SOURCE_DIR}/*.comp")
 
 # Create an interface target that other targets can link against
 add_library(shader_headers INTERFACE)
