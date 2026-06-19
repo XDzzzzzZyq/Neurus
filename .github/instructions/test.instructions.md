@@ -256,6 +256,30 @@ cd build/debug && ctest -E "DeferredShading|Lighting|Screenshot|ModelRender|Text
 build/debug/Debug/neurus_test --gtest_filter="DeferredShadingTest.*"
 ```
 
+### Filtering Test Output
+
+Coupled test output can be hard to parse. Use these patterns to pinpoint failures:
+
+```bash
+# PowerShell: Get only passed/failed summary
+cd build/debug; ctest --output-on-failure 2>&1 | Select-String -Pattern "tests passed|tests failed"
+
+# PowerShell: Get ALL failing test names (***Failed marker)
+cd build/debug; ctest --output-on-failure 2>&1 | Select-String -Pattern "\*\*\*Failed"
+
+# PowerShell: Filter to a specific subsystem
+cd build/debug; ctest -R "SceneWiring|SSAO|Lighting" --output-on-failure 2>&1 | Select-String -Pattern "FAIL|pass|fail"
+
+# PowerShell: Run test binary directly for cleaner output
+./build/debug/Debug/neurus_test.exe --gtest_filter="SceneWiring*" 2>&1 | Select-String -Pattern "FAILED|Running|OK|PASSED"
+
+# PowerShell: List failing tests only (gtest summary line)
+./build/debug/Debug/neurus_test.exe --gtest_filter="SceneWiring*" 2>&1 | Select-String -Pattern "FAILED.*test"
+
+# Bash/Git Bash: Same patterns but use grep instead of Select-String
+cd build/debug && ctest --output-on-failure 2>&1 | grep -E "tests (passed|failed)|FAILED"
+```
+
 ### Test Working Directory
 
 CTest runs the test exe with `WorkingDirectory = build/debug/test/`. The
