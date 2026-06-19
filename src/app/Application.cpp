@@ -33,6 +33,8 @@
 
 #include <iostream>
 #include <memory>
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 
 #include "core/Log.h"
@@ -45,6 +47,7 @@
 #include "render/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
+#include "render/Image.h"
 #include "asset/MeshData.h"
 #include "scene/Scene.h"
 #include "project/Project.h"
@@ -196,6 +199,66 @@ int Application::Run(int argc, char* argv[])
 
 	// --- Upload scene lights to GPU (via LightingPass) ---
 	m_renderer->UploadLights(scene);
+
+	// --- Generate IBL from procedural gradient equirect ---
+	{
+		constexpr uint32_t eqWidth  = 1024;
+		constexpr uint32_t eqHeight = 512;
+
+		// Generate colourful procedural equirectangular gradient
+		// R32G32B32A32_SFLOAT = 16 bytes per pixel
+		std::vector<float> pixels(eqWidth * eqHeight * 4, 0.0f);
+		for (uint32_t y = 0; y < eqHeight; ++y)
+		{
+			for (uint32_t x = 0; x < eqWidth; ++x)
+			{
+				const float u = static_cast<float>(x) / static_cast<float>(eqWidth - 1);   // 0..1 longitude
+				const float v = static_cast<float>(y) / static_cast<float>(eqHeight - 1);   // 0..1 latitude
+
+				// Red at left (u=0), blue at right (u=1) — horizontal gradient
+				float r = 1.0f - u;
+				float g = v;                    // green at bottom, zero at top
+				float b = u;
+
+				// Bright equator stripe (white band in the middle)
+				const float equator = 1.0f - std::fabs(v - 0.5f) * 3.0f;
+				if (equator > 0.0f)
+				{
+					r = std::max(r, equator);
+					g = std::max(g, equator);
+					b = std::max(b, equator);
+				}
+
+				const size_t idx = (y * eqWidth + x) * 4;
+				pixels[idx + 0] = r;
+				pixels[idx + 1] = g;
+				pixels[idx + 2] = b;
+				pixels[idx + 3] = 1.0f;  // alpha
+			}
+		}
+
+		// Create equirect 2D image
+		Image equirect(
+			m_vkContext->device(),
+			m_vkContext->physicalDevice(),
+			vk::Extent2D{eqWidth, eqHeight},
+			vk::Format::eR32G32B32A32Sfloat,
+			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+			/*mipLevels=*/1,
+			Image::ImageType::e2D,
+			"IBL_Equirect");
+
+		const size_t dataSize = pixels.size() * sizeof(float);
+		equirect.UploadPixelData(
+			m_vkContext->device(),
+			m_vkContext->physicalDevice(),
+			m_vkContext->graphicsQueue(),
+			m_vkContext->graphicsQueueFamily(),
+			pixels.data(), dataSize);
+
+		m_renderer->SetEquirectEnvironment(equirect);
+		NEURUS_LOG("[Application] IBL environment generated and enabled");
+	}
 
 	// Window was created hidden - show it now that the renderer is ready
 	mainWindow->show();

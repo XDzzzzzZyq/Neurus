@@ -179,6 +179,17 @@ public:
 	 */
 	void EnableIBL();
 
+	/**
+	 * @brief Generates IBL cubemaps from an equirect image and enables IBL.
+	 *
+	 * Convenience: calls IBLPass::Generate(equirect) then EnableIBL().
+	 * The equirect image must be 2D, R32G32B32A32_SFLOAT, in
+	 * SHADER_READ_ONLY_OPTIMAL layout.  One-shot operation – not per-frame.
+	 *
+	 * @param equirect  Equirectangular HDR panorama (2D image).
+	 */
+	void SetEquirectEnvironment(const Image& equirect);
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.

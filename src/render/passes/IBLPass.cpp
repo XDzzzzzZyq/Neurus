@@ -7,6 +7,7 @@
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
+#include "asset/ImageData.h"
 #include "shaders/ShaderModule.h"
 #include "passes/SyncObjects.h"
 
@@ -194,8 +195,9 @@ void IBLPass::Generate(const Image& equirectImage)
 			m_diffuseCubemap->SetCurrentLayout(vk::ImageLayout::eGeneral);
 		}
 
-		// Write descriptors with diffuse cubemap as output (mip 0)
-		WriteDescriptors(equirectImage, /*specularMip=*/0);
+		// Write descriptors with diffuse cubemap as output
+		// Pass kSpecularMipLevels as sentinel to indicate "not specular"
+		WriteDescriptors(equirectImage, kSpecularMipLevels);
 
 		// Dispatch irradiance
 		const uint32_t groupsX = (kDiffuseFaceRes + 3) / 4;
@@ -244,6 +246,8 @@ void IBLPass::Generate(const Image& equirectImage)
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
 		// Transition specular cubemap at this mip to GENERAL
+		// Use eUndefined for ALL mips (first use per mip; discarding is OK
+		// since each mip is written independently).
 		{
 			const auto barrier = vk::ImageMemoryBarrier2(
 				(mip == 0) ? vk::PipelineStageFlagBits2::eTopOfPipe
@@ -252,8 +256,7 @@ void IBLPass::Generate(const Image& equirectImage)
 				           : vk::AccessFlagBits2::eShaderWrite,
 				vk::PipelineStageFlagBits2::eComputeShader,
 				vk::AccessFlagBits2::eShaderWrite,
-				(mip == 0) ? vk::ImageLayout::eUndefined
-				           : vk::ImageLayout::eGeneral,
+				vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eGeneral,
 				VK_QUEUE_FAMILY_IGNORED,
 				VK_QUEUE_FAMILY_IGNORED,
@@ -526,6 +529,112 @@ void IBLPass::dispatchCompute(vk::CommandBuffer cmdBuf,
 // Saving cubemaps (GPU readback → HDR)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Per-face cubemap readback helper
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/**
+ * @brief Reads back all 6 faces of a cubemap into a flat float array.
+ *
+ * Creates a staging buffer, transitions the cubemap to TRANSFER_SRC_OPTIMAL,
+ * copies all 6 layers in one vkCmdCopyImageToBuffer, submits and waits.
+ * The cubemap is left in TRANSFER_SRC_OPTIMAL layout.
+ *
+ * @return Float pixel data (6 faces × faceRes² × 4 floats), or empty on failure.
+ */
+std::vector<float> readbackCubemapFaces(const vk::raii::Device& device,
+                                         const vk::raii::PhysicalDevice& physicalDevice,
+                                         vk::Queue queue,
+                                         uint32_t queueFamilyIndex,
+                                         Image& cubemap,
+                                         uint32_t faceRes)
+{
+	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(faceRes) * faceRes * 6 * 16; // 6 faces, R32G32B32A32_SFLOAT
+
+	// --- Staging buffer ---
+	vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
+	vk::raii::Buffer stagingBuf(device, stagingCI);
+
+	auto memReqs = stagingBuf.getMemoryRequirements();
+	uint32_t memType = 0;
+	{
+		auto memProps = physicalDevice.getMemoryProperties();
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+		{
+			if ((memReqs.memoryTypeBits & (1u << i)) &&
+			    (memProps.memoryTypes[i].propertyFlags &
+			     (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)) ==
+			        (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
+			{
+				memType = i;
+				break;
+			}
+		}
+	}
+	vk::raii::DeviceMemory stagingMem(device, vk::MemoryAllocateInfo(memReqs.size, memType));
+	stagingBuf.bindMemory(*stagingMem, 0);
+
+	// --- Transient command buffer ---
+	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient, queueFamilyIndex);
+	vk::raii::CommandPool cmdPool(device, poolCI);
+	vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+	vk::raii::CommandBuffers cmdBufs(device, allocInfo);
+
+	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+	// Transition UNDEFINED → TRANSFER_SRC_OPTIMAL if needed (handles final layouts)
+	const auto srcLayout = cubemap.CurrentLayout();
+	if (srcLayout != vk::ImageLayout::eTransferSrcOptimal)
+	{
+		const vk::ImageMemoryBarrier barrier(
+			vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead,
+			vk::AccessFlagBits::eTransferRead,
+			srcLayout,
+			vk::ImageLayout::eTransferSrcOptimal,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*cubemap.ImageHandle(),
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, cubemap.MipLevels(), 0, 6));
+		cmdBufs[0].pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{}, {}, {}, {barrier});
+	}
+
+	// Copy all 6 faces (mip 0 only)
+	vk::BufferImageCopy copyRegion(
+		0, 0, 0,
+		vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 6),
+		vk::Offset3D(0, 0, 0),
+		vk::Extent3D(faceRes, faceRes, 1));
+	cmdBufs[0].copyImageToBuffer(*cubemap.ImageHandle(),
+	                              vk::ImageLayout::eTransferSrcOptimal,
+	                              *stagingBuf, {copyRegion});
+
+	vk::MemoryBarrier memBarrier(vk::AccessFlagBits::eTransferWrite,
+	                             vk::AccessFlagBits::eHostRead);
+	cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+	                           vk::PipelineStageFlagBits::eHost,
+	                           {}, {memBarrier}, {}, {});
+
+	cmdBufs[0].end();
+
+	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+	queue.submit(submitInfo);
+	queue.waitIdle();
+
+	std::vector<float> result(static_cast<size_t>(faceRes) * faceRes * 6 * 4);
+	void* mapped = stagingMem.mapMemory(0, bufSize);
+	std::memcpy(result.data(), mapped, static_cast<size_t>(bufSize));
+	stagingMem.unmapMemory();
+
+	return result;
+}
+
+} // anonymous namespace
+
 bool IBLPass::SaveDiffuseCubemap(const std::string& pathPrefix)
 {
 	if (!m_diffuseCubemap)
@@ -533,10 +642,37 @@ bool IBLPass::SaveDiffuseCubemap(const std::string& pathPrefix)
 		return false;
 	}
 
-	// TODO: Implement cubemap face readback + HDR save
-	// For now: save as a single equirect via c2e conversion, or save 6 faces
-	NEURUS_LOG("[IBLPass] SaveDiffuseCubemap not yet implemented for " << pathPrefix);
-	return false;
+	const auto faceRes = kDiffuseFaceRes;
+	auto cubeData = readbackCubemapFaces(*m_device, *m_physicalDevice,
+	                                      m_graphicsQueue, m_queueFamilyIndex,
+	                                      *m_diffuseCubemap, faceRes);
+	if (cubeData.empty())
+	{
+		NEURUS_ERR("[IBLPass] SaveDiffuseCubemap: readback failed");
+		return false;
+	}
+
+	const size_t faceFloats = static_cast<size_t>(faceRes) * faceRes * 4;
+	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
+
+	bool allSaved = true;
+	for (int face = 0; face < 6; ++face)
+	{
+		const std::string path = pathPrefix + "_diffuse_" + kFaceNames[face] + ".hdr";
+		const float* faceData = cubeData.data() + face * faceFloats;
+		const bool saved = ImageData::SavePixelDataHDR(faceData, faceRes, faceRes, path);
+		if (saved)
+		{
+			NEURUS_LOG("[IBLPass] Saved diffuse cubemap face: " << path);
+		}
+		else
+		{
+			NEURUS_ERR("[IBLPass] Failed to save diffuse face: " << path);
+			allSaved = false;
+		}
+	}
+
+	return allSaved;
 }
 
 bool IBLPass::SaveSpecularCubemap(const std::string& pathPrefix)
@@ -546,9 +682,38 @@ bool IBLPass::SaveSpecularCubemap(const std::string& pathPrefix)
 		return false;
 	}
 
-	// TODO: Implement cubemap face readback + HDR save
-	NEURUS_LOG("[IBLPass] SaveSpecularCubemap not yet implemented for " << pathPrefix);
-	return false;
+	// Read mip 0 only (highest detail)
+	const auto faceRes = kSpecularFaceRes;
+	auto cubeData = readbackCubemapFaces(*m_device, *m_physicalDevice,
+	                                      m_graphicsQueue, m_queueFamilyIndex,
+	                                      *m_specularCubemap, faceRes);
+	if (cubeData.empty())
+	{
+		NEURUS_ERR("[IBLPass] SaveSpecularCubemap: readback failed");
+		return false;
+	}
+
+	const size_t faceFloats = static_cast<size_t>(faceRes) * faceRes * 4;
+	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
+
+	bool allSaved = true;
+	for (int face = 0; face < 6; ++face)
+	{
+		const std::string path = pathPrefix + "_specular_" + kFaceNames[face] + ".hdr";
+		const float* faceData = cubeData.data() + face * faceFloats;
+		const bool saved = ImageData::SavePixelDataHDR(faceData, faceRes, faceRes, path);
+		if (saved)
+		{
+			NEURUS_LOG("[IBLPass] Saved specular cubemap face: " << path);
+		}
+		else
+		{
+			NEURUS_ERR("[IBLPass] Failed to save specular face: " << path);
+			allSaved = false;
+		}
+	}
+
+	return allSaved;
 }
 
 } // namespace neurus

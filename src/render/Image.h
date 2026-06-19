@@ -101,6 +101,29 @@ public:
 	// --- GPU readback ---
 
 	/**
+	 * @brief Uploads raw pixel data from CPU to this GPU image via staging buffer.
+	 *
+	 * Creates a host-visible staging buffer, copies the pixel data to it,
+	 * records a vkCmdCopyBufferToImage command, submits, and waits for
+	 * completion.  The image is transitioned from UNDEFINED → TRANSFER_DST_OPTIMAL
+	 * before the copy and left in SHADER_READ_ONLY_OPTIMAL after completion.
+	 *
+	 * @note The image MUST have VK_IMAGE_USAGE_TRANSFER_DST_BIT.
+	 * @param device          Logical device.
+	 * @param physicalDevice  Physical device for memory queries.
+	 * @param queue           Queue for staging upload submits.
+	 * @param queueFamilyIndex Queue family index for temp command pool.
+	 * @param pixelData       Pointer to raw pixel bytes.
+	 * @param dataSize        Total byte count (must match extent × bytesPerPixel).
+	 */
+	void UploadPixelData(const vk::raii::Device& device,
+	                     const vk::raii::PhysicalDevice& physicalDevice,
+	                     vk::Queue queue,
+	                     uint32_t queueFamilyIndex,
+	                     const void* pixelData,
+	                     size_t dataSize);
+
+	/**
 	 * @brief Reads image data from the GPU into a host‑side byte vector.
 	 *
 	 * Creates a transient command buffer, records vkCmdCopyImageToBuffer

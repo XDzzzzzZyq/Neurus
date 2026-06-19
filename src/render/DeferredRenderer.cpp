@@ -220,6 +220,19 @@ void DeferredRenderer::EnableIBL()
 	NEURUS_LOG("[DeferredRenderer] IBL enabled in lighting pass");
 }
 
+void DeferredRenderer::SetEquirectEnvironment(const Image& equirect)
+{
+	if (!m_iblPass)
+	{
+		NEURUS_ERR("[DeferredRenderer] SetEquirectEnvironment: IBLPass not created");
+		return;
+	}
+
+	m_iblPass->Generate(equirect);
+	EnableIBL();
+	NEURUS_LOG("[DeferredRenderer] IBL environment set and enabled");
+}
+
 // ---------------------------------------------------------------------------
 // Static helpers
 // ---------------------------------------------------------------------------
@@ -738,15 +751,31 @@ bool DeferredRenderer::TakeScreenshot()
 
 int DeferredRenderer::TakeScreenshotAllAttachments()
 {
-	if (!m_attachmentManager)
+	int count = 0;
+
+	if (m_attachmentManager)
 	{
-		return 0;
+		count = Screenshot::CaptureAllAttachments(m_device, m_physicalDevice,
+		                                          m_graphicsQueue, m_queueFamilyIndex,
+		                                          *m_attachmentManager,
+		                                          "screenshots/gbuffer");
 	}
 
-	return Screenshot::CaptureAllAttachments(m_device, m_physicalDevice,
-	                                          m_graphicsQueue, m_queueFamilyIndex,
-	                                          *m_attachmentManager,
-	                                          "screenshots/gbuffer");
+	// --- Also save IBL cubemap faces if available ---
+	if (m_iblPass)
+	{
+		const std::string iblPrefix = Screenshot::timestampedFilename("screenshots/gbuffer/ibl", "");
+		if (m_iblPass->SaveDiffuseCubemap(iblPrefix))
+		{
+			NEURUS_LOG("[DeferredRenderer] Saved diffuse IBL cubemap");
+		}
+		if (m_iblPass->SaveSpecularCubemap(iblPrefix))
+		{
+			NEURUS_LOG("[DeferredRenderer] Saved specular IBL cubemap");
+		}
+	}
+
+	return count;
 }
 
 } // namespace neurus

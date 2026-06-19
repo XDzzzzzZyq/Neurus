@@ -312,6 +312,115 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 }
 
 // ---------------------------------------------------------------------------
+// CPU → GPU upload
+// ---------------------------------------------------------------------------
+
+void Image::UploadPixelData(const vk::raii::Device& device,
+                            const vk::raii::PhysicalDevice& physicalDevice,
+                            vk::Queue queue,
+                            uint32_t queueFamilyIndex,
+                            const void* pixelData,
+                            size_t dataSize)
+{
+	// --- Create staging buffer ---
+	const vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(dataSize);
+	vk::BufferCreateInfo stagingCI({}, bufferSize, vk::BufferUsageFlagBits::eTransferSrc);
+	vk::raii::Buffer stagingBuffer(device, stagingCI);
+
+	auto stagingMemReqs = stagingBuffer.getMemoryRequirements();
+	uint32_t stagingMemType = FindMemoryType(physicalDevice,
+	                                         stagingMemReqs.memoryTypeBits,
+	                                         vk::MemoryPropertyFlagBits::eHostVisible |
+	                                         vk::MemoryPropertyFlagBits::eHostCoherent);
+
+	vk::MemoryAllocateInfo stagingAlloc(stagingMemReqs.size, stagingMemType);
+	vk::raii::DeviceMemory stagingMemory(device, stagingAlloc);
+	stagingBuffer.bindMemory(*stagingMemory, 0);
+
+	// --- Copy pixel data to staging buffer ---
+	void* mapped = stagingMemory.mapMemory(0, bufferSize);
+	std::memcpy(mapped, pixelData, dataSize);
+	stagingMemory.unmapMemory();
+
+	// --- Transient command buffer ---
+	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
+	                                 queueFamilyIndex);
+	vk::raii::CommandPool cmdPool(device, poolCI);
+	vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+	vk::raii::CommandBuffers cmdBufs(device, allocInfo);
+
+	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+	// --- Transition image UNDEFINED → TRANSFER_DST_OPTIMAL ---
+	{
+		const vk::ImageMemoryBarrier barrier(
+			{},                                                       // srcAccessMask
+			vk::AccessFlagBits::eTransferWrite,                       // dstAccessMask
+			vk::ImageLayout::eUndefined,                              // oldLayout
+			vk::ImageLayout::eTransferDstOptimal,                     // newLayout
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*m_image,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                          0, 1, 0, m_arrayLayers));
+
+		cmdBufs[0].pipelineBarrier(
+			vk::PipelineStageFlagBits::eTopOfPipe,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			{},
+			{},
+			{ barrier });
+	}
+
+	// --- Copy buffer → image ---
+	{
+		vk::BufferImageCopy copyRegion;
+		copyRegion.bufferOffset      = 0;
+		copyRegion.bufferRowLength   = 0;
+		copyRegion.bufferImageHeight = 0;
+		copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
+			vk::ImageAspectFlagBits::eColor, 0, 0, m_arrayLayers);
+		copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
+		copyRegion.imageExtent = vk::Extent3D(m_extent.width, m_extent.height, 1);
+
+		cmdBufs[0].copyBufferToImage(*stagingBuffer, *m_image,
+		                             vk::ImageLayout::eTransferDstOptimal,
+		                             { copyRegion });
+	}
+
+	// --- Transition image TRANSFER_DST_OPTIMAL → SHADER_READ_ONLY_OPTIMAL ---
+	{
+		const vk::ImageMemoryBarrier barrier(
+			vk::AccessFlagBits::eTransferWrite,                       // srcAccessMask
+			vk::AccessFlagBits::eShaderRead,                           // dstAccessMask
+			vk::ImageLayout::eTransferDstOptimal,                      // oldLayout
+			vk::ImageLayout::eShaderReadOnlyOptimal,                  // newLayout
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*m_image,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                          0, 1, 0, m_arrayLayers));
+
+		cmdBufs[0].pipelineBarrier(
+			vk::PipelineStageFlagBits::eTransfer,
+			vk::PipelineStageFlagBits::eFragmentShader,
+			{},
+			{},
+			{},
+			{ barrier });
+	}
+
+	cmdBufs[0].end();
+
+	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+	queue.submit(submitInfo);
+	queue.waitIdle();
+
+	m_currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
+}
+
+// ---------------------------------------------------------------------------
 // GPU readback
 // ---------------------------------------------------------------------------
 

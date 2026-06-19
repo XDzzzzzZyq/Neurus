@@ -99,10 +99,41 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			Image::ImageType::eCube,
 			"Lighting_PrefilteredFallback");
 
-		// Fallback cubemaps – no pixel upload needed; IBL is disabled by default
-		// (iblEnabled=0), so the cubemap content is never read.  They are left
-		// in Undefined layout; the descriptor uses eShaderReadOnlyOptimal for
-		// layout consistency (valid since the shader doesn't sample from them).
+		// Transition fallback cubemaps from UNDEFINED to SHADER_READ_ONLY_OPTIMAL
+		// so that the descriptor image layout matches the actual image layout.
+		{
+			vk::CommandPoolCreateInfo poolCI(
+				vk::CommandPoolCreateFlagBits::eTransient,
+				m_queueFamilyIndex);
+			vk::raii::CommandPool cmdPool(*m_device, poolCI);
+
+			vk::CommandBufferAllocateInfo allocInfo(
+				*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+			vk::raii::CommandBuffers cmdBufs(*m_device, allocInfo);
+
+			cmdBufs[0].begin(vk::CommandBufferBeginInfo(
+				vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+			m_fallbackIrradianceCube->TransitionLayout(
+				cmdBufs[0],
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eShaderReadOnlyOptimal,
+				0, VK_REMAINING_MIP_LEVELS,
+				0, VK_REMAINING_ARRAY_LAYERS);
+
+			m_fallbackPrefilteredCube->TransitionLayout(
+				cmdBufs[0],
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eShaderReadOnlyOptimal,
+				0, VK_REMAINING_MIP_LEVELS,
+				0, VK_REMAINING_ARRAY_LAYERS);
+
+			cmdBufs[0].end();
+
+			vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+			m_graphicsQueue.submit(submitInfo);
+			m_graphicsQueue.waitIdle();
+		}
 
 		// Sampler for fallback cubemaps (maxLod=0 – only mip 0 exists)
 		{
