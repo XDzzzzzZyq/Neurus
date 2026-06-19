@@ -22,12 +22,6 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
-// Embedded shaders
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-#include <pbr_lighting.comp.h>
-#include <ssao.comp.h>
-
 #include <vulkan/vulkan_raii.hpp>
 
 #define WIN32_LEAN_AND_MEAN
@@ -206,11 +200,7 @@ protected:
 			m_queue,
 			m_graphicsQueueFamily,
 			*m_surface,
-			width, height,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv),
-			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv),
-			ssao_comp_spv, sizeof(ssao_comp_spv));
+			width, height);
 	}
 
 	/**

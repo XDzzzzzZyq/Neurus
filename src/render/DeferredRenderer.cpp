@@ -17,6 +17,12 @@
 #include "buffers/VertexBuffer.h"
 #include "buffers/IndexBuffer.h"
 
+// Generated SPIR-V shader headers
+#include "gbuffer.vert.h"
+#include "gbuffer.frag.h"
+#include "pbr_lighting.comp.h"
+#include "ssao.comp.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Log.h"
@@ -43,15 +49,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
                                     uint32_t queueFamilyIndex,
                                     const vk::raii::SurfaceKHR& surface,
                                     uint32_t width,
-                                    uint32_t height,
-                                    const uint32_t* gVertSpv,
-                                    size_t gVertSize,
-                                    const uint32_t* gFragSpv,
-                                    size_t gFragSize,
-                                    const uint32_t* lightCompSpv,
-                                    size_t lightCompSize,
-                                    const uint32_t* ssaoCompSpv,
-                                    size_t ssaoCompSize)
+                                    uint32_t height)
 	: m_device(device)
 	, m_physicalDevice(physicalDevice)
 	, m_graphicsQueue(graphicsQueue)
@@ -93,8 +91,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	m_geometryPass = std::make_unique<GeometryPass>(
 		device, physicalDevice, graphicsQueue, queueFamilyIndex,
 		*m_attachmentManager, *m_renderPassManager,
-		gVertSpv, gVertSize,
-		gFragSpv, gFragSize);
+		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
+		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
 	// --- 7. Create lighting pass ---
 	m_lightingPass = std::make_unique<LightingPass>(
@@ -102,7 +100,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		*m_attachmentManager,
 		kMaxFramesInFlight,
 		m_graphicsQueue, m_queueFamilyIndex,
-		lightCompSpv, lightCompSize);
+		pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 
 	// --- 7b. Create SSAO pass ---
 	m_ssaoPass = std::make_unique<SSAOPass>(
@@ -110,7 +108,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		*m_attachmentManager,
 		kMaxFramesInFlight,
 		m_graphicsQueue, m_queueFamilyIndex,
-		ssaoCompSpv, ssaoCompSize);
+		ssao_comp_spv, sizeof(ssao_comp_spv));
 
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
