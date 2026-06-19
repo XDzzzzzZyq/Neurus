@@ -6,6 +6,51 @@ isolation (Renderer ↔ Editor ↔ UI ↔ Data & Resource). Use this file as the
 single source of truth for commands, architectural rules, and code style
 expectations.
 
+---
+
+CURRENT SCOPE
+
+The project has completed its deferred-PBR MVP: a full G-Buffer → lighting
+compute → HDR output pipeline with reference-image regression tests.
+
+**In scope (implemented):**
+- Vulkan-HPP RAII instance, device, swapchain, pipeline
+- VK_KHR_dynamic_rendering for render passes
+- Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
+- Viewport as dockable central widget via ADS `CenterDockWidgetArea`
+- Docks: Shader Editor (left), Viewport (center), Outliner + Properties + Render Config (right), Texture Viewer (bottom)
+- Qt Signals/Slots UIEvents singleton (UI↔Editor)
+- Typed EventBus (EventPool) for Editor↔Renderer event dispatch
+- Swapchain recreation on window resize
+- Validation layers in Debug builds
+- Embedded SPIR-V shaders (compiled at CMake time)
+- Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
+- Dock layout persistence (save/restore via ADS serialization)
+- OBJ mesh loading with MeshData (icosphere, cube, etc.)
+- Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute) + composite blit
+- Cook-Torrance GGX BRDF in a compute shader (point lights)
+- PointLightGpu SSBO with std140-compatible struct layout
+- AttachmentManager for G-Buffer + HDRColor + post-FX attachments
+- Screenshot capture + TextureData PNG readback + half-float→U8 conversion
+- GPU tests with shared VulkanTestShared base class
+- Reference-image regression tests (capture → compare PNG at test/render/reference/)
+- Render caches: GpuResourceCache, DescriptorCache (per-frame descriptor pools)
+- RenderPassManager for dynamic rendering pass control
+
+**Out of scope (post-MVP):**
+- glTF/PNG file loading, asset pipeline (OBJ loading is in scope)
+- Multi-pass rendering (SSAO, SSR), IBL, shadows
+- Ray tracing, mesh shaders
+- Undo/redo, serialization, plugin system
+- Linux/macOS support
+- Threading, VMA, profilers, shader hot-reload
+
+--------------------------------------------------------------------------------
+BUILD / LINT / TEST
+--------------------------------------------------------------------------------
+single source of truth for commands, architectural rules, and code style
+expectations.
+
 --------------------------------------------------------------------------------
 CURRENT SCOPE
 --------------------------------------------------------------------------------
@@ -100,7 +145,7 @@ ARCHITECTURE RULES (HARD REQUIREMENTS)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ UI Layer (Qt6 QML)                                          │
+│ UI Layer (Qt6 Widgets + ADS)                                 │
 │  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
 │  QML provides window + input ONLY. No rendering logic.      │
 └─────────────────────┬────────────────────────────────────────┘
