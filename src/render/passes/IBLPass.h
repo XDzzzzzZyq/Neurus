@@ -133,6 +133,17 @@ public:
 	 */
 	bool SaveSpecularCubemap(const std::string& pathPrefix);
 
+	/**
+	 * @brief Saves all mip levels of the specular cubemap as .hdr face files.
+	 *
+	 * For each mip level (0..kSpecularMipLevels-1), reads back all 6 faces
+	 * and saves them as "{pathPrefix}_specular_mip{i}_{face}.hdr".
+	 *
+	 * @param pathPrefix  Output path prefix (e.g. "screenshots/gbuffer")
+	 * @return Total number of files saved (6 × kSpecularMipLevels on success, 0 on failure).
+	 */
+	int SaveSpecularCubemapAllMips(const std::string& pathPrefix);
+
 private:
 	// --- Cubemap creation ---
 	void createCubemaps();

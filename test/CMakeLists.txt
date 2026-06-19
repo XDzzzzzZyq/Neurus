@@ -25,6 +25,7 @@ add_executable(neurus_test
 	render/test_renderpass.cpp
 	render/test_gbuffer.cpp
 	render/test_ibl.cpp
+	render/test_ibl_render.cpp
 	render/test_lighting.cpp
 	render/test_model_render.cpp
 	render/test_deferred_shading.cpp

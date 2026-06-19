@@ -536,6 +536,102 @@ void IBLPass::dispatchCompute(vk::CommandBuffer cmdBuf,
 namespace {
 
 /**
+ * @brief Reads back all 6 faces of a specific mip level of a cubemap.
+ *
+ * Creates a staging buffer for the single mip level (6 faces), transitions
+ * the cubemap to TRANSFER_SRC_OPTIMAL, copies the mip's 6 layers in one
+ * vkCmdCopyImageToBuffer, submits and waits.
+ * The cubemap is left in TRANSFER_SRC_OPTIMAL layout.
+ *
+ * @return Float pixel data (6 faces × faceRes² × 4 floats), or empty on failure.
+ */
+std::vector<float> readbackCubemapMip(const vk::raii::Device& device,
+                                       const vk::raii::PhysicalDevice& physicalDevice,
+                                       vk::Queue queue,
+                                       uint32_t queueFamilyIndex,
+                                       Image& cubemap,
+                                       uint32_t faceRes,
+                                       uint32_t mipLevel)
+{
+	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(faceRes) * faceRes * 6 * 16;
+
+	vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
+	vk::raii::Buffer stagingBuf(device, stagingCI);
+
+	auto memReqs = stagingBuf.getMemoryRequirements();
+	uint32_t memType = 0;
+	{
+		auto memProps = physicalDevice.getMemoryProperties();
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+		{
+			if ((memReqs.memoryTypeBits & (1u << i)) &&
+			    (memProps.memoryTypes[i].propertyFlags &
+			     (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent)) ==
+			        (vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent))
+			{
+				memType = i;
+				break;
+			}
+		}
+	}
+	vk::raii::DeviceMemory stagingMem(device, vk::MemoryAllocateInfo(memReqs.size, memType));
+	stagingBuf.bindMemory(*stagingMem, 0);
+
+	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient, queueFamilyIndex);
+	vk::raii::CommandPool cmdPool(device, poolCI);
+	vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+	vk::raii::CommandBuffers cmdBufs(device, allocInfo);
+
+	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+	const auto srcLayout = cubemap.CurrentLayout();
+	if (srcLayout != vk::ImageLayout::eTransferSrcOptimal)
+	{
+		const vk::ImageMemoryBarrier barrier(
+			vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead,
+			vk::AccessFlagBits::eTransferRead,
+			srcLayout,
+			vk::ImageLayout::eTransferSrcOptimal,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*cubemap.ImageHandle(),
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, mipLevel, 1, 0, 6));
+		cmdBufs[0].pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{}, {}, {}, {barrier});
+	}
+
+	vk::BufferImageCopy copyRegion(
+		0, 0, 0,
+		vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, mipLevel, 0, 6),
+		vk::Offset3D(0, 0, 0),
+		vk::Extent3D(faceRes, faceRes, 1));
+	cmdBufs[0].copyImageToBuffer(*cubemap.ImageHandle(),
+	                              vk::ImageLayout::eTransferSrcOptimal,
+	                              *stagingBuf, {copyRegion});
+
+	vk::MemoryBarrier memBarrier(vk::AccessFlagBits::eTransferWrite,
+	                             vk::AccessFlagBits::eHostRead);
+	cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+	                           vk::PipelineStageFlagBits::eHost,
+	                           {}, {memBarrier}, {}, {});
+
+	cmdBufs[0].end();
+
+	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+	queue.submit(submitInfo);
+	queue.waitIdle();
+
+	std::vector<float> result(static_cast<size_t>(faceRes) * faceRes * 6 * 4);
+	void* mapped = stagingMem.mapMemory(0, bufSize);
+	std::memcpy(result.data(), mapped, static_cast<size_t>(bufSize));
+	stagingMem.unmapMemory();
+
+	return result;
+}
+
+/**
  * @brief Reads back all 6 faces of a cubemap into a flat float array.
  *
  * Creates a staging buffer, transitions the cubemap to TRANSFER_SRC_OPTIMAL,
@@ -714,6 +810,84 @@ bool IBLPass::SaveSpecularCubemap(const std::string& pathPrefix)
 	}
 
 	return allSaved;
+}
+
+int IBLPass::SaveSpecularCubemapAllMips(const std::string& pathPrefix)
+{
+	if (!m_specularCubemap)
+	{
+		return 0;
+	}
+
+	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
+	const size_t baseFaceFloats = static_cast<size_t>(kSpecularFaceRes) * kSpecularFaceRes * 4;
+	int totalSaved = 0;
+
+	for (uint32_t mip = 0; mip < kSpecularMipLevels; ++mip)
+	{
+		const uint32_t faceRes = kSpecularFaceRes >> mip;
+		const size_t faceFloats = static_cast<size_t>(faceRes) * faceRes * 4;
+
+		auto cubeData = readbackCubemapMip(*m_device, *m_physicalDevice,
+		                                    m_graphicsQueue, m_queueFamilyIndex,
+		                                    *m_specularCubemap, faceRes, mip);
+		if (cubeData.empty())
+		{
+			NEURUS_ERR("[IBLPass] SaveSpecularCubemapAllMips: readback failed for mip " << mip);
+			continue;
+		}
+
+		// Transition back to SHADER_READ_ONLY after readback
+		{
+			vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient, m_queueFamilyIndex);
+			vk::raii::CommandPool cmdPool(*m_device, poolCI);
+			vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+			vk::raii::CommandBuffers cmdBufs(*m_device, allocInfo);
+			cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+			const auto srcLayout = m_specularCubemap->CurrentLayout();
+			const auto barrier = vk::ImageMemoryBarrier(
+				vk::AccessFlagBits::eTransferRead,
+				vk::AccessFlagBits::eShaderRead,
+				srcLayout,
+				vk::ImageLayout::eShaderReadOnlyOptimal,
+				VK_QUEUE_FAMILY_IGNORED,
+				VK_QUEUE_FAMILY_IGNORED,
+				*m_specularCubemap->ImageHandle(),
+				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, mip, 1, 0, 6));
+			cmdBufs[0].pipelineBarrier(
+				vk::PipelineStageFlagBits::eTransfer,
+				vk::PipelineStageFlagBits::eComputeShader,
+				{}, {}, {}, {barrier});
+
+			cmdBufs[0].end();
+			vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+			m_graphicsQueue.submit(submitInfo);
+			m_graphicsQueue.waitIdle();
+			m_specularCubemap->SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+		}
+
+		for (int face = 0; face < 6; ++face)
+		{
+			const std::string path = pathPrefix + "_specular_mip" + std::to_string(mip)
+			                         + "_" + kFaceNames[face] + ".hdr";
+			const float* faceData = cubeData.data() + face * faceFloats;
+			if (ImageData::SavePixelDataHDR(faceData, faceRes, faceRes, path))
+			{
+				++totalSaved;
+			}
+			else
+			{
+				NEURUS_ERR("[IBLPass] Failed to save specular mip " << mip
+				           << " face " << kFaceNames[face]);
+			}
+		}
+
+		NEURUS_LOG("[IBLPass] Saved specular cubemap mip " << mip
+		           << " (" << faceRes << "²)");
+	}
+
+	return totalSaved;
 }
 
 } // namespace neurus

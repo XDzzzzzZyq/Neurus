@@ -764,14 +764,14 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 	// --- Also save IBL cubemap faces if available ---
 	if (m_iblPass)
 	{
-		const std::string iblPrefix = Screenshot::timestampedFilename("screenshots/gbuffer/ibl", "");
+		const std::string iblPrefix = Screenshot::timestampedFilename("screenshots/gbuffer", "");
 		if (m_iblPass->SaveDiffuseCubemap(iblPrefix))
 		{
 			NEURUS_LOG("[DeferredRenderer] Saved diffuse IBL cubemap");
 		}
-		if (m_iblPass->SaveSpecularCubemap(iblPrefix))
+		if (m_iblPass->SaveSpecularCubemapAllMips(iblPrefix) > 0)
 		{
-			NEURUS_LOG("[DeferredRenderer] Saved specular IBL cubemap");
+			NEURUS_LOG("[DeferredRenderer] Saved specular IBL cubemap (all mips)");
 		}
 	}
 
