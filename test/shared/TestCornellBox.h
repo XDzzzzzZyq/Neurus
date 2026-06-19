@@ -208,8 +208,9 @@ inline CornellBoxResources LoadCornellBox(
 		static_cast<float>(256),  // width (placeholder, caller adjusts)
 		static_cast<float>(256),  // height
 		60.0f, 0.1f, 100.0f);
-	res.camera->SetCamPos(glm::vec3(0.0f, 0.8f, 2.5f));
-	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+	res.camera->SetCamPos(glm::vec3(-2.5f, 0.0f, 1.0f));
+	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 1.0f));
+	res.camera->SetRotation(glm::vec3(0.0f, 0.0f, -90.0f));
 
 	// --- Create a point light near the ceiling ---
 	res.light = std::make_shared<Light>(LightType::POINTLIGHT, 30.0f,

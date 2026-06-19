@@ -217,7 +217,7 @@ void main()
 
 	// --- Write output ---
 	float ao = texture(U_AO, uv).r;       // ambient occlusion factor [0,1]
-	vec3 ambient = vec3(0.03) * albedo * ao;
+	vec3 ambient = vec3(0.03) * albedo * (1.0f - ao);
 	vec3 colour = ambient + Lo;
 
 	imageStore(outputImage, pixelCoord, vec4(colour, 1.0));

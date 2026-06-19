@@ -125,14 +125,49 @@ The triangle MVP implements a minimal but correct rendering path:
 5. **Single command buffer** - Recorded once, replayed each frame
 6. **Single in-flight frame** - No frame overlap (fence-synchronized)
 
+## Current Render Pipeline
+
+```
+GeometryPass (G-Buffer MRT: Position, Normal, Albedo, MetallicRoughness, Depth)
+    │
+    ▼
+SSAOPass (compute: reads G-Buffer, writes AO to R8 attachment)
+    │
+    ▼
+LightingPass (compute: reads G-Buffer + AO, writes HDRColor)
+    │
+    ▼
+Blit HDRColor → Swapchain (vkCmdBlitImage)
+```
+
+### SSAO Convention
+- **AO value**: 1.0 = fully occluded (black), 0.0 = no occlusion (lit)
+- **Sampling**: Hemisphere samples in view-space, random rotation via 16×16 noise texture
+- **Output**: `VK_FORMAT_R8_UNORM` attachment (`AttachmentName::SSAO`)
+- **Lighting**: Ambient term multiplied by `(1.0 - ao)` so occluded areas receive less ambient light
+- **Radius**: Default 0.15 (appropriate for [-1, 1] scene scale)
+
+### Attachment Formats
+| Attachment | Format | Clear Value | Purpose |
+|---|---|---|---|
+| Position | R32G32B32A32_SFLOAT | (0,0,0,0) | World-space position, w=1 for rendered pixels |
+| Normal | R32G32B32A32_SFLOAT | (0,0,0,0) | View-space normal |
+| Albedo | R8G8B8A8_SRGB | (0,0,0,0) | Base color |
+| MetallicRoughness | R8G8B8A8_UNORM | (0,0,0,0) | R=metallic, G=roughness |
+| Depth | D32_SFLOAT | 1.0 | Depth buffer |
+| HDRColor | R16G16B16A16_SFLOAT | (0,0,0,0) | Lighting output |
+| SSAO | R8_UNORM | 0 (no occlusion) | Screen-space ambient occlusion |
+| SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
+
 ## Future Evolution
 
-- Vertex buffer + index buffer support
-- Descriptor set layout + uniform buffers (MVP matrices)
-- Multi-pass rendering (render pass abstraction or dynamic rendering)
-- Depth buffer + multisampling
+- IBL (Image-Based Lighting): diffuse + specular cubemaps, BRDF LUT
+- Shadow mapping: per-light depth maps, shadow evaluation
+- SSR (Screen-Space Reflections): ray marching variants
+- Tonemapping: filmic (ACES) + gamma correction
+- FXAA: luma-based edge anti-aliasing
+- VMA integration for memory management
 - Multiple in-flight frames (double/triple buffering)
 - Threaded command buffer recording
-- VMA integration for memory management
 - Pipeline cache for faster startup
 - Render graph abstraction
