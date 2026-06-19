@@ -65,12 +65,15 @@ static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std1
 /**
  * @brief Push constants for the PBR lighting compute shader.
  *
- * Layout:
- *   int  lightCount  offset 0  (4 bytes)
- *   vec4 cameraPos   offset 16 (16 bytes)
- *   mat4 view        offset 32 (64 bytes)
- *   int  iblEnabled  offset 96 (4 bytes)
- *   Total: 100 bytes. Must NOT use alignas — push constant size must match exactly.
+ * Layout (matches GLSL push_constant block with std430 alignment):
+ *   int  lightCount    offset 0   (4 bytes)
+ *          padding     offset 4   (12 bytes)
+ *   vec4 cameraPos     offset 16  (16 bytes)
+ *   mat4 view          offset 32  (64 bytes)
+ *   int  iblEnabled    offset 96  (4 bytes)
+ *          padding     offset 100 (12 bytes, aligns mat4 to 16)
+ *   mat4 invProjView   offset 112 (64 bytes – inverse(proj * view) for skybox ray)
+ *   Total: 176 bytes. Must NOT use alignas.
  */
 struct LightingPushConstants
 {
@@ -80,8 +83,10 @@ struct LightingPushConstants
 	float    _pad1;                 ///< Padding (vec4 → 16 bytes)
 	float    view[16];              ///< View matrix (for normal transform VS→WS)
 	int32_t  iblEnabled;            ///< IBL enabled flag (0 = disabled, 1 = enabled)
+	float    _pad2[3];              ///< Padding to align invProjView at offset 112 (16-byte alignment)
+	float    invProjView[16];       ///< Inverse of (projection * view) matrix for skybox ray
 };
-static_assert(sizeof(LightingPushConstants) == 100, "LightingPushConstants must be 100 bytes");
+static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must be 176 bytes");
 
 // ---------------------------------------------------------------------------
 // LightingPass
@@ -200,6 +205,7 @@ public:
 	 * @param cmdBuf          Command buffer in recording state.
 	 * @param cameraPos       Camera world-space position.
 	 * @param viewMatrix      View matrix (for normal VS→WS transform).
+	 * @param invProjView     Inverse of (projection × view) matrix, for skybox ray.
 	 * @param renderExtent    Render area dimensions.
 	 * @param frameIndex      Index into the descriptor-set ring buffer
 	 *                        (0 … numSets-1). One set per in-flight frame
@@ -208,6 +214,7 @@ public:
 	void Record(vk::CommandBuffer cmdBuf,
 	            const glm::vec3& cameraPos,
 	            const glm::mat4& viewMatrix,
+	            const glm::mat4& invProjView,
 	            vk::Extent2D renderExtent,
 	            uint32_t frameIndex);
 

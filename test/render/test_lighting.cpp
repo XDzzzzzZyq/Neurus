@@ -74,7 +74,7 @@ protected:
 
 		// --- Check push-constant size support ---
 		const auto& limits = pd.getProperties().limits;
-		if (limits.maxPushConstantsSize < sizeof(PushConstants))
+		if (limits.maxPushConstantsSize < sizeof(LightingPushConstants))
 		{
 			m_hasVulkan = false;
 			return;
@@ -405,9 +405,9 @@ TEST_F(LightingPassTest, PointLightGpu_SizeIs48Bytes)
 // 3. LightingPushConstants - size matches shader expectation (100 bytes)
 // ---------------------------------------------------------------------------
 
-TEST_F(LightingPassTest, PushConstants_SizeIs100Bytes)
+TEST_F(LightingPassTest, PushConstants_SizeIs176Bytes)
 {
-	EXPECT_EQ(sizeof(LightingPushConstants), 100u);
+	EXPECT_EQ(sizeof(LightingPushConstants), 176u);
 }
 
 // ---------------------------------------------------------------------------
@@ -458,10 +458,12 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	// --- Step 3: Record lighting pass ---
 	{
 		auto& cmd = BeginCmd();
+		const auto testCam = MakeTestCamera();
 
 		m_lightingPass->Record(*cmd,
 		                       glm::vec3(0.0f, 0.0f, 2.0f), // camera pos
-		                       MakeTestCamera().view,        // view matrix
+		                       testCam.view,                  // view matrix
+		                       glm::inverse(testCam.viewProj),// inv proj*view for skybox ray
 		                       {kRenderWidth, kRenderHeight},
 		                       0);                           // frame index
 
@@ -528,10 +530,12 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 	// --- Record lighting pass with 0 lights ---
 	{
 		auto& cmd = BeginCmd();
+		const auto testCam = MakeTestCamera();
 
 		m_lightingPass->Record(*cmd,
 		                       glm::vec3(0.0f, 0.0f, 2.0f),
-		                       MakeTestCamera().view,
+		                       testCam.view,
+		                       glm::inverse(testCam.viewProj),
 		                       {kRenderWidth, kRenderHeight},
 		                       0);
 

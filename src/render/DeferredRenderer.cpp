@@ -640,9 +640,12 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	//     Light SSBO is owned and managed by LightingPass internally.
 	//     UploadLights() should be called before the first DrawFrame()
 	//     to populate the SSBO from the scene (handled by T9).
+	// Compute inverse projection*view for skybox background ray in lighting pass
+	const glm::mat4 invProjView = glm::inverse(cameraData.viewProj);
 	m_lightingPass->Record(cmdBuf,
 	                       cameraPos,
 	                       viewMatrix,
+	                       invProjView,
 	                       extent,
 	                       m_currentFrame);
 

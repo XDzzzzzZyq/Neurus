@@ -431,6 +431,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 		m_lightingPass->Record(*cmd,
 		                       camera->GetPosition(),
 		                       camUBO.view,
+		                       glm::inverse(camUBO.viewProj),
 		                       {kRenderWidth, kRenderHeight},
 		                       0);
 		EndSubmitWait(cmd);

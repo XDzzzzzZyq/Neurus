@@ -48,12 +48,14 @@ layout(std140, binding = 5) buffer LightBuffer
 // --- Push constants ---
 layout(push_constant) uniform PushConstants
 {
-	int lightCount;   // offset 0
-	vec4 cameraPos;   // offset 16 (vec4 = 16-byte aligned)
-	mat4 view;        // offset 32 (mat4 = 64 bytes)
-	int iblEnabled;   // offset 96 (0 = IBL disabled, 1 = enabled)
+	int lightCount;    // offset 0
+	vec4 cameraPos;    // offset 16 (vec4 = 16-byte aligned)
+	mat4 view;         // offset 32 (mat4 = 64 bytes)
+	int iblEnabled;    // offset 96 (0 = IBL disabled, 1 = enabled)
+	                  // implicit padding to align mat4 at 16 bytes (offset 112)
+	mat4 invProjView;  // offset 112 – inverse(proj * view), for skybox ray
 };
-// Total: 100 bytes
+// Total: 176 bytes
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -143,10 +145,17 @@ void main()
 	float metallic   = clamp(mrSample.r, 0.001, 0.999);
 	float roughness  = clamp(mrSample.g, 0.001, 0.999);
 
-	// Early out: clear-value pixels (no geometry rendered)
+	// Early out: clear-value pixels (no geometry rendered) → skybox
 	if (posSample.w < 0.5)
 	{
-		imageStore(outputImage, pixelCoord, vec4(0.0, 0.0, 0.0, 1.0));
+		// Compute ray direction from camera through this pixel
+		vec2 ndc = uv * 2.0 - 1.0;
+		vec4 clipPos = vec4(ndc, 1.0, 1.0); // far-plane in clip space
+		vec4 worldPos = invProjView * clipPos;
+		vec3 rayDir = normalize(worldPos.xyz / worldPos.w - cameraPos.xyz);
+
+		vec3 skyColor = textureLod(U_Prefiltered, rayDir, 0.0).rgb;
+		imageStore(outputImage, pixelCoord, vec4(skyColor, 1.0));
 		return;
 	}
 

@@ -106,7 +106,7 @@ protected:
 
 		auto& pd = PhysicalDevice();
 
-		if (pd.getProperties().limits.maxPushConstantsSize < sizeof(PushConstants))
+		if (pd.getProperties().limits.maxPushConstantsSize < sizeof(LightingPushConstants))
 		{
 			m_hasVulkan = false;
 			return;
@@ -366,6 +366,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 		m_lightingPass->Record(*cmd,
 		                       camera->GetPosition(),
 		                       camUBO.view,
+		                       glm::inverse(camUBO.viewProj),
 		                       {kRenderWidth, kRenderHeight},
 		                       0);
 		EndSubmitWait(cmd);

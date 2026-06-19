@@ -457,6 +457,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 void LightingPass::Record(vk::CommandBuffer cmdBuf,
                           const glm::vec3& cameraPos,
                           const glm::mat4& viewMatrix,
+                          const glm::mat4& invProjView,
                           vk::Extent2D renderExtent,
                           uint32_t frameIndex)
 {
@@ -615,6 +616,13 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 
 		// Enable IBL when cubemap resources are available
 		pc.iblEnabled = (m_iblIrradianceView != vk::ImageView{}) ? 1 : 0;
+
+		// Copy inverse(proj * view) matrix for skybox background ray
+		const float* ipv = &invProjView[0][0];
+		for (int i = 0; i < 16; ++i)
+		{
+			pc.invProjView[i] = ipv[i];
+		}
 
 		cmdBuf.pushConstants<LightingPushConstants>(
 			*m_pipelineBuilder->pipelineLayout(),

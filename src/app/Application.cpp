@@ -48,6 +48,7 @@
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
 #include "render/Image.h"
+#include <stb_image.h>
 #include "asset/MeshData.h"
 #include "scene/Scene.h"
 #include "project/Project.h"
@@ -200,64 +201,102 @@ int Application::Run(int argc, char* argv[])
 	// --- Upload scene lights to GPU (via LightingPass) ---
 	m_renderer->UploadLights(scene);
 
-	// --- Generate IBL from procedural gradient equirect ---
+	// --- Load IBL from HDR equirect file (with procedural fallback) ---
 	{
-		constexpr uint32_t eqWidth  = 1024;
-		constexpr uint32_t eqHeight = 512;
+		std::unique_ptr<Image> equirect;
 
-		// Generate colourful procedural equirectangular gradient
-		// R32G32B32A32_SFLOAT = 16 bytes per pixel
-		std::vector<float> pixels(eqWidth * eqHeight * 4, 0.0f);
-		for (uint32_t y = 0; y < eqHeight; ++y)
+		// Try loading room.hdr from resources
+		const std::string hdrPath = resolveResourcePath("tex/hdr/room.hdr").toStdString();
+		int w = 0, h = 0, c = 0;
+		float* hdrData = stbi_loadf(hdrPath.c_str(), &w, &h, &c, 4);
+
+		if (hdrData && w > 0 && h > 0)
 		{
-			for (uint32_t x = 0; x < eqWidth; ++x)
-			{
-				const float u = static_cast<float>(x) / static_cast<float>(eqWidth - 1);   // 0..1 longitude
-				const float v = static_cast<float>(y) / static_cast<float>(eqHeight - 1);   // 0..1 latitude
+			NEURUS_LOG("[Application] Loaded HDR equirect: " << hdrPath
+			           << " (" << w << "x" << h << ", " << c << " channels)");
 
-				// Red at left (u=0), blue at right (u=1) — horizontal gradient
-				float r = 1.0f - u;
-				float g = v;                    // green at bottom, zero at top
-				float b = u;
+			equirect = std::make_unique<Image>(
+				m_vkContext->device(),
+				m_vkContext->physicalDevice(),
+				vk::Extent2D{static_cast<uint32_t>(w), static_cast<uint32_t>(h)},
+				vk::Format::eR32G32B32A32Sfloat,
+				vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+				/*mipLevels=*/1,
+				Image::ImageType::e2D,
+				"IBL_Equirect");
 
-				// Bright equator stripe (white band in the middle)
-				const float equator = 1.0f - std::fabs(v - 0.5f) * 3.0f;
-				if (equator > 0.0f)
-				{
-					r = std::max(r, equator);
-					g = std::max(g, equator);
-					b = std::max(b, equator);
-				}
+			const size_t dataSize = static_cast<size_t>(w) * static_cast<size_t>(h) * 4 * sizeof(float);
+			equirect->UploadPixelData(
+				m_vkContext->device(),
+				m_vkContext->physicalDevice(),
+				m_vkContext->graphicsQueue(),
+				m_vkContext->graphicsQueueFamily(),
+				hdrData, dataSize);
 
-				const size_t idx = (y * eqWidth + x) * 4;
-				pixels[idx + 0] = r;
-				pixels[idx + 1] = g;
-				pixels[idx + 2] = b;
-				pixels[idx + 3] = 1.0f;  // alpha
-			}
+			stbi_image_free(hdrData);
+			NEURUS_LOG("[Application] IBL environment loaded from file and uploaded");
+		}
+		else
+		{
+			NEURUS_LOG("[Application] HDR file not found at " << hdrPath
+			           << ", falling back to procedural gradient");
 		}
 
-		// Create equirect 2D image
-		Image equirect(
-			m_vkContext->device(),
-			m_vkContext->physicalDevice(),
-			vk::Extent2D{eqWidth, eqHeight},
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-			/*mipLevels=*/1,
-			Image::ImageType::e2D,
-			"IBL_Equirect");
+		if (!equirect)
+		{
+			// Fallback: generate colourful procedural equirectangular gradient
+			constexpr uint32_t eqWidth  = 1024;
+			constexpr uint32_t eqHeight = 512;
 
-		const size_t dataSize = pixels.size() * sizeof(float);
-		equirect.UploadPixelData(
-			m_vkContext->device(),
-			m_vkContext->physicalDevice(),
-			m_vkContext->graphicsQueue(),
-			m_vkContext->graphicsQueueFamily(),
-			pixels.data(), dataSize);
+			std::vector<float> pixels(eqWidth * eqHeight * 4, 0.0f);
+			for (uint32_t y = 0; y < eqHeight; ++y)
+			{
+				for (uint32_t x = 0; x < eqWidth; ++x)
+				{
+					const float u = static_cast<float>(x) / static_cast<float>(eqWidth - 1);
+					const float v = static_cast<float>(y) / static_cast<float>(eqHeight - 1);
 
-		m_renderer->SetEquirectEnvironment(equirect);
-		NEURUS_LOG("[Application] IBL environment generated and enabled");
+					float r = 1.0f - u;
+					float g = v;
+					float b = u;
+
+					const float equator = 1.0f - std::fabs(v - 0.5f) * 3.0f;
+					if (equator > 0.0f)
+					{
+						r = std::max(r, equator);
+						g = std::max(g, equator);
+						b = std::max(b, equator);
+					}
+
+					const size_t idx = (y * eqWidth + x) * 4;
+					pixels[idx + 0] = r;
+					pixels[idx + 1] = g;
+					pixels[idx + 2] = b;
+					pixels[idx + 3] = 1.0f;
+				}
+			}
+
+			equirect = std::make_unique<Image>(
+				m_vkContext->device(),
+				m_vkContext->physicalDevice(),
+				vk::Extent2D{eqWidth, eqHeight},
+				vk::Format::eR32G32B32A32Sfloat,
+				vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+				/*mipLevels=*/1,
+				Image::ImageType::e2D,
+				"IBL_Equirect");
+
+			const size_t dataSize = pixels.size() * sizeof(float);
+			equirect->UploadPixelData(
+				m_vkContext->device(),
+				m_vkContext->physicalDevice(),
+				m_vkContext->graphicsQueue(),
+				m_vkContext->graphicsQueueFamily(),
+				pixels.data(), dataSize);
+		}
+
+		m_renderer->SetEquirectEnvironment(*equirect);
+		NEURUS_LOG("[Application] IBL environment set");
 	}
 
 	// Window was created hidden - show it now that the renderer is ready

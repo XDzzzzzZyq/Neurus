@@ -91,7 +91,7 @@ protected:
 
 		// --- Check push-constant size support ---
 		const auto& limits = pd.getProperties().limits;
-		if (limits.maxPushConstantsSize < sizeof(PushConstants))
+		if (limits.maxPushConstantsSize < sizeof(LightingPushConstants))
 		{
 			m_hasVulkan = false;
 			return;
@@ -492,6 +492,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		m_lightingPass->Record(*cmd,
 		                       camera->GetPosition(),                 // camera world pos
 		                       camUBO.view,                           // view matrix
+		                       glm::inverse(camUBO.viewProj),         // inv proj*view for skybox ray
 		                       {kRenderWidth, kRenderHeight},
 		                       0);                                     // frame index
 
