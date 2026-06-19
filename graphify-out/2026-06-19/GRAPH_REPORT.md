@@ -1,18 +1,13 @@
-# Graph Report - Neurus  (2026-06-19)
+# Graph Report - .  (2026-06-19)
 
 ## Corpus Check
-- 1600 files · ~5,216,962 words
+- 121 files · ~63,087 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 726 nodes · 1003 edges · 85 communities (83 shown, 2 thin omitted)
+- 698 nodes · 978 edges · 82 communities (81 shown, 1 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
-
-## Graph Freshness
-- Built from commit: `eb61bba1`
-- Run `git rev-parse HEAD` and compare to check if the graph is stale.
-- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - [[_COMMUNITY_Renderer - Sync|Renderer - Sync]]
@@ -56,9 +51,6 @@
 - [[_COMMUNITY_Renderer - Pipeline|Renderer - Pipeline]]
 - [[_COMMUNITY_Scene - Sprite|Scene - Sprite]]
 - [[_COMMUNITY_Renderer - Pipeline|Renderer - Pipeline]]
-- [[_COMMUNITY_Community 82|Community 82]]
-- [[_COMMUNITY_Community 83|Community 83]]
-- [[_COMMUNITY_Community 84|Community 84]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `BeginPass()` - 13 edges
@@ -73,19 +65,19 @@
 10. `AddFace()` - 9 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `NeurusMainWindow()` --calls--> `Resize()`  [INFERRED]
-  src/ui/NeurusMainWindow.cpp → src/render/AttachmentManager.cpp
 - `CaptureAllAttachments()` --calls--> `AttachmentNameToString()`  [INFERRED]
   src/render/Screenshot.cpp → src/render/AttachmentManager.cpp
 - `CreateCameraLayout()` --calls--> `BuildLayout()`  [INFERRED]
   src/render/GeometryPass.cpp → src/render/DescriptorManager.cpp
+- `NeurusMainWindow()` --calls--> `Resize()`  [INFERRED]
+  src/ui/NeurusMainWindow.cpp → src/render/AttachmentManager.cpp
 - `CreateDescriptorSetLayout()` --calls--> `BuildLayout()`  [INFERRED]
   src/render/LightingPass.cpp → src/render/DescriptorManager.cpp
 
 ## Import Cycles
 - None detected.
 
-## Communities (85 total, 2 thin omitted)
+## Communities (82 total, 1 thin omitted)
 
 ### Community 0 - "Renderer - Sync"
 Cohesion: 0.06
@@ -104,8 +96,8 @@ Cohesion: 0.18
 Nodes (24): computeMipLevels(), createFromPixelData(), createSampler(), ForAttachment(), FromData(), FromFile(), LoadTexture(), pixelByteSize() (+16 more)
 
 ### Community 4 - "UI Layer"
-Cohesion: 0.08
-Nodes (32): resolveResourcePath(), Run(), QKeyEvent, QMouseEvent, QPaintEvent, QResizeEvent, QWheelEvent, QString (+24 more)
+Cohesion: 0.11
+Nodes (23): resolveResourcePath(), Run(), QKeyEvent, QMouseEvent, QPaintEvent, QResizeEvent, QWheelEvent, QString (+15 more)
 
 ### Community 5 - "Renderer - Texture/Image"
 Cohesion: 0.15
@@ -120,8 +112,8 @@ Cohesion: 0.10
 Nodes (10): GetInputState(), IsCtrlHeld(), IsMouseButtonClicked(), IsMouseButtonPressed(), IsMouseButtonReleased(), IsShiftHeld(), RecordMousePress(), RecordMouseRelease() (+2 more)
 
 ### Community 8 - "Renderer - Attachment"
-Cohesion: 0.27
-Nodes (12): AttachmentConfig, AttachmentName, AttachmentManager(), AttachmentNameToString(), ConfigFor(), Create(), createAttachment(), HasAttachment() (+4 more)
+Cohesion: 0.15
+Nodes (21): AttachmentConfig, AttachmentName, AttachmentManager(), AttachmentNameToString(), ConfigFor(), Create(), createAttachment(), HasAttachment() (+13 more)
 
 ### Community 9 - "Renderer - Attachment"
 Cohesion: 0.19
@@ -247,30 +239,22 @@ Nodes (3): BuildGraphicsPipeline(), Device, Pipeline
 Cohesion: 0.67
 Nodes (3): ShaderProgram(), Device, Extent2D
 
-### Community 82 - "Community 82"
-Cohesion: 0.14
-Nodes (13): Architectural Invariants, Architecture Overview, Communication Protocols, Current Scope, Design Constraints, Formatting / Includes, Future Architecture Evolution, Layer Responsibilities (+5 more)
-
-### Community 83 - "Community 83"
-Cohesion: 0.18
-Nodes (10): Architectural Boundaries, Asset Layer & GPU Resource Management, ✅ Asset & Resource Code MAY:, ❌ Asset & Resource Code MUST NOT:, Core Responsibilities, Current Scope, Data Flow, Future Enhancements (+2 more)
-
 ## Knowledge Gaps
-- **161 isolated node(s):** `System Design Philosophy`, `Layer Responsibilities`, `Communication Protocols`, `Vulkan Ownership Graph (Critical)`, `Architectural Invariants` (+156 more)
+- **142 isolated node(s):** `QString`, `vector`, `Extent2D`, `vector`, `QObject` (+137 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ImageData` connect `Renderer - Texture/Image` to `Renderer - Texture/Image`, `Renderer - Texture/Image`?**
-  _High betweenness centrality (0.014) - this node is a cross-community bridge._
+  _High betweenness centrality (0.015) - this node is a cross-community bridge._
 - **Why does `Texture` connect `Renderer - Texture/Image` to `UI Layer`?**
   _High betweenness centrality (0.010) - this node is a cross-community bridge._
 - **Why does `Image()` connect `Renderer - Texture/Image` to `Renderer - Texture/Image`?**
-  _High betweenness centrality (0.009) - this node is a cross-community bridge._
-- **What connects `System Design Philosophy`, `Layer Responsibilities`, `Communication Protocols` to the rest of the system?**
-  _161 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.010) - this node is a cross-community bridge._
+- **What connects `QString`, `vector`, `Extent2D` to the rest of the system?**
+  _142 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Renderer - Sync` be split into smaller, more focused modules?**
   _Cohesion score 0.0595959595959596 - nodes in this community are weakly interconnected._
 - **Should `Scene - Transform` be split into smaller, more focused modules?**
