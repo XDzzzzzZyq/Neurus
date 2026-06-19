@@ -85,6 +85,23 @@ public:
 	                          const std::string& path,
 	                          bool remapSigned = false);
 
+	/**
+	 * @brief Writes raw HDR float pixel data to a Radiance .hdr file.
+	 *
+	 * Input data is interpreted as R32G32B32A32_SFLOAT pixels (16 bytes per pixel).
+	 * Output is RGBE-encoded in the Radiance HDR format.
+	 *
+	 * @param pixelData  Pointer to R32G32B32A32_SFLOAT pixel data.
+	 * @param width      Image width in pixels.
+	 * @param height     Image height in pixels.
+	 * @param path       Output file path (.hdr extension recommended).
+	 * @return true on success.
+	 */
+	static bool SavePixelDataHDR(const void* pixelData,
+	                             uint32_t width,
+	                             uint32_t height,
+	                             const std::string& path);
+
 private:
 	static float HalfToFloat(uint16_t half);
 	static void EnsureDirectory(const std::string& filePath);

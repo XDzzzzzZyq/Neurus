@@ -582,6 +582,9 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf,
 			pc.view[i] = vm[i];
 		}
 
+		// Enable IBL when cubemap resources are available
+		pc.iblEnabled = (m_iblIrradianceView != vk::ImageView{}) ? 1 : 0;
+
 		cmdBuf.pushConstants<LightingPushConstants>(
 			*m_pipelineBuilder->pipelineLayout(),
 			vk::ShaderStageFlagBits::eCompute,

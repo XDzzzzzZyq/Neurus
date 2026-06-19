@@ -31,9 +31,9 @@ void main()
 	float latitude  = (uv.y - 0.5) * PI;
 
 	vec3 dir;
-	dir.x = cos(latitude) * cos(longitude);
+	dir.x = cos(latitude) * sin(longitude);
 	dir.y = sin(latitude);
-	dir.z = -cos(latitude) * sin(longitude);
+	dir.z = cos(latitude) * cos(longitude);
 
 	vec4 color = texture(u_CubeInput, dir);
 

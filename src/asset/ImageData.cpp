@@ -3,9 +3,11 @@
 
 #include "ImageData.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 
 namespace neurus {
 
@@ -188,6 +190,78 @@ bool ImageData::SavePixelData(const void* rawData,
 	                      static_cast<int>(extent.height),
 	                      static_cast<int>(channels),
 	                      pngData.data(), stride) != 0;
+}
+
+// ===========================================================================
+// SavePixelDataHDR (Radiance .hdr format)
+// ===========================================================================
+
+bool ImageData::SavePixelDataHDR(const void* pixelData,
+                                  uint32_t width,
+                                  uint32_t height,
+                                  const std::string& path)
+{
+	const auto* src = static_cast<const float*>(pixelData);
+
+	std::string out;
+	out.reserve(256 + static_cast<size_t>(width) * height * 4);
+
+	// --- Radiance header ---
+	out += "#?RADIANCE\n";
+	out += "FORMAT=32-bit_rle_rgbe\n";
+	out += "\n";
+	out += "-Y " + std::to_string(height) + " +X " + std::to_string(width) + "\n";
+
+	// --- RGBE pixel data (flat, non-RLE) ---
+	for (uint32_t y = 0; y < height; ++y)
+	{
+		for (uint32_t x = 0; x < width; ++x)
+		{
+			const size_t idx = (static_cast<size_t>(y) * width + x) * 4;
+			const float r = src[idx + 0];
+			const float g = src[idx + 1];
+			const float b = src[idx + 2];
+
+			// Find maximum channel and encode as RGBE
+			const float maxVal = std::max({r, g, b});
+
+			if (maxVal < 1e-32f)
+			{
+				out.push_back(static_cast<char>(0));
+				out.push_back(static_cast<char>(0));
+				out.push_back(static_cast<char>(0));
+				out.push_back(static_cast<char>(0));
+			}
+			else
+			{
+				int e = 0;
+				float m = std::frexp(maxVal, &e);
+				const float scale = (m * 255.9999f) / maxVal;
+
+				const uint8_t re = static_cast<uint8_t>(r * scale);
+				const uint8_t ge = static_cast<uint8_t>(g * scale);
+				const uint8_t be = static_cast<uint8_t>(b * scale);
+				const uint8_t ee = static_cast<uint8_t>(e + 128);
+
+				out.push_back(static_cast<char>(re));
+				out.push_back(static_cast<char>(ge));
+				out.push_back(static_cast<char>(be));
+				out.push_back(static_cast<char>(ee));
+			}
+		}
+	}
+
+	// --- Write file ---
+	EnsureDirectory(path);
+
+	std::ofstream file(path, std::ios::binary);
+	if (!file.is_open())
+	{
+		return false;
+	}
+
+	file.write(out.data(), out.size());
+	return file.good();
 }
 
 } // namespace neurus
