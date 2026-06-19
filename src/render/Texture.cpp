@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <string>
 
 namespace neurus {
 
@@ -95,7 +96,11 @@ Texture Texture::FromFile(const vk::raii::Device& device,
 	vk::DeviceSize dataSize = 0;
 
 	// Determine whether to load as HDR (float) or LDR (byte)
-	const bool isHdr = (format == vk::Format::eR32G32B32A32Sfloat);
+	// Auto-detect from file extension (.hdr, .exr) or explicit float format
+	const std::string pathStr(path);
+	const bool isHdrExt = (pathStr.find(".hdr") != std::string::npos) ||
+	                      (pathStr.find(".HDR") != std::string::npos);
+	const bool isHdr = isHdrExt || (format == vk::Format::eR32G32B32A32Sfloat);
 
 	if (isHdr)
 	{
@@ -116,12 +121,15 @@ Texture Texture::FromFile(const vk::raii::Device& device,
 		return Texture{}; // invalid
 	}
 
-	dataSize = static_cast<vk::DeviceSize>(width) * static_cast<vk::DeviceSize>(height) * pixelByteSize(format);
+	// Force HDR format when auto-detected from extension
+	const vk::Format effectiveFormat = (isHdrExt && !isHdr) ? vk::Format::eR32G32B32A32Sfloat : format;
+
+	dataSize = static_cast<vk::DeviceSize>(width) * static_cast<vk::DeviceSize>(height) * pixelByteSize(effectiveFormat);
 
 	Texture tex = createFromPixelData(device, physicalDevice, queue, queueFamilyIndex,
 	                                  static_cast<uint32_t>(width),
 	                                  static_cast<uint32_t>(height),
-	                                  pixelData, dataSize, format,
+	                                  pixelData, dataSize, effectiveFormat,
 	                                  /*generateMipmaps=*/true, config);
 
 	// Free STB data

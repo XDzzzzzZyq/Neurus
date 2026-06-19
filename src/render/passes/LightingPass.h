@@ -1,20 +1,21 @@
 /**
  * @file LightingPass.h
  * @brief PBR lighting pass - compute shader reading G-Buffer and evaluating
- *        Cook-Torrance GGX BRDF per point light.
+ *        Cook-Torrance GGX BRDF per point light with IBL support.
  *
  * LightingPass consumes the G-Buffer attachments written by GeometryPass and
- * evaluates direct PBR lighting into a single HDR colour attachment.
+ * evaluates direct PBR lighting + IBL ambient into a single HDR colour attachment.
  * Uses a compute shader dispatched at 16×16 thread groups.
  *
  * Architecture:
  * - Owns the compute pipeline, descriptor sets, sampler, descriptor pool,
  *   and light SSBO (VulkanBuffer).
  * - Borrows AttachmentManager for G-Buffer and HDR colour image views.
+ * - Optionally accepts IBL cubemap resources via SetIBLResources().
  * - Uses ComputePipelineBuilder for pipeline construction.
  *
- * @note Direct lighting only (no IBL, no shadows).
- * @note Descriptor set layout: 7 bindings (5 sampled images, 1 storage image, 1 SSBO).
+ * @note Direct lighting + IBL (diffuse + specular).
+ * @note Descriptor set layout: 9 bindings (5 sampled images, 1 storage image, 1 SSBO, 2 cube samplers).
  */
 
 #pragma once
@@ -32,6 +33,7 @@ namespace neurus {
 // --- Forward declarations ---
 class AttachmentManager;
 class ComputePipelineBuilder;
+class Image;
 class Scene;
 
 // ---------------------------------------------------------------------------
@@ -63,21 +65,23 @@ static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std1
 /**
  * @brief Push constants for the PBR lighting compute shader.
  *
- * Layout (std140 in push-constant memory):
+ * Layout:
  *   int  lightCount  offset 0  (4 bytes)
  *   vec4 cameraPos   offset 16 (16 bytes)
  *   mat4 view        offset 32 (64 bytes)
- *   Total: 96 bytes.
+ *   int  iblEnabled  offset 96 (4 bytes)
+ *   Total: 100 bytes. Must NOT use alignas — push constant size must match exactly.
  */
-struct alignas(16) LightingPushConstants
+struct LightingPushConstants
 {
 	int32_t  lightCount;            ///< Number of active point lights in SSBO
 	float    _pad0[3];              ///< Padding to align cameraPos at offset 16
 	float    camX, camY, camZ;      ///< Camera world-space position
 	float    _pad1;                 ///< Padding (vec4 → 16 bytes)
 	float    view[16];              ///< View matrix (for normal transform VS→WS)
+	int32_t  iblEnabled;            ///< IBL enabled flag (0 = disabled, 1 = enabled)
 };
-static_assert(sizeof(LightingPushConstants) == 96, "LightingPushConstants must be 96 bytes");
+static_assert(sizeof(LightingPushConstants) == 100, "LightingPushConstants must be 100 bytes");
 
 // ---------------------------------------------------------------------------
 // LightingPass
@@ -160,6 +164,26 @@ public:
 	uint32_t GetLightCount() const;
 
 	// -------------------------------------------------------------------
+	// IBL resource injection
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Sets the IBL cubemap resources for bindings 7-8.
+	 *
+	 * Call before the first Record() to enable IBL (diffuse + specular).
+	 * If not called, fallback black cubemaps are used (valid but zero contribution).
+	 *
+	 * @param irradianceView    ImageView for diffuse irradiance cubemap.
+	 * @param irradianceSampler Sampler for diffuse cubemap.
+	 * @param prefilteredView   ImageView for specular prefiltered cubemap.
+	 * @param prefilteredSampler Sampler for specular cubemap.
+	 */
+	void SetIBLResources(vk::ImageView irradianceView,
+	                     vk::Sampler irradianceSampler,
+	                     vk::ImageView prefilteredView,
+	                     vk::Sampler prefilteredSampler);
+
+	// -------------------------------------------------------------------
 	// Recording
 	// -------------------------------------------------------------------
 
@@ -189,7 +213,7 @@ public:
 
 private:
 	/**
-	 * @brief Creates the descriptor set layout (7 bindings).
+	 * @brief Creates the descriptor set layout (9 bindings).
 	 *
 	 * Bindings:
 	 *   0: gPosition           (combined image sampler)
@@ -199,6 +223,8 @@ private:
 	 *   4: outputImage          (storage image)
 	 *   5: LightBuffer          (storage buffer / SSBO)
 	 *   6: U_AO                 (combined image sampler, SSAO occlusion)
+	 *   7: U_Irradiance         (combined image sampler, diffuse IBL cubemap)
+	 *   8: U_Prefiltered        (combined image sampler, specular IBL cubemap)
 	 */
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
@@ -250,5 +276,15 @@ private:
 	std::unique_ptr<VulkanBuffer> m_lightSSBO;
 	uint32_t m_lightCount = 0;
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
+
+	// --- IBL cubemap fallback (1×1 black cubemap, valid when no IBL set) ---
+	Image* m_fallbackIrradianceCube = nullptr;
+	Image* m_fallbackPrefilteredCube = nullptr;
+	vk::raii::Sampler m_fallbackCubeSampler = nullptr;
+	// IBL resources injected by SetIBLResources() (non-owning handles)
+	vk::ImageView m_iblIrradianceView = nullptr;
+	vk::Sampler    m_iblIrradianceSampler = nullptr;
+	vk::ImageView m_iblPrefilteredView = nullptr;
+	vk::Sampler    m_iblPrefilteredSampler = nullptr;
 };
 } // namespace neurus

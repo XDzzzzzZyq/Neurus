@@ -24,6 +24,10 @@ layout(rgba16f, binding = 4) uniform writeonly image2D outputImage;
 // --- SSAO input (combined image sampler) ---
 layout(binding = 6) uniform sampler2D U_AO;
 
+// --- IBL cubemap samplers (optional – valid even when IBL disabled) ---
+layout(binding = 7) uniform samplerCube U_Irradiance;
+layout(binding = 8) uniform samplerCube U_Prefiltered;
+
 // --- Point light SSBO (std140) ---
 struct PointLight
 {
@@ -47,8 +51,9 @@ layout(push_constant) uniform PushConstants
 	int lightCount;   // offset 0
 	vec4 cameraPos;   // offset 16 (vec4 = 16-byte aligned)
 	mat4 view;        // offset 32 (mat4 = 64 bytes)
+	int iblEnabled;   // offset 96 (0 = IBL disabled, 1 = enabled)
 };
-// Total: 96 bytes
+// Total: 100 bytes
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -215,10 +220,30 @@ void main()
 		Lo += (kD * albedo / PI + specular) * radiance;
 	}
 
+	// --- IBL (Image-Based Lighting) ---
+	vec3 ibl = vec3(0.0);
+	if (iblEnabled != 0)
+	{
+		// Diffuse IBL: sample irradiance cubemap with surface normal
+		float kD_ibl = (1.0 - metallic);
+		vec3 diffuseIBL = texture(U_Irradiance, normalWS).rgb * albedo * kD_ibl;
+
+		// Specular IBL: sample prefiltered cubemap with reflection vector
+		vec3 R = reflect(-V, normalWS);
+		// Roughness 0..1 maps to mip 0..(numMips-1), where numMips = 8
+		float specularMip = roughness * 7.0;
+		vec3 prefilteredColor = textureLod(U_Prefiltered, R, specularMip).rgb;
+
+		// Simplified Fresnel (no LUT)
+		vec3 F_ibl = F0 + (1.0 - F0) * pow(clamp(1.0 - NdotV, 0.0, 1.0), 5.0);
+
+		ibl = diffuseIBL + prefilteredColor * F_ibl;
+	}
+
 	// --- Write output ---
-	float ao = texture(U_AO, uv).r;       // ambient occlusion factor [0,1]
-	vec3 ambient = vec3(0.03) * albedo * (1.0f - ao);
-	vec3 colour = ambient + Lo;
+	float ao = texture(U_AO, uv).r;       // 1.0 = no occlusion, 0.0 = fully occluded
+	vec3 ambient = vec3(0.03) * albedo * ao;
+	vec3 colour = ambient + ibl + Lo;
 
 	imageStore(outputImage, pixelCoord, vec4(colour, 1.0));
 }

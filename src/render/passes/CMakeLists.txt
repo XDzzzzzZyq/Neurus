@@ -5,6 +5,8 @@ add_library(neurus_render_passes STATIC
 	AttachmentManager.cpp
 	GeometryPass.h
 	GeometryPass.cpp
+	IBLPass.h
+	IBLPass.cpp
 	LightingPass.h
 	LightingPass.cpp
 	RenderPassManager.h

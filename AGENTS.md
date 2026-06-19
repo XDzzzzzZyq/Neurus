@@ -299,7 +299,10 @@ CODE STYLE GUIDELINES
 - For the renaming and moving, use `git mv` to track the history.
 - Any files should not include absolute path.
 - Complete and Double check all aspects (tests, coding style, document) of the current task before commit.
-- Only master agent can commit and merge. If the tasks of subagents may have code overlaps, then use Branches and Git Worktree for parallelism and isolation. Don't forget to remove the branch and worktree after the task completed.
+- Only master agent can commit and merge. If the tasks of subagents may have code overlaps, then use Branches and Git Worktree for parallelism and isolation. Don't forget to remove the branch and worktree after the task completed. Use:
+```
+git worktree add ../my-project-feature -b feature-branch
+```
  
 --------------------------------------------------------------------------------
 FILE LAYOUT

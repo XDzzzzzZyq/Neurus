@@ -402,12 +402,12 @@ TEST_F(LightingPassTest, PointLightGpu_SizeIs48Bytes)
 }
 
 // ---------------------------------------------------------------------------
-// 3. LightingPushConstants - size matches shader expectation (96 bytes)
+// 3. LightingPushConstants - size matches shader expectation (100 bytes)
 // ---------------------------------------------------------------------------
 
-TEST_F(LightingPassTest, PushConstants_SizeIs96Bytes)
+TEST_F(LightingPassTest, PushConstants_SizeIs100Bytes)
 {
-	EXPECT_EQ(sizeof(LightingPushConstants), 96u);
+	EXPECT_EQ(sizeof(LightingPushConstants), 100u);
 }
 
 // ---------------------------------------------------------------------------

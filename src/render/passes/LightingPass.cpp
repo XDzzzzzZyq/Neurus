@@ -16,6 +16,8 @@
 #include "scene/Scene.h"
 
 #include <array>
+#include <cstring>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -72,6 +74,53 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 		NEURUS_LOG("[LightingPass] Created fallback SSBO (zero-light)");
 	}
 
+	// --- Create fallback IBL cubemaps (4×4 black) for bindings 7-8 ---
+	//     These ensure the descriptor bindings are always valid even when
+	//     SetIBLResources() has not been called (no HDR loaded).
+	//     Using 4×4 faces to satisfy minimum cubemap dimension requirements.
+	{
+		const vk::ImageUsageFlags cubeUsage =
+			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+		const vk::Extent2D fbExtent{4, 4};
+
+		// --- Fallback diffuse irradiance cubemap ---
+		m_fallbackIrradianceCube = new Image(
+			device, physicalDevice, fbExtent,
+			vk::Format::eR32G32B32A32Sfloat,
+			cubeUsage, /*mipLevels=*/1,
+			Image::ImageType::eCube,
+			"Lighting_IrradianceFallback");
+
+		// --- Fallback specular prefiltered cubemap ---
+		m_fallbackPrefilteredCube = new Image(
+			device, physicalDevice, fbExtent,
+			vk::Format::eR32G32B32A32Sfloat,
+			cubeUsage, /*mipLevels=*/1,
+			Image::ImageType::eCube,
+			"Lighting_PrefilteredFallback");
+
+		// Fallback cubemaps – no pixel upload needed; IBL is disabled by default
+		// (iblEnabled=0), so the cubemap content is never read.  They are left
+		// in Undefined layout; the descriptor uses eShaderReadOnlyOptimal for
+		// layout consistency (valid since the shader doesn't sample from them).
+
+		// Sampler for fallback cubemaps (maxLod=0 – only mip 0 exists)
+		{
+			vk::SamplerCreateInfo samplerCI(
+				{}, vk::Filter::eNearest, vk::Filter::eNearest,
+				vk::SamplerMipmapMode::eNearest,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				0.0f, VK_FALSE, 0.0f, VK_FALSE,
+				vk::CompareOp::eAlways, 0.0f, 0.0f,  // minLod=0, maxLod=0
+				vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+			m_fallbackCubeSampler = vk::raii::Sampler(device, samplerCI);
+		}
+
+		NEURUS_LOG("[LightingPass] Created fallback IBL cubemaps (4×4 black)");
+	}
+
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
 	{
@@ -81,7 +130,11 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 #endif
 }
 
-LightingPass::~LightingPass() = default;
+LightingPass::~LightingPass()
+{
+	delete m_fallbackIrradianceCube;
+	delete m_fallbackPrefilteredCube;
+}
 
 // ---------------------------------------------------------------------------
 // Light SSBO management
@@ -187,6 +240,14 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.AddBinding(6,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
+		// IBL diffuse irradiance cubemap (combined image sampler)
+		.AddBinding(7,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		// IBL specular prefiltered cubemap (combined image sampler)
+		.AddBinding(8,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
 		.Build();
 
 	return DescriptorSetLayout(device, bindings);
@@ -236,13 +297,29 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute,
 		0,
-		sizeof(LightingPushConstants));
+		sizeof(LightingPushConstants));  // 100 bytes
 
 	// --- Build compute pipeline ---
 	return m_pipelineBuilder->SetShaderStage(compModule, "main")
 		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();
+}
+
+// ---------------------------------------------------------------------------
+// IBL resource injection
+// ---------------------------------------------------------------------------
+
+void LightingPass::SetIBLResources(vk::ImageView irradianceView,
+                                    vk::Sampler irradianceSampler,
+                                    vk::ImageView prefilteredView,
+                                    vk::Sampler prefilteredSampler)
+{
+	m_iblIrradianceView    = irradianceView;
+	m_iblIrradianceSampler  = irradianceSampler;
+	m_iblPrefilteredView    = prefilteredView;
+	m_iblPrefilteredSampler = prefilteredSampler;
+	NEURUS_LOG("[LightingPass] IBL resources set");
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +383,38 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 		);
 
 		dstSet.WriteImage(6, imageInfo,
+		                  vk::DescriptorType::eCombinedImageSampler);
+	}
+
+	// --- Write IBL irradiance cubemap (binding 7) ---
+	{
+		const bool hasIBL = (m_iblIrradianceView != vk::ImageView{});
+		const vk::Sampler sampler = hasIBL ? m_iblIrradianceSampler : *m_fallbackCubeSampler;
+
+		Image& fbIrrad = *m_fallbackIrradianceCube;
+		const vk::ImageView fallbackView = *fbIrrad.ImageViewHandle();
+		const vk::ImageView view = hasIBL ? m_iblIrradianceView : fallbackView;
+
+		vk::DescriptorImageInfo imageInfo(sampler, view,
+		                                  vk::ImageLayout::eShaderReadOnlyOptimal);
+
+		dstSet.WriteImage(7, imageInfo,
+		                  vk::DescriptorType::eCombinedImageSampler);
+	}
+
+	// --- Write IBL specular cubemap (binding 8) ---
+	{
+		const bool hasIBL = (m_iblPrefilteredView != vk::ImageView{});
+		const vk::Sampler sampler = hasIBL ? m_iblPrefilteredSampler : *m_fallbackCubeSampler;
+
+		Image& fbSpec = *m_fallbackPrefilteredCube;
+		const vk::ImageView fallbackView = *fbSpec.ImageViewHandle();
+		const vk::ImageView view = hasIBL ? m_iblPrefilteredView : fallbackView;
+
+		vk::DescriptorImageInfo imageInfo(sampler, view,
+		                                  vk::ImageLayout::eShaderReadOnlyOptimal);
+
+		dstSet.WriteImage(8, imageInfo,
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 }

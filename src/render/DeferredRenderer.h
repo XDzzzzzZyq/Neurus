@@ -19,6 +19,7 @@
 #pragma once
 
 #include "passes/GeometryPass.h"
+#include "passes/IBLPass.h"
 #include "passes/LightingPass.h"
 #include "passes/SSAOPass.h"
 #include "Swapchain.h"
@@ -47,13 +48,7 @@ class Mesh;
  *
  * Usage:
  *   DeferredRenderer renderer(device, physDev, queue, qfi, surface,
- *                              w, h,
- *                              vertexData, vertexCount,
- *                              indexData, indexCount,
- *                              light,
- *                              gVertSpv, gVertSize,
- *                              gFragSpv, gFragSize,
- *                              lightCompSpv, lightCompSize);
+ *                              w, h);
  *   // Each frame:
  *   renderer.DrawFrame();
  */
@@ -82,6 +77,10 @@ public:
 	 * @param lightCompSize    PBR lighting compute shader SPIR-V size.
 	 * @param ssaoCompSpv      SSAO compute shader SPIR-V data.
 	 * @param ssaoCompSize     SSAO compute shader SPIR-V size.
+	 * @param iblIrradianceSpv IBL irradiance compute SPIR-V (optional, nullptr → no IBL).
+	 * @param iblIrradianceSize IBL irradiance compute SPIR-V size.
+	 * @param iblSpecularSpv   IBL specular compute SPIR-V (optional, nullptr → no IBL).
+	 * @param iblSpecularSize  IBL specular compute SPIR-V size.
 	 */
 	DeferredRenderer(const vk::raii::Device& device,
 	                 const vk::raii::PhysicalDevice& physicalDevice,
@@ -97,7 +96,11 @@ public:
 	                 const uint32_t* lightCompSpv,
 	                 size_t lightCompSize,
 	                 const uint32_t* ssaoCompSpv,
-	                 size_t ssaoCompSize);
+	                 size_t ssaoCompSize,
+	                 const uint32_t* iblIrradianceSpv = nullptr,
+	                 size_t iblIrradianceSize = 0,
+	                 const uint32_t* iblSpecularSpv = nullptr,
+	                 size_t iblSpecularSize = 0);
 
 	~DeferredRenderer();
 
@@ -182,6 +185,22 @@ public:
 	 */
 	void HandleResize(uint32_t width, uint32_t height);
 
+	/**
+	 * @brief Returns the IBL pass (always created — IBL shaders are embedded).
+	 *
+	 * Caller should load an HDR equirect environment map and call
+	 * IBLPass::Generate(), then EnableIBL() to wire cubemaps into lighting.
+	 */
+	IBLPass* GetIBLPass() { return m_iblPass.get(); }
+
+	/**
+	 * @brief Enables IBL in the lighting pass using the IBLPass cubemaps.
+	 *
+	 * Must be called after IBLPass::Generate() to activate IBL.
+	 * Safe to call before IBL is generated (uses fallback black cubemaps).
+	 */
+	void EnableIBL();
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
@@ -233,6 +252,7 @@ private:
 	std::unique_ptr<GeometryPass> m_geometryPass;
 	std::unique_ptr<LightingPass> m_lightingPass;
 	std::unique_ptr<SSAOPass> m_ssaoPass;
+	std::unique_ptr<IBLPass> m_iblPass;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;

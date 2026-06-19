@@ -17,6 +17,12 @@
 #include "buffers/VertexBuffer.h"
 #include "buffers/IndexBuffer.h"
 
+// Generated SPIR-V shader headers
+#include "gbuffer.vert.h"
+#include "gbuffer.frag.h"
+#include "pbr_lighting.comp.h"
+#include "ssao.comp.h"
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Log.h"
@@ -51,7 +57,11 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
                                     const uint32_t* lightCompSpv,
                                     size_t lightCompSize,
                                     const uint32_t* ssaoCompSpv,
-                                    size_t ssaoCompSize)
+                                    size_t ssaoCompSize,
+                                    const uint32_t* iblIrradianceSpv,
+                                    size_t iblIrradianceSize,
+                                    const uint32_t* iblSpecularSpv,
+                                    size_t iblSpecularSize)
 	: m_device(device)
 	, m_physicalDevice(physicalDevice)
 	, m_graphicsQueue(graphicsQueue)
@@ -93,8 +103,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	m_geometryPass = std::make_unique<GeometryPass>(
 		device, physicalDevice, graphicsQueue, queueFamilyIndex,
 		*m_attachmentManager, *m_renderPassManager,
-		gVertSpv, gVertSize,
-		gFragSpv, gFragSize);
+		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
+		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
 	// --- 7. Create lighting pass ---
 	m_lightingPass = std::make_unique<LightingPass>(
@@ -102,7 +112,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		*m_attachmentManager,
 		kMaxFramesInFlight,
 		m_graphicsQueue, m_queueFamilyIndex,
-		lightCompSpv, lightCompSize);
+		pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 
 	// --- 7b. Create SSAO pass ---
 	m_ssaoPass = std::make_unique<SSAOPass>(
@@ -110,7 +120,22 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		*m_attachmentManager,
 		kMaxFramesInFlight,
 		m_graphicsQueue, m_queueFamilyIndex,
-		ssaoCompSpv, ssaoCompSize);
+		ssao_comp_spv, sizeof(ssao_comp_spv));
+
+	// --- 7c. Create IBL pass (only if IBL shaders are provided) ---
+	if (iblIrradianceSpv && iblSpecularSpv && iblIrradianceSize > 0 && iblSpecularSize > 0)
+	{
+		m_iblPass = std::make_unique<IBLPass>(
+			device, physicalDevice,
+			m_graphicsQueue, m_queueFamilyIndex,
+			iblIrradianceSpv, iblIrradianceSize,
+			iblSpecularSpv, iblSpecularSize);
+		NEURUS_LOG("[DeferredRenderer] IBLPass created");
+	}
+	else
+	{
+		NEURUS_LOG("[DeferredRenderer] IBL disabled (no shader data provided)");
+	}
 
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
@@ -183,6 +208,31 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 	{
 		m_lightingPass->UploadLights(scene);
 	}
+}
+
+// ---------------------------------------------------------------------------
+// IBL wiring
+// ---------------------------------------------------------------------------
+
+void DeferredRenderer::EnableIBL()
+{
+	if (!m_iblPass || !m_lightingPass)
+	{
+		return;
+	}
+
+	const auto& diffuse  = m_iblPass->GetDiffuseCubemap();
+	const auto& specular = m_iblPass->GetSpecularCubemap();
+	const auto& diffSampler  = m_iblPass->GetDiffuseSampler();
+	const auto& specSampler  = m_iblPass->GetSpecularSampler();
+
+	m_lightingPass->SetIBLResources(
+		*diffuse.ImageViewHandle(),
+		*diffSampler,
+		*specular.ImageViewHandle(),
+		*specSampler);
+
+	NEURUS_LOG("[DeferredRenderer] IBL enabled in lighting pass");
 }
 
 // ---------------------------------------------------------------------------
