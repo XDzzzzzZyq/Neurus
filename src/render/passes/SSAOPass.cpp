@@ -3,12 +3,12 @@
  * @brief Screen-Space Ambient Occlusion compute pass implementation.
  */
 
-#include "SSAOPass.h"
+#include "passes/SSAOPass.h"
 
-#include "AttachmentManager.h"
+#include "passes/AttachmentManager.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
-#include "SyncObjects.h"
+#include "passes/SyncObjects.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"

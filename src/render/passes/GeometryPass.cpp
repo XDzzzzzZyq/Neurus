@@ -3,11 +3,11 @@
  * @brief G-Buffer geometry pass implementation.
  */
 
-#include "GeometryPass.h"
+#include "passes/GeometryPass.h"
 
-#include "AttachmentManager.h"
+#include "passes/AttachmentManager.h"
 #include "PipelineBuilder.h"
-#include "RenderPassManager.h"
+#include "passes/RenderPassManager.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"

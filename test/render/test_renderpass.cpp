@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "render/RenderPassManager.h"
+#include "render/passes/RenderPassManager.h"
 #include "render/Image.h"
 
 #include <vulkan/vulkan_raii.hpp>

@@ -1,6 +1,6 @@
 #include "Screenshot.h"
 #include "Image.h"
-#include "AttachmentManager.h"
+#include "passes/AttachmentManager.h"
 #include "asset/ImageData.h"
 #include "Texture.h"
 #include "Log.h"

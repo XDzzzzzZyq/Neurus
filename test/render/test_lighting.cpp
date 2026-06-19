@@ -16,10 +16,10 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/AttachmentManager.h"
-#include "render/GeometryPass.h"
-#include "render/LightingPass.h"
-#include "render/RenderPassManager.h"
+#include "render/passes/AttachmentManager.h"
+#include "render/passes/GeometryPass.h"
+#include "render/passes/LightingPass.h"
+#include "render/passes/RenderPassManager.h"
 #include "render/VulkanBuffer.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"

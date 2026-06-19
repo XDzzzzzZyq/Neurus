@@ -17,11 +17,11 @@
 #include "shared/TestCornellBox.h"
 
 // --- Render layer ---
-#include "render/AttachmentManager.h"
-#include "render/GeometryPass.h"
-#include "render/RenderPassManager.h"
+#include "render/passes/AttachmentManager.h"
+#include "render/passes/GeometryPass.h"
+#include "render/passes/RenderPassManager.h"
+#include "render/passes/SSAOPass.h"
 #include "render/Screenshot.h"
-#include "render/SSAOPass.h"
 
 // --- Embedded shaders ---
 #include <gbuffer.vert.h>

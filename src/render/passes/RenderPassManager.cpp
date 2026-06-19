@@ -1,4 +1,4 @@
-#include "RenderPassManager.h"
+#include "passes/RenderPassManager.h"
 
 #include <cassert>
 #include <stdexcept>

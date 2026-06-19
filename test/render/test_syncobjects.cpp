@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "render/SyncObjects.h"
+#include "render/passes/SyncObjects.h"
 
 #include <chrono>
 #include <memory>

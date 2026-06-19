@@ -11,8 +11,6 @@ add_library(neurus_render STATIC
 	VulkanBuffer.cpp
 	Image.h
 	Image.cpp
-	AttachmentManager.h
-	AttachmentManager.cpp
 	DescriptorManager.h
 	DescriptorManager.cpp
 	ComputePipelineBuilder.h
@@ -35,20 +33,13 @@ add_library(neurus_render STATIC
 	Material.h
 	Material.cpp
 	MeshBindings.cpp
-	RenderPassManager.h
-	RenderPassManager.cpp
-	GeometryPass.h
-	GeometryPass.cpp
-	LightingPass.h
-	LightingPass.cpp
-	SSAOPass.h
-	SSAOPass.cpp
 	DeferredRenderer.h
 	DeferredRenderer.cpp
-	SyncObjects.h
 	Screenshot.h
 	Screenshot.cpp
 )
+
+add_subdirectory(passes)
 
 target_link_libraries(neurus_render PUBLIC
 	Vulkan::Vulkan
@@ -57,6 +48,7 @@ target_link_libraries(neurus_render PUBLIC
 	stb
 	neurus_core
 	neurus_scene
+	neurus_render_passes
 )
 
 target_include_directories(neurus_render PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "GeometryPass.h"
-#include "LightingPass.h"
-#include "SSAOPass.h"
+#include "passes/GeometryPass.h"
+#include "passes/LightingPass.h"
+#include "passes/SSAOPass.h"
 #include "Swapchain.h"
 
 #include <vulkan/vulkan_raii.hpp>

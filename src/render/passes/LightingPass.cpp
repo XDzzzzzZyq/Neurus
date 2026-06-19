@@ -3,9 +3,9 @@
  * @brief PBR lighting pass implementation.
  */
 
-#include "LightingPass.h"
+#include "passes/LightingPass.h"
 
-#include "AttachmentManager.h"
+#include "passes/AttachmentManager.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "shaders/ShaderModule.h"

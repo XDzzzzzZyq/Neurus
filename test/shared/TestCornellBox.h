@@ -19,7 +19,7 @@
 #pragma once
 
 #include "Log.h"
-#include "render/GeometryPass.h"
+#include "render/passes/GeometryPass.h"
 #include "render/Material.h"
 #include "render/VulkanBuffer.h"
 #include "render/buffers/IndexBuffer.h"

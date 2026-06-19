@@ -2,7 +2,7 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/AttachmentManager.h"
+#include "render/passes/AttachmentManager.h"
 #include "render/Image.h"
 
 using namespace neurus;
