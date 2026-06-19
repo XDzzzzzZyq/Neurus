@@ -204,6 +204,7 @@ Follow Karpathy Guidelines. For each task:
 1. Think and plan. This project is complicated. System design should be highly decoupled and elegent
 2. Implement the plan. Do not hide the error, expose the error directly. Use debug printing and logging. Moreover, do not just focus and implement the testing, all feature should be wired immediately into the renderer and program.
 3. Test and Verify. Do not just focus on the test, launch `Neurus.exe` to check the terminal output and any runtime error. Also, use the screenshot to analyze the rendered result.
+4. Before commit the code, always keep all relavent documents updated.
 ```
 $output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
 ``` 
@@ -296,6 +297,7 @@ CODE STYLE GUIDELINES
 **Version Control:**
 - Prefer Git submodule.
 - For the renaming and moving, use `git mv` to track the history.
+- Any files should not include absolute path.
 - Complete and Double check all aspects (tests, coding style, document) of the current task before commit.
 - Only master agent can commit and merge. If the tasks of subagents may have code overlaps, then use Branches and Git Worktree for parallelism and isolation. Don't forget to remove the branch and worktree after the task completed.
  
@@ -390,3 +392,16 @@ PRACTICAL GUIDANCE FOR AGENTS
 --------------------------------------------------------------------------------
 END
 --------------------------------------------------------------------------------
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
