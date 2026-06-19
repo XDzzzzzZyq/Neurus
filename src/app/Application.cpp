@@ -49,14 +49,6 @@
 #include "scene/Scene.h"
 #include "project/Project.h"
 
-// Generated SPIR-V shader headers
-#include "gbuffer.vert.h"
-#include "gbuffer.frag.h"
-#include "pbr_lighting.comp.h"
-#include "ssao.comp.h"
-#include "irradiance_conv.comp.h"
-#include "importance_samp.comp.h"
-
 namespace {
 
 /**
@@ -193,13 +185,7 @@ int Application::Run(int argc, char* argv[])
 			m_vkContext->graphicsQueueFamily(),
 			*surface,
 			vulkanWidget->width(),
-			vulkanWidget->height(),
-			gbuffer_vert_spv, gbuffer_vert_spv_size,
-			gbuffer_frag_spv, gbuffer_frag_spv_size,
-			pbr_lighting_comp_spv, pbr_lighting_comp_spv_size,
-			ssao_comp_spv, ssao_comp_spv_size,
-			irradiance_conv_comp_spv, irradiance_conv_comp_spv_size,
-			importance_samp_comp_spv, importance_samp_comp_spv_size
+			vulkanWidget->height()
 		);
 	}
 	catch (const std::exception& e)

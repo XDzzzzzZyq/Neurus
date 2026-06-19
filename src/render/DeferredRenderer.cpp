@@ -22,6 +22,8 @@
 #include "gbuffer.frag.h"
 #include "pbr_lighting.comp.h"
 #include "ssao.comp.h"
+#include "irradiance_conv.comp.h"
+#include "importance_samp.comp.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -49,19 +51,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
                                     uint32_t queueFamilyIndex,
                                     const vk::raii::SurfaceKHR& surface,
                                     uint32_t width,
-                                    uint32_t height,
-                                    const uint32_t* gVertSpv,
-                                    size_t gVertSize,
-                                    const uint32_t* gFragSpv,
-                                    size_t gFragSize,
-                                    const uint32_t* lightCompSpv,
-                                    size_t lightCompSize,
-                                    const uint32_t* ssaoCompSpv,
-                                    size_t ssaoCompSize,
-                                    const uint32_t* iblIrradianceSpv,
-                                    size_t iblIrradianceSize,
-                                    const uint32_t* iblSpecularSpv,
-                                    size_t iblSpecularSize)
+                                    uint32_t height)
 	: m_device(device)
 	, m_physicalDevice(physicalDevice)
 	, m_graphicsQueue(graphicsQueue)
@@ -122,19 +112,14 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_graphicsQueue, m_queueFamilyIndex,
 		ssao_comp_spv, sizeof(ssao_comp_spv));
 
-	// --- 7c. Create IBL pass (only if IBL shaders are provided) ---
-	if (iblIrradianceSpv && iblSpecularSpv && iblIrradianceSize > 0 && iblSpecularSize > 0)
+	// --- 7c. Create IBL pass ---
 	{
 		m_iblPass = std::make_unique<IBLPass>(
 			device, physicalDevice,
 			m_graphicsQueue, m_queueFamilyIndex,
-			iblIrradianceSpv, iblIrradianceSize,
-			iblSpecularSpv, iblSpecularSize);
+			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
+			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
-	}
-	else
-	{
-		NEURUS_LOG("[DeferredRenderer] IBL disabled (no shader data provided)");
 	}
 
 	// --- 8. Create command pool ---

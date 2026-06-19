@@ -49,6 +49,7 @@ class Mesh;
  * Usage:
  *   DeferredRenderer renderer(device, physDev, queue, qfi, surface,
  *                              w, h);
+ *   // SPIR-V shaders are embedded in DeferredRenderer.cpp - no params needed.
  *   // Each frame:
  *   renderer.DrawFrame();
  */
@@ -61,6 +62,7 @@ public:
 	 * Construction order: Swapchain → AttachmentManager → RenderPassManager →
 	 * GeometryPass → LightingPass → sync objects. Mesh buffers are uploaded
 	 * directly to GPU by Mesh objects. LightingPass owns its own light SSBO.
+	 * SPIR-V shaders are embedded at compile time (no constructor parameters needed).
 	 *
 	 * @param device           Logical device (borrowed, must outlive this object).
 	 * @param physicalDevice   Physical device (borrowed).
@@ -69,18 +71,6 @@ public:
 	 * @param surface          Presentation surface (borrowed, must outlive swapchain).
 	 * @param width            Initial window width.
 	 * @param height           Initial window height.
-	 * @param gVertSpv         G-Buffer vertex shader SPIR-V data.
-	 * @param gVertSize        G-Buffer vertex shader SPIR-V size.
-	 * @param gFragSpv         G-Buffer fragment shader SPIR-V data.
-	 * @param gFragSize        G-Buffer fragment shader SPIR-V size.
-	 * @param lightCompSpv     PBR lighting compute shader SPIR-V data.
-	 * @param lightCompSize    PBR lighting compute shader SPIR-V size.
-	 * @param ssaoCompSpv      SSAO compute shader SPIR-V data.
-	 * @param ssaoCompSize     SSAO compute shader SPIR-V size.
-	 * @param iblIrradianceSpv IBL irradiance compute SPIR-V (optional, nullptr → no IBL).
-	 * @param iblIrradianceSize IBL irradiance compute SPIR-V size.
-	 * @param iblSpecularSpv   IBL specular compute SPIR-V (optional, nullptr → no IBL).
-	 * @param iblSpecularSize  IBL specular compute SPIR-V size.
 	 */
 	DeferredRenderer(const vk::raii::Device& device,
 	                 const vk::raii::PhysicalDevice& physicalDevice,
@@ -88,19 +78,7 @@ public:
 	                 uint32_t queueFamilyIndex,
 	                 const vk::raii::SurfaceKHR& surface,
 	                 uint32_t width,
-	                 uint32_t height,
-	                 const uint32_t* gVertSpv,
-	                 size_t gVertSize,
-	                 const uint32_t* gFragSpv,
-	                 size_t gFragSize,
-	                 const uint32_t* lightCompSpv,
-	                 size_t lightCompSize,
-	                 const uint32_t* ssaoCompSpv,
-	                 size_t ssaoCompSize,
-	                 const uint32_t* iblIrradianceSpv = nullptr,
-	                 size_t iblIrradianceSize = 0,
-	                 const uint32_t* iblSpecularSpv = nullptr,
-	                 size_t iblSpecularSize = 0);
+	                 uint32_t height);
 
 	~DeferredRenderer();
 
