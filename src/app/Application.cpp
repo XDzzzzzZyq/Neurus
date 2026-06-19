@@ -14,8 +14,8 @@
  *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
  *  10. QTimer-driven render loop - ~60 FPS
  *
- * Cleanup order (CRITICAL: destroy surface BEFORE instance):
- *   renderer -> surface -> mainWindow -> vkContext
+ * Cleanup order (CRITICAL: destroy GPU child objects BEFORE device, surface BEFORE instance):
+ *   renderer -> context -> project -> surface -> mainWindow -> vkContext
  */
 
 // Must define platform before including any Vulkan headers
@@ -414,11 +414,13 @@ int Application::Run(int argc, char* argv[])
 	// --- Run application ---
 	int result = qtApp.exec();
 
-	// --- Clean shutdown (CRITICAL: destroy surface BEFORE instance) ---
-	m_renderer.reset();         // 1. Destroy DeferredRenderer (swapchain, pipeline, etc.)
-	surface.reset();            // 2. Destroy VkSurfaceKHR
-	mainWindow.reset();         // 3. Destroy main window (deletes VulkanWidget)
-	m_vkContext.reset();        // 4. Destroy VkDevice + VkInstance
+	// --- Clean shutdown (CRITICAL: destroy GPU child objects BEFORE device, surface BEFORE instance) ---
+	m_renderer.reset();         // 1. Destroy DeferredRenderer -> WaitIdle(), swapchain, pipeline
+	m_context.reset();          // 2. Destroy Context (releases scene references)
+	m_project.reset();          // 3. Destroy Project -> Scene -> Mesh -> ReleaseGPUBuffers -> free VBO/IBO
+	surface.reset();            // 4. Destroy VkSurfaceKHR
+	mainWindow.reset();         // 5. Destroy main window (deletes VulkanWidget)
+	m_vkContext.reset();        // 6. Destroy VkDevice + VkInstance (all child objects now freed)
 
 	return result;
 }

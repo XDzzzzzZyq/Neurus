@@ -123,6 +123,7 @@ private:
 	std::unique_ptr<VertexBuffer> m_gpuVertices;
 	std::unique_ptr<IndexBuffer> m_gpuIndices;
 	uint32_t m_gpuIndexCount = 0;
+	const vk::raii::Device* m_gpuDevice = nullptr;
 };
 
 } // namespace neurus

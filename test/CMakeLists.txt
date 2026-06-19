@@ -8,7 +8,8 @@ add_executable(neurus_test
 	render/test_vulkan_buffer.cpp
 	render/test_vulkan_context.cpp
 	render/test_shader_program.cpp
-	render/test_meshdata.cpp
+	asset/test_meshdata.cpp
+	asset/test_imagedata.cpp
 	render/test_shader_module.cpp
 	render/test_swapchain.cpp
 	render/test_syncobjects.cpp
@@ -17,6 +18,7 @@ add_executable(neurus_test
 	render/test_compute_pipeline.cpp
 	render/test_texture.cpp
 	render/test_material.cpp
+	render/test_mesh.cpp
 	render/test_pipeline.cpp
 	render/test_attachments.cpp
 	render/test_commandbuffer.cpp

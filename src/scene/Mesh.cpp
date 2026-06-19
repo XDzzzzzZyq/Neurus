@@ -23,7 +23,10 @@ Mesh::Mesh(const std::string& path)
 	if (meshData->LoadObj(path)) o_mesh = meshData;
 }
 
-Mesh::~Mesh() = default;
+Mesh::~Mesh()
+{
+	ReleaseGPUBuffers();
+}
 
 void Mesh::ReloadMeshData(const std::string& assetDir)
 {
@@ -80,6 +83,7 @@ void Mesh::UploadToGPU(const vk::raii::Device& device,
 		meshData.indexArray.data(), indexDataSize, indexCount,
 		("IBO_" + meshData.name).c_str());
 	m_gpuIndexCount = indexCount;
+	m_gpuDevice = &device;
 
 	NEURUS_LOG("[Mesh] Uploaded mesh " << GetObjectID()
 	           << " ('" << meshData.name << "')"
@@ -89,6 +93,9 @@ void Mesh::UploadToGPU(const vk::raii::Device& device,
 
 void Mesh::ReleaseGPUBuffers()
 {
+	if (m_gpuDevice) {
+		m_gpuDevice->waitIdle();
+	}
 	m_gpuVertices.reset();
 	m_gpuIndices.reset();
 	m_gpuIndexCount = 0;
