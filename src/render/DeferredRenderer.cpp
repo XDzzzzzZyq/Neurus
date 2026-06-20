@@ -9,6 +9,7 @@
 #include "passes/GeometryPass.h"
 #include "passes/LightingPass.h"
 #include "passes/RenderPassManager.h"
+#include "Image.h"
 #include "Screenshot.h"
 #include "passes/SSAOPass.h"
 #include "Swapchain.h"
@@ -112,7 +113,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_graphicsQueue, m_queueFamilyIndex,
 		ssao_comp_spv, sizeof(ssao_comp_spv));
 
-	// --- 7c. Create IBL pass ---
+	// --- 7c. Create IBL pass (pure compute service) ---
 	{
 		m_iblPass = std::make_unique<IBLPass>(
 			device, physicalDevice,
@@ -120,6 +121,41 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
 			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
+	}
+
+	// --- 7d. Create IBL cubemap Images (owned by DeferredRenderer) ---
+	{
+		const vk::ImageUsageFlags cubeUsage =
+			vk::ImageUsageFlagBits::eStorage      // compute write
+			| vk::ImageUsageFlagBits::eSampled    // shader read
+			| vk::ImageUsageFlagBits::eTransferSrc; // readback for saving
+
+		m_diffuseCubemap = std::make_unique<Image>(
+			device, physicalDevice,
+			vk::Extent2D{IBLPass::kDiffuseFaceRes, IBLPass::kDiffuseFaceRes},
+			vk::Format::eR32G32B32A32Sfloat,
+			cubeUsage,
+			/*mipLevels=*/1,
+			Image::ImageType::eCube,
+			"IBL_DiffuseCubemap");
+
+		m_specularCubemap = std::make_unique<Image>(
+			device, physicalDevice,
+			vk::Extent2D{IBLPass::kSpecularFaceRes, IBLPass::kSpecularFaceRes},
+			vk::Format::eR32G32B32A32Sfloat,
+			cubeUsage,
+			/*mipLevels=*/IBLPass::kSpecularMipLevels,
+			Image::ImageType::eCube,
+			"IBL_SpecularCubemap");
+
+		// Create cubemap samplers
+		m_diffuseSampler = IBLPass::CreateCubemapSampler(device, 1);
+		m_specularSampler = IBLPass::CreateCubemapSampler(device, IBLPass::kSpecularMipLevels);
+
+		NEURUS_LOG("[DeferredRenderer] Created IBL cubemaps: diffuse "
+		           << IBLPass::kDiffuseFaceRes << "², specular "
+		           << IBLPass::kSpecularFaceRes << "² x "
+		           << IBLPass::kSpecularMipLevels << " mips");
 	}
 
 	// --- 8. Create command pool ---
@@ -201,34 +237,29 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 
 void DeferredRenderer::EnableIBL()
 {
-	if (!m_iblPass || !m_lightingPass)
+	if (!m_iblPass || !m_lightingPass || !m_diffuseCubemap || !m_specularCubemap)
 	{
 		return;
 	}
 
-	const auto& diffuse  = m_iblPass->GetDiffuseCubemap();
-	const auto& specular = m_iblPass->GetSpecularCubemap();
-	const auto& diffSampler  = m_iblPass->GetDiffuseSampler();
-	const auto& specSampler  = m_iblPass->GetSpecularSampler();
-
 	m_lightingPass->SetIBLResources(
-		*diffuse.ImageViewHandle(),
-		*diffSampler,
-		*specular.ImageViewHandle(),
-		*specSampler);
+		*m_diffuseCubemap->ImageViewHandle(),
+		*m_diffuseSampler,
+		*m_specularCubemap->ImageViewHandle(),
+		*m_specularSampler);
 
 	NEURUS_LOG("[DeferredRenderer] IBL enabled in lighting pass");
 }
 
 void DeferredRenderer::SetEquirectEnvironment(const Image& equirect)
 {
-	if (!m_iblPass)
+	if (!m_iblPass || !m_diffuseCubemap || !m_specularCubemap)
 	{
-		NEURUS_ERR("[DeferredRenderer] SetEquirectEnvironment: IBLPass not created");
+		NEURUS_ERR("[DeferredRenderer] SetEquirectEnvironment: IBLPass or cubemaps not created");
 		return;
 	}
 
-	m_iblPass->Generate(equirect);
+	m_iblPass->Generate(equirect, *m_diffuseCubemap, *m_specularCubemap);
 	EnableIBL();
 	NEURUS_LOG("[DeferredRenderer] IBL environment set and enabled");
 }
@@ -762,20 +793,6 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 		                                          m_graphicsQueue, m_queueFamilyIndex,
 		                                          *m_attachmentManager,
 		                                          "screenshots/gbuffer");
-	}
-
-	// --- Also save IBL cubemap faces if available ---
-	if (m_iblPass)
-	{
-		const std::string iblPrefix = Screenshot::timestampedFilename("screenshots/gbuffer", "");
-		if (m_iblPass->SaveDiffuseCubemap(iblPrefix))
-		{
-			NEURUS_LOG("[DeferredRenderer] Saved diffuse IBL cubemap");
-		}
-		if (m_iblPass->SaveSpecularCubemapAllMips(iblPrefix) > 0)
-		{
-			NEURUS_LOG("[DeferredRenderer] Saved specular IBL cubemap (all mips)");
-		}
 	}
 
 	return count;

@@ -1,19 +1,22 @@
 /**
  * @file IBLPass.h
- * @brief Image-Based Lighting generation pass.
+ * @brief Image-Based Lighting generation pass – pure compute service.
  *
  * Converts an equirectangular HDR image into diffuse irradiance and
  * specular prefiltered cubemaps for PBR IBL evaluation.
  *
- * Owns the cubemap Images, samplers, and compute pipelines.
+ * Does NOT own cubemap resources – caller provides output Image
+ * references.  Owns only compute pipelines and descriptor management.
  * One-shot generation (not per-frame) – call Generate() once after
  * loading the HDR environment map.
  *
  * Architecture:
- * - Owns diffuse cubemap (64², 1 mip) and specular cubemap (2048², 8 mips)
- * - Creates compute pipelines for irradiance and specular convolution
- * - Provides ImageViews + Samplers for LightingPass descriptor binding
- * - Provides Save*() methods for GPU readback → HDR file
+ * - Caller creates diffuse cubemap (64², 1 mip) and specular cubemap
+ *   (2048², 8 mips) externally
+ * - Generates compute pipelines for irradiance and specular convolution
+ * - Writes compute results into caller-provided output Images
+ * - Cubemap ownership (Images + Samplers) belongs to the caller
+ *   (e.g. DeferredRenderer or test fixture)
  */
 
 #pragma once
@@ -22,9 +25,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include <array>
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace neurus {
@@ -53,8 +54,11 @@ public:
 	static constexpr int32_t kDefaultSpecularSteps = 32;
 
 	/**
-	 * @brief Constructs the IBL pass – creates cubemap Images, samplers,
-	 *        descriptor sets, and compute pipelines.
+	 * @brief Constructs the IBL pass – creates samplers, descriptor sets,
+	 *        and compute pipelines.
+	 *
+	 * Does NOT create cubemap Images – the caller provides those to
+	 * Generate().
 	 *
 	 * @param device          Logical device (retained reference).
 	 * @param physicalDevice  Physical device for memory/sampler queries.
@@ -92,73 +96,38 @@ public:
 	 * The equirect Image must be 2D, R32G32B32A32_SFLOAT, and in
 	 * SHADER_READ_ONLY_OPTIMAL layout (or will be transitioned).
 	 *
+	 * The caller MUST pre-create the output Images:
+	 * - diffuseOut: 64², 6-layer Cube, 1 mip, R32G32B32A32_SFLOAT
+	 * - specularOut: 2048², 6-layer Cube, 8 mips, R32G32B32A32_SFLOAT
+	 *   (Images must have eStorage | eSampled usage)
+	 *
 	 * Records one-shot command buffers for irradiance convolution (1 dispatch)
 	 * and specular prefilter (kSpecularMipLevels dispatches, one per mip).
 	 *
 	 * @param equirectImage  Equirectangular HDR panorama (2D image).
+	 * @param diffuseOut     Pre-created diffuse irradiance cubemap Image.
+	 * @param specularOut    Pre-created specular prefiltered cubemap Image.
 	 */
-	void Generate(const Image& equirectImage);
+	void Generate(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
 
-	// -------------------------------------------------------------------
-	// Output accessors (for LightingPass descriptor binding)
-	// -------------------------------------------------------------------
+	/** @brief Static factory: creates a linear-clamp equirect sampler. */
+	static vk::raii::Sampler CreateEquirectSampler(const vk::raii::Device& device);
 
-	/** @brief Diffuse irradiance cubemap Image. */
-	const Image& GetDiffuseCubemap() const { return *m_diffuseCubemap; }
-
-	/** @brief Specular prefiltered cubemap Image. */
-	const Image& GetSpecularCubemap() const { return *m_specularCubemap; }
-
-	/** @brief Sampler for diffuse cubemap (linear, clamp). */
-	const vk::raii::Sampler& GetDiffuseSampler() const { return m_diffuseSampler; }
-
-	/** @brief Sampler for specular cubemap (linear mipmapped, clamp). */
-	const vk::raii::Sampler& GetSpecularSampler() const { return m_specularSampler; }
-
-	// -------------------------------------------------------------------
-	// Saving
-	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Saves the diffuse irradiance cubemap as 6 .hdr face files.
-	 * @param pathPrefix  Output path prefix (e.g. "ibl/diffuse")
-	 * @return true if all 6 faces were saved successfully.
-	 */
-	bool SaveDiffuseCubemap(const std::string& pathPrefix);
-
-	/**
-	 * @brief Saves the specular cubemap mip 0 as 6 .hdr face files.
-	 * @param pathPrefix  Output path prefix (e.g. "ibl/specular")
-	 * @return true if all 6 faces were saved successfully.
-	 */
-	bool SaveSpecularCubemap(const std::string& pathPrefix);
-
-	/**
-	 * @brief Saves all mip levels of the specular cubemap as .hdr face files.
-	 *
-	 * For each mip level (0..kSpecularMipLevels-1), reads back all 6 faces
-	 * and saves them as "{pathPrefix}_specular_mip{i}_{face}.hdr".
-	 *
-	 * @param pathPrefix  Output path prefix (e.g. "screenshots/gbuffer")
-	 * @return Total number of files saved (6 × kSpecularMipLevels on success, 0 on failure).
-	 */
-	int SaveSpecularCubemapAllMips(const std::string& pathPrefix);
+	/** @brief Static factory: creates a cubemap sampler (linear, clamp, mipmapped). */
+	static vk::raii::Sampler CreateCubemapSampler(const vk::raii::Device& device, uint32_t mipLevels);
 
 private:
-	// --- Cubemap creation ---
-	void createCubemaps();
-
 	// --- Pipeline / descriptor helpers ---
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
-	static vk::raii::Sampler CreateEquirectSampler(const vk::raii::Device& device);
-	static vk::raii::Sampler CreateCubemapSampler(const vk::raii::Device& device, uint32_t mipLevels);
 
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
 	                                  const uint32_t* compSpv,
 	                                  size_t compSize,
 	                                  std::unique_ptr<ComputePipelineBuilder>& outBuilder);
 
-	void WriteDescriptors(const Image& equirectImage, uint32_t specularMip);
+	void WriteDescriptors(const Image& equirectImage,
+	                      const vk::raii::Sampler& equirectSampler,
+	                      const vk::raii::ImageView& outputView);
 
 	// --- Dispatch helpers ---
 	void dispatchCompute(vk::CommandBuffer cmdBuf,
@@ -176,17 +145,6 @@ private:
 	const vk::raii::PhysicalDevice* m_physicalDevice;
 	vk::Queue m_graphicsQueue;
 	uint32_t m_queueFamilyIndex;
-
-	// --- Owned cubemaps ---
-	std::unique_ptr<Image> m_diffuseCubemap;   // 64², 1 mip, Cube
-	std::unique_ptr<Image> m_specularCubemap;  // 2048², 8 mips, Cube
-	/** Per-mip image views for specular cubemap (index 0 = mip 0, etc.). */
-	std::vector<vk::raii::ImageView> m_specularMipViews;
-
-	// --- Samplers ---
-	vk::raii::Sampler m_equirectSampler;   // linear clamp (for HDR source reads)
-	vk::raii::Sampler m_diffuseSampler;    // linear clamp (1 mip)
-	vk::raii::Sampler m_specularSampler;   // linear mipmapped clamp (8 mips)
 
 	// --- Descriptor resources ---
 	DescriptorSetLayout m_descriptorSetLayout;

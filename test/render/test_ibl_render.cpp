@@ -179,6 +179,35 @@ protected:
 			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
 			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
 
+		// --- Create IBL cubemap Images (owned by test fixture) ---
+		{
+			const vk::ImageUsageFlags cubeUsage =
+				vk::ImageUsageFlagBits::eStorage      // compute write
+				| vk::ImageUsageFlagBits::eSampled    // shader read
+				| vk::ImageUsageFlagBits::eTransferSrc; // readback
+
+			m_diffuseCubemap = std::make_unique<Image>(
+				dev, pd,
+				vk::Extent2D{IBLPass::kDiffuseFaceRes, IBLPass::kDiffuseFaceRes},
+				vk::Format::eR32G32B32A32Sfloat,
+				cubeUsage,
+				/*mipLevels=*/1,
+				Image::ImageType::eCube,
+				"IBLRenderTest_DiffuseCube");
+
+			m_specularCubemap = std::make_unique<Image>(
+				dev, pd,
+				vk::Extent2D{IBLPass::kSpecularFaceRes, IBLPass::kSpecularFaceRes},
+				vk::Format::eR32G32B32A32Sfloat,
+				cubeUsage,
+				/*mipLevels=*/IBLPass::kSpecularMipLevels,
+				Image::ImageType::eCube,
+				"IBLRenderTest_SpecularCube");
+
+			m_diffuseSampler = IBLPass::CreateCubemapSampler(dev, 1);
+			m_specularSampler = IBLPass::CreateCubemapSampler(dev, IBLPass::kSpecularMipLevels);
+		}
+
 		// --- Generate equirect gradient & upload to GPU ---
 		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
 
@@ -197,19 +226,14 @@ protected:
 		                                  gradientPixels.size() * sizeof(float));
 
 		// --- Generate IBL cubemaps ---
-		m_iblPass->Generate(*m_equirectImage);
+		m_iblPass->Generate(*m_equirectImage, *m_diffuseCubemap, *m_specularCubemap);
 
 		// --- Wire IBL resources into lighting pass ---
-		const auto& diffuseCubemap  = m_iblPass->GetDiffuseCubemap();
-		const auto& specularCubemap = m_iblPass->GetSpecularCubemap();
-		const auto& diffSampler     = m_iblPass->GetDiffuseSampler();
-		const auto& specSampler     = m_iblPass->GetSpecularSampler();
-
 		m_lightingPass->SetIBLResources(
-			*diffuseCubemap.ImageViewHandle(),
-			*diffSampler,
-			*specularCubemap.ImageViewHandle(),
-			*specSampler);
+			*m_diffuseCubemap->ImageViewHandle(),
+			*m_diffuseSampler,
+			*m_specularCubemap->ImageViewHandle(),
+			*m_specularSampler);
 	}
 
 	void TearDown() override
@@ -306,6 +330,12 @@ protected:
 	std::unique_ptr<LightingPass>       m_lightingPass;
 	std::unique_ptr<IBLPass>            m_iblPass;
 	std::unique_ptr<Image>              m_equirectImage;
+	// --- IBL cubemaps (owned by test fixture, passed to IBLPass::Generate) ---
+	std::unique_ptr<Image>              m_diffuseCubemap;
+	std::unique_ptr<Image>              m_specularCubemap;
+	// --- Cubemap samplers ---
+	vk::raii::Sampler                   m_diffuseSampler = nullptr;
+	vk::raii::Sampler                   m_specularSampler = nullptr;
 };
 
 // ===========================================================================

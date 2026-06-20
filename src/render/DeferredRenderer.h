@@ -42,6 +42,7 @@ class VulkanBuffer;
 class Camera;
 class Scene;
 class Mesh;
+class Image;
 
 /**
  * @brief Deferred renderer orchestrating GeometryPass → LightingPass → composite.
@@ -242,6 +243,13 @@ private:
 	std::unique_ptr<LightingPass> m_lightingPass;
 	std::unique_ptr<SSAOPass> m_ssaoPass;
 	std::unique_ptr<IBLPass> m_iblPass;
+
+	// --- IBL cubemap Images (64² diffuse, 2048² specular 8-mip) ---
+	std::unique_ptr<Image> m_diffuseCubemap;
+	std::unique_ptr<Image> m_specularCubemap;
+	// --- Cubemap samplers ---
+	vk::raii::Sampler m_diffuseSampler = nullptr;
+	vk::raii::Sampler m_specularSampler = nullptr;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
