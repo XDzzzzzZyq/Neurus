@@ -104,6 +104,20 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		specularMipViews.push_back(vk::raii::ImageView(*m_device, viewCI));
 	}
 
+	// --- Create 2D_ARRAY view for diffuse cubemap (shader expects image2DArray) ---
+	vk::ImageSubresourceRange diffSubresource(
+		vk::ImageAspectFlagBits::eColor,
+		0, 1,    // baseMipLevel=0, levelCount=1
+		0, 6);   // baseArrayLayer=0, layerCount=6
+	vk::ImageViewCreateInfo diffViewCI(
+		{},
+		*diffuseOut.ImageHandle(),
+		vk::ImageViewType::e2DArray,
+		vk::Format::eR32G32B32A32Sfloat,
+		vk::ComponentMapping(),
+		diffSubresource);
+	vk::raii::ImageView diffArrayView(*m_device, diffViewCI);
+
 	// --- Create transient command pool ---
 	const vk::CommandPoolCreateInfo poolCI(
 		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, m_queueFamilyIndex);
@@ -152,7 +166,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		}
 
 		// Write descriptors with diffuse cubemap view as output
-		WriteDescriptors(equirectImage, equirectSampler, diffuseOut.ImageViewHandle());
+		WriteDescriptors(equirectImage, equirectSampler, diffArrayView);
 
 		// Dispatch irradiance
 		const uint32_t groupsX = (kDiffuseFaceRes + 3) / 4;
