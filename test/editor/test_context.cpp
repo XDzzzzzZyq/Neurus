@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "editor/Context.h"
-#include "editor/events/EventBus.h"
+#include "editor/events/EventQueue.h"
 #include "editor/events/EditorEvents.h"
 #include "scene/Scene.h"
 #include "scene/Camera.h"
@@ -200,9 +200,9 @@ TEST_F(EditorContextRefactoredTest, SelectionManager_InitiallyEmpty)
 	EXPECT_EQ(m_editor->selections.GetSelectionCount(), 0u);
 }
 
-TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventBus)
+TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventQueue)
 {
-	auto& pool = EventBus();
+	auto& pool = EventQueue();
 	int receivedStatus = -1;
 
 	pool.subscribe<SceneStatusChanged>(
@@ -250,17 +250,17 @@ class ContextTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_pool = &EventBus();
+		m_queue = &EventQueue();
 		m_scene = std::make_unique<Scene>();
-		m_context = std::make_unique<Context>(*m_pool);
+		m_context = std::make_unique<Context>(*m_queue);
 	}
 
 	void TearDown() override
 	{
-		m_pool->Process();
+		m_queue->Process();
 	}
 
-	EventPool* m_pool = nullptr;
+	EventQueue* m_queue = nullptr;
 	std::unique_ptr<Scene> m_scene;
 	std::unique_ptr<Context> m_context;
 };
@@ -268,7 +268,7 @@ protected:
 TEST_F(ContextTest, ConstructsWithoutCrash)
 {
 	ASSERT_NO_THROW({
-		Context ctx(EventBus());
+		Context ctx(EventQueue());
 	});
 }
 
@@ -295,8 +295,8 @@ TEST_F(ContextTest, SceneStatusChanged_UpdatesSceneAndEmitsSignal)
 	                 [&signalCalled]() { signalCalled = true; });
 
 	// Enqueue a scene status change event — Context constructor subscribed to it
-	m_pool->enqueue(SceneStatusChanged{Scene::LightChanged});
-	m_pool->Process();
+	m_queue->enqueue(SceneStatusChanged{Scene::LightChanged});
+	m_queue->Process();
 
 	// EditorContext::sceneChanged should have been emitted
 	EXPECT_TRUE(signalCalled);
@@ -308,8 +308,8 @@ TEST_F(ContextTest, SceneStatusChanged_UpdatesSceneStatusFlag)
 	m_context->editor.SetScene(m_scene.get());
 	m_scene->ResetStatus();
 
-	m_pool->enqueue(SceneStatusChanged{Scene::ObjectTransChanged});
-	m_pool->Process();
+	m_queue->enqueue(SceneStatusChanged{Scene::ObjectTransChanged});
+	m_queue->Process();
 
 	// The Scene should now have ObjectTransChanged flag set
 	EXPECT_TRUE(m_scene->CheckStatus(Scene::ObjectTransChanged));

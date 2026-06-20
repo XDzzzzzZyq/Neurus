@@ -10,7 +10,7 @@
  * - SceneContext: Owns active Scene* pointer, provides const accessors
  * - EditorContext: Owns SelectionManager, editor state, dirty tracking (QObject with signals)
  * - RenderContext: Non-owning RenderConfigs* pointer (stub - T45 creates RenderConfigs)
- * - Context: Composite aggregating all three; subscribes to EventPool events
+ * - Context: Composite aggregating all three; subscribes to EventQueue events
  */
 
 #pragma once
@@ -27,7 +27,7 @@ class Scene;
 class Camera;
 class ObjectID;
 class RenderConfigs;
-class EventPool;
+class EventQueue;
 
 // ===========================================================================
 // SceneContext - read-only scene graph access
@@ -214,9 +214,9 @@ public:
 public:
 	/**
 	 * @brief Constructs the context and subscribes to relevant events.
-	 * @param pool EventPool for subscribing to context-related events.
+	 * @param pool EventQueue for subscribing to context-related events.
 	 */
-	explicit Context(EventPool& pool);
+	explicit Context(EventQueue& pool);
 
 	Context(const Context&) = delete;
 	Context& operator=(const Context&) = delete;

@@ -26,6 +26,8 @@
 	DebugLine.cpp
 	DebugPoints.h
 	DebugPoints.cpp
+	Environment.h
+	Environment.cpp
 )
 
 target_include_directories(neurus_scene PRIVATE

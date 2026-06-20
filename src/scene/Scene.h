@@ -42,12 +42,13 @@
 #include "Light.h"
 #include "Mesh.h"
 #include "Sprite.h"
+#include "Environment.h"
 
 namespace neurus
 {
 
 /**
- * @brief Container for all scene objects and scene-wide state.
+ * @brief Container for all scene objects, environments, and scene-wide state.
  *
  * Scene aggregates all renderable and non-renderable objects in a scene.
  * It provides typed pools (ResPool) for each object category, enabling
@@ -143,7 +144,8 @@ public:
 	void serialize(Archive& ar)
 	{
 		ar(CEREAL_NVP(cam_list), CEREAL_NVP(mesh_list), CEREAL_NVP(light_list),
-		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list));
+		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list),
+		   CEREAL_NVP(env_list));
 	}
 
 	// -------------------------------------------------------------------
@@ -189,6 +191,7 @@ public:
 	ResPool<Sprite>      sprite_list;   ///< 2D sprite overlays
 	ResPool<DebugLine>   dLine_list;    ///< Debug line primitives
 	ResPool<DebugPoints> dPoints_list;  ///< Debug point primitives
+	ResPool<Environment> env_list;      ///< Environment objects (IBL)
 
 	// -------------------------------------------------------------------
 	// Registration - store in both type-specific pool AND obj_list
@@ -252,6 +255,16 @@ public:
 	void UseDebugPoints(Resource<DebugPoints> dpoints)
 	{
 		RegisterObject(dpoints, dPoints_list);
+	}
+
+	/**
+	 * @brief Registers an environment object in the scene.
+	 * @param env Shared pointer to Environment object.
+	 * @note Adds to env_list and obj_list.
+	 */
+	void UseEnvironment(Resource<Environment> env)
+	{
+		RegisterObject(env, env_list);
 	}
 
 	// -------------------------------------------------------------------

@@ -4,7 +4,7 @@
  *
  * Tests cover:
  * - Selection API: Select, Deselect, ClearSelection, IsSelected, GetActiveObject
- * - EventBus emission: ObjectSelected / ObjectDeselected on selection changes
+ * - EventQueue emission: ObjectSelected / ObjectDeselected on selection changes
  * - RaycastSelect: screen → world ray → sphere intersection against mesh objects
  * - BoxSelect: stub returns empty vector
  *
@@ -17,7 +17,7 @@
 
 #include "editor/SelectionController.h"
 #include "editor/events/EditorEvents.h"
-#include "editor/events/EventBus.h"
+#include "editor/events/EventQueue.h"
 #include "scene/Camera.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -25,7 +25,7 @@
 using namespace neurus;
 
 // ===========================================================================
-// SelectionControllerTest — basic API (no EventBus dependency needed)
+// SelectionControllerTest — basic API (no EventQueue dependency needed)
 // ===========================================================================
 
 class SelectionControllerTest : public ::testing::Test
@@ -175,7 +175,7 @@ TEST_F(SelectionControllerTest, GetActiveObject_AfterDeselectActive_FallsBack)
 }
 
 // ===========================================================================
-// SelectionControllerEventTest — EventBus emission
+// SelectionControllerEventTest — EventQueue emission
 // ===========================================================================
 
 class SelectionControllerEventTest : public ::testing::Test
@@ -184,17 +184,17 @@ protected:
 	void SetUp() override
 	{
 		m_sel = std::make_unique<SelectionController>();
-		m_pool = &EventBus();
+		m_queue = &EventQueue();
 	}
 
 	void TearDown() override
 	{
 		// Drain any remaining events to keep queue clean
-		m_pool->Process();
+		m_queue->Process();
 	}
 
 	std::unique_ptr<SelectionController> m_sel;
-	EventPool* m_pool = nullptr;
+	EventQueue* m_queue = nullptr;
 };
 
 TEST_F(SelectionControllerEventTest, Select_EmitsObjectSelected)
@@ -202,7 +202,7 @@ TEST_F(SelectionControllerEventTest, Select_EmitsObjectSelected)
 	bool received = false;
 	int receivedId = -1;
 
-	m_pool->subscribe<ObjectSelected>([&](const ObjectSelected& e) {
+	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected& e) {
 		received = true;
 		receivedId = e.objectId;
 	});
@@ -212,7 +212,7 @@ TEST_F(SelectionControllerEventTest, Select_EmitsObjectSelected)
 	// Event is enqueued, must Process to dispatch
 	EXPECT_FALSE(received); // not yet dispatched
 
-	m_pool->Process();
+	m_queue->Process();
 
 	EXPECT_TRUE(received);
 	EXPECT_EQ(receivedId, 42);
@@ -223,16 +223,16 @@ TEST_F(SelectionControllerEventTest, Deselect_EmitsObjectDeselected)
 	bool received = false;
 	int receivedId = -1;
 
-	m_pool->subscribe<ObjectDeselected>([&](const ObjectDeselected& e) {
+	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected& e) {
 		received = true;
 		receivedId = e.objectId;
 	});
 
 	m_sel->Select(7);
-	m_pool->Process(); // drain the select event
+	m_queue->Process(); // drain the select event
 
 	m_sel->Deselect(7);
-	m_pool->Process();
+	m_queue->Process();
 
 	EXPECT_TRUE(received);
 	EXPECT_EQ(receivedId, 7);
@@ -242,12 +242,12 @@ TEST_F(SelectionControllerEventTest, Deselect_NotSelected_NoEventEmitted)
 {
 	bool received = false;
 
-	m_pool->subscribe<ObjectDeselected>([&](const ObjectDeselected&) {
+	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) {
 		received = true;
 	});
 
 	m_sel->Deselect(99); // not in selection
-	m_pool->Process();
+	m_queue->Process();
 
 	EXPECT_FALSE(received);
 }
@@ -256,17 +256,17 @@ TEST_F(SelectionControllerEventTest, ClearSelection_EmitsDeselectedForAll)
 {
 	std::vector<int> deselectedIds;
 
-	m_pool->subscribe<ObjectDeselected>([&](const ObjectDeselected& e) {
+	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected& e) {
 		deselectedIds.push_back(e.objectId);
 	});
 
 	// Select 42 (single selection replaces), so we need to test multiple deselections
 	// by selecting sequentially and tracking what was selected
 	m_sel->Select(10);
-	m_pool->Process(); // drain select event
+	m_queue->Process(); // drain select event
 
 	m_sel->ClearSelection();
-	m_pool->Process();
+	m_queue->Process();
 
 	ASSERT_EQ(deselectedIds.size(), 1u);
 	EXPECT_EQ(deselectedIds[0], 10);
@@ -276,13 +276,13 @@ TEST_F(SelectionControllerEventTest, SelectSameId_NoDuplicateEvent)
 {
 	int selectCount = 0;
 
-	m_pool->subscribe<ObjectSelected>([&](const ObjectSelected&) {
+	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) {
 		selectCount++;
 	});
 
 	m_sel->Select(1);
 	m_sel->Select(1); // same ID again
-	m_pool->Process();
+	m_queue->Process();
 
 	// Only one ObjectSelected event should be emitted (first time)
 	EXPECT_EQ(selectCount, 1);

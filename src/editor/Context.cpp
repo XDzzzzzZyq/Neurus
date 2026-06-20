@@ -86,7 +86,7 @@ const Scene* EditorContext::activeScene() const
 // Context - aggregates sub-contexts, wires event subscriptions
 // ===========================================================================
 
-Context::Context(EventPool& pool)
+Context::Context(EventQueue& pool)
 {
 	// Wire back-pointer: EditorContext needs access to its sibling SceneContext
 	editor.m_sceneCtx = &scene;
