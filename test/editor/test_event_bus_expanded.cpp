@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "editor/events/EventQueue.h"
+#include "editor/events/EventBus.h"
 #include "editor/events/EditorEvents.h"
 
 using namespace neurus;
@@ -25,7 +25,7 @@ protected:
 		m_queue->Process();
 	}
 
-	EventQueue* m_queue = nullptr;
+	class EventQueue* m_queue = nullptr;
 };
 
 // --- ObjectSelected: multiple values ---

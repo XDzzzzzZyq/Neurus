@@ -45,13 +45,13 @@ void SelectionController::Select(int objectId)
 
 	for (int id : previous)
 	{
-		EventBus().enqueue(ObjectDeselected{id});
+		EventQueue().enqueue(ObjectDeselected{id});
 	}
 
 	m_selection.insert(objectId);
 	m_activeId = objectId;
 
-	EventBus().enqueue(ObjectSelected{objectId});
+	EventQueue().enqueue(ObjectSelected{objectId});
 }
 
 void SelectionController::Deselect(int objectId)
@@ -70,7 +70,7 @@ void SelectionController::Deselect(int objectId)
 	}
 
 	// Emit event
-	EventBus().enqueue(ObjectDeselected{objectId});
+	EventQueue().enqueue(ObjectDeselected{objectId});
 }
 
 void SelectionController::ClearSelection()
@@ -83,7 +83,7 @@ void SelectionController::ClearSelection()
 	// Emit deselect events for every previously selected object
 	for (int id : toRemove)
 	{
-		EventBus().enqueue(ObjectDeselected{id});
+		EventQueue().enqueue(ObjectDeselected{id});
 	}
 }
 

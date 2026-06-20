@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "editor/EditorContext.h"
-#include "editor/events/EventQueue.h"
+#include "editor/Context.h"
+#include "editor/events/EventBus.h"
 #include "editor/events/EditorEvents.h"
 #include "scene/Scene.h"
 
@@ -34,7 +34,7 @@ protected:
 
 	std::unique_ptr<EditorContext> m_context;
 	std::unique_ptr<Scene> m_scene;
-	EventQueue* m_queue = nullptr;
+	class EventQueue* m_queue = nullptr;
 };
 
 // -----------------------------------------------------------------------

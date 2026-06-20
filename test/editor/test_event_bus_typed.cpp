@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "editor/events/EventQueue.h"
+#include "editor/events/EventBus.h"
 #include "editor/events/EditorEvents.h"
 
 using namespace neurus;
@@ -28,7 +28,7 @@ protected:
 		m_queue->Process();
 	}
 
-	EventQueue* m_queue = nullptr;
+	class EventQueue* m_queue = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -264,9 +264,9 @@ TEST_F(TypedEventQueueTest, Process_MaxEventsCapPreventsInfiniteLoop)
 
 TEST_F(TypedEventQueueTest, EventQueueIsNotCopyable)
 {
-	static_assert(!std::is_copy_constructible_v<EventQueue>,
+	static_assert(!std::is_copy_constructible_v<class EventQueue>,
 	              "EventQueue must not be copyable");
-	static_assert(!std::is_copy_assignable_v<EventQueue>,
+	static_assert(!std::is_copy_assignable_v<class EventQueue>,
 	              "EventQueue must not be copy-assignable");
 	SUCCEED();
 }

@@ -38,8 +38,8 @@ protected:
 
 	void TearDown() override
 	{
-		// Process any queued EventBus events
-		EventBus().Process();
+		// Process any queued EventQueue events
+		EventQueue().Process();
 	}
 
 	std::unique_ptr<Scene> m_scene;

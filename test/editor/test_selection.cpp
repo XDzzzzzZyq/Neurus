@@ -17,7 +17,7 @@
 
 #include "editor/SelectionController.h"
 #include "editor/events/EditorEvents.h"
-#include "editor/events/EventQueue.h"
+#include "editor/events/EventBus.h"
 #include "scene/Camera.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -194,7 +194,7 @@ protected:
 	}
 
 	std::unique_ptr<SelectionController> m_sel;
-	EventQueue* m_queue = nullptr;
+	class EventQueue* m_queue = nullptr;
 };
 
 TEST_F(SelectionControllerEventTest, Select_EmitsObjectSelected)

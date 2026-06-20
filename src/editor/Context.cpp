@@ -70,7 +70,7 @@ void EditorContext::SetScene(Scene* scene)
 
 void EditorContext::NotifySceneChanged(int status)
 {
-	EventBus().enqueue(SceneStatusChanged{status});
+	EventQueue().enqueue(SceneStatusChanged{status});
 }
 
 const Scene* EditorContext::activeScene() const
@@ -86,7 +86,7 @@ const Scene* EditorContext::activeScene() const
 // Context - aggregates sub-contexts, wires event subscriptions
 // ===========================================================================
 
-Context::Context(EventQueue& pool)
+Context::Context(class EventQueue& pool)
 {
 	// Wire back-pointer: EditorContext needs access to its sibling SceneContext
 	editor.m_sceneCtx = &scene;

@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "editor/Context.h"
-#include "editor/events/EventQueue.h"
+#include "editor/events/EventBus.h"
 #include "editor/events/EditorEvents.h"
 #include "scene/Scene.h"
 #include "scene/Camera.h"
@@ -260,7 +260,7 @@ protected:
 		m_queue->Process();
 	}
 
-	EventQueue* m_queue = nullptr;
+	class EventQueue* m_queue = nullptr;
 	std::unique_ptr<Scene> m_scene;
 	std::unique_ptr<Context> m_context;
 };
