@@ -3,10 +3,10 @@
 add_library(neurus_editor STATIC
 	CameraController.h
 	CameraController.cpp
+	Editor.h
+	Editor.cpp
 	Input.h
 	Input.cpp
-	EditorContext.h
-	EditorContext.cpp
 	Context.h
 	Context.cpp
 	SelectionManager.h
@@ -19,6 +19,7 @@ add_library(neurus_editor STATIC
 target_link_libraries(neurus_editor PUBLIC
 	Qt6::Core
 	neurus_scene
+	stb
 )
 
 target_include_directories(neurus_editor PUBLIC

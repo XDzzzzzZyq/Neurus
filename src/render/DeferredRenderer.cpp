@@ -34,11 +34,16 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
+#include <stb_image.h>
+
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
 namespace neurus {
 
@@ -262,6 +267,132 @@ void DeferredRenderer::SetEquirectEnvironment(const Image& equirect)
 	m_iblPass->Generate(equirect, *m_diffuseCubemap, *m_specularCubemap);
 	EnableIBL();
 	NEURUS_LOG("[DeferredRenderer] IBL environment set and enabled");
+}
+
+void DeferredRenderer::OnEnvironmentChanged(const EnvironmentChanged& e)
+{
+	NEURUS_LOG("[DeferredRenderer] OnEnvironmentChanged (sceneId="
+	           << e.sceneId << ", envId=" << e.envId
+	           << "), regenerating IBL cubemaps");
+
+	if (!m_scene)
+	{
+		NEURUS_ERR("[DeferredRenderer] OnEnvironmentChanged: no scene set (call SetScene first)");
+		return;
+	}
+
+	// Look up Environment by envId from scene.env_list
+	auto it = m_scene->env_list.find(e.envId);
+	if (it == m_scene->env_list.end())
+	{
+		NEURUS_ERR("[DeferredRenderer] OnEnvironmentChanged: env ID "
+		           << e.envId << " not found in scene");
+		return;
+	}
+
+	const auto& env = it->second;
+	const std::string& hdrPath = env->GetEquirectPath();
+
+	std::unique_ptr<Image> equirect;
+
+	// Try loading HDR file via stbi_loadf
+	int w = 0, h = 0, c = 0;
+	float* hdrData = stbi_loadf(hdrPath.c_str(), &w, &h, &c, 4);
+
+	if (hdrData && w > 0 && h > 0)
+	{
+		NEURUS_LOG("[DeferredRenderer] Loaded HDR equirect: " << hdrPath
+		           << " (" << w << "x" << h << ", " << c << " channels)");
+
+		equirect = std::make_unique<Image>(
+			m_device, m_physicalDevice,
+			vk::Extent2D{static_cast<uint32_t>(w), static_cast<uint32_t>(h)},
+			vk::Format::eR32G32B32A32Sfloat,
+			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+			/*mipLevels=*/1,
+			Image::ImageType::e2D,
+			"IBL_Equirect_Event");
+
+		const size_t dataSize = static_cast<size_t>(w)
+		                      * static_cast<size_t>(h) * 4 * sizeof(float);
+		equirect->UploadPixelData(m_device, m_physicalDevice,
+		                          m_graphicsQueue, m_queueFamilyIndex,
+		                          hdrData, dataSize);
+
+		stbi_image_free(hdrData);
+		NEURUS_LOG("[DeferredRenderer] HDR equirect uploaded to GPU");
+	}
+	else
+	{
+		NEURUS_LOG("[DeferredRenderer] HDR file not found: '"
+		           << hdrPath << "', falling back to procedural gradient");
+	}
+
+	// Fallback: generate colourful procedural equirectangular gradient
+	if (!equirect)
+	{
+		constexpr uint32_t eqWidth  = 1024;
+		constexpr uint32_t eqHeight = 512;
+
+		std::vector<float> pixels(eqWidth * eqHeight * 4, 0.0f);
+		for (uint32_t y = 0; y < eqHeight; ++y)
+		{
+			for (uint32_t x = 0; x < eqWidth; ++x)
+			{
+				const float u = static_cast<float>(x) / static_cast<float>(eqWidth - 1);
+				const float v = static_cast<float>(y) / static_cast<float>(eqHeight - 1);
+
+				float r = 1.0f - u;
+				float g = v;
+				float b = u;
+
+				const float equator = 1.0f - std::fabs(v - 0.5f) * 3.0f;
+				if (equator > 0.0f)
+				{
+					r = std::max(r, equator);
+					g = std::max(g, equator);
+					b = std::max(b, equator);
+				}
+
+				const size_t idx = (y * eqWidth + x) * 4;
+				pixels[idx + 0] = r;
+				pixels[idx + 1] = g;
+				pixels[idx + 2] = b;
+				pixels[idx + 3] = 1.0f;
+			}
+		}
+
+		equirect = std::make_unique<Image>(
+			m_device, m_physicalDevice,
+			vk::Extent2D{eqWidth, eqHeight},
+			vk::Format::eR32G32B32A32Sfloat,
+			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+			/*mipLevels=*/1,
+			Image::ImageType::e2D,
+			"IBL_Equirect_Fallback");
+
+		const size_t dataSize = pixels.size() * sizeof(float);
+		equirect->UploadPixelData(m_device, m_physicalDevice,
+		                          m_graphicsQueue, m_queueFamilyIndex,
+		                          pixels.data(), dataSize);
+
+		NEURUS_LOG("[DeferredRenderer] Procedural gradient created ("
+		           << eqWidth << "x" << eqHeight << ")");
+	}
+
+	// Generate IBL cubemaps from equirect
+	if (m_iblPass && m_diffuseCubemap && m_specularCubemap)
+	{
+		m_iblPass->Generate(*equirect, *m_diffuseCubemap, *m_specularCubemap);
+		EnableIBL();
+		NEURUS_LOG("[DeferredRenderer] IBL cubemaps regenerated from environment event");
+	}
+	else
+	{
+		NEURUS_ERR("[DeferredRenderer] OnEnvironmentChanged: IBLPass or cubemaps not available");
+	}
+
+	// equirect Image destroyed here — GPU resources released
 }
 
 // ---------------------------------------------------------------------------

@@ -56,9 +56,10 @@ private:
 	std::unique_ptr<neurus::project::Project> m_project;
 	std::unique_ptr<Context> m_context;
 
-	// --- Non-owning GPU infrastructure ---
+	// --- Non-owning references ---
 	VulkanContext* m_vkContext = nullptr;
 	DeferredRenderer* m_renderer = nullptr;
+	Scene* m_ownerScene = nullptr;  ///< Scene passed to Initialize()
 };
 
 } // namespace neurus
