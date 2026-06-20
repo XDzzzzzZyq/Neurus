@@ -20,20 +20,20 @@ namespace neurus {
 /**
  * @brief Type-safe event dispatcher with deferred execution queue.
  *
- * EventPool enables publish-subscribe with compile-time type safety. Components
+ * EventQueue enables publish-subscribe with compile-time type safety. Components
  * emit events without knowing subscribers, preventing direct coupling. Events
  * are enqueued on emit() and dispatched on Process() in FIFO order.
  *
  * Usage:
  * @code
- *   auto& pool = EventBus();
+ *   auto& queue = EventQueue();
  *
- *   pool.subscribe<ObjectSelected>([](const ObjectSelected& e) {
+ *   queue.subscribe<ObjectSelected>([](const ObjectSelected& e) {
  *       inspector.showEntity(e.objectId);
  *   });
  *
- *   pool.emit(ObjectSelected{42});
- *   pool.Process();  // dispatches all queued events
+ *   queue.enqueue(ObjectSelected{42});
+ *   queue.Process();  // dispatches all queued events
  * @endcode
  *
  * @note Execution model:
@@ -46,14 +46,14 @@ namespace neurus {
  * @note Thread-safety: Not thread-safe. All subscribe/emit/Process must occur
  *       on main thread.
  */
-class EventPool
+class EventQueue
 {
 public:
-	EventPool() = default;
+	EventQueue() = default;
 
 	// Non-copyable - singleton semantics
-	EventPool(const EventPool&) = delete;
-	EventPool& operator=(const EventPool&) = delete;
+	EventQueue(const EventQueue&) = delete;
+	EventQueue& operator=(const EventQueue&) = delete;
 
 	/**
 	 * @brief Handler function type for events of type TEvent.
@@ -160,7 +160,7 @@ private:
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Returns the global singleton EventPool instance.
+ * @brief Returns the global singleton EventQueue instance.
  *
  * This is the primary entry point for all cross-layer event communication.
  * Editor and Renderer layers use this to emit and subscribe to typed events
@@ -168,14 +168,14 @@ private:
  *
  * Usage:
  * @code
- *   auto& pool = EventBus();
- *   pool.subscribe<SceneLoaded>([](const SceneLoaded& e) { ... });
+ *   auto& queue = EventQueue();
+ *   queue.subscribe<SceneLoaded>([](const SceneLoaded& e) { ... });
  * @endcode
  */
-inline EventPool& EventBus()
+inline EventQueue& EventQueue()
 {
-	static EventPool pool;
-	return pool;
+	static EventQueue queue;
+	return queue;
 }
 
 } // namespace neurus
