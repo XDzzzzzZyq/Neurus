@@ -65,4 +65,17 @@ struct MaterialChanged
 	int materialId;
 };
 
+/**
+ * @brief Emitted when the active IBL environment is loaded or changed.
+ *
+ * The Renderer subscribes to this event to regenerate diffuse/specular
+ * cubemaps via IBLPass::Generate(). The event carries the IDs needed
+ * to locate the Environment object in the Scene's env_list pool.
+ */
+struct EnvironmentChanged
+{
+	int sceneId = -1; ///< ID of the Scene containing the Environment
+	int envId   = -1; ///< ID of the Environment object (from UID::GetObjectID())
+};
+
 } // namespace neurus

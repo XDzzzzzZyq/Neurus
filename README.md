@@ -106,11 +106,11 @@ the full four-layer architecture:
 - `VK_KHR_dynamic_rendering` for the triangle pass
 - Qt6 QML window (800×600, resizable, titled "Neurus")
 - Qt Signals/Slots UIEvents singleton (UI↔Editor)
-- Typed EventBus (EventPool) for Editor↔Renderer events
+- Typed EventQueue for Editor↔Renderer events
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
-- Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
+- Non-GPU Google Test samples (UIEvents, EventQueue, EditorContext)
 
 ## Code Style
 

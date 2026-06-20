@@ -20,11 +20,11 @@ compute → HDR output pipeline with reference-image regression tests.
 - Viewport as dockable central widget via ADS `CenterDockWidgetArea`
 - Docks: Shader Editor (left), Viewport (center), Outliner + Properties + Render Config (right), Texture Viewer (bottom)
 - Qt Signals/Slots UIEvents singleton (UI↔Editor)
-- Typed EventBus (EventPool) for Editor↔Renderer event dispatch
+- Typed EventQueue for Editor↔Renderer event dispatch
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
-- Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
+- Non-GPU Google Test samples (UIEvents, EventQueue, EditorContext)
 - Dock layout persistence (save/restore via ADS serialization)
 - OBJ mesh loading with MeshData (icosphere, cube, etc.)
 - Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute) + composite blit
@@ -65,11 +65,11 @@ compute → HDR output pipeline with reference-image regression tests.
 - Viewport as dockable central widget via ADS `CenterDockWidgetArea`
 - Docks: Shader Editor (left), Viewport (center), Outliner + Properties + Render Config (right), Texture Viewer (bottom)
 - Qt Signals/Slots UIEvents singleton (UI↔Editor)
-- Typed EventBus (EventPool) for Editor↔Renderer event dispatch
+- Typed EventQueue for Editor↔Renderer event dispatch
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
-- Non-GPU Google Test samples (UIEvents, EventBus, EditorContext)
+- Non-GPU Google Test samples (UIEvents, EventQueue, EditorContext)
 - Dock layout persistence (save/restore via ADS serialization)
 - OBJ mesh loading with MeshData (icosphere, cube, etc.)
 - Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute) + composite blit
@@ -125,7 +125,7 @@ make test
 
 **Tests:**
 - Framework: Google Test
-- Non-GPU tests run in CI (UIEvents, EventBus, EditorContext)
+- Non-GPU tests run in CI (UIEvents, EventQueue, EditorContext)
 - GPU tests require a Vulkan 1.4-capable device
 - Run all tests: `cd build/debug && ctest --output-on-failure`
 - Run a single test: `cd build/debug && ctest -R DeferredShading`
@@ -172,7 +172,7 @@ ARCHITECTURE RULES (HARD REQUIREMENTS)
 - **Renderer**: pure rendering service; owns GPU resources; consumes read-only
   scene data; must not mutate application-level state.
 - **Editor**: application logic and scene mutation; owns Controllers;
-  communicates via Context, UIEvents (Qt signals), and EventBus (typed events).
+  communicates via Context, UIEvents (Qt signals), and EventQueue (typed events).
 - **UI**: Qt QML presentation only; owns surface; emits signals.
 - **Data & Resource**: GPU resource management; descriptor pools, allocators,
   buffer/image abstractions. (Stub for MVP.)
@@ -180,7 +180,7 @@ ARCHITECTURE RULES (HARD REQUIREMENTS)
 **Communication:**
 - Cross-layer communication MUST go through:
   - UIEvents (Qt Signals/Slots) for UI↔Editor signals
-  - EventBus (typed EventPool) for Editor↔Renderer events
+  - EventQueue for Editor↔Renderer events
   - Context objects for data queries
 - Direct coupling across layers is forbidden.
 - Renderer must not include Editor or UI headers.
@@ -390,9 +390,9 @@ Neurus/
 │   │   ├── Swapchain.h/cpp
 │   │   └── VulkanContext.h/cpp
 │   ├── editor/             # Editor layer (logic, controllers)
-│   │   ├── events/          # Event system (UIEvents + typed EventBus)
+│   │   ├── events/          # Event system (UIEvents + typed EventQueue)
 │   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor
-│   │   │   ├── EventBus.h        # Typed EventPool dispatcher (no Qt)
+│   │   │   ├── EventQueue.h        # Typed EventQueue dispatcher (no Qt)
 │   │   │   └── EditorEvents.h    # Event type structs
 │   │   ├── EditorContext.h/cpp
 │   │   └── CMakeLists.txt
@@ -423,7 +423,7 @@ PRACTICAL GUIDANCE FOR AGENTS
 
 - Respect layer isolation; do not introduce cross-layer header includes where
   forbidden.
-- Prefer UIEvents/EventBus/Context-driven flows over direct calls across layers.
+- Prefer UIEvents/EventQueue/Context-driven flows over direct calls across layers.
 - Do not add global state unless a file already uses it and there is no
   alternative.
 - When extending renderer behavior, keep GPU ownership inside Renderer or
