@@ -258,21 +258,6 @@ void DeferredRenderer::EnableIBL()
 	NEURUS_LOG("[DeferredRenderer] IBL enabled in lighting pass");
 }
 
-void DeferredRenderer::SetEquirectEnvironment(const Image& equirect)
-{
-	if (!m_iblPass || !m_diffuseCubemap || !m_specularCubemap)
-	{
-		NEURUS_ERR("[DeferredRenderer] SetEquirectEnvironment: IBLPass or cubemaps not created");
-		return;
-	}
-
-	m_iblPass->Generate(equirect, *m_diffuseCubemap, *m_specularCubemap);
-	// EnableIBL() is no longer called here — IBL resources are now wired
-	// per-frame from scene Environment textures in DrawFrame(const Scene&).
-	// EnableIBL();
-	NEURUS_LOG("[DeferredRenderer] IBL environment generated (wired per-frame in DrawFrame)");
-}
-
 void DeferredRenderer::OnEnvironmentChanged(const EnvironmentChanged& e)
 {
 	NEURUS_LOG("[DeferredRenderer] OnEnvironmentChanged (sceneId="
