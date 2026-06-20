@@ -36,6 +36,13 @@ public:
 
 	void Initialize(Scene& scene);
 
+	/**
+	 * @brief Takes ownership of an existing project.
+	 * Used by Application to transfer the initial project into Editor ownership.
+	 * @param project Unique pointer to the project to adopt.
+	 */
+	void SetProject(std::unique_ptr<neurus::project::Project> project);
+
 	Scene& GetScene();
 	neurus::project::Project& GetProject();
 

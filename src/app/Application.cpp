@@ -15,7 +15,7 @@
  *  10. QTimer-driven render loop - ~60 FPS
  *
  * Cleanup order (CRITICAL: destroy GPU child objects BEFORE device, surface BEFORE instance):
- *   renderer -> context -> project -> surface -> mainWindow -> vkContext
+ *   renderer -> editor -> surface -> mainWindow -> vkContext
  */
 
 // Must define platform before including any Vulkan headers
@@ -38,7 +38,7 @@
 #include <cstring>
 
 #include "core/Log.h"
-#include "editor/Context.h"
+#include "editor/Editor.h"
 #include "editor/Input.h"
 #include "editor/events/UIEvents.h"
 #include "editor/events/EventBus.h"
@@ -47,8 +47,6 @@
 #include "render/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
-#include "render/Image.h"
-#include <stb_image.h>
 #include "asset/MeshData.h"
 #include "scene/Scene.h"
 #include "project/Project.h"
@@ -131,29 +129,29 @@ int Application::Run(int argc, char* argv[])
 	// --- Load or create project ---
 	const QString projectFilePath = resolveResourcePath("shadow.neurus.json"); // Temporarily used for Rendering development and test.
 	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
-	m_project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
+	auto project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
 	try
 	{
-		*m_project = neurus::project::Project::Open(projectFilePath.toStdString(),
+		*project = neurus::project::Project::Open(projectFilePath.toStdString(),
 		                                          resolveResourcePath("").toStdString());
 		NEURUS_LOG("[Application] Loaded project: " << projectFilePath.toStdString());
 	}
 	catch (const std::exception& e)
 	{
 		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
-		m_project = std::make_unique<neurus::project::Project>(
+		project = std::make_unique<neurus::project::Project>(
 			neurus::project::Project::CreateDefault(objFilePath.toStdString()));
 		// Store relative paths in the project file for portability
-		for (auto& [id, mesh] : m_project->GetScene().mesh_list)
+		for (auto& [id, mesh] : project->GetScene().mesh_list)
 		{
 			mesh->o_meshPath = "obj/sphere.obj";
 		}
 		// Save for future runs
-		try { m_project->Save(projectFilePath.toStdString()); }
+		try { project->Save(projectFilePath.toStdString()); }
 		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
 	}
 
-	auto& scene = m_project->GetScene();
+	auto& scene = project->GetScene();
 
 	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
 	{
@@ -201,103 +199,15 @@ int Application::Run(int argc, char* argv[])
 	// --- Upload scene lights to GPU (via LightingPass) ---
 	m_renderer->UploadLights(scene);
 
-	// --- Load IBL from HDR equirect file (with procedural fallback) ---
-	{
-		std::unique_ptr<Image> equirect;
+	// --- Create Editor and transfer project ownership ---
+	m_editor = std::make_unique<neurus::Editor>(m_vkContext.get(), m_renderer.get());
+	m_editor->SetProject(std::move(project));
+	m_editor->Initialize(scene);
 
-		// Try loading room.hdr from resources
-		const std::string hdrPath = resolveResourcePath("tex/hdr/room.hdr").toStdString();
-		int w = 0, h = 0, c = 0;
-		float* hdrData = stbi_loadf(hdrPath.c_str(), &w, &h, &c, 4);
+	// Set scene back-pointer for renderer (event-driven lookups)
+	m_renderer->SetScene(&m_editor->GetScene());
 
-		if (hdrData && w > 0 && h > 0)
-		{
-			NEURUS_LOG("[Application] Loaded HDR equirect: " << hdrPath
-			           << " (" << w << "x" << h << ", " << c << " channels)");
-
-			equirect = std::make_unique<Image>(
-				m_vkContext->device(),
-				m_vkContext->physicalDevice(),
-				vk::Extent2D{static_cast<uint32_t>(w), static_cast<uint32_t>(h)},
-				vk::Format::eR32G32B32A32Sfloat,
-				vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-				/*mipLevels=*/1,
-				Image::ImageType::e2D,
-				"IBL_Equirect");
-
-			const size_t dataSize = static_cast<size_t>(w) * static_cast<size_t>(h) * 4 * sizeof(float);
-			equirect->UploadPixelData(
-				m_vkContext->device(),
-				m_vkContext->physicalDevice(),
-				m_vkContext->graphicsQueue(),
-				m_vkContext->graphicsQueueFamily(),
-				hdrData, dataSize);
-
-			stbi_image_free(hdrData);
-			NEURUS_LOG("[Application] IBL environment loaded from file and uploaded");
-		}
-		else
-		{
-			NEURUS_LOG("[Application] HDR file not found at " << hdrPath
-			           << ", falling back to procedural gradient");
-		}
-
-		if (!equirect)
-		{
-			// Fallback: generate colourful procedural equirectangular gradient
-			constexpr uint32_t eqWidth  = 1024;
-			constexpr uint32_t eqHeight = 512;
-
-			std::vector<float> pixels(eqWidth * eqHeight * 4, 0.0f);
-			for (uint32_t y = 0; y < eqHeight; ++y)
-			{
-				for (uint32_t x = 0; x < eqWidth; ++x)
-				{
-					const float u = static_cast<float>(x) / static_cast<float>(eqWidth - 1);
-					const float v = static_cast<float>(y) / static_cast<float>(eqHeight - 1);
-
-					float r = 1.0f - u;
-					float g = v;
-					float b = u;
-
-					const float equator = 1.0f - std::fabs(v - 0.5f) * 3.0f;
-					if (equator > 0.0f)
-					{
-						r = std::max(r, equator);
-						g = std::max(g, equator);
-						b = std::max(b, equator);
-					}
-
-					const size_t idx = (y * eqWidth + x) * 4;
-					pixels[idx + 0] = r;
-					pixels[idx + 1] = g;
-					pixels[idx + 2] = b;
-					pixels[idx + 3] = 1.0f;
-				}
-			}
-
-			equirect = std::make_unique<Image>(
-				m_vkContext->device(),
-				m_vkContext->physicalDevice(),
-				vk::Extent2D{eqWidth, eqHeight},
-				vk::Format::eR32G32B32A32Sfloat,
-				vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-				/*mipLevels=*/1,
-				Image::ImageType::e2D,
-				"IBL_Equirect");
-
-			const size_t dataSize = pixels.size() * sizeof(float);
-			equirect->UploadPixelData(
-				m_vkContext->device(),
-				m_vkContext->physicalDevice(),
-				m_vkContext->graphicsQueue(),
-				m_vkContext->graphicsQueueFamily(),
-				pixels.data(), dataSize);
-		}
-
-		m_renderer->SetEquirectEnvironment(*equirect);
-		NEURUS_LOG("[Application] IBL environment set");
-	}
+	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
 
 	// Window was created hidden - show it now that the renderer is ready
 	mainWindow->show();
@@ -305,10 +215,10 @@ int Application::Run(int argc, char* argv[])
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
 	                 [this]() {
-	                     if (m_renderer && m_project)
+	                     if (m_renderer && m_editor)
 	                     {
 	                         Input::UpdateState();
-	                         try { m_renderer->DrawFrame(m_project->GetScene()); }
+	                         try { m_renderer->DrawFrame(m_editor->GetScene()); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
@@ -345,163 +255,18 @@ int Application::Run(int argc, char* argv[])
 	                     }
 	                 });
 
-	// --- Project file signal wiring ---
-
-	// Handle New Project (Ctrl+N)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectNewRequested,
-		[this]() {
-			try {
-				m_project = std::make_unique<neurus::project::Project>(
-					neurus::project::Project::New());
-				NEURUS_LOG("[Application] Created new project.");
-
-				// Upload scene data to GPU
-				auto& projectScene = m_project->GetScene();
-				for (const auto& [id, mesh] : projectScene.mesh_list)
-				{
-					mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-					                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
-				}
-				if (m_renderer)
-				{
-					m_renderer->UploadLights(projectScene);
-				}
-
-				if (m_context)
-				{
-					m_context->editor.SetScene(&m_project->GetScene());
-				}
-			}
-			catch (const std::exception& e) {
-				NEURUS_ERR("Failed to create new project: " << e.what());
-			}
-		});
-
-	// Handle Open Project (Ctrl+O)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectOpenRequested,
-		[this](const QString& path) {
-			try {
-				m_project = std::make_unique<neurus::project::Project>(
-					neurus::project::Project::Open(path.toStdString(),
-					                               resolveResourcePath("").toStdString()));
-				NEURUS_LOG("[Application] Opened project: " << path.toStdString());
-
-				// Re-upload scene data to GPU
-				auto& projectScene = m_project->GetScene();
-				for (const auto& [id, mesh] : projectScene.mesh_list)
-				{
-					mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-					                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
-				}
-				if (m_renderer)
-				{
-					m_renderer->UploadLights(projectScene);
-				}
-
-				if (m_context)
-				{
-					m_context->editor.SetScene(&m_project->GetScene());
-				}
-			}
-			catch (const std::exception& e) {
-				NEURUS_ERR("Failed to open project: " << e.what());
-			}
-		});
-
-	// Handle Save (Ctrl+S)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveRequested,
-		[this]() {
-			if (m_project)
-			{
-				try { m_project->Save(); }
-				catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
-			}
-		});
-
-	// Handle Save As (Ctrl+Shift+S)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveAsRequested,
-		[this](const QString& path) {
-			if (m_project)
-			{
-				try { m_project->Save(path.toStdString()); }
-				catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
-			}
-		});
-
-	// --- Mesh import signal wiring ---
-
-	// Handle mesh import (Edit → Add → Mesh...)
-	QObject::connect(&uiEvents, &neurus::UIEvents::meshImportRequested,
-		[this](const QString& path) {
-			try {
-				auto mesh = std::make_shared<neurus::Mesh>(path.toStdString());
-				mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-				                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
-				m_project->GetScene().UseMesh(mesh);
-				m_project->MarkDirty();
-				NEURUS_LOG("[Application] Imported mesh: " << path.toStdString());
-			}
-			catch (const std::exception& e) {
-				NEURUS_ERR("Failed to import mesh: " << e.what());
-			}
-		});
-
-	// Handle camera add (Edit → Add → Camera)
-	QObject::connect(&uiEvents, &neurus::UIEvents::cameraAddRequested,
-		[this]() {
-			try {
-				auto camera = std::make_shared<neurus::Camera>();
-				camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
-				camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-				m_project->GetScene().UseCamera(camera);
-				m_project->MarkDirty();
-				NEURUS_LOG("[Application] Added camera at (0, 2, 5)");
-			}
-			catch (const std::exception& e) {
-				NEURUS_ERR("Failed to add camera: " << e.what());
-			}
-		});
-
-	// Handle light add (Edit → Add → Light)
-	QObject::connect(&uiEvents, &neurus::UIEvents::lightAddRequested,
-		[this]() {
-			try {
-				auto light = std::make_shared<neurus::Light>(
-					neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
-				light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-				light->SetRadius(0.05f);
-				m_project->GetScene().UseLight(light);
-				if (m_renderer)
-				{
-					m_renderer->UploadLights(m_project->GetScene());
-				}
-				m_project->MarkDirty();
-				NEURUS_LOG("[Application] Added point light at (3, 3, 3)");
-			}
-			catch (const std::exception& e) {
-				NEURUS_ERR("Failed to add light: " << e.what());
-			}
-		});
-
-	// --- Context (cross-layer state aggregation + event communication) ---
-	// Context owns SceneContext (scene pointer), EditorContext (selections, signals, dirty
-	// tracking), and RenderContext (render configs stub). It subscribes to EventBus events
-	// to keep sub-contexts in sync with scene modifications.
-	m_context = std::make_unique<neurus::Context>(neurus::EventBus());
-	m_context->editor.SetScene(&scene);
-
 	// --- Timer-driven render loop ---
 	QTimer renderTimer;
 	renderTimer.setInterval(16);  // ~60 FPS
 	QObject::connect(&renderTimer, &QTimer::timeout, [this]() {
 		Input::UpdateState();
-		if (m_renderer && m_project)
+		if (m_renderer && m_editor)
 		{
-			try { m_renderer->DrawFrame(m_project->GetScene()); }
+			try { m_renderer->DrawFrame(m_editor->GetScene()); }
 			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}
 		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)
-		neurus::EventBus().Process();
+		neurus::EventQueue().Process();
 	});
 	renderTimer.start();
 
@@ -510,11 +275,10 @@ int Application::Run(int argc, char* argv[])
 
 	// --- Clean shutdown (CRITICAL: destroy GPU child objects BEFORE device, surface BEFORE instance) ---
 	m_renderer.reset();         // 1. Destroy DeferredRenderer -> WaitIdle(), swapchain, pipeline
-	m_context.reset();          // 2. Destroy Context (releases scene references)
-	m_project.reset();          // 3. Destroy Project -> Scene -> Mesh -> ReleaseGPUBuffers -> free VBO/IBO
-	surface.reset();            // 4. Destroy VkSurfaceKHR
-	mainWindow.reset();         // 5. Destroy main window (deletes VulkanWidget)
-	m_vkContext.reset();        // 6. Destroy VkDevice + VkInstance (all child objects now freed)
+	m_editor.reset();           // 2. Destroy Editor -> Context -> Project -> Scene -> Mesh -> ReleaseGPUBuffers
+	surface.reset();            // 3. Destroy VkSurfaceKHR
+	mainWindow.reset();         // 4. Destroy main window (deletes VulkanWidget)
+	m_vkContext.reset();        // 5. Destroy VkDevice + VkInstance (all child objects now freed)
 
 	return result;
 }

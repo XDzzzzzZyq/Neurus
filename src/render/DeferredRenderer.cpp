@@ -10,6 +10,7 @@
 #include "passes/LightingPass.h"
 #include "passes/RenderPassManager.h"
 #include "Image.h"
+#include "Texture.h"
 #include "Screenshot.h"
 #include "passes/SSAOPass.h"
 #include "Swapchain.h"
@@ -31,6 +32,7 @@
 #include "Log.h"
 
 #include "scene/Camera.h"
+#include "scene/Environment.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
@@ -265,8 +267,10 @@ void DeferredRenderer::SetEquirectEnvironment(const Image& equirect)
 	}
 
 	m_iblPass->Generate(equirect, *m_diffuseCubemap, *m_specularCubemap);
-	EnableIBL();
-	NEURUS_LOG("[DeferredRenderer] IBL environment set and enabled");
+	// EnableIBL() is no longer called here — IBL resources are now wired
+	// per-frame from scene Environment textures in DrawFrame(const Scene&).
+	// EnableIBL();
+	NEURUS_LOG("[DeferredRenderer] IBL environment generated (wired per-frame in DrawFrame)");
 }
 
 void DeferredRenderer::OnEnvironmentChanged(const EnvironmentChanged& e)
@@ -617,6 +621,23 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 			continue;
 		}
 		renderItems.push_back(buildRenderItem(*mesh));
+	}
+
+	// --- Pull Environment textures from Scene and wire into lighting pass (per-frame) ---
+	//     Cubemaps are generated on EnvironmentChanged and stored as Texture*
+	//     on Environment objects in scene.env_list. When absent, the lighting
+	//     pass falls back to its internal black 1x1 cubemap placeholders.
+	if (!scene.env_list.empty())
+	{
+		auto& env = scene.env_list.begin()->second;
+		if (env->diffuse_texture && env->specular_texture)
+		{
+			m_lightingPass->SetIBLResources(
+				*env->diffuse_texture->GetImage()->ImageViewHandle(),
+				*env->diffuse_texture->GetSampler(),
+				*env->specular_texture->GetImage()->ImageViewHandle(),
+				*env->specular_texture->GetSampler());
+		}
 	}
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---

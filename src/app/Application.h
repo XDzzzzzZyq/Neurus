@@ -2,16 +2,12 @@
 
 #include <memory>
 
-namespace neurus::project {
-class Project;
-}
-
 namespace neurus {
 
 // Forward declarations
 class VulkanContext;
 class DeferredRenderer;
-class Context;
+class Editor;
 
 /**
  * @brief Application lifecycle manager.
@@ -46,8 +42,7 @@ public:
 private:
 	std::unique_ptr<VulkanContext> m_vkContext;
 	std::unique_ptr<DeferredRenderer> m_renderer;
-	std::unique_ptr<Context> m_context;
-	std::unique_ptr<neurus::project::Project> m_project;
+	std::unique_ptr<Editor> m_editor;
 };
 
 } // namespace neurus

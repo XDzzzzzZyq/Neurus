@@ -46,6 +46,11 @@ Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer)
 {
 }
 
+void Editor::SetProject(std::unique_ptr<neurus::project::Project> project)
+{
+	m_project = std::move(project);
+}
+
 Editor::~Editor()
 {
 	// Destroy in order: Context (references scene) → Project (owns scene)
@@ -97,6 +102,14 @@ void Editor::Initialize(Scene& scene)
 
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
+
+	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
+	EventQueue().subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
+		if (m_renderer)
+		{
+			m_renderer->OnEnvironmentChanged(e);
+		}
+	});
 
 	NEURUS_LOG("[Editor] Initialized");
 }
