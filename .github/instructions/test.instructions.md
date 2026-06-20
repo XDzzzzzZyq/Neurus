@@ -339,6 +339,71 @@ If validation layers print an error:
 2. Check the VUID in the Vulkan spec (or search web for the exact error).
 3. Fix the root cause — never suppress validation errors with `#ifndef _DEBUG`.
 
+### Runtime Validation Error Capture
+
+Vulkan validation errors are routed through a `vk::DebugUtilsMessengerEXT`
+callback function, NOT directly to stdout or stderr. This means standard
+output redirection (`2>&1`) may or may not capture validation messages
+depending on how the callback is implemented.
+
+**Common validation error patterns**:
+
+1. **Wrong image view type**: Creating `VkImageView` with
+   `VK_IMAGE_VIEW_TYPE_CUBE` for per-mip sub-resources of a cubemap is
+   invalid — each per-mip view covers one array layer (not 6). Use
+   `VK_IMAGE_VIEW_TYPE_2D_ARRAY` with `layerCount = 6` instead.
+
+2. **Missing command pool reset flag**: `vk::CommandPoolCreateInfo` without
+   `VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT` will trigger
+   `VK_ERROR_VALIDATION_FAILED_EXT` if `vkResetCommandBuffer()` is called
+   explicitly.
+
+**Why validation errors can be invisible**:
+
+| Output channel | Visible in terminal? | Captured by `2>&1`? |
+|---|---|---|
+| `std::cout` from callback | Yes | Yes (stdout) |
+| `std::cerr` from callback | Yes | Yes (stderr) |
+| File-only logger | No | No |
+| Silent/no-op callback | No | No |
+| `OutputDebugString` (VS Debug Output window) | No | No |
+
+**How to capture validation errors reliably**:
+
+1. **Use `2>&1` always** — this merges stdout and stderr, capturing both
+   `std::cout` and `std::cerr` from any debug callback:
+   ```
+   $output = & "build/debug/Debug/Neurus.exe" 2>&1
+   ```
+   Then grep for `VUID-` to detect any validation violations.
+
+2. **Verify the debug callback implementation** in `VulkanContext.cpp` or
+   `TestVulkanShared.cpp`. The callback should write to `std::cerr`, not
+   `std::cout`, so validation messages survive stderr-only captures:
+   ```cpp
+   static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+       VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+       VkDebugUtilsMessageTypeFlagsEXT /*type*/,
+       const VkDebugUtilsMessengerCallbackDataEXT* data,
+       void* /*userData*/) {
+       std::cerr << "[VALIDATION] " << data->pMessage << std::endl;
+       return VK_FALSE;
+   }
+   ```
+
+3. **Explicitly verify after fixing** suspected validation issues by running
+   the application and checking for remaining VUIDs:
+   ```
+   $output = & "build/debug/Debug/Neurus.exe" 2>&1
+   if ($output -match "VUID-") { Write-Host "VALIDATION ERROR STILL PRESENT" }
+   ```
+
+4. **Be aware of the IDE pitfall**: Visual Studio's Debug Output window
+   (`OutputDebugString`) can receive validation messages through a separate
+   channel. The application may appear clean in the IDE while silently
+   violating validation rules when run outside it. Always verify from a
+   clean terminal, not from within the IDE.
+
 ## CI Expectations
 
 - **Non-GPU tests** (editor layer, events): Run on every CI push. Must pass.
