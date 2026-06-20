@@ -96,7 +96,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		const vk::ImageViewCreateInfo viewCI(
 			{},
 			*specularOut.ImageHandle(),
-			vk::ImageViewType::eCube,
+			vk::ImageViewType::e2DArray,
 			vk::Format::eR32G32B32A32Sfloat,
 			vk::ComponentMapping(),
 			subresourceRange);
@@ -106,7 +106,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 
 	// --- Create transient command pool ---
 	const vk::CommandPoolCreateInfo poolCI(
-		vk::CommandPoolCreateFlagBits::eTransient, m_queueFamilyIndex);
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, m_queueFamilyIndex);
 	vk::raii::CommandPool cmdPool(*m_device, poolCI);
 
 	const vk::CommandBufferAllocateInfo allocInfo(
