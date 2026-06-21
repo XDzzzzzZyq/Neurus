@@ -49,6 +49,9 @@ bool Input::s_prevAlt      = false;
 float Input::s_pendingScroll = 0.0f;
 float Input::s_currScroll    = 0.0f;
 
+// --- Active camera ---
+Camera* Input::s_activeCamera = nullptr;
+
 // ---------------------------------------------------------------------------
 // Recording - write to pending buffer
 // ---------------------------------------------------------------------------
@@ -56,9 +59,9 @@ float Input::s_currScroll    = 0.0f;
 void Input::RecordKeyPress(const int qtKey)
 {
 	// Modifier keys - their Qt codes exceed kMaxKeys, handle via dedicated flags
-	if (qtKey == kQtKeyShift)   { s_pendingShift = true;  return; }
-	if (qtKey == kQtKeyControl) { s_pendingCtrl  = true;  return; }
-	if (qtKey == kQtKeyAlt)     { s_pendingAlt   = true;  return; }
+	if (qtKey == 0x01000020) { s_pendingShift = true;  return; } // Qt::Key_Shift
+	if (qtKey == 0x01000021) { s_pendingCtrl  = true;  return; } // Qt::Key_Control
+	if (qtKey == 0x01000023) { s_pendingAlt   = true;  return; } // Qt::Key_Alt
 
 	if (qtKey < 0 || qtKey >= kMaxKeys) return;
 	s_pendingKeys[qtKey] = true;
@@ -67,9 +70,9 @@ void Input::RecordKeyPress(const int qtKey)
 void Input::RecordKeyRelease(const int qtKey)
 {
 	// Modifier keys - dedicated flags
-	if (qtKey == kQtKeyShift)   { s_pendingShift = false; return; }
-	if (qtKey == kQtKeyControl) { s_pendingCtrl  = false; return; }
-	if (qtKey == kQtKeyAlt)     { s_pendingAlt   = false; return; }
+	if (qtKey == 0x01000020) { s_pendingShift = false; return; } // Qt::Key_Shift
+	if (qtKey == 0x01000021) { s_pendingCtrl  = false; return; } // Qt::Key_Control
+	if (qtKey == 0x01000023) { s_pendingAlt   = false; return; } // Qt::Key_Alt
 
 	if (qtKey < 0 || qtKey >= kMaxKeys) return;
 	s_pendingKeys[qtKey] = false;
@@ -217,6 +220,8 @@ InputState Input::GetInputState()
 	state.middleMouseHeld = s_currMouseButtons[static_cast<int>(MouseButton::Middle)];
 	state.shiftHeld       = IsShiftHeld();
 	state.ctrlHeld        = IsCtrlHeld();
+	state.leftMouseHeld   = s_currMouseButtons[static_cast<int>(MouseButton::Left)];
+	state.altHeld         = IsAltHeld();
 	return state;
 }
 
