@@ -3,7 +3,7 @@
         "m_scene": {
             "cam_list": [
                 {
-                    "key": 2,
+                    "key": 7,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -17,9 +17,9 @@
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": 0.0,
-                                        "y": 2.0,
-                                        "z": 5.0
+                                        "x": -4.061962127685547,
+                                        "y": -0.6597824692726135,
+                                        "z": 3.473493814468384
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -50,7 +50,7 @@
             ],
             "mesh_list": [
                 {
-                    "key": 3,
+                    "key": 8,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -91,7 +91,7 @@
             ],
             "light_list": [
                 {
-                    "key": 4,
+                    "key": 9,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -140,7 +140,45 @@
             "sprite_list": [],
             "dLine_list": [],
             "dPoints_list": [],
-            "env_list": []
+            "env_list": [
+                {
+                    "key": 10,
+                    "value": {
+                        "polymorphic_id": 1073741824,
+                        "ptr_wrapper": {
+                            "id": 2147483652,
+                            "data": {
+                                "value0": {
+                                    "o_name": "Environment",
+                                    "o_type": 4,
+                                    "is_viewport": true,
+                                    "is_rendered": true
+                                },
+                                "transform": {
+                                    "m_position": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_rotation": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_scale": {
+                                        "x": 1.0,
+                                        "y": 1.0,
+                                        "z": 1.0
+                                    }
+                                },
+                                "m_equirectPath": "tex/hdr/room.hdr",
+                                "m_intensity": 1.0,
+                                "m_rotation": 0.0
+                            }
+                        }
+                    }
+                }
+            ]
         }
     }
 }

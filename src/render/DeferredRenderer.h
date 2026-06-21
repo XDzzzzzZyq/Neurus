@@ -179,6 +179,16 @@ public:
 	 */
 	void GenerateIBL(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
 
+	/**
+	 * @brief Resets the LightingPass IBL cubemap references to fallback,
+	 *        overwriting descriptor set bindings 7-8 with fallback cubemaps.
+	 *
+	 * Call before destroying the Environment that owns the current IBL
+	 * cubemaps (e.g., on project reload) to prevent stale handle validation
+	 * errors.  Typically preceded by WaitIdle().
+	 */
+	void ResetIBLResources();
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.

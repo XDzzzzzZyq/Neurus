@@ -140,12 +140,23 @@ void Editor::OnProjectNew()
 {
 	try
 	{
+		// Drain GPU work and reset IBL descriptor references before
+		// destroying the old project's GPU resources.
+		if (m_renderer)
+		{
+			m_renderer->WaitIdle();
+			m_renderer->ResetIBLResources();
+		}
+
 		m_project = std::make_unique<neurus::project::Project>(
 			neurus::project::Project::New());
 		NEURUS_LOG("[Editor] Created new project.");
 
-		// Upload scene data to GPU
+		// Update owner scene pointer
 		auto& projectScene = m_project->GetScene();
+		m_ownerScene = &projectScene;
+
+		// Upload scene data to GPU
 		for (const auto& [id, mesh] : projectScene.mesh_list)
 		{
 			mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
@@ -158,8 +169,11 @@ void Editor::OnProjectNew()
 
 		if (m_context)
 		{
-			m_context->editor.SetScene(&m_project->GetScene());
+			m_context->editor.SetScene(&projectScene);
 		}
+
+		// Generate IBL for the new environment
+		OnIBLLoad();
 	}
 	catch (const std::exception& e)
 	{
@@ -171,13 +185,28 @@ void Editor::OnProjectOpen(const QString& path)
 {
 	try
 	{
+		// Drain any GPU work referencing the old project's resources and
+		// reset IBL cubemap descriptor references to fallback before the
+		// old Environment (and its cubemap Image/Sampler resources) are
+		// destroyed. This prevents:
+		//   - vkDestroySampler while still in use by descriptor set
+		//   - VUID-VkWriteDescriptorSet-descriptorType-02996 (stale VkImageView)
+		if (m_renderer)
+		{
+			m_renderer->WaitIdle();
+			m_renderer->ResetIBLResources();
+		}
+
 		m_project = std::make_unique<neurus::project::Project>(
 			neurus::project::Project::Open(path.toStdString(),
 			                               resolveResourcePath("").toStdString()));
 		NEURUS_LOG("[Editor] Opened project: " << path.toStdString());
 
-		// Re-upload scene data to GPU
+		// Update owner scene pointer to the new project's scene
 		auto& projectScene = m_project->GetScene();
+		m_ownerScene = &projectScene;
+
+		// Re-upload scene data to GPU
 		for (const auto& [id, mesh] : projectScene.mesh_list)
 		{
 			mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
@@ -190,8 +219,12 @@ void Editor::OnProjectOpen(const QString& path)
 
 		if (m_context)
 		{
-			m_context->editor.SetScene(&m_project->GetScene());
+			m_context->editor.SetScene(&projectScene);
 		}
+
+		// Regenerate IBL for the new environment (BuildIBLTextures, load HDR,
+		// run IBLPass convolution).
+		OnIBLLoad();
 	}
 	catch (const std::exception& e)
 	{
@@ -283,7 +316,7 @@ void Editor::OnIBLLoad()
 	}
 
 	// --- Find or create an Environment on the scene ---
-	Environment::Resource env;
+	std::shared_ptr<Environment> env;
 	if (!scene->env_list.empty())
 	{
 		env = scene->env_list.begin()->second;
@@ -298,10 +331,18 @@ void Editor::OnIBLLoad()
 		           << env->GetObjectID() << ")");
 	}
 
-	// Set the equirect path (resolved from resource directory)
-	const std::string hdrPath =
-		resolveResourcePath("tex/hdr/room.hdr").toStdString();
-	env->SetEquirectPath(hdrPath);
+	// Read the equirect path from the environment object (set by CreateDefault or deserialized)
+	const std::string& envRelPath = env->GetEquirectPath();
+	if (envRelPath.empty())
+	{
+		NEURUS_LOG("[Editor] No environment path set, using procedural fallback");
+	}
+	else
+	{
+		const std::string hdrPath = resolveResourcePath(envRelPath.c_str()).toStdString();
+		NEURUS_LOG("[Editor] Loading environment: " << envRelPath);
+		env->SetEquirectPath(hdrPath);
+	}
 
 	GenerateIBL(env);
 }

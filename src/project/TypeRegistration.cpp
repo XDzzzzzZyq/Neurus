@@ -15,6 +15,7 @@
 #include "scene/Camera.h"
 #include "scene/DebugLine.h"
 #include "scene/DebugPoints.h"
+#include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Sprite.h"
@@ -30,6 +31,7 @@ CEREAL_REGISTER_TYPE(neurus::Light)
 CEREAL_REGISTER_TYPE(neurus::Sprite)
 CEREAL_REGISTER_TYPE(neurus::DebugLine)
 CEREAL_REGISTER_TYPE(neurus::DebugPoints)
+CEREAL_REGISTER_TYPE(neurus::Environment)
 
 // --- Polymorphic relations (base → derived) ---
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::ObjectID, neurus::Camera)
@@ -38,3 +40,4 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::ObjectID, neurus::Light)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::ObjectID, neurus::Sprite)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::ObjectID, neurus::DebugLine)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::ObjectID, neurus::DebugPoints)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::ObjectID, neurus::Environment)

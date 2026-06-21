@@ -15,6 +15,7 @@
 
 #include "project/Project.h"
 #include "scene/Camera.h"
+#include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 
@@ -115,4 +116,47 @@ TEST(DefaultProject, HasLight)
 	ASSERT_NE(light, nullptr);
 	EXPECT_EQ(light->o_type, ObjectID::GOType::GO_LIGHT);
 	EXPECT_GT(light->light_power, 0.0f);
+}
+
+// -----------------------------------------------------------------------
+// DefaultProject: Has environment in env_list
+// -----------------------------------------------------------------------
+
+/**
+ * @test The default project file contains an Environment in env_list
+ *       with the expected IBL equirect path.
+ */
+TEST(DefaultProject, HasEnvironment)
+{
+	auto project = project::Project::Open(DefaultProjectPath());
+	auto& scene = project.GetScene();
+	EXPECT_FALSE(scene.env_list.empty());
+	auto env = scene.env_list.begin()->second;
+	ASSERT_NE(env, nullptr);
+	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/room.hdr");
+}
+
+// -----------------------------------------------------------------------
+// DefaultProject: Environment roundtrip via CreateDefault
+// -----------------------------------------------------------------------
+
+/**
+ * @test CreateDefault adds an Environment to env_list with the default
+ *       equirect path, and the path can be updated via SetEquirectPath().
+ */
+TEST(DefaultProject, EnvironmentRoundtrip)
+{
+	auto project = project::Project::CreateDefault("fake.obj");
+	auto& scene = project.GetScene();
+	EXPECT_FALSE(scene.env_list.empty());
+	auto env = scene.env_list.begin()->second;
+	ASSERT_NE(env, nullptr);
+	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/room.hdr");
+
+	env->SetEquirectPath("tex/hdr/sunset.hdr");
+	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/sunset.hdr");
+
+	// Empty path should be allowed (procedural fallback)
+	env->SetEquirectPath("");
+	EXPECT_TRUE(env->GetEquirectPath().empty());
 }

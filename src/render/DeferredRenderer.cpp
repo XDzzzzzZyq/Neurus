@@ -281,6 +281,14 @@ void DeferredRenderer::GenerateIBL(const Image& equirectImage,
 	m_iblPass->Generate(equirectImage, diffuseOut, specularOut);
 }
 
+void DeferredRenderer::ResetIBLResources()
+{
+	if (m_lightingPass)
+	{
+		m_lightingPass->ResetIBLResources();
+	}
+}
+
 // ---------------------------------------------------------------------------
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------

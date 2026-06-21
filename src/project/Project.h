@@ -143,13 +143,12 @@ public:
 	 * @brief Cereal serialization entry point.
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
-	 * @note Only the scene is serialized. RenderConfigs will be added in Phase 5 T45.
+	 * @note Serializes scene data and the IBL/HDR environment path.
 	 */
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
 		ar(cereal::make_nvp("m_scene", *m_scene));
-		// RenderConfigs will be added when implemented (Phase 5 T45)
 	}
 
 private:

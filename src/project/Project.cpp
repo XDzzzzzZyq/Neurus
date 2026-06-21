@@ -13,6 +13,7 @@
 #include <glm/glm.hpp>
 
 #include "core/Log.h"
+#include "scene/Environment.h"
 
 namespace neurus::project
 {
@@ -111,6 +112,11 @@ Project Project::CreateDefault(const std::string& objPath)
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 	light->SetRadius(0.05f);
 	project.m_scene->UseLight(light);
+
+	// --- Environment ---
+	auto env = std::make_shared<Environment>();
+	env->SetEquirectPath("tex/hdr/room.hdr");
+	project.m_scene->UseEnvironment(env);
 
 	NEURUS_LOG("[Project] Default project created.");
 	return project;

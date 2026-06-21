@@ -434,6 +434,7 @@ std::unique_ptr<Image> Image::LoadFromPath(const vk::raii::Device& device,
 	auto result = ImageData::LoadFromPath(path);
 	if (!result.valid())
 	{
+		NEURUS_ERR("[Image] Failed to load image from path: " << path);
 		return nullptr;
 	}
 

@@ -186,6 +186,17 @@ public:
 	                     vk::ImageView prefilteredView,
 	                     vk::Sampler prefilteredSampler);
 
+	/**
+	 * @brief Resets IBL cubemap references to null and writes fallback
+	 *        cubemap descriptors into all descriptor sets.
+	 *
+	 * Must be called before the Environment that owns the current IBL
+	 * cubemaps is destroyed, to prevent descriptor sets from referencing
+	 * stale (soon-to-be-destroyed) VkImageView/VkSampler handles.
+	 * Typically paired with a preceding DeviceWaitIdle().
+	 */
+	void ResetIBLResources();
+
 	// -------------------------------------------------------------------
 	// Recording
 	// -------------------------------------------------------------------

@@ -282,6 +282,7 @@ ImageLoadResult ImageData::LoadFromPath(const std::string& path)
 		float* data = stbi_loadf(path.c_str(), &w, &h, &c, 4);
 		if (!data || w <= 0 || h <= 0)
 		{
+			NEURUS_ERR("[ImageData] Failed to load HDR image from path: " << path);
 			return result;
 		}
 
@@ -302,6 +303,7 @@ ImageLoadResult ImageData::LoadFromPath(const std::string& path)
 		stbi_uc* data = stbi_load(path.c_str(), &w, &h, &c, 4);
 		if (!data || w <= 0 || h <= 0)
 		{
+			NEURUS_ERR("[ImageData] Failed to load LDR image from path: " << path);
 			return result;
 		}
 

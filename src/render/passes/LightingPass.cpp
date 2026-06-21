@@ -308,6 +308,50 @@ void LightingPass::SetIBLResources(vk::ImageView irradianceView,
 }
 
 // ---------------------------------------------------------------------------
+// IBL resource reset (project reload safety)
+// ---------------------------------------------------------------------------
+
+void LightingPass::ResetIBLResources()
+{
+	// Clear stored IBL handles so WriteDescriptors() uses fallback cubemaps
+	m_iblIrradianceView    = vk::ImageView{};
+	m_iblIrradianceSampler  = vk::Sampler{};
+	m_iblPrefilteredView    = vk::ImageView{};
+	m_iblPrefilteredSampler = vk::Sampler{};
+
+	// Overwrite bindings 7-8 in all descriptor sets with fallback cubemaps.
+	// This removes any GPU-side reference to the soon-to-be-destroyed old
+	// cubemaps, preventing vkDestroyImageView/vkDestroySampler validation errors.
+	const uint32_t numSets = static_cast<uint32_t>(m_descriptorSets.size());
+	for (uint32_t i = 0; i < numSets; ++i)
+	{
+		DescriptorSet& dstSet = m_descriptorSets[i];
+
+		// Binding 7: fallback diffuse cubemap
+		{
+			vk::DescriptorImageInfo imageInfo(
+				*m_fallbackCubeSampler,
+				*m_fallbackIrradianceCube->ImageViewHandle(),
+				vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(7, imageInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
+		}
+
+		// Binding 8: fallback specular cubemap
+		{
+			vk::DescriptorImageInfo imageInfo(
+				*m_fallbackCubeSampler,
+				*m_fallbackPrefilteredCube->ImageViewHandle(),
+				vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(8, imageInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
+		}
+	}
+
+	NEURUS_LOG("[LightingPass] IBL resources reset to fallback cubemaps");
+}
+
+// ---------------------------------------------------------------------------
 // Descriptor writes
 // ---------------------------------------------------------------------------
 

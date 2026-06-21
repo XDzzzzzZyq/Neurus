@@ -57,9 +57,6 @@ class Image;
 class Environment : public ObjectID, public Transform3D
 {
 public:
-	/// Shared ownership type for scene graph containers
-	using Resource = std::shared_ptr<Environment>;
-
 	/**
 	 * @brief Constructs an Environment with default IBL parameters.
 	 */
@@ -243,7 +240,8 @@ public:
 	/**
 	 * @brief Cereal serialization for Environment.
 	 *
-	 * Only file path, intensity, and rotation are serialized.
+	 * Serializes ObjectID identity and transform through base class
+	 * serialization, along with environment-specific properties.
 	 * Texture pointers (GPU resources) are NOT serialized.
 	 *
 	 * @tparam Archive Cereal archive type (input or output).
@@ -252,7 +250,9 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(CEREAL_NVP(m_equirectPath),
+		ar(cereal::base_class<ObjectID>(this),
+		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
+		   CEREAL_NVP(m_equirectPath),
 		   CEREAL_NVP(m_intensity),
 		   CEREAL_NVP(m_rotation));
 	}
