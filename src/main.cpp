@@ -10,6 +10,6 @@
 
 int main(int argc, char* argv[])
 {
-	neurus::Application app;
-	return app.Run(argc, argv);
+	neurus::Application app(argc, argv);
+	return app.Run();
 }

@@ -71,20 +71,27 @@ static QString resolveResourcePath(const char* relativePath)
 
 namespace neurus {
 
-Application::Application() = default;
+Application::Application(int argc, char* argv[])
+	: m_argc(argc)
+	, m_argv(argv)
+{
+}
 
 Application::~Application()
 {
-	// m_renderer and m_vkContext are reset explicitly in Run()
-	// before the Application object is destroyed, ensuring correct
-	// cleanup order. This destructor is a safety net but should
-	// not normally be reached with live GPU resources.
+	// Cleanup in strict order: destroy GPU child objects BEFORE device,
+	// surface BEFORE instance.
+	m_renderer.reset();     // 1. DeferredRenderer -> WaitIdle(), swapchain, pipeline
+	m_editor.reset();       // 2. Editor -> Context -> Project -> Scene -> Mesh -> ReleaseGPUBuffers
+	m_surface.reset();      // 3. VkSurfaceKHR
+	m_mainWindow.reset();   // 4. Main window (deletes VulkanWidget)
+	m_vkContext.reset();    // 5. VkDevice + VkInstance (all child objects now freed)
 }
 
-int Application::Run(int argc, char* argv[])
+int Application::Run()
 {
 	// --- Qt Application ---
-	QApplication qtApp(argc, argv);
+	QApplication qtApp(m_argc, m_argv);
 	qtApp.setApplicationName("Neurus");
 	qtApp.setApplicationVersion("0.1.0");
 
@@ -92,8 +99,6 @@ int Application::Run(int argc, char* argv[])
 	auto& uiEvents = neurus::UIEvents::instance();
 
 	// --- Two-phase Vulkan initialization ---
-	std::unique_ptr<neurus::NeurusMainWindow> mainWindow;
-	std::unique_ptr<vk::raii::SurfaceKHR> surface;
 	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport CDockWidget
 
 	try
@@ -103,9 +108,9 @@ int Application::Run(int argc, char* argv[])
 		m_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
 		// Step 2: Create Qt window with VulkanWidget
-		mainWindow = std::make_unique<neurus::NeurusMainWindow>();
+		m_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
 		vulkanWidget = new neurus::VulkanWidget();
-		mainWindow->setViewportWidget(vulkanWidget);
+		m_mainWindow->setViewportWidget(vulkanWidget);
 
 		vulkanWidget->resize(800, 600);
 		vulkanWidget->winId();  // Force native window handle creation
@@ -113,10 +118,10 @@ int Application::Run(int argc, char* argv[])
 		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
 		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, vulkanWidget->hwnd());
-		surface = std::make_unique<vk::raii::SurfaceKHR>(m_vkContext->instance(), surfaceCreateInfo);
+		m_surface = std::make_unique<vk::raii::SurfaceKHR>(m_vkContext->instance(), surfaceCreateInfo);
 
 		// Step 4: Create logical device
-		m_vkContext->initDevice(*surface);
+		m_vkContext->initDevice(*m_surface);
 
 		uiEvents.setGpuName(QString::fromStdString(m_vkContext->gpuName()));
 	}
@@ -185,7 +190,7 @@ int Application::Run(int argc, char* argv[])
 			m_vkContext->physicalDevice(),
 			m_vkContext->graphicsQueue(),
 			m_vkContext->graphicsQueueFamily(),
-			*surface,
+			*m_surface,
 			vulkanWidget->width(),
 			vulkanWidget->height()
 		);
@@ -207,7 +212,7 @@ int Application::Run(int argc, char* argv[])
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
 
 	// Window was created hidden - show it now that the renderer is ready
-	mainWindow->show();
+	m_mainWindow->show();
 
 	// --- Connect UIEvents signals ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
@@ -269,13 +274,6 @@ int Application::Run(int argc, char* argv[])
 
 	// --- Run application ---
 	int result = qtApp.exec();
-
-	// --- Clean shutdown (CRITICAL: destroy GPU child objects BEFORE device, surface BEFORE instance) ---
-	m_renderer.reset();         // 1. Destroy DeferredRenderer -> WaitIdle(), swapchain, pipeline
-	m_editor.reset();           // 2. Destroy Editor -> Context -> Project -> Scene -> Mesh -> ReleaseGPUBuffers
-	surface.reset();            // 3. Destroy VkSurfaceKHR
-	mainWindow.reset();         // 4. Destroy main window (deletes VulkanWidget)
-	m_vkContext.reset();        // 5. Destroy VkDevice + VkInstance (all child objects now freed)
 
 	return result;
 }
