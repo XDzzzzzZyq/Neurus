@@ -1,23 +1,21 @@
-/**
+﻿/**
  * @file test_camera_controller.cpp
- * @brief TDD unit tests for CameraController MMB navigation (orbit, dolly, pan, zoom).
+ * @brief Tests for CameraController event-driven navigation (orbit, dolly, pan, zoom).
  *
- * Tests are written in RED state — they verify the expected behavior of the
- * new MMB-based camera controller. The implementation will be completed in
- * Task 4 to make these tests GREEN.
+ * CameraController is now event-driven 鈥?it subscribes to CameraEvents via Init()
+ * and reacts to enqueued events dispatched through EventQueue::Process().
  *
  * MMB Convention (from decisions.md):
- *   - MMB alone       = Orbit (rotate around target)
- *   - Ctrl + MMB      = Dolly (move forward/back along view direction)
- *   - Shift + MMB     = Pan (translate parallel to view plane)
- *   - Scroll wheel    = Zoom (toward/away from target)
+ *   - MMB alone       = Orbit  (CameraRotateEvent)
+ *   - Ctrl + MMB      = Dolly  (CameraPushEvent)
+ *   - Shift + MMB     = Pan    (CameraSlideEvent)
+ *   - Scroll wheel    = Zoom   (CameraZoomEvent)
  *
  * Sensitivity constants (from CameraController.h):
  *   - kOrbitSensitivity = 0.005f  (radians per pixel)
  *   - kPanSensitivity   = 0.01f   (world units per pixel)
  *   - kZoomSensitivity  = 1.0f    (factor per scroll notch)
  *   - kDollySensitivity = 0.05f   (world units per pixel)
- *   - kSlowMultiplier   = 0.25f   (Ctrl held)
  */
 
 #include <gtest/gtest.h>
@@ -25,7 +23,8 @@
 #include <cmath>
 #include <memory>
 
-#include "editor/CameraController.h"
+#include "editor/controllers/CameraController.h"
+#include "editor/events/EventBus.h"
 #include "scene/Camera.h"
 
 using namespace neurus;
@@ -53,11 +52,12 @@ protected:
 	{
 		m_camera = std::make_unique<Camera>();
 		m_controller = std::make_unique<CameraController>();
+		m_controller->Init(EventQueue());
 	}
 
 	void TearDown() override
 	{
-		// No-op
+		// No-op 鈥?EventQueue is a singleton shared across tests
 	}
 
 	std::unique_ptr<Camera> m_camera;
@@ -65,7 +65,7 @@ protected:
 };
 
 // ===========================================================================
-// Orbit tests (MMB, no modifier)
+// Orbit tests (MMB, no modifier 鈫?CameraRotateEvent)
 // ===========================================================================
 
 /**
@@ -81,11 +81,9 @@ TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.middleMouseHeld = true;
-	input.mouseDeltaX = 10.0f;
-
-	m_controller->Update(*m_camera, input);
+	CameraRotateEvent e{m_camera.get(), 10.0f, 0.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
 	// Camera Z should be non-zero (azimuth rotated right around target)
 	EXPECT_NE(m_camera->GetPosition().z, 0.0f);
@@ -107,13 +105,11 @@ TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
 	const float initialY = m_camera->GetPosition().y;
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.middleMouseHeld = true;
-	input.mouseDeltaY = 10.0f;
+	CameraRotateEvent e{m_camera.get(), 0.0f, 10.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
-	m_controller->Update(*m_camera, input);
-
-	// Elevation decreased (drag up = look down) — camera Y should be lower
+	// Elevation decreased (drag up = look down) 鈥?camera Y should be lower
 	EXPECT_LT(m_camera->GetPosition().y, initialY);
 	// Target unchanged
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
@@ -123,7 +119,7 @@ TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
  * @test Orbit_Clamp_Elevation_89_Degrees
  *
  * Camera at (0,5,0) looking straight down at origin. A large mouseDeltaY
- * should NOT flip the camera past the poles. Elevation is clamped to ±89°.
+ * should NOT flip the camera past the poles. Elevation is clamped to 卤89掳.
  * No crash, position values remain finite.
  */
 TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
@@ -131,13 +127,12 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	InputState input;
-	input.middleMouseHeld = true;
-	input.mouseDeltaY = 1000.0f;
+	CameraRotateEvent e{m_camera.get(), 0.0f, 1000.0f};
 
 	// Should not crash or assert
 	EXPECT_NO_FATAL_FAILURE(
-		m_controller->Update(*m_camera, input);
+		EventQueue().enqueue(e);
+		EventQueue().Process();
 	);
 
 	const glm::vec3 pos = m_camera->GetPosition();
@@ -145,7 +140,7 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 	EXPECT_TRUE(std::isfinite(pos.y));
 	EXPECT_TRUE(std::isfinite(pos.z));
 
-	// Elevation from target should not exceed ±89°
+	// Elevation from target should not exceed 卤89掳
 	const glm::vec3 dir = pos - m_camera->cam_tar;
 	const float radius = glm::length(dir);
 	if (radius > 1e-6f)
@@ -156,13 +151,13 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 }
 
 // ===========================================================================
-// Zoom tests (scroll wheel)
+// Zoom tests (scroll wheel 鈫?CameraZoomEvent)
 // ===========================================================================
 
 /**
  * @test Zoom_ScrollUp_Decreases_Distance
  *
- * Camera at (0,0,5), target at origin. Scroll up (positive scrollDelta)
+ * Camera at (0,0,5), target at origin. Scroll up (positive scroll_dir)
  * should zoom in, decreasing the distance from camera to target.
  */
 TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
@@ -172,10 +167,9 @@ TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.scrollDelta = 1.0f;
-
-	m_controller->Update(*m_camera, input);
+	CameraZoomEvent e{m_camera.get(), 1.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
 	EXPECT_LT(DistanceToTarget(*m_camera), initialDist);
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
@@ -184,7 +178,7 @@ TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
 /**
  * @test Zoom_ScrollDown_Increases_Distance
  *
- * Camera at (0,0,5), target at origin. Scroll down (negative scrollDelta)
+ * Camera at (0,0,5), target at origin. Scroll down (negative scroll_dir)
  * should zoom out, increasing the distance from camera to target.
  */
 TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
@@ -194,10 +188,9 @@ TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.scrollDelta = -1.0f;
-
-	m_controller->Update(*m_camera, input);
+	CameraZoomEvent e{m_camera.get(), -1.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
 	EXPECT_GT(DistanceToTarget(*m_camera), initialDist);
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
@@ -214,11 +207,11 @@ TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
 	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 0.01f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	InputState input;
-	input.scrollDelta = 1.0f; // Try to zoom in more
+	CameraZoomEvent e{m_camera.get(), 1.0f}; // Try to zoom in more
 
 	EXPECT_NO_FATAL_FAILURE(
-		m_controller->Update(*m_camera, input);
+		EventQueue().enqueue(e);
+		EventQueue().Process();
 	);
 
 	// Distance must stay at or above the minimum clamp
@@ -226,7 +219,7 @@ TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
 }
 
 // ===========================================================================
-// Dolly tests (Ctrl + MMB)
+// Dolly tests (Ctrl + MMB 鈫?CameraPushEvent)
 // ===========================================================================
 
 /**
@@ -244,12 +237,9 @@ TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
 	const float initialZ = m_camera->GetPosition().z;
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.ctrlHeld = true;
-	input.middleMouseHeld = true;
-	input.mouseDeltaY = 10.0f;
-
-	m_controller->Update(*m_camera, input);
+	CameraPushEvent e{m_camera.get(), 0.0f, 10.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
 	// Camera moved along forward axis (Z changed)
 	EXPECT_NE(m_camera->GetPosition().z, initialZ);
@@ -262,7 +252,7 @@ TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
 /**
  * @test Dolly_WithoutMMB_NoMovement
  *
- * Ctrl held but MMB NOT held — no dolly should occur. Camera unchanged.
+ * No event enqueued 鈥?camera should not change.
  */
 TEST_F(CameraControllerTest, Dolly_WithoutMMB_NoMovement)
 {
@@ -271,19 +261,15 @@ TEST_F(CameraControllerTest, Dolly_WithoutMMB_NoMovement)
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.ctrlHeld = true;
-	input.middleMouseHeld = false; // No MMB — should not trigger dolly
-	input.mouseDeltaY = 10.0f;
-
-	m_controller->Update(*m_camera, input);
+	// No event 鈥?camera unchanged
+	EventQueue().Process();
 
 	EXPECT_EQ(m_camera->GetPosition(), initialPos);
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
 }
 
 // ===========================================================================
-// Pan tests (Shift + MMB)
+// Pan tests (Shift + MMB 鈫?CameraSlideEvent)
 // ===========================================================================
 
 /**
@@ -300,12 +286,9 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Right_MovesCameraAndTarget)
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.shiftHeld = true;
-	input.middleMouseHeld = true;
-	input.mouseDeltaX = 10.0f;
-
-	m_controller->Update(*m_camera, input);
+	CameraSlideEvent e{m_camera.get(), 10.0f, 0.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
 	// Both camera position and target changed (pan shifts both)
 	EXPECT_NE(m_camera->GetPosition(), initialPos);
@@ -333,12 +316,9 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Up_MovesUp)
 	const float initialY = m_camera->GetPosition().y;
 	const float initialTarY = m_camera->cam_tar.y;
 
-	InputState input;
-	input.shiftHeld = true;
-	input.middleMouseHeld = true;
-	input.mouseDeltaY = 10.0f;
-
-	m_controller->Update(*m_camera, input);
+	CameraSlideEvent e{m_camera.get(), 0.0f, 10.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
 	// Vertical pan should change Y of both camera and target
 	EXPECT_NE(m_camera->GetPosition().y, initialY);
@@ -353,7 +333,7 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Up_MovesUp)
  * @test Edge_CameraAtTarget_NoCrash
  *
  * Camera position equals target position (degenerate direction vector).
- * Update() should handle this gracefully — no crash, no position change.
+ * Event handlers should handle this gracefully 鈥?no crash, no position change.
  */
 TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
 {
@@ -362,17 +342,13 @@ TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.middleMouseHeld = true;
-	input.mouseDeltaX = 10.0f;
-	input.mouseDeltaY = 10.0f;
-	input.scrollDelta = 5.0f;
-
 	EXPECT_NO_FATAL_FAILURE(
-		m_controller->Update(*m_camera, input);
+		EventQueue().enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 10.0f});
+		EventQueue().enqueue(CameraZoomEvent{m_camera.get(), 5.0f});
+		EventQueue().Process();
 	);
 
-	// No position change (degenerate direction — all ops early-out)
+	// No position change (degenerate direction 鈥?all ops early-out)
 	EXPECT_EQ(m_camera->GetPosition(), initialPos);
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
 }
@@ -380,7 +356,7 @@ TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
 /**
  * @test Edge_NoInput_NoChange
  *
- * All InputState fields zero/false. Update() should not modify the camera.
+ * No events enqueued 鈥?camera should not change.
  */
 TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
 {
@@ -389,9 +365,8 @@ TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input; // All fields zero/false
-
-	m_controller->Update(*m_camera, input);
+	// No events enqueued 鈥?camera unchanged
+	EventQueue().Process();
 
 	EXPECT_EQ(m_camera->GetPosition(), initialPos);
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
@@ -400,8 +375,9 @@ TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
 /**
  * @test Edge_ModifierConflict_CtrlWins
  *
- * Both Ctrl and Shift held with MMB. Ctrl should take priority,
- * resulting in Dolly behavior (not Pan). Target should NOT move.
+ * When both Ctrl and Shift are held (event system decides), the appropriate
+ * event type (CameraPushEvent for Ctrl priority) should be enqueued.
+ * Target should NOT move (dolly behavior, not pan).
  */
 TEST_F(CameraControllerTest, Edge_ModifierConflict_CtrlWins)
 {
@@ -409,15 +385,12 @@ TEST_F(CameraControllerTest, Edge_ModifierConflict_CtrlWins)
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	InputState input;
-	input.ctrlHeld = true;
-	input.shiftHeld = true;  // Both modifiers held
-	input.middleMouseHeld = true;
-	input.mouseDeltaY = 10.0f;
+	// Ctrl wins 鈫?CameraPushEvent (dolly), not CameraSlideEvent (pan)
+	CameraPushEvent e{m_camera.get(), 0.0f, 10.0f};
+	EventQueue().enqueue(e);
+	EventQueue().Process();
 
-	m_controller->Update(*m_camera, input);
-
-	// Ctrl wins → Dolly behavior: target should NOT move
+	// Ctrl wins 鈫?Dolly behavior: target should NOT move
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
 	// Camera should have moved (dolly along forward)
 	EXPECT_NE(m_camera->GetPosition().z, 5.0f);

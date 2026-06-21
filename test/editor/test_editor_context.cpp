@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "editor/EditorContext.h"
+#include "editor/Context.h"
 
 using namespace neurus;
 
