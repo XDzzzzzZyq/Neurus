@@ -1,4 +1,5 @@
 #include "NeurusMainWindow.h"
+#include "VulkanWidget.h"
 
 #include "editor/events/UIEvents.h"
 
@@ -16,6 +17,10 @@
 
 namespace neurus {
 
+// =========================================================================
+// Constructor / Destructor
+// =========================================================================
+
 NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	: QMainWindow(parent)
 {
@@ -28,6 +33,11 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 
 	m_dockManager = new ads::CDockManager(this);
 
+	// Create VulkanWidget BEFORE docks — CreateDocks() places it as viewport content
+	m_vulkanWidget = new VulkanWidget();
+	m_vulkanWidget->resize(800, 600);
+	m_vulkanWidget->winId();  // Force native window handle creation
+
 	CreateDocks();
 	LoadLayout();   // Restore saved layout if available
 	CreateMenus();
@@ -35,12 +45,33 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 
 NeurusMainWindow::~NeurusMainWindow() = default;
 
-void NeurusMainWindow::setViewportWidget(QWidget* viewportWidget)
+// =========================================================================
+// Viewport accessors
+// =========================================================================
+
+HWND NeurusMainWindow::getViewportHwnd() const
 {
-	if (viewportWidget != nullptr)
-		m_viewportWidget = viewportWidget;
-	m_viewportDock->setWidget(m_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+	return m_vulkanWidget ? m_vulkanWidget->hwnd() : nullptr;
 }
+
+int NeurusMainWindow::getViewportWidth() const
+{
+	return m_vulkanWidget ? m_vulkanWidget->width() : 0;
+}
+
+int NeurusMainWindow::getViewportHeight() const
+{
+	return m_vulkanWidget ? m_vulkanWidget->height() : 0;
+}
+
+VulkanWidget* NeurusMainWindow::getVulkanWidget() const
+{
+	return m_vulkanWidget;
+}
+
+// =========================================================================
+// Menus
+// =========================================================================
 
 void NeurusMainWindow::CreateMenus()
 {
@@ -138,6 +169,10 @@ void NeurusMainWindow::CreateMenus()
 	});
 }
 
+// =========================================================================
+// Docks
+// =========================================================================
+
 // Helper: create a labeled placeholder widget
 static QWidget* makePlaceholder(const QString& text)
 {
@@ -154,14 +189,20 @@ static QWidget* makePlaceholder(const QString& text)
 
 void NeurusMainWindow::CreateDocks()
 {
-	if (m_viewportWidget == nullptr) {
-		// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
-		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
-		m_viewportDock->setWidget(makePlaceholder("Viewport"));  // for restoreState matching
-		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-		// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
-		m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);
+	// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
+	m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
+	m_viewportDock->setObjectName("ViewportDock");
+	if (m_vulkanWidget)
+	{
+		m_viewportDock->setWidget(m_vulkanWidget, ads::CDockWidget::ForceNoScrollArea);
 	}
+	else
+	{
+		m_viewportDock->setWidget(makePlaceholder("Viewport"));
+	}
+	m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+	// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
+	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);
 
 	// --- Left: Shader Editor ---
 	auto* shaderDock = new ads::CDockWidget(m_dockManager, "Shader Editor");
@@ -198,6 +239,10 @@ void NeurusMainWindow::CreateDocks()
 	textureDock->setMinimumSize(200, 150);
 	m_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
 }
+
+// =========================================================================
+// Layout persistence
+// =========================================================================
 
 void NeurusMainWindow::SaveLayout()
 {

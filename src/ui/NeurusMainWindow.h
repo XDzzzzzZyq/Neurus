@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
+#include <Windows.h>
 
 class QDockWidget;  // forward decl for QWidget param
 
@@ -11,6 +12,8 @@ class CDockWidget;
 
 namespace neurus {
 
+class VulkanWidget;
+
 class NeurusMainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -19,12 +22,19 @@ public:
 	explicit NeurusMainWindow(QWidget* parent = nullptr);
 	~NeurusMainWindow() override;
 
-	/**
-	 * @brief Creates a dockable Viewport dock widget containing the given widget.
-	 * @param viewportWidget The QWidget (from createWindowContainer) to embed.
-	 * @return The created CDockWidget (owned by the dock manager).
-	 */
-	void setViewportWidget(QWidget* viewportWidget);
+	/** @brief Returns the VulkanWidget's native HWND for VkSurface creation. */
+	HWND getViewportHwnd() const;
+
+	/** @brief Returns viewport widget width in pixels. */
+	int getViewportWidth() const;
+
+	/** @brief Returns viewport widget height in pixels. */
+	int getViewportHeight() const;
+
+	/** @brief Returns non-owning raw pointer to the VulkanWidget (for signal connections). */
+	VulkanWidget* getVulkanWidget() const;
+
+	/** @brief Returns the viewport dock widget (for layout / restoreState). */
 	ads::CDockWidget* getViewportDock() const { return m_viewportDock; }
 
 private:
@@ -35,8 +45,8 @@ private:
 	void RestoreDefaultLayout();
 
 	ads::CDockManager* m_dockManager = nullptr;
-	ads::CDockWidget* m_viewportDock = nullptr;  // created first in CreateDocks (central widget)
-	QWidget* m_viewportWidget = nullptr;
+	ads::CDockWidget*  m_viewportDock = nullptr;
+	VulkanWidget*      m_vulkanWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus

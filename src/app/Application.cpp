@@ -14,8 +14,8 @@
  *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
  *  10. QTimer-driven render loop - ~60 FPS
  *
- * Cleanup order (CRITICAL: destroy GPU child objects BEFORE device, surface BEFORE instance):
- *   renderer -> editor -> surface -> mainWindow -> vkContext
+ * Cleanup: C++ member destruction in reverse declaration order handles
+ *   renderer → editor → surface → mainWindow → vkContext automatically.
  */
 
 // Must define platform before including any Vulkan headers
@@ -71,35 +71,59 @@ static QString resolveResourcePath(const char* relativePath)
 
 namespace neurus {
 
+// =========================================================================
+// Constructor / Destructor
+// =========================================================================
+
 Application::Application(int argc, char* argv[])
-	: m_argc(argc)
-	, m_argv(argv)
 {
+	// --- Qt Application ---
+	m_qtApp = std::make_unique<QApplication>(argc, argv);
+	m_renderTimer = std::make_unique<QTimer>();
+	m_qtApp->setApplicationName("Neurus");
+	m_qtApp->setApplicationVersion("0.1.0");
 }
 
-Application::~Application()
-{
-	// Cleanup in strict order: destroy GPU child objects BEFORE device,
-	// surface BEFORE instance.
-	m_renderer.reset();     // 1. DeferredRenderer -> WaitIdle(), swapchain, pipeline
-	m_editor.reset();       // 2. Editor -> Context -> Project -> Scene -> Mesh -> ReleaseGPUBuffers
-	m_surface.reset();      // 3. VkSurfaceKHR
-	m_mainWindow.reset();   // 4. Main window (deletes VulkanWidget)
-	m_vkContext.reset();    // 5. VkDevice + VkInstance (all child objects now freed)
-}
+Application::~Application() = default;
+
+// =========================================================================
+// Run() – orchestration
+// =========================================================================
 
 int Application::Run()
 {
-	// --- Qt Application ---
-	QApplication qtApp(m_argc, m_argv);
-	qtApp.setApplicationName("Neurus");
-	qtApp.setApplicationVersion("0.1.0");
+	if (!InitVulkan())
+	{
+		return -1;
+	}
 
-	// --- UIEvents (must be created first - used by all layers) ---
+	auto project = LoadProject();
+	auto& scene = project->GetScene();
+
+	if (!InitRenderer(*project))
+	{
+		return -1;
+	}
+
+	InitEditor(std::move(project));
+
+	m_mainWindow->show();
+
+	WireSignals();
+	StartRenderLoop();
+
+	NEURUS_LOG("[Application] Entering event loop");
+	int result = m_qtApp->exec();
+	return result;
+}
+
+// =========================================================================
+// InitVulkan – two-phase Vulkan initialisation (Instance → Window → Surface → Device)
+// =========================================================================
+
+bool Application::InitVulkan()
+{
 	auto& uiEvents = neurus::UIEvents::instance();
-
-	// --- Two-phase Vulkan initialization ---
-	neurus::VulkanWidget* vulkanWidget = nullptr;  // Owned by mainWindow's Viewport CDockWidget
 
 	try
 	{
@@ -109,15 +133,11 @@ int Application::Run()
 
 		// Step 2: Create Qt window with VulkanWidget
 		m_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
-		vulkanWidget = new neurus::VulkanWidget();
-		m_mainWindow->setViewportWidget(vulkanWidget);
-
-		vulkanWidget->resize(800, 600);
-		vulkanWidget->winId();  // Force native window handle creation
+		// VulkanWidget is created internally by NeurusMainWindow constructor
 
 		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
-		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, vulkanWidget->hwnd());
+		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, m_mainWindow->getViewportHwnd());
 		m_surface = std::make_unique<vk::raii::SurfaceKHR>(m_vkContext->instance(), surfaceCreateInfo);
 
 		// Step 4: Create logical device
@@ -128,13 +148,22 @@ int Application::Run()
 	catch (const std::exception& e)
 	{
 		NEURUS_ERR("Vulkan initialization failed: " << e.what());
-		return -1;
+		return false;
 	}
 
-	// --- Load or create project ---
+	return true;
+}
+
+// =========================================================================
+// LoadProject – load existing or create default, upload meshes
+// =========================================================================
+
+std::unique_ptr<project::Project> Application::LoadProject()
+{
 	const QString projectFilePath = resolveResourcePath("shadow.neurus.json"); // Temporarily used for Rendering development and test.
 	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
 	auto project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
+
 	try
 	{
 		*project = neurus::project::Project::Open(projectFilePath.toStdString(),
@@ -182,7 +211,15 @@ int Application::Run()
 		                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
 	}
 
-	// --- Create deferred renderer ---
+	return project;
+}
+
+// =========================================================================
+// InitRenderer – deferred renderer + light upload
+// =========================================================================
+
+bool Application::InitRenderer(const project::Project& project)
+{
 	try
 	{
 		m_renderer = std::make_unique<neurus::DeferredRenderer>(
@@ -191,30 +228,44 @@ int Application::Run()
 			m_vkContext->graphicsQueue(),
 			m_vkContext->graphicsQueueFamily(),
 			*m_surface,
-			vulkanWidget->width(),
-			vulkanWidget->height()
+			m_mainWindow->getViewportWidth(),
+			m_mainWindow->getViewportHeight()
 		);
 	}
 	catch (const std::exception& e)
 	{
 		NEURUS_ERR("DeferredRenderer initialization failed: " << e.what());
-		return -1;
+		return false;
 	}
 
 	// --- Upload scene lights to GPU (via LightingPass) ---
-	m_renderer->UploadLights(scene);
+	m_renderer->UploadLights(project.GetScene());
 
-	// --- Create Editor and transfer project ownership ---
+	return true;
+}
+
+// =========================================================================
+// InitEditor – editor with project ownership transfer
+// =========================================================================
+
+void Application::InitEditor(std::unique_ptr<project::Project> project)
+{
+	auto& scene = project->GetScene();  // Grab reference before ownership transfer
 	m_editor = std::make_unique<neurus::Editor>(m_vkContext.get(), m_renderer.get());
 	m_editor->SetProject(std::move(project));
 	m_editor->Initialize(scene);
-
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
+}
 
-	// Window was created hidden - show it now that the renderer is ready
-	m_mainWindow->show();
+// =========================================================================
+// WireSignals – Qt signal/slot connections
+// =========================================================================
 
-	// --- Connect UIEvents signals ---
+void Application::WireSignals()
+{
+	auto& uiEvents = neurus::UIEvents::instance();
+
+	// --- Render request (manual frame trigger) ---
 	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
 	                 [this]() {
 	                     if (m_renderer && m_editor)
@@ -228,7 +279,7 @@ int Application::Run()
 	// Handle VulkanWidget resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
-	QObject::connect(vulkanWidget, &neurus::VulkanWidget::resized,
+	QObject::connect(m_mainWindow->getVulkanWidget(), &neurus::VulkanWidget::resized,
 	                 [this](int width, int height) {
 	                     if (m_renderer)
 	                     {
@@ -256,11 +307,16 @@ int Application::Run()
 	                         m_renderer->TakeScreenshotAllAttachments();
 	                     }
 	                 });
+}
 
-	// --- Timer-driven render loop ---
-	QTimer renderTimer;
-	renderTimer.setInterval(16);  // ~60 FPS
-	QObject::connect(&renderTimer, &QTimer::timeout, [this]() {
+// =========================================================================
+// StartRenderLoop – timer-driven ~60 FPS render loop
+// =========================================================================
+
+void Application::StartRenderLoop()
+{
+	m_renderTimer->setInterval(16);  // ~60 FPS
+	QObject::connect(m_renderTimer.get(), &QTimer::timeout, [this]() {
 		Input::UpdateState();
 		if (m_renderer && m_editor)
 		{
@@ -270,12 +326,7 @@ int Application::Run()
 		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)
 		neurus::EventQueue().Process();
 	});
-	renderTimer.start();
-
-	// --- Run application ---
-	int result = qtApp.exec();
-
-	return result;
+	m_renderTimer->start();
 }
 
 } // namespace neurus
