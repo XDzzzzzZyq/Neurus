@@ -157,16 +157,17 @@ public:
 	                                               vk::ImageLayout currentLayout);
 
 	/**
-	 * @brief Loads an equirectangular HDR image from file and uploads to GPU.
+	 * @brief Loads an image from file (PNG, HDR, BMP, JPG, etc.) and uploads to GPU.
 	 *
-	 * Uses ImageData::LoadFromPath() for CPU-side loading, then creates
-	 * an Image with R32G32B32A32_SFLOAT format and uploads pixel data.
+	 * Uses ImageData::LoadFromPath() for CPU-side format detection and loading,
+	 * then creates an Image with the appropriate format and uploads pixel data.
+	 * HDR files use R32G32B32A32_SFLOAT; LDR files use R8G8B8A8_SRGB.
 	 *
 	 * @param device           Logical device.
 	 * @param physicalDevice   Physical device for memory allocation.
 	 * @param queue            Queue for staging upload.
 	 * @param queueFamilyIndex Queue family index.
-	 * @param path             File path to .hdr equirectangular map.
+	 * @param path             File path to the image.
 	 * @param debugName        Optional debug name for the image.
 	 * @return Unique pointer to GPU Image, or nullptr on failure.
 	 */

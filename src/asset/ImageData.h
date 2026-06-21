@@ -18,6 +18,24 @@
 
 namespace neurus {
 
+/**
+ * @brief Result of loading an image file from disk.
+ *
+ * Holds dimensions, Vulkan pixel format, and owning pixel data.
+ * HDR images (.hdr) are loaded as R32G32B32A32_SFLOAT (16 bytes/pixel).
+ * LDR images (.png, .bmp, .jpg, .tga) are loaded as R8G8B8A8_SRGB (4 bytes/pixel).
+ */
+struct ImageLoadResult
+{
+	std::vector<uint8_t> pixelData;  ///< Raw pixel bytes (format-dependent byte count)
+	uint32_t width = 0;
+	uint32_t height = 0;
+	vk::Format format = vk::Format::eUndefined;
+
+	/** @brief True if a valid image was loaded. */
+	bool valid() const { return width > 0 && height > 0 && !pixelData.empty(); }
+};
+
 class ImageData
 {
 public:
@@ -103,21 +121,16 @@ public:
 	                             const std::string& path);
 
 	/**
-	 * @brief Loads an HDR equirectangular image from a file path.
+	 * @brief Loads an image from file, auto-detecting HDR vs LDR.
 	 *
-	 * Calls stbi_loadf() to decode the .hdr file, forcing 4-channel RGBA.
-	 * The pixel data is returned as a flat vector of R32_SFLOAT values
-	 * per channel (float-per-pixel layout). Returns an empty vector on
-	 * failure.
+	 * Uses stbi_is_hdr() to detect Radiance HDR format; falls back to
+	 * stbi_load() for standard LDR formats (PNG, BMP, JPG, TGA, etc.).
+	 * Always forces 4-channel RGBA output.
 	 *
-	 * @param path      File path to .hdr file.
-	 * @param outWidth  [out] Image width in pixels.
-	 * @param outHeight [out] Image height in pixels.
-	 * @return Owning vector of float RGBA pixel data, or empty on failure.
+	 * @param path File path to the image.
+	 * @return ImageLoadResult with pixel data, dimensions, and VkFormat.
 	 */
-	static std::vector<float> LoadFromPath(const std::string& path,
-	                                       uint32_t& outWidth,
-	                                       uint32_t& outHeight);
+	static ImageLoadResult LoadFromPath(const std::string& path);
 
 private:
 	static float HalfToFloat(uint16_t half);

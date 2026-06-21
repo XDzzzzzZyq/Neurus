@@ -431,24 +431,23 @@ std::unique_ptr<Image> Image::LoadFromPath(const vk::raii::Device& device,
                                            const std::string& path,
                                            const char* debugName)
 {
-	uint32_t w = 0, h = 0;
-	auto pixels = ImageData::LoadFromPath(path, w, h);
-	if (pixels.empty())
+	auto result = ImageData::LoadFromPath(path);
+	if (!result.valid())
 	{
 		return nullptr;
 	}
 
 	auto image = std::make_unique<Image>(
 		device, physicalDevice,
-		vk::Extent2D{w, h},
-		vk::Format::eR32G32B32A32Sfloat,
+		vk::Extent2D{result.width, result.height},
+		result.format,
 		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
 		1,
 		ImageType::e2D,
 		debugName);
 
 	image->UploadPixelData(device, physicalDevice, queue, queueFamilyIndex,
-	                       pixels.data(), pixels.size() * sizeof(float));
+	                       result.pixelData.data(), result.pixelData.size());
 
 	return image;
 }

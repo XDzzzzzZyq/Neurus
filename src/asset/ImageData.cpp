@@ -269,30 +269,55 @@ bool ImageData::SavePixelDataHDR(const void* pixelData,
 }
 
 // ===========================================================================
-// LoadFromPath (HDR equirect loader)
+// LoadFromPath (generic image loader: auto-detects HDR vs LDR)
 // ===========================================================================
 
-std::vector<float> ImageData::LoadFromPath(const std::string& path,
-                                           uint32_t& outWidth,
-                                           uint32_t& outHeight)
+ImageLoadResult ImageData::LoadFromPath(const std::string& path)
 {
-	int w = 0, h = 0, c = 0;
-	float* hdrData = stbi_loadf(path.c_str(), &w, &h, &c, 4);
-	if (!hdrData || w <= 0 || h <= 0)
+	ImageLoadResult result;
+
+	if (stbi_is_hdr(path.c_str()))
 	{
-		return {};
+		int w = 0, h = 0, c = 0;
+		float* data = stbi_loadf(path.c_str(), &w, &h, &c, 4);
+		if (!data || w <= 0 || h <= 0)
+		{
+			return result;
+		}
+
+		NEURUS_LOG("[ImageData] Loaded HDR: " << path << " (" << w << "x" << h << ", " << c << " channels)");
+
+		result.width = static_cast<uint32_t>(w);
+		result.height = static_cast<uint32_t>(h);
+		result.format = vk::Format::eR32G32B32A32Sfloat;
+
+		const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * 4 * sizeof(float);
+		result.pixelData.resize(byteCount);
+		std::memcpy(result.pixelData.data(), data, byteCount);
+		stbi_image_free(data);
+	}
+	else
+	{
+		int w = 0, h = 0, c = 0;
+		stbi_uc* data = stbi_load(path.c_str(), &w, &h, &c, 4);
+		if (!data || w <= 0 || h <= 0)
+		{
+			return result;
+		}
+
+		NEURUS_LOG("[ImageData] Loaded LDR: " << path << " (" << w << "x" << h << ", " << c << " channels)");
+
+		result.width = static_cast<uint32_t>(w);
+		result.height = static_cast<uint32_t>(h);
+		result.format = vk::Format::eR8G8B8A8Srgb;
+
+		const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * 4;
+		result.pixelData.resize(byteCount);
+		std::memcpy(result.pixelData.data(), data, byteCount);
+		stbi_image_free(data);
 	}
 
-	NEURUS_LOG("[ImageData] Loaded HDR: " << path << " (" << w << "x" << h << ", " << c << " channels)");
-
-	const size_t pixelCount = static_cast<size_t>(w) * static_cast<size_t>(h);
-	std::vector<float> pixels(pixelCount * 4);
-	std::memcpy(pixels.data(), hdrData, pixels.size() * sizeof(float));
-	stbi_image_free(hdrData);
-
-	outWidth = static_cast<uint32_t>(w);
-	outHeight = static_cast<uint32_t>(h);
-	return pixels;
+	return result;
 }
 
 } // namespace neurus
