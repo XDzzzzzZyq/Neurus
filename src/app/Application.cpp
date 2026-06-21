@@ -271,6 +271,13 @@ void Application::WireSignals()
 	                     if (m_renderer && m_editor)
 	                     {
 	                         Input::UpdateState();
+	                         // Camera controller: process input → update active camera
+	                         auto& scene = m_editor->GetScene();
+	                         auto* activeCam = scene.GetActiveCamera();
+	                         if (activeCam)
+	                         {
+	                             m_editor->GetCameraController().Update(*activeCam, Input::GetInputState());
+	                         }
 	                         try { m_renderer->DrawFrame(m_editor->GetScene()); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
@@ -320,6 +327,13 @@ void Application::StartRenderLoop()
 		Input::UpdateState();
 		if (m_renderer && m_editor)
 		{
+			// Camera controller: process input → update active camera
+			auto& scene = m_editor->GetScene();
+			auto* activeCam = scene.GetActiveCamera();
+			if (activeCam)
+			{
+				m_editor->GetCameraController().Update(*activeCam, Input::GetInputState());
+			}
 			try { m_renderer->DrawFrame(m_editor->GetScene()); }
 			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 		}

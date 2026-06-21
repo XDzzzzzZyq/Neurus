@@ -3,6 +3,8 @@
 #include <memory>
 #include <QString>
 
+#include "editor/CameraController.h"
+
 // Forward declarations (no render headers!)
 namespace neurus {
 class VulkanContext;
@@ -46,6 +48,7 @@ public:
 
 	Scene& GetScene();
 	neurus::project::Project& GetProject();
+	CameraController& GetCameraController() { return m_cameraController; }
 
 private:
 	// --- Signal handlers (implemented in later tasks) ---
@@ -64,6 +67,7 @@ private:
 	// --- Owned ---
 	std::unique_ptr<neurus::project::Project> m_project;
 	std::unique_ptr<Context> m_context;
+	CameraController m_cameraController;
 
 	// --- Non-owning references ---
 	VulkanContext* m_vkContext = nullptr;
