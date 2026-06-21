@@ -16,6 +16,7 @@
 #pragma once
 
 #include <iostream>
+#include <io.h>
 
 /**
  * @brief Debug-only info log.
@@ -25,7 +26,13 @@
  */
 #ifdef _DEBUG
 #define NEURUS_LOG(msg) \
-	std::cout << "[" << __func__ << ":" << __LINE__ << "] " << msg << "\n"
+	do { \
+		if (_isatty(_fileno(stdout))) { \
+			std::cout << "\033[36m[" << __func__ << ":" << __LINE__ << "]\033[0m " << msg << "\n"; \
+		} else { \
+			std::cout << "[" << __func__ << ":" << __LINE__ << "] " << msg << "\n"; \
+		} \
+	} while(0)
 #else
 #define NEURUS_LOG(msg) ((void)0)
 #endif
@@ -37,4 +44,10 @@
  * Active in all build configurations so errors are never silently swallowed.
  */
 #define NEURUS_ERR(msg) \
-	std::cerr << "[" << __func__ << ":" << __LINE__ << "] ERROR: " << msg << "\n"
+	do { \
+		if (_isatty(_fileno(stderr))) { \
+			std::cerr << "\033[1;31m[" << __func__ << ":" << __LINE__ << "] ERROR:\033[0m " << msg << "\n"; \
+		} else { \
+			std::cerr << "[" << __func__ << ":" << __LINE__ << "] ERROR: " << msg << "\n"; \
+		} \
+	} while(0)
