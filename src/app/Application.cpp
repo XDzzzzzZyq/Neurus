@@ -160,7 +160,7 @@ bool Application::InitVulkan()
 
 std::unique_ptr<project::Project> Application::LoadProject()
 {
-	const QString projectFilePath = resolveResourcePath("default.neurus.json"); // Temporarily used for Rendering development and test.
+	const QString projectFilePath = resolveResourcePath("shadow.neurus.json"); // Temporarily used for Rendering development and test.
 	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
 	auto project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
 

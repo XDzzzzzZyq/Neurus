@@ -217,7 +217,8 @@
             ],
             "sprite_list": [],
             "dLine_list": [],
-            "dPoints_list": []
+            "dPoints_list": [],
+            "env_list": []
         }
     }
 }
