@@ -1,15 +1,14 @@
 /**
  * @file CameraController.cpp
- * @brief Implementation of MMB-based camera navigation: orbit, dolly, pan, zoom.
+ * @brief Event-driven camera navigation: orbit (rotate), dolly (push), pan (slide), zoom.
  *
- * MMB Convention:
- *   - MMB alone     = Orbit (rotate around target)
- *   - Ctrl + MMB    = Dolly (move camera forward/back along view direction)
- *   - Shift + MMB   = Pan (translate camera parallel to view plane)
- *   - Scroll        = Zoom (move camera toward/away from target)
+ * Each event handler receives a discrete camera event, extracts the camera
+ * pointer and delta values, and applies the corresponding transform math.
+ * Speed control is external — Editor scales deltas before enqueuing events.
  */
 
-#include "editor/CameraController.h"
+#include "editor/controllers/CameraController.h"
+#include "editor/events/EventBus.h"
 #include "scene/Camera.h"
 
 #include <algorithm>
@@ -18,66 +17,66 @@
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Speed
-// ---------------------------------------------------------------------------
-
-float CameraController::GetSpeedMultiplier(const InputState& input) const
-{
-	if (input.ctrlHeld) return kSlowMultiplier;
-	return 1.0f;
-}
-
-// ---------------------------------------------------------------------------
 // Event notification
 // ---------------------------------------------------------------------------
 
 void CameraController::NotifyCameraChanged(const Camera& camera)
 {
-	// Stub - will enqueue CameraTransformChanged event in the future
+	// Stub — will enqueue CameraTransformChanged event in the future
 	(void)camera;
 }
 
 // ---------------------------------------------------------------------------
-// Update - main entry point called each frame
+// Init — subscribe to camera events
 // ---------------------------------------------------------------------------
 
-void CameraController::Update(Camera& camera, const InputState& input)
+void CameraController::Init(class EventQueue& bus)
 {
-	const float speed = GetSpeedMultiplier(input);
-
-	// Scroll wheel → Zoom (always active, no modifier required)
-	if (std::abs(input.scrollDelta) > 0.001f)
-	{
-		Zoom(camera, input, speed);
-		NotifyCameraChanged(camera);
-	}
-
-	// MMB held → dispatch based on modifier keys
-	if (input.middleMouseHeld)
-	{
-		if (input.ctrlHeld)
-		{
-			Dolly(camera, input, speed); // Ctrl + MMB = Dolly (Ctrl wins over Shift)
-		}
-		else if (input.shiftHeld)
-		{
-			Pan(camera, input, speed);   // Shift + MMB = Pan
-		}
-		else
-		{
-			Orbit(camera, input, speed); // MMB alone = Orbit
-		}
-
-		NotifyCameraChanged(camera);
-	}
+	bus.subscribe<CameraZoomEvent>([this](const CameraZoomEvent& e) { OnCameraZoom(e); });
+	bus.subscribe<CameraRotateEvent>([this](const CameraRotateEvent& e) { OnCameraRotate(e); });
+	bus.subscribe<CameraPushEvent>([this](const CameraPushEvent& e) { OnCameraPush(e); });
+	bus.subscribe<CameraSlideEvent>([this](const CameraSlideEvent& e) { OnCameraSlide(e); });
 }
 
 // ---------------------------------------------------------------------------
-// Orbit - rotate camera around look-at target (MMB drag)
+// OnCameraZoom — scroll wheel → move camera toward/away from target
 // ---------------------------------------------------------------------------
 
-void CameraController::Orbit(Camera& camera, const InputState& input, float speed)
+void CameraController::OnCameraZoom(const CameraZoomEvent& e)
 {
+	Camera& camera = *e.cam;
+
+	const glm::vec3 pos = camera.GetPosition();
+	const glm::vec3& target = camera.cam_tar;
+
+	const glm::vec3 dir = pos - target;
+	const float radius = glm::length(dir);
+	if (radius < 1e-6f) return;
+
+	// Zoom factor: scroll up → closer, scroll down → farther
+	// Speed = 1.0f (Editor scales e.scroll_dir before enqueuing)
+	const float factor = std::pow(0.8f, e.scroll_dir * kZoomSensitivity);
+	const float newRadius = radius * factor;
+
+	// Clamp to prevent going through target or flying to infinity
+	constexpr float kMinRadius = 0.01f;
+	constexpr float kMaxRadius = 1000.0f;
+	const float clampedRadius = std::clamp(newRadius, kMinRadius, kMaxRadius);
+
+	const glm::vec3 newDir = glm::normalize(dir) * clampedRadius;
+	camera.SetCamPos(target + newDir);
+
+	NotifyCameraChanged(camera);
+}
+
+// ---------------------------------------------------------------------------
+// OnCameraRotate — orbit camera around look-at target
+// ---------------------------------------------------------------------------
+
+void CameraController::OnCameraRotate(const CameraRotateEvent& e)
+{
+	Camera& camera = *e.cam;
+
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
 
@@ -92,8 +91,9 @@ void CameraController::Orbit(Camera& camera, const InputState& input, float spee
 	const float azimuth   = std::atan2(dir.x, dir.z);             // [-PI, PI]
 
 	// Apply mouse delta (inverted for natural drag feel)
-	const float deltaAzimuth   = -input.mouseDeltaX * kOrbitSensitivity * speed;
-	const float deltaElevation = -input.mouseDeltaY * kOrbitSensitivity * speed;
+	// Speed = 1.0f (Editor scales deltas before enqueuing)
+	const float deltaAzimuth   = -e.mouse_delta_x * kOrbitSensitivity;
+	const float deltaElevation = -e.mouse_delta_y * kOrbitSensitivity;
 
 	// Clamp elevation to avoid flipping at +/-89 degrees
 	constexpr float kMaxElevation = glm::radians(89.0f);
@@ -109,41 +109,19 @@ void CameraController::Orbit(Camera& camera, const InputState& input, float spee
 	);
 
 	camera.SetCamPos(target + newDir * radius);
-	// Target stays fixed - camera continues looking at same point
+	// Target stays fixed — camera continues looking at same point
+
+	NotifyCameraChanged(camera);
 }
 
 // ---------------------------------------------------------------------------
-// Zoom - move camera toward/away from target (scroll wheel)
+// OnCameraPush — dolly camera forward/back along view direction (Ctrl+MMB)
 // ---------------------------------------------------------------------------
 
-void CameraController::Zoom(Camera& camera, const InputState& input, float speed)
+void CameraController::OnCameraPush(const CameraPushEvent& e)
 {
-	const glm::vec3 pos = camera.GetPosition();
-	const glm::vec3& target = camera.cam_tar;
+	Camera& camera = *e.cam;
 
-	const glm::vec3 dir = pos - target;
-	const float radius = glm::length(dir);
-	if (radius < 1e-6f) return;
-
-	// Zoom factor: scroll up → closer, scroll down → farther
-	const float factor = std::pow(0.8f, input.scrollDelta * kZoomSensitivity * speed);
-	const float newRadius = radius * factor;
-
-	// Clamp to prevent going through target or flying to infinity
-	constexpr float kMinRadius = 0.01f;
-	constexpr float kMaxRadius = 1000.0f;
-	const float clampedRadius = std::clamp(newRadius, kMinRadius, kMaxRadius);
-
-	const glm::vec3 newDir = glm::normalize(dir) * clampedRadius;
-	camera.SetCamPos(target + newDir);
-}
-
-// ---------------------------------------------------------------------------
-// Dolly - move camera forward/back along view direction (Ctrl+MMB drag)
-// ---------------------------------------------------------------------------
-
-void CameraController::Dolly(Camera& camera, const InputState& input, float speed)
-{
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
 
@@ -153,20 +131,25 @@ void CameraController::Dolly(Camera& camera, const InputState& input, float spee
 	if (len < 1e-6f) return;
 	dir /= len;
 
-	// Positive mouseDeltaY = move forward (toward target)
-	const float dollyAmount = input.mouseDeltaY * kDollySensitivity * speed;
+	// Positive mouse_delta_y = move forward (toward target)
+	// Speed = 1.0f (Editor scales deltas before enqueuing)
+	const float dollyAmount = e.mouse_delta_y * kDollySensitivity;
 	const glm::vec3 offset = dir * dollyAmount;
 
 	camera.SetCamPos(pos + offset);
-	// Target stays fixed - Dolly moves only camera along view axis
+	// Target stays fixed — Dolly moves only camera along view axis
+
+	NotifyCameraChanged(camera);
 }
 
 // ---------------------------------------------------------------------------
-// Pan - translate camera parallel to view plane (Shift+MMB drag)
+// OnCameraSlide — pan camera parallel to view plane (Shift+MMB)
 // ---------------------------------------------------------------------------
 
-void CameraController::Pan(Camera& camera, const InputState& input, float speed)
+void CameraController::OnCameraSlide(const CameraSlideEvent& e)
 {
+	Camera& camera = *e.cam;
+
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
 
@@ -186,16 +169,18 @@ void CameraController::Pan(Camera& camera, const InputState& input, float speed)
 	}
 	right = glm::normalize(right);
 
-	// Up: cross(right, forward) - camera-local up (not world up)
+	// Up: cross(right, forward) — camera-local up (not world up)
 	const glm::vec3 up = glm::cross(right, forward);
 
 	// Compute translation: horizontal mouse = right, vertical mouse = up
-	const float panSensitivity = kPanSensitivity * speed;
-	const glm::vec3 delta = input.mouseDeltaX * panSensitivity * right
-	                        - input.mouseDeltaY * panSensitivity * up;
+	// Speed = 1.0f (Editor scales deltas before enqueuing)
+	const glm::vec3 delta = e.mouse_delta_x * kPanSensitivity * right
+	                        - e.mouse_delta_y * kPanSensitivity * up;
 
 	camera.SetCamPos(pos + delta);
 	camera.SetTarPos(target + delta);
+
+	NotifyCameraChanged(camera);
 }
 
 } // namespace neurus

@@ -1,8 +1,6 @@
 # src/editor/CMakeLists.txt - Editor Layer
 
 add_library(neurus_editor STATIC
-	CameraController.h
-	CameraController.cpp
 	Editor.h
 	Editor.cpp
 	Input.h
@@ -12,6 +10,9 @@ add_library(neurus_editor STATIC
 	SelectionManager.h
 	SelectionController.h
 	SelectionController.cpp
+	controllers/Controllers.h
+	controllers/CameraController.h
+	controllers/CameraController.cpp
 	events/UIEvents.h
 	events/UIEvents.cpp
 )

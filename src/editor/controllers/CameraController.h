@@ -1,134 +1,86 @@
 /**
  * @file CameraController.h
- * @brief Camera manipulation controller for MMB-based interactive viewpoint control.
+ * @brief Camera manipulation controller — event-driven, no per-frame polling.
  *
- * CameraController translates mouse input into camera transform updates using the
- * Middle Mouse Button (MMB) convention, a standard pattern in 3D viewport navigation.
+ * CameraController translates discrete camera events (zoom, rotate, push, slide)
+ * into camera transform updates. All navigation logic is triggered by events
+ * enqueued from the Editor layer (which reads raw input and normalizes it).
  *
- * MMB Convention:
- *   - MMB alone     = Orbit (rotate around target)
- *   - Ctrl + MMB    = Dolly (move camera forward/back along view direction)
- *   - Shift + MMB   = Pan (translate camera parallel to view plane)
- *   - Scroll        = Zoom (move camera toward/away from target)
- *
- * Speed modifiers:
- *   - Ctrl held: 0.25x sensitivity (slow/precise)
- *   - No ctrl: 1.0x (normal)
+ * Event Mapping:
+ *   - CameraZoomEvent   → Zoom  (scroll wheel)
+ *   - CameraRotateEvent → Orbit (rotate around target)
+ *   - CameraPushEvent   → Dolly (move camera forward/back along view direction)
+ *   - CameraSlideEvent  → Pan   (translate camera parallel to view plane)
  *
  * Coordinate System:
  *   - Right-handed Y-up world space
  *   - Camera forward: derived from target - position
  *
  * Architecture:
- *   - Receives InputState each frame via Update()
- *   - Modifies active Camera's position and look-at target directly
+ *   - bound to an EventQueue via Init() — no per-frame Update() polling
+ *   - Operates on Camera* provided by each event
  *   - NotifyCameraChanged() stub for future event notification
  *
- * @note CameraController does not own the camera - it operates on a reference.
- * @note No renderer or event dependency. Uses only Camera and glm.
+ * @note CameraController does not own the camera — it operates on a pointer.
+ * @note Speed control is external — Editor scales deltas before enqueuing.
  */
 #pragma once
 
-#include <glm/glm.hpp>
+#include "editor/controllers/Controllers.h"
+#include "editor/events/CameraEvents.h"
+#include "editor/Input.h"
 
 namespace neurus {
 
 class Camera;
-
-// ---------------------------------------------------------------------------
-// InputState - raw input data consumed by CameraController each frame
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Raw input state consumed by CameraController::Update() each frame.
- *
- * Provides mouse and keyboard modifier state needed for MMB-based camera
- * manipulation. No WASD fields - all navigation is mouse-driven.
- *
- * Field meanings:
- *   - mouseDeltaX/Y: Cursor position delta since last frame (pixels)
- *   - scrollDelta: Scroll wheel delta (+1 up, -1 down per notch)
- *   - leftMouseHeld: LMB currently pressed (reserved for future use)
- *   - middleMouseHeld: MMB currently pressed - primary camera control button
- *   - rightMouseHeld: RMB currently pressed (reserved for future use)
- *   - shiftHeld: Shift modifier (Shift+MMB = Pan)
- *   - ctrlHeld: Ctrl modifier (Ctrl+MMB = Dolly; also 0.25x speed)
- *   - altHeld: Alt modifier (reserved for future use)
- */
-struct InputState
-{
-	float mouseDeltaX = 0.0f;
-	float mouseDeltaY = 0.0f;
-	float scrollDelta = 0.0f;
-	bool leftMouseHeld = false;
-	bool middleMouseHeld = false;
-	bool rightMouseHeld = false;
-	bool shiftHeld = false;
-	bool ctrlHeld = false;
-	bool altHeld = false;
-};
+class EventQueue;
 
 // ---------------------------------------------------------------------------
 // CameraController
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Controller for MMB-based interactive camera manipulation.
+ * @brief Event-driven camera manipulation controller.
  *
- * CameraController implements the standard 3D viewport MMB navigation convention:
- * orbit, dolly, pan (via MMB with modifiers), and zoom (via scroll wheel).
+ * CameraController subscribes to camera events on an EventQueue and transforms
+ * each discrete event into a camera transform update. This replaces the
+ * previous per-frame Update(Camera&, InputState&) polling model.
  *
  * Supported Operations:
- *   - **Orbit** (MMB drag): Rotate camera around look-at target. Horizontal
- *     mouse movement rotates around world Y axis; vertical movement rotates
- *     around camera's local right axis.
- *   - **Dolly** (Ctrl+MMB drag vertical): Move camera forward/backward along
- *     the line-of-sight direction. Positive deltaY = move forward.
- *   - **Pan** (Shift+MMB drag): Translate camera and target perpendicular to
- *     the view direction using camera's right and up vectors.
- *   - **Zoom** (scroll wheel): Move camera toward or away from target along
- *     the line-of-sight direction. Always active, no modifier required.
- *
- * Speed Adjustment:
- *   - Normal: 1.0x sensitivity
- *   - Ctrl held: 0.25x (slow/precise)
+ *   - **Orbit** (CameraRotateEvent): Rotate camera around look-at target.
+ *   - **Dolly** (CameraPushEvent): Move camera forward/backward along
+ *     the line-of-sight direction.
+ *   - **Pan** (CameraSlideEvent): Translate camera and target perpendicular to
+ *     the view direction.
+ *   - **Zoom** (CameraZoomEvent): Move camera toward or away from target along
+ *     the line-of-sight direction.
  *
  * Usage:
  * @code
  *   CameraController controller;
- *   // ... per frame:
- *   InputState input = Input::GetInputState();
- *   controller.Update(camera, input);
+ *   controller.Init(GetEventQueue());
+ *   // Editor enqueues events, EventQueue::Process() dispatches them
  * @endcode
  *
- * @note CameraController does not own the camera - it operates on a reference.
- * @note No renderer or event dependency. Uses only Camera and glm.
+ * @note CameraController does not own the camera — it operates on a pointer
+ *       provided by each event.
+ * @note Speed is controlled externally by scaling delta values before enqueuing.
  */
-class CameraController
+class CameraController : public Controllers
 {
 public:
 	CameraController() = default;
 
 	/**
-	 * @brief Updates the camera transform based on input state.
+	 * @brief Subscribes to camera events on the given EventQueue.
 	 *
-	 * Reads mouse delta, scroll, and modifier keys from InputState and
-	 * applies the corresponding camera operation based on MMB convention:
-	 *   - MMB alone        → Orbit()
-	 *   - Ctrl + MMB       → Dolly()
-	 *   - Shift + MMB      → Pan()
-	 *   - Scroll (always)  → Zoom()
+	 * Registers four lambda handlers that forward each event to the
+	 * corresponding private handler method. Must be called once during
+	 * initialization, before any events are enqueued.
 	 *
-	 * Multiple operations can be combined in one frame (e.g., scroll zoom
-	 * while orbiting with MMB).
-	 *
-	 * @param camera Camera to modify (position and target updated in place).
-	 * @param input Current frame's input state from the Input system.
-	 *
-	 * @note No-ops when camera position equals target (degenerate direction).
-	 * @note Elevation is clamped to avoid gimbal-lock at +/-89 degrees.
+	 * @param bus EventQueue to subscribe to.
 	 */
-	void Update(Camera& camera, const InputState& input);
+	void Init(class EventQueue& bus) override;
 
 private:
 	// --- Sensitivity constants ---
@@ -145,79 +97,40 @@ private:
 	/** @brief Base sensitivity for dolly translation (world units per pixel). */
 	static constexpr float kDollySensitivity = 0.05f;
 
-	/** @brief Speed multiplier when Ctrl is held (slow/precise). */
-	static constexpr float kSlowMultiplier = 0.25f;
-
-	// --- Speed ---
-
-	/**
-	 * @brief Computes the effective speed multiplier from modifier keys.
-	 * @param input Current input state.
-	 * @return 1.0f (normal) or kSlowMultiplier (slow when Ctrl held).
-	 */
-	float GetSpeedMultiplier(const InputState& input) const;
-
 	// --- Event notification ---
 
 	/**
 	 * @brief Notifies downstream systems of a camera transform change.
 	 * @param camera Camera that was modified.
-	 * @note Stub - will enqueue a CameraTransformChanged event in the future.
+	 * @note Stub — will enqueue a CameraTransformChanged event in the future.
 	 */
 	void NotifyCameraChanged(const Camera& camera);
 
-	// --- Camera operations ---
+	// --- Event handlers (called via Init() subscriptions) ---
 
 	/**
-	 * @brief Orbits the camera around its look-at target (MMB drag).
-	 *
-	 * Horizontal mouse delta rotates azimuth around world Y axis.
-	 * Vertical mouse delta rotates elevation around camera's local right axis.
-	 * Elevation is clamped to +/-89 degrees to avoid gimbal lock.
-	 *
-	 * @param camera Camera to modify.
-	 * @param input Current input state (reads mouseDeltaX/Y).
-	 * @param speed Effective speed multiplier.
+	 * @brief Handles CameraZoomEvent — moves camera toward/away from target.
+	 * @param e Zoom event carrying camera pointer and scroll direction.
 	 */
-	void Orbit(Camera& camera, const InputState& input, float speed);
+	void OnCameraZoom(const CameraZoomEvent& e);
 
 	/**
-	 * @brief Zooms the camera toward or away from its look-at target (scroll wheel).
-	 *
-	 * Moves camera along the line-of-sight direction. scrollDelta > 0
-	 * moves toward target; scrollDelta < 0 moves away.
-	 *
-	 * @param camera Camera to modify.
-	 * @param input Current input state (reads scrollDelta).
-	 * @param speed Effective speed multiplier.
+	 * @brief Handles CameraRotateEvent — orbits camera around target.
+	 * @param e Rotate event carrying camera pointer and mouse deltas.
 	 */
-	void Zoom(Camera& camera, const InputState& input, float speed);
+	void OnCameraRotate(const CameraRotateEvent& e);
 
 	/**
-	 * @brief Dollies the camera forward/backward along the view direction (Ctrl+MMB drag).
-	 *
-	 * Translates both camera position and target along the line-of-sight
-	 * direction, maintaining the current framing. Positive mouseDeltaY
-	 * moves forward, negative moves backward.
-	 *
-	 * @param camera Camera to modify (both position and target).
-	 * @param input Current input state (reads mouseDeltaY).
-	 * @param speed Effective speed multiplier.
+	 * @brief Handles CameraPushEvent — dollies camera along view direction.
+	 * @param e Push event carrying camera pointer and mouse deltas.
 	 */
-	void Dolly(Camera& camera, const InputState& input, float speed);
+	void OnCameraPush(const CameraPushEvent& e);
 
 	/**
-	 * @brief Pans the camera parallel to the view plane (Shift+MMB drag).
-	 *
-	 * Translates both camera position and target using camera's right
-	 * and up vectors. Horizontal mouse delta pans along right vector;
-	 * vertical mouse delta pans along up vector.
-	 *
-	 * @param camera Camera to modify (both position and target).
-	 * @param input Current input state (reads mouseDeltaX/Y).
-	 * @param speed Effective speed multiplier.
+	 * @brief Handles CameraSlideEvent — pans camera parallel to view plane.
+	 * @param e Slide event carrying camera pointer and mouse deltas.
 	 */
-	void Pan(Camera& camera, const InputState& input, float speed);
+	void OnCameraSlide(const CameraSlideEvent& e);
 };
 
 } // namespace neurus
