@@ -86,8 +86,8 @@ void Environment::ClearDirty()
 // IBL texture ownership
 // -----------------------------------------------------------------------
 
-void Environment::SetImages(const vk::raii::Device& device,
-                           const vk::raii::PhysicalDevice& physicalDevice)
+void Environment::BuildIBLTextures(const vk::raii::Device& device,
+                                 const vk::raii::PhysicalDevice& physicalDevice)
 {
 	// Already initialised — nothing to do
 	if (m_diffuseTexture && m_specularTexture)
@@ -95,7 +95,7 @@ void Environment::SetImages(const vk::raii::Device& device,
 		return;
 	}
 
-	NEURUS_LOG("[Environment] SetImages: creating cubemap Images + samplers + Textures");
+	NEURUS_LOG("[Environment] BuildIBLTextures: creating cubemap Images + samplers + Textures");
 
 	// --- Cubemap Image creation ---
 	constexpr uint32_t kDiffuseRes  = 64;

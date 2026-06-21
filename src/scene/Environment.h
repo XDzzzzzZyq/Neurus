@@ -95,8 +95,8 @@ public:
 	 * @param device         Logical device for resource creation.
 	 * @param physicalDevice Physical device for memory allocation.
 	 */
-	void SetImages(const vk::raii::Device& device,
-	               const vk::raii::PhysicalDevice& physicalDevice);
+	void BuildIBLTextures(const vk::raii::Device& device,
+	                       const vk::raii::PhysicalDevice& physicalDevice);
 
 	/**
 	 * @brief Returns a non-owning pointer to the GPU diffuse cubemap Image.

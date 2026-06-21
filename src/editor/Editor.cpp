@@ -321,7 +321,7 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 	uint32_t qfi = m_vkContext->graphicsQueueFamily();
 
 	// Ensure cubemaps exist (lazily created on first call)
-	env->SetImages(device, pd);
+	env->BuildIBLTextures(device, pd);
 
 	// Load HDR or fallback
 	auto equirect = Image::LoadFromPath(device, pd, queue, qfi, env->GetEquirectPath());
