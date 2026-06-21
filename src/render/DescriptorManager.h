@@ -81,6 +81,15 @@ class DescriptorSetLayout
 {
 public:
 	/**
+	 * @brief Default-constructs a null descriptor set layout.
+	 *
+	 * The layout is nullptr until assigned via the parameterised constructor
+	 * or move assignment.  Useful when a subclass declares the member but
+	 * defers creation to the constructor body.
+	 */
+	DescriptorSetLayout() = default;
+
+	/**
 	 * @brief Creates the Vulkan descriptor set layout from the given bindings.
 	 *
 	 * @param device    Logical device (must outlive this layout).
@@ -211,6 +220,15 @@ private:
 class DescriptorPool
 {
 public:
+	/**
+	 * @brief Default-constructs a null descriptor pool.
+	 *
+	 * The pool is nullptr until assigned via the parameterised constructor
+	 * or move assignment.  Useful when a subclass declares the member but
+	 * defers creation to the constructor body.
+	 */
+	DescriptorPool() = default;
+
 	/**
 	 * @brief Creates a descriptor pool with the given capacity.
 	 *

@@ -3,11 +3,12 @@
  * @brief Screen-Space Ambient Occlusion compute pass implementation.
  */
 
+#include "passes/AttachmentManager.h"
 #include "passes/SSAOPass.h"
 
-#include "passes/AttachmentManager.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
+#include "passes/PassContext.h"
 #include "passes/SyncObjects.h"
 #include "shaders/ShaderModule.h"
 
@@ -83,20 +84,8 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
                    uint32_t queueFamilyIndex,
                    const uint32_t* compSpv,
                    size_t compSize)
-	: m_device(&device)
-	, m_attachmentManager(&attachmentManager)
-	// --- Nearest-neighbour sampler for G-Buffer reads ---
-	, m_sampler(CreateSampler(device, physicalDevice))
-	// --- Descriptor set layout ---
-	, m_descriptorSetLayout(CreateDescriptorSetLayout(device))
-	// --- Descriptor pool (numSets sets, pool sizes from layout × numSets) ---
-	, m_descriptorPool(device,
-	                   numSets,
-	                   DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, numSets))
-	// --- Descriptor sets (one per in-flight frame) ---
-	, m_descriptorSets(m_descriptorPool.Allocate(m_descriptorSetLayout, numSets))
-	// --- Pipeline builder (must outlive pipeline) ---
-	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
+	: ComputePass(device, physicalDevice, &attachmentManager,
+	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
 	NEURUS_LOG("[SSAOPass] compSize=" << compSize << " numSets=" << numSets
@@ -157,7 +146,6 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 #endif
 }
 
-SSAOPass::~SSAOPass() = default;
 // ---------------------------------------------------------------------------
 
 std::array<KernelSampleGpu, SSAOPass::kMaxKernelSamples> SSAOPass::GenerateKernel()
@@ -282,35 +270,6 @@ DescriptorSetLayout SSAOPass::CreateDescriptorSetLayout(const vk::raii::Device& 
 }
 
 // ---------------------------------------------------------------------------
-// Sampler factory
-// ---------------------------------------------------------------------------
-
-vk::raii::Sampler SSAOPass::CreateSampler(const vk::raii::Device& device,
-                                           const vk::raii::PhysicalDevice& /*physicalDevice*/)
-{
-	vk::SamplerCreateInfo samplerCI(
-		{},                                         // flags
-		vk::Filter::eNearest,                       // magFilter
-		vk::Filter::eNearest,                       // minFilter
-		vk::SamplerMipmapMode::eNearest,             // mipmapMode
-		vk::SamplerAddressMode::eClampToEdge,        // addressModeU
-		vk::SamplerAddressMode::eClampToEdge,        // addressModeV
-		vk::SamplerAddressMode::eClampToEdge,        // addressModeW
-		0.0f,                                        // mipLodBias
-		VK_FALSE,                                    // anisotropyEnable
-		0.0f,                                        // maxAnisotropy
-		VK_FALSE,                                    // compareEnable
-		vk::CompareOp::eAlways,                      // compareOp
-		0.0f,                                        // minLod
-		0.0f,                                        // maxLod
-		vk::BorderColor::eFloatTransparentBlack,      // borderColor
-		VK_FALSE                                     // unnormalizedCoordinates
-	);
-
-	return vk::raii::Sampler(device, samplerCI);
-}
-
-// ---------------------------------------------------------------------------
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
@@ -396,10 +355,11 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex)
 // Record
 // ---------------------------------------------------------------------------
 
-void SSAOPass::Record(vk::CommandBuffer cmdBuf,
-                      vk::Extent2D renderExtent,
-                      uint32_t frameIndex)
+void SSAOPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 {
+	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const uint32_t    frameIndex   = ctx.frameIndex;
+
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex);
 

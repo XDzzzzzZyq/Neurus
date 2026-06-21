@@ -22,6 +22,7 @@
 #include "render/passes/AttachmentManager.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
+#include "render/passes/PassContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Material.h"
 #include "render/Screenshot.h"
@@ -346,9 +347,13 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, camUBO,
-		                       { renderItem },
-		                       { kRenderWidth, kRenderHeight });
+		std::vector<GeometryRenderItem> items = { renderItem };
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camUBO.viewProj,
+			.view = camUBO.view,
+			.renderItems = &items,
+		});
 		EndSubmitWait(cmd);
 	}
 
@@ -363,12 +368,13 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 
 	{
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd,
-		                       camera->GetPosition(),
-		                       camUBO.view,
-		                       glm::inverse(camUBO.viewProj),
-		                       {kRenderWidth, kRenderHeight},
-		                       0);
+		m_lightingPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.frameIndex = 0,
+			.view = camUBO.view,
+			.cameraPos = camera->GetPosition(),
+			.invProjView = glm::inverse(camUBO.viewProj),
+		});
 		EndSubmitWait(cmd);
 	}
 

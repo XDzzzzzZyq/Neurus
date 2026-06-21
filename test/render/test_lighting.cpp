@@ -19,6 +19,7 @@
 #include "render/passes/AttachmentManager.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
+#include "render/passes/PassContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/VulkanBuffer.h"
 #include "render/buffers/BufferLayout.h"
@@ -174,9 +175,13 @@ protected:
 
 		{
 			auto& cmd = BeginCmd();
-			m_geometryPass->Record(*cmd, camera,
-			                       {item},
-			                       {kRenderWidth, kRenderHeight});
+			std::vector<GeometryRenderItem> items = {item};
+			m_geometryPass->Record(*cmd, PassContext{
+				.renderExtent = {kRenderWidth, kRenderHeight},
+				.viewProj = camera.viewProj,
+				.view = camera.view,
+				.renderItems = &items,
+			});
 			EndSubmitWait(cmd);
 		}
 
@@ -460,12 +465,13 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 		auto& cmd = BeginCmd();
 		const auto testCam = MakeTestCamera();
 
-		m_lightingPass->Record(*cmd,
-		                       glm::vec3(0.0f, 0.0f, 2.0f), // camera pos
-		                       testCam.view,                  // view matrix
-		                       glm::inverse(testCam.viewProj),// inv proj*view for skybox ray
-		                       {kRenderWidth, kRenderHeight},
-		                       0);                           // frame index
+		m_lightingPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.frameIndex = 0,
+			.view = testCam.view,
+			.cameraPos = glm::vec3(0.0f, 0.0f, 2.0f),
+			.invProjView = glm::inverse(testCam.viewProj),
+		});
 
 		EndSubmitWait(cmd);
 	}
@@ -532,12 +538,13 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 		auto& cmd = BeginCmd();
 		const auto testCam = MakeTestCamera();
 
-		m_lightingPass->Record(*cmd,
-		                       glm::vec3(0.0f, 0.0f, 2.0f),
-		                       testCam.view,
-		                       glm::inverse(testCam.viewProj),
-		                       {kRenderWidth, kRenderHeight},
-		                       0);
+		m_lightingPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.frameIndex = 0,
+			.view = testCam.view,
+			.cameraPos = glm::vec3(0.0f, 0.0f, 2.0f),
+			.invProjView = glm::inverse(testCam.viewProj),
+		});
 
 		EndSubmitWait(cmd);
 	}

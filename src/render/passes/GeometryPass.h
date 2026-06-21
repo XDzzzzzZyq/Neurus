@@ -20,9 +20,11 @@
 
 #pragma once
 
-#include "DescriptorManager.h"
-#include "VulkanBuffer.h"
-#include "buffers/BufferLayout.h"
+#include "../DescriptorManager.h"
+#include "../VulkanBuffer.h"
+#include "../buffers/BufferLayout.h"
+#include "Pass.h"
+#include "PassContext.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -83,7 +85,7 @@ struct GeometryRenderItem
  *
  * Non-copyable, movable.
  */
-class GeometryPass
+class GeometryPass : public Pass
 {
 public:
 	/**
@@ -113,14 +115,6 @@ public:
 	             const uint32_t* fragSpv,
 	             size_t fragSize);
 
-	~GeometryPass() = default;
-
-	// --- Non-copyable, movable ---
-	GeometryPass(const GeometryPass&) = delete;
-	GeometryPass& operator=(const GeometryPass&) = delete;
-	GeometryPass(GeometryPass&&) noexcept = default;
-	GeometryPass& operator=(GeometryPass&&) noexcept = default;
-
 	/**
 	 * @brief Records the G-Buffer draw commands into a command buffer.
 	 *
@@ -137,10 +131,7 @@ public:
 	 * @param renderItems     Vector of draw batches to render.
 	 * @param renderExtent    Render area dimensions.
 	 */
-	void Record(vk::CommandBuffer cmdBuf,
-	            const CameraUBOData& cameraData,
-	            const std::vector<GeometryRenderItem>& renderItems,
-	            vk::Extent2D renderExtent);
+	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
 
 	/**
 	 * @brief Returns the camera descriptor set layout (set 0).
@@ -164,7 +155,6 @@ private:
 	                                  size_t fragSize);
 
 	// --- References (non-owning) ---
-	const vk::raii::Device* m_device;
 	const vk::raii::PhysicalDevice* m_physicalDevice;
 	AttachmentManager* m_attachmentManager;
 	RenderPassManager* m_renderPassManager;

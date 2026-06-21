@@ -20,7 +20,6 @@
 #include "render/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Image.h"
-#include "render/passes/IBLPass.h"
 #include "core/Log.h"
 
 namespace {
@@ -314,12 +313,6 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 		NEURUS_ERR("[Editor] GenerateIBL: VulkanContext or Renderer not available");
 		return;
 	}
-	auto* iblPass = m_renderer->GetIBLPass();
-	if (!iblPass)
-	{
-		NEURUS_ERR("[Editor] GenerateIBL: IBLPass not available");
-		return;
-	}
 
 	auto& device = m_vkContext->device();
 	auto& pd = m_vkContext->physicalDevice();
@@ -336,8 +329,8 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 		equirect = Environment::GenerateFallbackImage(device, pd, queue, qfi);
 	}
 
-	// Generate IBL into cubemaps (owned by Environment, reused across updates)
-	iblPass->Generate(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
+	// Generate IBL into cubemaps via DeferredRenderer wrapper (respects layer isolation)
+	m_renderer->GenerateIBL(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
 }

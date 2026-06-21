@@ -19,6 +19,7 @@
 // --- Render layer ---
 #include "render/passes/AttachmentManager.h"
 #include "render/passes/GeometryPass.h"
+#include "render/passes/PassContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/passes/SSAOPass.h"
 #include "render/Screenshot.h"
@@ -214,9 +215,12 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, camUBO,
-		                       cb.renderItems,
-		                       { kRenderWidth, kRenderHeight });
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camUBO.viewProj,
+			.view = camUBO.view,
+			.renderItems = &cb.renderItems,
+		});
 		EndSubmitWait(cmd);
 	}
 
@@ -231,7 +235,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 		const glm::vec3 camPos   = cb.camera->GetPosition();
 
 		m_ssaoPass->UpdateParams(viewProj, view, camPos);
-		m_ssaoPass->Record(*cmd, {kRenderWidth, kRenderHeight}, 0);
+		m_ssaoPass->Record(*cmd, PassContext{{kRenderWidth, kRenderHeight}, 0});
 
 		EndSubmitWait(cmd);
 	}

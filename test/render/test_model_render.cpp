@@ -24,6 +24,7 @@
 #include "render/passes/AttachmentManager.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
+#include "render/passes/PassContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Material.h"
 #include "render/Texture.h"
@@ -474,9 +475,13 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, camUBO,
-		                       { renderItem },
-		                       { kRenderWidth, kRenderHeight });
+		std::vector<GeometryRenderItem> items = { renderItem };
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camUBO.viewProj,
+			.view = camUBO.view,
+			.renderItems = &items,
+		});
 		EndSubmitWait(cmd);
 	}
 
@@ -489,12 +494,13 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	{
 		auto& cmd = BeginCmd();
 
-		m_lightingPass->Record(*cmd,
-		                       camera->GetPosition(),                 // camera world pos
-		                       camUBO.view,                           // view matrix
-		                       glm::inverse(camUBO.viewProj),         // inv proj*view for skybox ray
-		                       {kRenderWidth, kRenderHeight},
-		                       0);                                     // frame index
+		m_lightingPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.frameIndex = 0,
+			.view = camUBO.view,
+			.cameraPos = camera->GetPosition(),
+			.invProjView = glm::inverse(camUBO.viewProj),
+		});
 
 		EndSubmitWait(cmd);
 	}

@@ -6,6 +6,7 @@
 #include "passes/LightingPass.h"
 
 #include "passes/AttachmentManager.h"
+#include "passes/PassContext.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "shaders/ShaderModule.h"
@@ -36,23 +37,10 @@ LightingPass::LightingPass(const vk::raii::Device& device,
                            uint32_t queueFamilyIndex,
                            const uint32_t* compSpv,
                            size_t compSize)
-	: m_device(&device)
-	, m_physicalDevice(&physicalDevice)
-	, m_attachmentManager(&attachmentManager)
+	: ComputePass(device, physicalDevice, &attachmentManager,
+	              LightingPass::CreateDescriptorSetLayout(device), numSets)
 	, m_graphicsQueue(graphicsQueue)
 	, m_queueFamilyIndex(queueFamilyIndex)
-	// --- Nearest-neighbour sampler for G-Buffer reads ---
-	, m_sampler(CreateSampler(device, physicalDevice))
-	// --- Descriptor set layout ---
-	, m_descriptorSetLayout(CreateDescriptorSetLayout(device))
-	// --- Descriptor pool (numSets sets, pool sizes from layout × numSets) ---
-	, m_descriptorPool(device,
-	                   numSets,
-	                   DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, numSets))
-	// --- Descriptor sets (one per in-flight frame) ---
-	, m_descriptorSets(m_descriptorPool.Allocate(m_descriptorSetLayout, numSets))
-	// --- Pipeline builder (must outlive pipeline) ---
-	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
 	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets
@@ -65,7 +53,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	{
 		uint8_t zero[sizeof(PointLightGpu)] = {};
 		m_fallbackSSBO = std::make_unique<VulkanBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
+			*m_device, *m_physicalDevice, graphicsQueue, queueFamilyIndex,
 			sizeof(PointLightGpu),
 			vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
 			vk::MemoryPropertyFlagBits::eDeviceLocal,
@@ -84,16 +72,16 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 		const vk::Extent2D fbExtent{4, 4};
 
 		// --- Fallback diffuse irradiance cubemap ---
-		m_fallbackIrradianceCube = new Image(
-			device, physicalDevice, fbExtent,
+		m_fallbackIrradianceCube = std::make_unique<Image>(
+			*m_device, *m_physicalDevice, fbExtent,
 			vk::Format::eR32G32B32A32Sfloat,
 			cubeUsage, /*mipLevels=*/1,
 			Image::ImageType::eCube,
 			"Lighting_IrradianceFallback");
 
 		// --- Fallback specular prefiltered cubemap ---
-		m_fallbackPrefilteredCube = new Image(
-			device, physicalDevice, fbExtent,
+		m_fallbackPrefilteredCube = std::make_unique<Image>(
+			*m_device, *m_physicalDevice, fbExtent,
 			vk::Format::eR32G32B32A32Sfloat,
 			cubeUsage, /*mipLevels=*/1,
 			Image::ImageType::eCube,
@@ -146,7 +134,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 				0.0f, VK_FALSE, 0.0f, VK_FALSE,
 				vk::CompareOp::eAlways, 0.0f, 0.0f,  // minLod=0, maxLod=0
 				vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
-			m_fallbackCubeSampler = vk::raii::Sampler(device, samplerCI);
+			m_fallbackCubeSampler = vk::raii::Sampler(*m_device, samplerCI);
 		}
 
 		NEURUS_LOG("[LightingPass] Created fallback IBL cubemaps (4×4 black)");
@@ -161,11 +149,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 #endif
 }
 
-LightingPass::~LightingPass()
-{
-	delete m_fallbackIrradianceCube;
-	delete m_fallbackPrefilteredCube;
-}
+LightingPass::~LightingPass() = default;
 
 // ---------------------------------------------------------------------------
 // Light SSBO management
@@ -282,35 +266,6 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.Build();
 
 	return DescriptorSetLayout(device, bindings);
-}
-
-// ---------------------------------------------------------------------------
-// Sampler factory
-// ---------------------------------------------------------------------------
-
-vk::raii::Sampler LightingPass::CreateSampler(const vk::raii::Device& device,
-                                               const vk::raii::PhysicalDevice& physicalDevice)
-{
-	vk::SamplerCreateInfo samplerCI(
-		{},                                    // flags
-		vk::Filter::eNearest,                  // magFilter
-		vk::Filter::eNearest,                  // minFilter
-		vk::SamplerMipmapMode::eNearest,        // mipmapMode
-		vk::SamplerAddressMode::eClampToEdge,   // addressModeU
-		vk::SamplerAddressMode::eClampToEdge,   // addressModeV
-		vk::SamplerAddressMode::eClampToEdge,   // addressModeW
-		0.0f,                                   // mipLodBias
-		VK_FALSE,                               // anisotropyEnable
-		0.0f,                                   // maxAnisotropy
-		VK_FALSE,                               // compareEnable
-		vk::CompareOp::eAlways,                 // compareOp
-		0.0f,                                   // minLod
-		0.0f,                                   // maxLod
-		vk::BorderColor::eFloatTransparentBlack, // borderColor
-		VK_FALSE                                // unnormalizedCoordinates
-	);
-
-	return vk::raii::Sampler(device, samplerCI);
 }
 
 // ---------------------------------------------------------------------------
@@ -453,13 +408,14 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 // Record
 // ---------------------------------------------------------------------------
 
-void LightingPass::Record(vk::CommandBuffer cmdBuf,
-                          const glm::vec3& cameraPos,
-                          const glm::mat4& viewMatrix,
-                          const glm::mat4& invProjView,
-                          vk::Extent2D renderExtent,
-                          uint32_t frameIndex)
+void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 {
+	const glm::vec3& cameraPos = ctx.cameraPos;
+	const glm::mat4& viewMatrix = ctx.view;
+	const glm::mat4& invProjView = ctx.invProjView;
+	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const uint32_t frameIndex = ctx.frameIndex;
+
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex);
 

@@ -32,8 +32,7 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
                            size_t vertSize,
                            const uint32_t* fragSpv,
                            size_t fragSize)
-	: m_device(&device)
-	, m_physicalDevice(&physicalDevice)
+	: m_physicalDevice(&physicalDevice)
 	, m_attachmentManager(&attachmentManager)
 	, m_renderPassManager(&renderPassManager)
 	// --- Descriptor set layout ---
@@ -59,6 +58,8 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	, m_pipelineLayout(nullptr)
 	, m_pipeline(nullptr)
 {
+	m_device = &device;
+
 	// --- Write camera UBO to descriptor set ---
 	m_cameraDescriptorSet.WriteBuffer(0, m_cameraUBO.GetDescriptorInfo(),
 	                                  vk::DescriptorType::eUniformBuffer);
@@ -175,11 +176,13 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
 // Record
 // ---------------------------------------------------------------------------
 
-void GeometryPass::Record(vk::CommandBuffer cmdBuf,
-                          const CameraUBOData& cameraData,
-                          const std::vector<GeometryRenderItem>& renderItems,
-                          vk::Extent2D renderExtent)
+void GeometryPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 {
+	// --- Extract per-frame context ---
+	const CameraUBOData cameraData{ctx.viewProj, ctx.view};
+	const auto& renderItems = *ctx.renderItems;
+	const auto& renderExtent = ctx.renderExtent;
+
 	// --- 1. Upload camera data to UBO (host-visible, synchronous memcpy) ---
 	{
 		void* mapped = m_cameraUBO.Map();

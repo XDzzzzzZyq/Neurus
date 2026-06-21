@@ -18,10 +18,7 @@
 
 #pragma once
 
-#include "passes/GeometryPass.h"
-#include "passes/IBLPass.h"
-#include "passes/LightingPass.h"
-#include "passes/SSAOPass.h"
+#include "passes/Pass.h"
 #include "Swapchain.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -43,6 +40,12 @@ class Camera;
 class Scene;
 class Mesh;
 class Image;
+class GeometryPass;
+class LightingPass;
+class SSAOPass;
+class IBLPass;
+struct GeometryRenderItem;
+struct CameraUBOData;
 
 /**
  * @brief Deferred renderer orchestrating GeometryPass → LightingPass → composite.
@@ -167,7 +170,19 @@ public:
 	/**
 	 * @brief Returns the IBL pass (always created — IBL shaders are embedded).
 	 */
-	IBLPass* GetIBLPass() { return m_iblPass.get(); }
+	IBLPass* GetIBLPass() { return m_iblPass; }
+
+	/**
+	 * @brief Generates diffuse + specular cubemaps from an equirect HDR image.
+	 *
+	 * Forwards to IBLPass::Generate().  Editor calls this instead of reaching
+	 * into render pass headers directly (architecture boundary).
+	 *
+	 * @param equirectImage  Equirectangular HDR panorama (2D image).
+	 * @param diffuseOut     Pre-created diffuse irradiance cubemap.
+	 * @param specularOut    Pre-created specular prefiltered cubemap.
+	 */
+	void GenerateIBL(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
 
 private:
 	/**
@@ -217,10 +232,14 @@ private:
 	// --- Deferred pipeline ---
 	std::unique_ptr<AttachmentManager> m_attachmentManager;
 	std::unique_ptr<RenderPassManager> m_renderPassManager;
-	std::unique_ptr<GeometryPass> m_geometryPass;
-	std::unique_ptr<LightingPass> m_lightingPass;
-	std::unique_ptr<SSAOPass> m_ssaoPass;
-	std::unique_ptr<IBLPass> m_iblPass;
+	// --- Polymorphic pass container (owning) ---
+	std::vector<std::unique_ptr<Pass>> m_passes;
+
+	// --- Cached raw pointers for zero-cost access (non-owning) ---
+	GeometryPass* m_geometryPass = nullptr;
+	LightingPass* m_lightingPass = nullptr;
+	SSAOPass*   m_ssaoPass     = nullptr;
+	IBLPass*    m_iblPass      = nullptr;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;

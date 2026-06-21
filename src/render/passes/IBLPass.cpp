@@ -43,17 +43,9 @@ IBLPass::IBLPass(const vk::raii::Device& device,
                  size_t irradianceSize,
                  const uint32_t* specularSpv,
                  size_t specularSize)
-	: m_device(&device)
-	, m_physicalDevice(&physicalDevice)
+	: ComputePass(device, physicalDevice, nullptr, IBLPass::CreateDescriptorSetLayout(device), 1)
 	, m_graphicsQueue(graphicsQueue)
 	, m_queueFamilyIndex(queueFamilyIndex)
-	// --- Descriptor set layout ---
-	, m_descriptorSetLayout(CreateDescriptorSetLayout(device))
-	// --- Descriptor pool ---
-	, m_descriptorPool(device, 1,  // need 1 set
-	                   DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, 1))
-	// --- Allocate descriptor set ---
-	, m_descriptorSets(m_descriptorPool.Allocate(m_descriptorSetLayout, 1))
 	// --- Pipeline builders (must outlive pipelines) ---
 	, m_irradiancePipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 	, m_irradiancePipeline(CreatePipeline(device, irradianceSpv, irradianceSize,

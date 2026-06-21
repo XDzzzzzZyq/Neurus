@@ -7,7 +7,9 @@
 
 #include "passes/AttachmentManager.h"
 #include "passes/GeometryPass.h"
+#include "passes/IBLPass.h"
 #include "passes/LightingPass.h"
+#include "passes/PassContext.h"
 #include "passes/RenderPassManager.h"
 #include "Image.h"
 #include "Texture.h"
@@ -95,35 +97,49 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	}
 
 	// --- 5. Create geometry pass ---
-	m_geometryPass = std::make_unique<GeometryPass>(
-		device, physicalDevice, graphicsQueue, queueFamilyIndex,
-		*m_attachmentManager, *m_renderPassManager,
-		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+	{
+		auto geoPass = std::make_unique<GeometryPass>(
+			device, physicalDevice, graphicsQueue, queueFamilyIndex,
+			*m_attachmentManager, *m_renderPassManager,
+			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
+			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+		m_geometryPass = geoPass.get();
+		m_passes.push_back(std::move(geoPass));
+	}
 
 	// --- 7. Create lighting pass ---
-	m_lightingPass = std::make_unique<LightingPass>(
-		device, physicalDevice,
-		*m_attachmentManager,
-		kMaxFramesInFlight,
-		m_graphicsQueue, m_queueFamilyIndex,
-		pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+	{
+		auto lightPass = std::make_unique<LightingPass>(
+			device, physicalDevice,
+			*m_attachmentManager,
+			kMaxFramesInFlight,
+			m_graphicsQueue, m_queueFamilyIndex,
+			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+		m_lightingPass = lightPass.get();
+		m_passes.push_back(std::move(lightPass));
+	}
 
 	// --- 7b. Create SSAO pass ---
-	m_ssaoPass = std::make_unique<SSAOPass>(
-		device, physicalDevice,
-		*m_attachmentManager,
-		kMaxFramesInFlight,
-		m_graphicsQueue, m_queueFamilyIndex,
-		ssao_comp_spv, sizeof(ssao_comp_spv));
+	{
+		auto ssaoPass = std::make_unique<SSAOPass>(
+			device, physicalDevice,
+			*m_attachmentManager,
+			kMaxFramesInFlight,
+			m_graphicsQueue, m_queueFamilyIndex,
+			ssao_comp_spv, sizeof(ssao_comp_spv));
+		m_ssaoPass = ssaoPass.get();
+		m_passes.push_back(std::move(ssaoPass));
+	}
 
 	// --- 7c. Create IBL pass (pure compute service) ---
 	{
-		m_iblPass = std::make_unique<IBLPass>(
+		auto iblPass = std::make_unique<IBLPass>(
 			device, physicalDevice,
 			m_graphicsQueue, m_queueFamilyIndex,
 			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
 			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
+		m_iblPass = iblPass.get();
+		m_passes.push_back(std::move(iblPass));
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
 	}
 
@@ -184,8 +200,8 @@ DeferredRenderer::~DeferredRenderer()
 {
 	WaitIdle();
 	// vk::raii destructors clean up automatically in reverse declaration order.
-	// Unique_ptr destruction order: m_lightingPass → m_geometryPass → m_renderPassManager →
-	//   m_attachmentManager → m_swapchain → ... (reverse member declaration).
+	// m_passes vector destroys all passes in construction order (GeometryPass → LightingPass →
+	//   SSAOPass → IBLPass), before RenderPassManager and AttachmentManager.
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +272,17 @@ GeometryRenderItem DeferredRenderer::buildRenderItem(const Mesh& mesh) const
 	item.pushConstants.normalMatrix = glm::transpose(glm::inverse(sphereScale));
 
 	return item;
+}
+
+// ---------------------------------------------------------------------------
+// GenerateIBL - wrapper for Editor (avoids cross-layer include of IBLPass.h)
+// ---------------------------------------------------------------------------
+
+void DeferredRenderer::GenerateIBL(const Image& equirectImage,
+                                    Image& diffuseOut,
+                                    Image& specularOut)
+{
+	m_iblPass->Generate(equirectImage, diffuseOut, specularOut);
 }
 
 // ---------------------------------------------------------------------------
@@ -613,13 +640,20 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	const glm::mat4 viewProj = cameraData.viewProj;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
-	m_geometryPass->Record(cmdBuf, cameraData, renderItems, extent);
+	m_geometryPass->Record(cmdBuf, PassContext{
+		.renderExtent = extent,
+		.frameIndex = m_currentFrame,
+		.viewProj = cameraData.viewProj,
+		.view = viewMatrix,
+		.cameraPos = cameraPos,
+		.renderItems = &renderItems,
+	});
 
 	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
 	if (m_ssaoPass)
 	{
 		m_ssaoPass->UpdateParams(viewProj, viewMatrix, cameraPos);
-		m_ssaoPass->Record(cmdBuf, extent, m_currentFrame);
+		m_ssaoPass->Record(cmdBuf, PassContext{extent, m_currentFrame});
 	}
 
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
@@ -628,12 +662,13 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	//     to populate the SSBO from the scene (handled by T9).
 	// Compute inverse projection*view for skybox background ray in lighting pass
 	const glm::mat4 invProjView = glm::inverse(cameraData.viewProj);
-	m_lightingPass->Record(cmdBuf,
-	                       cameraPos,
-	                       viewMatrix,
-	                       invProjView,
-	                       extent,
-	                       m_currentFrame);
+	m_lightingPass->Record(cmdBuf, PassContext{
+		.renderExtent = extent,
+		.frameIndex = m_currentFrame,
+		.view = viewMatrix,
+		.cameraPos = cameraPos,
+		.invProjView = invProjView,
+	});
 
 	// --- Phase 4: Blit HDRColor → swapchain image ---
 	// LightingPass leaves HDRColor in GENERAL layout.

@@ -21,7 +21,8 @@
 
 #pragma once
 
-#include "DescriptorManager.h"
+#include "../DescriptorManager.h"
+#include "ComputePass.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -32,14 +33,13 @@ namespace neurus {
 
 // --- Forward declarations ---
 class Image;
-class ComputePipelineBuilder;
 
 /**
  * @brief IBL generation pass - equirect → diffuse + specular cubemaps.
  *
  * Non-copyable, movable.
  */
-class IBLPass
+class IBLPass : public ComputePass
 {
 public:
 	/** Diffuse irradiance cubemap face resolution. */
@@ -80,11 +80,11 @@ public:
 
 	~IBLPass();
 
-	// --- Non-copyable, movable ---
-	IBLPass(const IBLPass&) = delete;
-	IBLPass& operator=(const IBLPass&) = delete;
-	IBLPass(IBLPass&&) noexcept = default;
-	IBLPass& operator=(IBLPass&&) noexcept = default;
+	/** @brief No-op — IBL generation is one-shot via Generate(), not per-frame. */
+	void Record(vk::CommandBuffer, const PassContext&) override {}
+
+	/** @brief No-op — IBLPass manages its own descriptor writes via Generate(). */
+	void WriteDescriptors(uint32_t) override {}
 
 	// -------------------------------------------------------------------
 	// Generation
@@ -138,15 +138,8 @@ private:
 	                     float roughnessSq);
 
 	// --- References (non-owning) ---
-	const vk::raii::Device* m_device;
-	const vk::raii::PhysicalDevice* m_physicalDevice;
 	vk::Queue m_graphicsQueue;
 	uint32_t m_queueFamilyIndex;
-
-	// --- Descriptor resources ---
-	DescriptorSetLayout m_descriptorSetLayout;
-	DescriptorPool m_descriptorPool;
-	std::vector<DescriptorSet> m_descriptorSets;  // one set (index 0 used for all dispatches)
 
 	// --- Pipelines ---
 	std::unique_ptr<ComputePipelineBuilder> m_irradiancePipelineBuilder;

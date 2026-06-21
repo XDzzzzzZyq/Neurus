@@ -3,12 +3,15 @@
 add_library(neurus_render_passes STATIC
 	AttachmentManager.h
 	AttachmentManager.cpp
+	ComputePass.h
 	GeometryPass.h
 	GeometryPass.cpp
 	IBLPass.h
 	IBLPass.cpp
 	LightingPass.h
 	LightingPass.cpp
+	Pass.h
+	PassContext.h
 	RenderPassManager.h
 	RenderPassManager.cpp
 	SSAOPass.h

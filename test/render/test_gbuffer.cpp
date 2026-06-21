@@ -255,10 +255,14 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 	// --- Record ---
 	{
 		auto& cmd = BeginCmd();
+		std::vector<GeometryRenderItem> items = { item };
 
-		m_geometryPass->Record(*cmd, camera,
-		                       { item },
-		                       { kRenderWidth, kRenderHeight });
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camera.viewProj,
+			.view = camera.view,
+			.renderItems = &items,
+		});
 
 		EndSubmitWait(cmd);
 	}
@@ -311,9 +315,13 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, camera,
-		                       { item0, item1 },
-		                       { kRenderWidth, kRenderHeight });
+		std::vector<GeometryRenderItem> items = { item0, item1 };
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camera.viewProj,
+			.view = camera.view,
+			.renderItems = &items,
+		});
 		EndSubmitWait(cmd);
 	}
 
@@ -337,9 +345,13 @@ TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, camera,
-		                       {},   // empty
-		                       { kRenderWidth, kRenderHeight });
+		const std::vector<GeometryRenderItem> emptyItems;
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camera.viewProj,
+			.view = camera.view,
+			.renderItems = &emptyItems,
+		});
 		EndSubmitWait(cmd);
 	}
 

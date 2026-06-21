@@ -20,8 +20,9 @@
 
 #pragma once
 
-#include "DescriptorManager.h"
-#include "VulkanBuffer.h"
+#include "passes/ComputePass.h"
+#include "../DescriptorManager.h"
+#include "../VulkanBuffer.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -101,7 +102,7 @@ static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must 
  *
  * Non-copyable, movable.
  */
-class LightingPass
+class LightingPass : public ComputePass
 {
 public:
 	/**
@@ -129,11 +130,8 @@ public:
 	             const uint32_t* compSpv,
 	             size_t compSize);
 
-	~LightingPass();
+	~LightingPass() override;
 
-	// --- Non-copyable, movable ---
-	LightingPass(const LightingPass&) = delete;
-	LightingPass& operator=(const LightingPass&) = delete;
 	LightingPass(LightingPass&&) noexcept = default;
 	LightingPass& operator=(LightingPass&&) noexcept = default;
 
@@ -203,20 +201,10 @@ public:
 	 *   6. Inserts a memory barrier to make the output visible.
 	 *
 	 * @param cmdBuf          Command buffer in recording state.
-	 * @param cameraPos       Camera world-space position.
-	 * @param viewMatrix      View matrix (for normal VS→WS transform).
-	 * @param invProjView     Inverse of (projection × view) matrix, for skybox ray.
-	 * @param renderExtent    Render area dimensions.
-	 * @param frameIndex      Index into the descriptor-set ring buffer
-	 *                        (0 … numSets-1). One set per in-flight frame
-	 *                        avoids updating a set while the GPU is reading it.
+	 * @param ctx             Per-frame context (camera position, view matrix,
+	 *                        invProjView, render extent, frame index).
 	 */
-	void Record(vk::CommandBuffer cmdBuf,
-	            const glm::vec3& cameraPos,
-	            const glm::mat4& viewMatrix,
-	            const glm::mat4& invProjView,
-	            vk::Extent2D renderExtent,
-	            uint32_t frameIndex);
+	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
 
 private:
 	/**
@@ -236,12 +224,6 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates a nearest-neighbour sampler for G-Buffer reads.
-	 */
-	static vk::raii::Sampler CreateSampler(const vk::raii::Device& device,
-	                                       const vk::raii::PhysicalDevice& physicalDevice);
-
-	/**
 	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
 	 */
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
@@ -256,27 +238,13 @@ private:
 	 *
 	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
 	 */
-	void WriteDescriptors(uint32_t setIndex);
-
-	// --- References (non-owning) ---
-	const vk::raii::Device* m_device;
-	const vk::raii::PhysicalDevice* m_physicalDevice;
-	AttachmentManager* m_attachmentManager;
+	void WriteDescriptors(uint32_t setIndex) override;
 
 	// --- Queue handles for SSBO creation ---
 	vk::Queue m_graphicsQueue;
 	uint32_t m_queueFamilyIndex;
 
-	// --- Sampler ---
-	vk::raii::Sampler m_sampler;
-
-	// --- Descriptor resources ---
-	DescriptorSetLayout m_descriptorSetLayout;
-	DescriptorPool m_descriptorPool;
-	std::vector<DescriptorSet> m_descriptorSets;  // one per in-flight frame
-
 	// --- Pipeline ---
-	std::unique_ptr<ComputePipelineBuilder> m_pipelineBuilder;  // must outlive pipeline
 	vk::raii::Pipeline m_pipeline;
 
 	// --- Owned light SSBO ---
@@ -284,9 +252,9 @@ private:
 	uint32_t m_lightCount = 0;
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
 
-	// --- IBL cubemap fallback (1×1 black cubemap, valid when no IBL set) ---
-	Image* m_fallbackIrradianceCube = nullptr;
-	Image* m_fallbackPrefilteredCube = nullptr;
+	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---
+	std::unique_ptr<Image> m_fallbackIrradianceCube;
+	std::unique_ptr<Image> m_fallbackPrefilteredCube;
 	vk::raii::Sampler m_fallbackCubeSampler = nullptr;
 	// IBL resources injected by SetIBLResources() (non-owning handles)
 	vk::ImageView m_iblIrradianceView = nullptr;

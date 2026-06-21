@@ -8,10 +8,10 @@
  * by the lighting pass.
  *
  * Architecture:
- * - Owns the compute pipeline, descriptor sets, sampler, descriptor pool,
- *   camera/kernel UBO, and noise UBO.
+ * - Inherits from ComputePass for shared infrastructure (sampler, descriptor
+ *   pool/sets, barrier transitions, dispatch logic).
+ * - Owns the compute pipeline, camera/kernel UBO, and noise UBO.
  * - Borrows AttachmentManager for G-Buffer and SSAO image views.
- * - Uses ComputePipelineBuilder for pipeline construction.
  *
  * @note Hemisphere sampling with 16 kernel samples, world-space depth
  *       comparison, and lightweight 2-pixel neighbour blur.
@@ -19,8 +19,8 @@
 
 #pragma once
 
-#include "DescriptorManager.h"
-#include "VulkanBuffer.h"
+#include "passes/ComputePass.h"
+#include "../VulkanBuffer.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -33,7 +33,6 @@ namespace neurus {
 
 // --- Forward declarations ---
 class AttachmentManager;
-class ComputePipelineBuilder;
 
 // ---------------------------------------------------------------------------
 // GPU-side data structures (std140-compatible)
@@ -92,13 +91,13 @@ static_assert(sizeof(NoiseEntryGpu) == 16, "NoiseEntryGpu must be 16 bytes (std1
 /**
  * @brief Screen-space ambient occlusion compute pass.
  *
- * Reads the G-Buffer (Position, Normal, Alpha) as combined image samplers,
+ * Reads the G-Buffer (Position, Normal, Albedo) as combined image samplers,
  * performs hemisphere sampling in world-space, applies a lightweight
  * neighbour blur, and writes the occlusion factor (R8) to the SSAO attachment.
  *
- * Non-copyable, movable.
+ * Inherits shared compute-pass infrastructure from ComputePass.
  */
-class SSAOPass
+class SSAOPass : public ComputePass
 {
 public:
 	/** Default kernel size and noise dimensions. */
@@ -130,14 +129,6 @@ public:
 	         const uint32_t* compSpv,
 	         size_t compSize);
 
-	~SSAOPass();
-
-	// --- Non-copyable, movable ---
-	SSAOPass(const SSAOPass&) = delete;
-	SSAOPass& operator=(const SSAOPass&) = delete;
-	SSAOPass(SSAOPass&&) noexcept = default;
-	SSAOPass& operator=(SSAOPass&&) noexcept = default;
-
 	// -------------------------------------------------------------------
 	// Parameter updates
 	// -------------------------------------------------------------------
@@ -167,13 +158,16 @@ public:
 	 *   5. Dispatches ceil(width/16) × ceil(height/16) × 1 thread groups.
 	 *   6. Inserts a memory barrier for SSAO output visibility.
 	 *
-	 * @param cmdBuf        Command buffer in recording state.
-	 * @param renderExtent  Render area dimensions.
-	 * @param frameIndex    Descriptor set ring buffer index.
+	 * @param cmdBuf  Command buffer in recording state.
+	 * @param ctx     Per-frame context (render extent, frame index).
 	 */
-	void Record(vk::CommandBuffer cmdBuf,
-	            vk::Extent2D renderExtent,
-	            uint32_t frameIndex);
+	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
+
+	/**
+	 * @brief Writes all descriptors (image + buffer) into the specified set.
+	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
+	 */
+	void WriteDescriptors(uint32_t setIndex) override;
 
 private:
 	/**
@@ -182,7 +176,7 @@ private:
 	 * Bindings:
 	 *   0: gPosition       (combined image sampler)
 	 *   1: gNormal          (combined image sampler)
-	 *   2: gAlpha           (combined image sampler)
+	 *   2: gAlbedo          (combined image sampler)
 	 *   3: outputSSAO       (storage image, R8)
 	 *   4: SSAOParams       (uniform buffer)
 	 *   5: NoiseBuffer      (uniform buffer)
@@ -190,23 +184,11 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates a nearest-neighbour sampler for G-Buffer reads.
-	 */
-	static vk::raii::Sampler CreateSampler(const vk::raii::Device& device,
-	                                       const vk::raii::PhysicalDevice& physicalDevice);
-
-	/**
 	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
 	 */
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
 	                                  const uint32_t* compSpv,
 	                                  size_t compSize);
-
-	/**
-	 * @brief Writes all descriptors (image + buffer) into the specified set.
-	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
-	 */
-	void WriteDescriptors(uint32_t setIndex);
 
 	/**
 	 * @brief Generates the hemisphere kernel samples.
@@ -230,20 +212,7 @@ private:
 	 */
 	static std::array<NoiseEntryGpu, kNoiseEntryCount> GenerateNoise();
 
-	// --- References (non-owning) ---
-	const vk::raii::Device* m_device;
-	AttachmentManager* m_attachmentManager;
-
-	// --- Sampler ---
-	vk::raii::Sampler m_sampler;
-
-	// --- Descriptor resources ---
-	DescriptorSetLayout m_descriptorSetLayout;
-	DescriptorPool m_descriptorPool;
-	std::vector<DescriptorSet> m_descriptorSets;  // one per in-flight frame
-
 	// --- Pipeline ---
-	std::unique_ptr<ComputePipelineBuilder> m_pipelineBuilder;  // must outlive pipeline
 	vk::raii::Pipeline m_pipeline;
 
 	// --- Owned UBOs ---
