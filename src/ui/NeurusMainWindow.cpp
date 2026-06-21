@@ -36,12 +36,6 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	CreateDocks();
 	LoadLayout();   // Restore saved layout if available
 	CreateMenus();
-
-	// Create VulkanWidget after docks — CreateDocks() places it as viewport content
-	m_viewportWidget = new VulkanWidget();
-	m_viewportWidget->resize(800, 600);
-	m_viewportWidget->winId();  // Force native window handle creation
-	m_viewportDock->setWidget(m_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
 }
 
 NeurusMainWindow::~NeurusMainWindow() = default;
@@ -190,12 +184,19 @@ static QWidget* makePlaceholder(const QString& text)
 
 void NeurusMainWindow::CreateDocks()
 {
-	// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
-	m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
-	m_viewportDock->setWidget(makePlaceholder("Viewport"));  // for restoreState matching
-	m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-	// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
-	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);
+	if (!m_viewportWidget){
+		// Create VulkanWidget after docks — CreateDocks() places it as viewport content
+		m_viewportWidget = new VulkanWidget();
+		m_viewportWidget->resize(800, 600);
+		m_viewportWidget->winId();  // Force native window handle creation
+
+		// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
+		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
+		m_viewportDock->setWidget(m_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+		// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
+		m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);
+	}
 
 	// --- Left: Shader Editor ---
 	auto* shaderDock = new ads::CDockWidget(m_dockManager, "Shader Editor");
