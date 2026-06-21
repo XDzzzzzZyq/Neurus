@@ -35,10 +35,39 @@
  */
 #pragma once
 
-#include "editor/CameraController.h"   // InputState
 #include "scene/Camera.h"
 
 namespace neurus {
+
+// ---------------------------------------------------------------------------
+// InputState - raw input data consumed by Editor::Edit() each frame
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Raw input state consumed by Editor::Edit() each frame.
+ *
+ * Field meanings:
+ *   - mouseDeltaX/Y: Cursor position delta since last frame (pixels)
+ *   - scrollDelta: Scroll wheel delta (+1 up, -1 down per notch)
+ *   - leftMouseHeld: LMB currently pressed (reserved for future use)
+ *   - middleMouseHeld: MMB currently pressed - primary camera control button
+ *   - rightMouseHeld: RMB currently pressed (reserved for future use)
+ *   - shiftHeld: Shift modifier (Shift+MMB = Pan)
+ *   - ctrlHeld: Ctrl modifier (Ctrl+MMB = Dolly; also 0.25x speed)
+ *   - altHeld: Alt modifier (reserved for future use)
+ */
+struct InputState
+{
+	float mouseDeltaX = 0.0f;
+	float mouseDeltaY = 0.0f;
+	float scrollDelta = 0.0f;
+	bool leftMouseHeld = false;
+	bool middleMouseHeld = false;
+	bool rightMouseHeld = false;
+	bool shiftHeld = false;
+	bool ctrlHeld = false;
+	bool altHeld = false;
+};
 
 class Input
 {
