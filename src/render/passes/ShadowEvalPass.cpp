@@ -72,6 +72,9 @@ void ShadowEvalPass::SetLight(const Image& cubemap,
 	m_lightPosition = lightPos;
 	m_farPlane = farPlane;
 	m_bias = bias;
+
+	NEURUS_LOG("[ShadowEvalPass] SetLight: pos=(" << lightPos.x << "," << lightPos.y << "," << lightPos.z
+	           << ") farPlane=" << farPlane << " bias=" << bias);
 }
 
 // ===========================================================================
@@ -123,6 +126,11 @@ void ShadowEvalPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 	const uint32_t frameIndex = ctx.frameIndex;
 	WriteDescriptors(frameIndex);
+
+	NEURUS_LOG("[ShadowEvalPass] Record: extent=" << ctx.renderExtent.width << "x"
+	           << ctx.renderExtent.height << " frameIndex=" << frameIndex
+	           << " lightPos=(" << m_lightPosition.x << "," << m_lightPosition.y << "," << m_lightPosition.z << ")"
+	           << " farPlane=" << m_farPlane << " bias=" << m_bias);
 
 	// Transition G-Buffer position to read
 	TransitionGbufferToRead(cmdBuf,

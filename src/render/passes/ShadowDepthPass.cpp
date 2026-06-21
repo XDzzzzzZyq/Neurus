@@ -54,7 +54,8 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	            vk::Extent2D{resolution, resolution},
 	            kDepthFmt,
 	            vk::ImageUsageFlagBits::eDepthStencilAttachment |
-	                vk::ImageUsageFlagBits::eSampled,
+	                vk::ImageUsageFlagBits::eSampled |
+	                vk::ImageUsageFlagBits::eTransferSrc,
 	            1u, Image::ImageType::eCube,
 	            "ShadowDepthCubemap")
 	, m_ubo(std::make_unique<VulkanBuffer>(device, physicalDevice,
@@ -117,7 +118,9 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 
 	updateUBO();
 
-	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution << " farPlane=" << farPlane);
+	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution << " farPlane=" << farPlane
+	           << " lightPos=(" << m_lightPosition.x << "," << m_lightPosition.y << "," << m_lightPosition.z << ")"
+	           << " UBOsize=" << sizeof(LightUBO));
 }
 
 // ===========================================================================
@@ -157,7 +160,13 @@ void ShadowDepthPass::updateUBO()
 	ubo.faceVP[4] = proj * glm::lookAt(p, p + glm::vec3( 0, 0, 1), glm::vec3( 0,-1, 0));
 	ubo.faceVP[5] = proj * glm::lookAt(p, p + glm::vec3( 0, 0,-1), glm::vec3( 0,-1, 0));
 	ubo.lpx = p.x; ubo.lpy = p.y; ubo.lpz = p.z;
+	ubo._pad0 = 0.0f;
 	ubo.farPlane = m_farPlane;
+
+	NEURUS_LOG("[ShadowDepthPass] UBO: farPlane=" << m_farPlane
+	           << " nearPlane=" << kNearPlane
+	           << " lightPos=(" << p.x << "," << p.y << "," << p.z << ")"
+	           << " sizeof=" << sizeof(LightUBO));
 
 	void* mapped = m_ubo->Map();
 	std::memcpy(mapped, &ubo, sizeof(LightUBO));
@@ -176,6 +185,10 @@ void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
 
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 {
+	const size_t itemCount = ctx.renderItems ? ctx.renderItems->size() : 0;
+	NEURUS_LOG("[ShadowDepthPass] Record: " << itemCount << " render items, "
+	           << m_resolution << "x" << m_resolution << " faces");
+
 	// Transition cubemap to depth attachment layout (all faces/layers)
 	{
 		vk::ImageMemoryBarrier barrier(

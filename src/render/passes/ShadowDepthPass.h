@@ -51,7 +51,14 @@ public:
 private:
 	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
 
-	struct LightUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz, farPlane; };
+	// Must match std140 layout in shadow shaders:
+	//   mat4 faceViewProj[6];  // 384 bytes (offset 0)
+	//   vec3 lightWorldPos;    //  16 bytes (offset 384) — std140 pads vec3
+	//   float farPlane;        //   4 bytes (offset 400)
+	// Total: 404 bytes
+	struct LightUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float _pad0; float farPlane; };
+	static_assert(sizeof(LightUBO) == 404,
+	              "LightUBO size must match std140 layout (vec3 padding)");
 
 	void createCubemap(const vk::raii::Device& device,
 	                   const vk::raii::PhysicalDevice& physicalDevice);
