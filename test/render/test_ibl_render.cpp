@@ -557,3 +557,291 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 			<< badPixels << " pixel(s) differ in IBL render (threshold: 3 per channel).";
 	}
 }
+
+// ===========================================================================
+// 5. Reload test — validates GPU resource lifetime across destroy/recreate
+// ===========================================================================
+
+TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
+{
+	if (!m_hasVulkan)
+	{
+		GTEST_SKIP() << "No Vulkan-capable GPU found.";
+	}
+
+	auto& dev = *m_device;
+	auto& pd  = PhysicalDevice();
+
+	// ================================================================
+	// Phase 1 — Set up scene + IBL and render Frame 1
+	// ================================================================
+
+	// --- Load sphere OBJ ---
+	std::string objPath = ResolveAssetPath("res/obj/sphere.obj");
+	auto meshData = std::make_shared<MeshData>();
+	ASSERT_TRUE(meshData->LoadObj(objPath)) << "Failed to load OBJ: " << objPath;
+
+	const auto& rawMesh = meshData->GetMeshData();
+	const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
+	const size_t indexCount = rawMesh.indexArray.size();
+	ASSERT_GT(srcVertexCount, 0u);
+	ASSERT_GT(indexCount, 0u);
+
+	std::vector<float>    srcVertexData = rawMesh.dataArray;
+	std::vector<uint32_t> srcIndexData  = rawMesh.indexArray;
+
+	// --- Camera ---
+	auto camera = std::make_shared<Camera>(
+		static_cast<float>(kRenderWidth),
+		static_cast<float>(kRenderHeight),
+		60.0f, 0.1f, 100.0f);
+	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+	const CameraUBOData camUBO = ComputeCameraUBO(*camera);
+
+	// --- Light ---
+	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	light->SetPosition(glm::vec3(2.0f, 2.0f, 2.0f));
+	light->light_radius = 10.0f;
+
+	// --- Material ---
+	auto material = std::make_shared<Material>();
+	material->SetMatParam(Material::MAT_METAL, 0.0f);
+	material->SetMatParam(Material::MAT_ROUGH, 0.5f);
+	material->SetMatParam(Material::MAT_ALBEDO, glm::vec3(1.0f, 1.0f, 1.0f));
+
+	// --- Mesh ---
+	auto mesh = std::make_shared<Mesh>();
+	mesh->o_mesh = meshData;
+	mesh->o_material = material;
+
+	// --- Vertex / index buffers ---
+	std::vector<IBLTestVertex> vertices(srcVertexCount);
+	for (size_t i = 0; i < srcVertexCount; ++i)
+	{
+		const float* s = &srcVertexData[i * 14];
+		IBLTestVertex& v = vertices[i];
+		v.posX = s[0] * 0.25f; v.posY = s[1] * 0.25f; v.posZ = s[2] * 0.25f;
+		v.nrmX = s[3]; v.nrmY = s[4]; v.nrmZ = s[5];
+		v.uvX  = s[6]; v.uvY  = s[7];
+	}
+	std::vector<uint32_t> indices = srcIndexData;
+
+	VertexBuffer vbo(dev, pd, m_queue, m_graphicsQueueFamily,
+	                 vertices.data(), vertices.size() * sizeof(IBLTestVertex),
+	                 sizeof(IBLTestVertex), static_cast<uint32_t>(vertices.size()));
+	IndexBuffer ibo(dev, pd, m_queue, m_graphicsQueueFamily,
+	                indices.data(), indices.size() * sizeof(uint32_t),
+	                static_cast<uint32_t>(indices.size()));
+
+	GeometryRenderItem renderItem;
+	renderItem.vertexBuffer = vbo.buffer();
+	renderItem.indexBuffer  = ibo.buffer();
+	renderItem.indexCount   = ibo.GetIndexCount();
+	renderItem.indexType    = ibo.GetIndexType();
+	renderItem.pushConstants.model = glm::mat4(1.0f);
+	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
+
+	// --- Render Frame 1 (IBL active) ---
+	{
+		TransitionGbufferToColorAttachment();
+
+		auto& cmd = BeginCmd();
+		std::vector<GeometryRenderItem> items = { renderItem };
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camUBO.viewProj,
+			.view = camUBO.view,
+			.renderItems = &items,
+		});
+		EndSubmitWait(cmd);
+	}
+	{
+		Scene scene;
+		scene.UseLight(light);
+		m_lightingPass->UploadLights(scene);
+	}
+	{
+		auto& cmd = BeginCmd();
+		m_lightingPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.frameIndex = 0,
+			.view = camUBO.view,
+			.cameraPos = camera->GetPosition(),
+			.invProjView = glm::inverse(camUBO.viewProj),
+		});
+		EndSubmitWait(cmd);
+	}
+
+	// ================================================================
+	// Phase 2 — Simulate project reload: destroy then recreate
+	// ================================================================
+
+	// 2a. Wait for all GPU work to finish
+	m_device->waitIdle();
+
+	// 2b. Reset IBL references in LightingPass so descriptor sets no
+	//     longer reference the soon-to-be-destroyed cubemap ImageViews.
+	SCOPED_TRACE("ResetIBLResources");
+	m_lightingPass->ResetIBLResources();
+
+	// 2c. Destroy render pass objects (reverse order of creation).
+	//     Unique_ptr destructors handle Vulkan resource teardown.
+	//     This simulates destroying DeferredRenderer on project close.
+	SCOPED_TRACE("Destroy passes");
+	m_iblPass.reset();
+	m_lightingPass.reset();
+	m_geometryPass.reset();
+	m_renderPassManager.reset();
+	m_attachmentManager.reset();
+
+	// 2d. Destroy IBL GPU resources (cubemap images + samplers + equirect).
+	SCOPED_TRACE("Destroy IBL resources");
+	m_equirectImage.reset();
+	m_diffuseCubemap.reset();
+	m_specularCubemap.reset();
+	m_diffuseSampler  = vk::raii::Sampler(nullptr);
+	m_specularSampler = vk::raii::Sampler(nullptr);
+
+	// 2e. Recreate AttachmentManager + passes (simulating renderer init).
+	SCOPED_TRACE("Recreate passes");
+	m_attachmentManager = std::make_unique<AttachmentManager>(dev, pd);
+	m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+	m_renderPassManager = std::make_unique<RenderPassManager>();
+
+	m_geometryPass = std::make_unique<GeometryPass>(
+		dev, pd, m_queue, m_graphicsQueueFamily,
+		*m_attachmentManager, *m_renderPassManager,
+		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
+		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+
+	m_lightingPass = std::make_unique<LightingPass>(
+		dev, pd, *m_attachmentManager, 1u,
+		m_queue, m_graphicsQueueFamily,
+		pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+
+	m_iblPass = std::make_unique<IBLPass>(
+		dev, pd, m_queue, m_graphicsQueueFamily,
+		irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
+		importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
+
+	// 2f. Re-create IBL cubemap Images + samplers.
+	SCOPED_TRACE("Recreate IBL resources");
+	{
+		const vk::ImageUsageFlags cubeUsage =
+			vk::ImageUsageFlagBits::eStorage
+			| vk::ImageUsageFlagBits::eSampled
+			| vk::ImageUsageFlagBits::eTransferSrc;
+
+		m_diffuseCubemap = std::make_unique<Image>(
+			dev, pd,
+			vk::Extent2D{IBLPass::kDiffuseFaceRes, IBLPass::kDiffuseFaceRes},
+			vk::Format::eR32G32B32A32Sfloat,
+			cubeUsage,
+			/*mipLevels=*/1,
+			Image::ImageType::eCube,
+			"IBLRenderTest_DiffuseCube_Reload");
+
+		m_specularCubemap = std::make_unique<Image>(
+			dev, pd,
+			vk::Extent2D{IBLPass::kSpecularFaceRes, IBLPass::kSpecularFaceRes},
+			vk::Format::eR32G32B32A32Sfloat,
+			cubeUsage,
+			IBLPass::kSpecularMipLevels,
+			Image::ImageType::eCube,
+			"IBLRenderTest_SpecularCube_Reload");
+	}
+
+	// Samplers (reuse same creation params as SetUp)
+	{
+		vk::SamplerCreateInfo diffuseSamplerCI(
+			{}, vk::Filter::eLinear, vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eLinear,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			0.0f, VK_FALSE, 0.0f, VK_FALSE,
+			vk::CompareOp::eAlways, 0.0f, 1.0f,
+			vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+		m_diffuseSampler = vk::raii::Sampler(dev, diffuseSamplerCI);
+
+		vk::SamplerCreateInfo specularSamplerCI(
+			{}, vk::Filter::eLinear, vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eLinear,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			0.0f, VK_FALSE, 0.0f, VK_FALSE,
+			vk::CompareOp::eAlways, 0.0f,
+			static_cast<float>(IBLPass::kSpecularMipLevels),
+			vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+		m_specularSampler = vk::raii::Sampler(dev, specularSamplerCI);
+	}
+
+	// 2g. Re-create equirect gradient + upload to GPU.
+	{
+		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
+		m_equirectImage = std::make_unique<Image>(
+			dev, pd,
+			vk::Extent2D{kEquiWidth, kEquiHeight},
+			vk::Format::eR32G32B32A32Sfloat,
+			vk::ImageUsageFlagBits::eSampled |
+			    vk::ImageUsageFlagBits::eTransferDst,
+			/*mipLevels=*/1,
+			Image::ImageType::e2D,
+			"IBLRenderTest_Equirect_Reload");
+		m_equirectImage->UploadPixelData(dev, pd, m_queue, m_graphicsQueueFamily,
+		                                 gradientPixels.data(),
+		                                 gradientPixels.size() * sizeof(float));
+	}
+
+	// 2h. Generate IBL cubemaps and wire into lighting pass.
+	SCOPED_TRACE("Generate IBL cubemaps");
+	m_iblPass->Generate(*m_equirectImage, *m_diffuseCubemap, *m_specularCubemap);
+
+	SCOPED_TRACE("Wire IBL into LightingPass");
+	m_lightingPass->SetIBLResources(
+		*m_diffuseCubemap->ImageViewHandle(),
+		*m_diffuseSampler,
+		*m_specularCubemap->ImageViewHandle(),
+		*m_specularSampler);
+
+	// ================================================================
+	// Phase 3 — Render Frame 2 (after reload, IBL active again)
+	// ================================================================
+
+	SCOPED_TRACE("Render Frame 2");
+	{
+		TransitionGbufferToColorAttachment();
+
+		auto& cmd = BeginCmd();
+		std::vector<GeometryRenderItem> items = { renderItem };
+		m_geometryPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = camUBO.viewProj,
+			.view = camUBO.view,
+			.renderItems = &items,
+		});
+		EndSubmitWait(cmd);
+	}
+	{
+		Scene scene;
+		scene.UseLight(light);
+		m_lightingPass->UploadLights(scene);
+	}
+	{
+		auto& cmd = BeginCmd();
+		m_lightingPass->Record(*cmd, PassContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.frameIndex = 0,
+			.view = camUBO.view,
+			.cameraPos = camera->GetPosition(),
+			.invProjView = glm::inverse(camUBO.viewProj),
+		});
+		EndSubmitWait(cmd);
+	}
+
+	// If we reached here without crashing or triggering Vulkan validation
+	// errors, the GPU resource lifetime fix is verified.
+	SUCCEED() << "Reload cycle completed without validation errors or crashes.";
+}

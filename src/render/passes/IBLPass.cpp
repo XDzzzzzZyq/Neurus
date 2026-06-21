@@ -313,8 +313,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 	}
 
 	NEURUS_LOG("[IBLPass] IBL generation complete - diffuse "
-	           << kDiffuseFaceRes << "², specular "
-	           << kSpecularFaceRes << "² x " << kSpecularMipLevels << " mips");
+	           << kDiffuseFaceRes << "^2, specular "
+	           << kSpecularFaceRes << "^2 x " << kSpecularMipLevels << " mips");
 }
 
 // ---------------------------------------------------------------------------
