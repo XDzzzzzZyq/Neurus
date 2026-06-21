@@ -16,7 +16,7 @@ namespace neurus {
  *
  * Usage:
  *   auto& ui = UIEvents::instance();
- *   QObject::connect(&ui, &UIEvents::renderRequested, &myRenderer, &Renderer::DrawFrame);
+ *   QObject::connect(&ui, &UIEvents::newFrame, &myRenderer, &Renderer::DrawFrame);
  */
 class UIEvents : public QObject
 {
@@ -41,7 +41,7 @@ public:
 
 signals:
 	/** @brief Emitted each frame to trigger rendering. Connected to Renderer::DrawFrame(). */
-	void renderRequested();
+	void newFrame();
 
 	/** @brief Emitted when the application window is resized.
 	 *  @param width New window width in pixels.

@@ -99,7 +99,7 @@ ApplicationWindow {
         repeat: true
         onTriggered: {
             if (EventBus) {
-                EventBus.renderRequested();
+                EventBus.newFrame();
             }
         }
     }

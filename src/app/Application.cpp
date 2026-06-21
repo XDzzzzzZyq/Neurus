@@ -266,18 +266,13 @@ void Application::WireSignals()
 	auto& uiEvents = neurus::UIEvents::instance();
 
 	// --- Render request (manual frame trigger) ---
-	QObject::connect(&uiEvents, &neurus::UIEvents::renderRequested,
+	// 3-line newFrame pattern: update input → translate to events → draw
+	QObject::connect(&uiEvents, &neurus::UIEvents::newFrame,
 	                 [this]() {
 	                     if (m_renderer && m_editor)
 	                     {
 	                         Input::UpdateState();
-	                         // Camera controller: process input → update active camera
-	                         auto& scene = m_editor->GetScene();
-	                         auto* activeCam = scene.GetActiveCamera();
-	                         if (activeCam)
-	                         {
-	                             m_editor->GetCameraController().Update(*activeCam, Input::GetInputState());
-	                         }
+	                         m_editor->Edit(Input::GetInputState());
 	                         try { m_renderer->DrawFrame(m_editor->GetScene()); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
@@ -323,22 +318,9 @@ void Application::WireSignals()
 void Application::StartRenderLoop()
 {
 	m_renderTimer->setInterval(16);  // ~60 FPS
-	QObject::connect(m_renderTimer.get(), &QTimer::timeout, [this]() {
-		Input::UpdateState();
-		if (m_renderer && m_editor)
-		{
-			// Camera controller: process input → update active camera
-			auto& scene = m_editor->GetScene();
-			auto* activeCam = scene.GetActiveCamera();
-			if (activeCam)
-			{
-				m_editor->GetCameraController().Update(*activeCam, Input::GetInputState());
-			}
-			try { m_renderer->DrawFrame(m_editor->GetScene()); }
-			catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
-		}
-		// Dispatch all queued cross-layer events (e.g. SceneStatusChanged, ObjectSelected)
-		neurus::EventQueue().Process();
+	auto& uiEvents = neurus::UIEvents::instance();
+	QObject::connect(m_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
+		emit uiEvents.newFrame();
 	});
 	m_renderTimer->start();
 }

@@ -37,10 +37,10 @@ TEST_F(UIEventsTest, EmitRenderRequested_CallsConnectedSlot)
 {
 	bool wasCalled = false;
 
-	QObject::connect(m_ui, &UIEvents::renderRequested,
+	QObject::connect(m_ui, &UIEvents::newFrame,
 	                 [&wasCalled]() { wasCalled = true; });
 
-	emit m_ui->renderRequested();
+	emit m_ui->newFrame();
 
 	EXPECT_TRUE(wasCalled);
 }
@@ -127,14 +127,14 @@ TEST_F(UIEventsTest, MultipleSignals_IndependentChannels)
 	int renderCount = 0;
 	int resizeCount = 0;
 
-	QObject::connect(m_ui, &UIEvents::renderRequested,
+	QObject::connect(m_ui, &UIEvents::newFrame,
 	                 [&renderCount]() { renderCount++; });
 	QObject::connect(m_ui, &UIEvents::windowResized,
 	                 [&resizeCount](int, int) { resizeCount++; });
 
-	// Only emit renderRequested
-	emit m_ui->renderRequested();
-	emit m_ui->renderRequested();
+	// Only emit newFrame
+	emit m_ui->newFrame();
+	emit m_ui->newFrame();
 
 	// Only resizeCount should NOT have changed
 	EXPECT_EQ(renderCount, 2);
