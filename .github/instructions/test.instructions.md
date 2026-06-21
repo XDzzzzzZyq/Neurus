@@ -18,7 +18,8 @@ test/
 ├── editor/                 # Non-GPU tests (run in CI)
 │   ├── test_uievents.cpp
 │   ├── test_eventbus.cpp
-│   └── test_editor_context.cpp
+│   ├── test_editor_context.cpp
+│   └── test_camera_controller.cpp   # Event-driven MMB camera controls
 ├── render/                 # GPU tests (excluded from CI)
 │   ├── test_attachments.cpp
 │   ├── test_gbuffer.cpp
@@ -419,6 +420,19 @@ depending on how the callback is implemented.
 3. Verify the new references with Python (`PIL.Image` analysis).
 4. Commit the new PNGs alongside the code changes.
 5. The PR reviewer should verify the visual change is expected.
+
+## GPU Test Patterns (Quick Reference)
+
+These patterns were established during deferred PBR development and apply to all GPU tests:
+
+- **Inherit `VulkanTestShared`** (`test/shared/TestVulkanShared.h`). The base class bootstraps Instance → PhysicalDevice → Device → Queue → CommandPool.
+- **Use `BeginCmd()` and `EndSubmitWait(cmd)`** for every GPU command sequence. `BeginCmd()` returns a one-shot command buffer; `EndSubmitWait(cmd)` submits and waits-idle.
+- **Reference-image tests**: "first-run-generates, second-run-compares" pattern. First run captures attachments as PNGs to `reference/deferred/` and SKIPs; second run compares pixel-by-pixel against those references with ±2 tolerance.
+- **Attachment format conversions**: HDRColor (`R16G16B16A16_SFLOAT`) converts via half→float→clamp→U8. Normal attachments use signed remap `(val+1)*0.5` before clamp.
+- **Test scene scale**: A sphere OBJ (radius ≈ 1) fills ~36% of a 256×256 viewport at 60° FOV from distance 5. Scale vertices with `pos * 0.25f` or reposition camera/light as needed.
+- **Light placement**: Inverse-square attenuation `1/d²` is aggressive. Keep test lights within 2-4 units of geometry for visible lighting. A light at distance 5 produces only ~4% radiance vs distance 2.
+- **Debugging black HDRColor**: First check that Position.w > 0 (the early-out in the compute shader), then check attenuation distance, light power, and descriptor bindings. Don't assume "zero lighting" means the compute shader is broken.
+- **Verify references with Python** before committing: use `PIL.Image` to check uniform values, unique pixel counts, and histogram analysis.
 
 ## Common Pitfalls Summary
 

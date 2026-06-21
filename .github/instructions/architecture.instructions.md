@@ -9,7 +9,7 @@ with modern rendering algorithms. The architecture prioritizes:
   boundaries must not be violated
 - **Minimal global state** - State is explicit and localized
 - **Explicit data flow** - Communication via UIEvents (Qt Signals/Slots),
-  EventBus (typed EventPool), and Context objects
+  EventQueue (typed event dispatcher), and Context objects
 - **Stateless rendering** - Renderer does not own application-level state
 - **Deterministic GPU resource management** - Vulkan resources have explicit
   RAII ownership via `vk::raii` namespace
@@ -22,7 +22,7 @@ with modern rendering algorithms. The architecture prioritizes:
 │  (Window, surface, UIEvents, user input)                    │
 └──────────────────────┬───────────────────────────────────────┘
                        │ Qt Signals/Slots (UIEvents)
-                       │ + Typed Events (EventBus)
+                        │ + Typed Events (EventQueue)
                        ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                Editor Layer                                  │
@@ -55,11 +55,13 @@ are shared across layers.
 
 **Editor Layer** (`src/editor/`)
 - Contains application logic and scene mutation
-- Owns Controllers (Camera, Selection, etc.)
+- Owns Controllers (Camera, etc.) via `src/editor/controllers/`
 - Manages EditorContext (scene + editor state)
-- Owns UIEvents (Qt signals) and EventBus (typed EventPool)
-- Communicates with Renderer via Context and typed EventBus
+- Owns UIEvents (Qt signals) and EventQueue (typed EventPool)
+- Communicates with Renderer via Context and typed EventQueue
 - Must NOT directly manipulate GPU resources
+- Controller registry pattern: `Editor::RegisterController<T>(bus)` creates controller, calls `Init(bus)`, stores in `m_controllers`
+- Event-driven controller communication: `Editor::Edit(input)` translates InputState → typed events → EventQueue.Process() → controllers handle events
 
 **UI Layer** (`src/ui/`)
 - Qt6 Widgets presentation layer (MainWindow, dock panels via Qt-Advanced-Docking-System)
@@ -81,15 +83,15 @@ are shared across layers.
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals
 - UI↔Editor layer dispatch
-- Main signals: `renderRequested()`, `windowResized(int, int)`
+- Main signals: `newFrame()`, `windowResized(int, int)`
 - Decoupled: emitters don't know subscribers
 
-**EventBus System** (Typed EventPool)
+**EventQueue System** (Typed Event Dispatcher)
 - Header-only template-based event dispatcher (no Qt dependency)
 - Editor↔Renderer event dispatch with deferred Process()
-- Subscribe: `EventBus().subscribe<T>(handler)`
-- Enqueue: `EventBus().enqueue(event)`
-- Dispatch: `EventBus().Process()` (call once per frame)
+- Subscribe: `EventQueue().subscribe<T>(handler)`
+- Enqueue: `EventQueue().enqueue(event)`
+- Dispatch: `EventQueue().Process()` (call once per frame)
 
 **Context System** (Data)
 - `EditorContext` - Scene + editor state
@@ -120,7 +122,7 @@ Renderer Layer owns:
 
 ### Architectural Invariants
 
-1. **No cross-layer direct coupling** - Use UIEvents/EventBus/Context only
+1. **No cross-layer direct coupling** - Use UIEvents/EventQueue/Context only
 2. **Renderer is stateless** - Application state lives in Editor
 3. **Full RAII** - No two-phase initialization; no `Init()`/`Terminate()` methods
 4. **Explicit GPU ownership** - Each Vulkan handle has one owning layer
@@ -162,7 +164,7 @@ compute pass, and full G-Buffer pipeline through the four-layer architecture.
 - Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
 - Viewport as dockable central widget
 - Qt Signals/Slots UIEvents singleton (UI↔Editor)
-- Typed EventBus (EventPool) for Editor↔Renderer event dispatch
+- Typed EventQueue for Editor↔Renderer event dispatch
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)

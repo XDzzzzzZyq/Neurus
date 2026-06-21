@@ -45,7 +45,7 @@ renders frames. It must remain stateless with respect to application logic.
 ## Data Flow
 
 ```
-EventBus::renderRequested() → Renderer::DrawFrame()
+UIEvents::newFrame() → Renderer::DrawFrame()
                                 ├── Swapchain::AcquireNextImage()
                                 ├── Begin dynamic rendering
                                 ├── Bind pipeline
@@ -77,7 +77,7 @@ vk::raii::Device device(physicalDevice, deviceCreateInfo);
 **Debug mode:**
 - Enable `VK_LAYER_KHRONOS_validation`
 - Set up debug utils messenger for callback-based reporting
-- Report all validation messages via EventBus signal
+- Report all validation messages via UIEvents signal
 
 **Release mode:**
 - No validation layers (performance)
@@ -86,7 +86,7 @@ vk::raii::Device device(physicalDevice, deviceCreateInfo);
 ## Error Handling
 
 ### Device Loss (`VK_ERROR_DEVICE_LOST`)
-- Notify user via EventBus
+- Notify user via UIEvents
 - Attempt clean shutdown (destroy resources)
 - Do not crash or enter infinite loop
 
@@ -103,9 +103,9 @@ vk::raii::Device device(physicalDevice, deviceCreateInfo);
 
 ### ✅ Renderer MAY:
 - Read scene data via const reference
-- Subscribe to EventBus signals for configuration changes
+- Subscribe to UIEvents signals for configuration changes
 - Own GPU resources (device, swapchain, pipeline, command buffers)
-- Emit performance metrics or warnings via EventBus
+- Emit performance metrics or warnings via UIEvents
 
 ### ❌ Renderer MUST NOT:
 - Mutate application state

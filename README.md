@@ -83,7 +83,8 @@ Neurus/
 ├── src/
 │   ├── render/             # Renderer layer (Vulkan-HPP)
 │   ├── editor/             # Editor layer (logic, controllers)
-│   ├── ui/                 # UI layer (Qt6 QML)
+│   │   └── controllers/    # Controller implementations (CameraController)
+│   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   └── qml/            # QML source files
 │   ├── data/               # Data & Resource layer
 │   └── main.cpp            # Application entry point
@@ -97,20 +98,25 @@ Neurus/
 └── README.md               # This file
 ```
 
-## Current Scope (Triangle MVP)
+## Current Scope (Deferred PBR MVP)
 
-The current deliverable is a working colored RGB triangle rendered through
-the full four-layer architecture:
+The current deliverable is a deferred PBR renderer with geometry pass,
+lighting compute pass, and full G-Buffer pipeline:
 
 - Vulkan-HPP RAII instance, device, swapchain, pipeline
-- `VK_KHR_dynamic_rendering` for the triangle pass
-- Qt6 QML window (800×600, resizable, titled "Neurus")
+- `VK_KHR_dynamic_rendering` for render passes
+- Qt6 Widgets window with Qt-Advanced-Docking-System (ADS)
+- Viewport as dockable central widget via ADS `CenterDockWidgetArea`
 - Qt Signals/Slots UIEvents singleton (UI↔Editor)
-- Typed EventQueue for Editor↔Renderer events
+- Typed EventQueue for Editor↔Renderer event dispatch
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
 - Non-GPU Google Test samples (UIEvents, EventQueue, EditorContext)
+- Event-driven CameraController (orbit/zoom/dolly/pan via EventQueue)
+- OBJ mesh loading with MeshData (icosphere, cube, etc.)
+- Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute)
+- Reference-image regression tests (capture → compare PNG)
 
 ## Code Style
 
