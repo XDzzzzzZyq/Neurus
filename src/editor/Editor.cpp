@@ -8,10 +8,13 @@
 #include <vector>
 
 #include "editor/Context.h"
+#include "editor/controllers/CameraController.h"
+#include "editor/events/CameraEvents.h"
 #include "editor/events/EventBus.h"
 #include "editor/events/EditorEvents.h"
 #include "editor/events/UIEvents.h"
 #include "project/Project.h"
+#include "scene/Camera.h"
 #include "scene/Environment.h"
 #include "scene/Scene.h"
 #include "render/VulkanContext.h"
@@ -102,6 +105,9 @@ void Editor::Initialize(Scene& scene)
 
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
+
+	// --- Register controllers ---
+	RegisterController<CameraController>(EventQueue());
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	EventQueue().subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
@@ -334,6 +340,34 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 	iblPass->Generate(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
+}
+
+// =========================================================================
+// Edit() – translate InputState → CameraEvents, following OpenGL Viewport.cpp pattern
+// =========================================================================
+
+void Editor::Edit(const InputState& input)
+{
+	auto& scene = GetScene();
+	auto* cam = const_cast<Camera*>(scene.GetActiveCamera());
+	if (!cam) return;
+
+	auto& bus = EventQueue();
+
+	// Translate InputState → CameraEvents (matching OpenGL Viewport.cpp:178-198)
+	if (input.middleMouseHeld)
+	{
+		if (input.ctrlHeld)
+			bus.enqueue(CameraPushEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+		else if (input.shiftHeld)
+			bus.enqueue(CameraSlideEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+		else
+			bus.enqueue(CameraRotateEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+	}
+	if (std::abs(input.scrollDelta) > 0.001f)
+		bus.enqueue(CameraZoomEvent{cam, input.scrollDelta});
+
+	bus.Process(); // Dispatch to CameraController event handlers
 }
 
 } // namespace neurus

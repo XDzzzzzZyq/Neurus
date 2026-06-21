@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include <QString>
 
-#include "editor/CameraController.h"
+#include "controllers/Controllers.h"
+#include "editor/Input.h"   // InputState
 
 // Forward declarations (no render headers!)
 namespace neurus {
@@ -48,7 +50,30 @@ public:
 
 	Scene& GetScene();
 	neurus::project::Project& GetProject();
-	CameraController& GetCameraController() { return m_cameraController; }
+
+	/**
+	 * @brief Registers a controller of type T, calls Init(bus), and stores it.
+	 * @tparam T Controller type (must derive from Controllers).
+	 * @param bus EventQueue to pass to the controller's Init().
+	 */
+	template<typename T>
+	void RegisterController(EventQueue& bus)
+	{
+		auto ctrl = std::make_unique<T>();
+		ctrl->Init(bus);
+		m_controllers.push_back(std::move(ctrl));
+	}
+
+	/**
+	 * @brief Translates raw InputState into CameraEvents and dispatches them.
+	 *
+	 * Reads modifier keys and mouse deltas from InputState, enqueues the
+	 * appropriate CameraEvent (rotate, push, slide, zoom), then calls
+	 * EventQueue().Process() to dispatch to CameraController handlers.
+	 *
+	 * @param input Raw input state from Input::GetInputState().
+	 */
+	void Edit(const InputState& input);
 
 private:
 	// --- Signal handlers (implemented in later tasks) ---
@@ -67,7 +92,7 @@ private:
 	// --- Owned ---
 	std::unique_ptr<neurus::project::Project> m_project;
 	std::unique_ptr<Context> m_context;
-	CameraController m_cameraController;
+	std::vector<std::unique_ptr<Controllers>> m_controllers;
 
 	// --- Non-owning references ---
 	VulkanContext* m_vkContext = nullptr;
