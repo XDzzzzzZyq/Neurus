@@ -107,6 +107,9 @@ int Application::Run()
 
 	InitEditor(std::move(project));
 
+	// Wire scene to Property Editor for object property display
+	m_mainWindow->SetScene(&m_editor->GetScene());
+
 	m_mainWindow->show();
 
 	WireSignals();

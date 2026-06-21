@@ -1,7 +1,10 @@
 #include "NeurusMainWindow.h"
+#include "OutlinerPanel.h"
+#include "PropertyEditor.h"
 #include "VulkanWidget.h"
 
 #include "editor/events/UIEvents.h"
+#include "scene/Scene.h"
 
 #include <QApplication>
 #include <QFile>
@@ -62,6 +65,14 @@ int NeurusMainWindow::getViewportHeight() const
 VulkanWidget* NeurusMainWindow::getVulkanWidget() const
 {
 	return m_viewportWidget;
+}
+
+void NeurusMainWindow::SetScene(Scene* scene)
+{
+	if (m_propertyEditor)
+	{
+		m_propertyEditor->SetScene(scene);
+	}
 }
 
 // =========================================================================
@@ -205,16 +216,18 @@ void NeurusMainWindow::CreateDocks()
 	shaderDock->setMinimumSize(200, 200);
 	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
 
-	// --- Right: Outliner ---
+	// --- Left: Outliner ---
 	auto* outlinerDock = new ads::CDockWidget(m_dockManager, "Outliner");
-	outlinerDock->setWidget(makePlaceholder("Outliner"));
+	auto* outlinerPanel = new OutlinerPanel();
+	outlinerDock->setWidget(outlinerPanel);
 	outlinerDock->resize(280, 300);
 	outlinerDock->setMinimumSize(200, 200);
-	m_dockManager->addDockWidget(ads::RightDockWidgetArea, outlinerDock);
+	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
 
 	// --- Right: Property Editor ---
+	m_propertyEditor = new PropertyEditor(nullptr);  // Scene set later via SetScene()
 	auto* propDock = new ads::CDockWidget(m_dockManager, "Property Editor");
-	propDock->setWidget(makePlaceholder("Property Editor"));
+	propDock->setWidget(m_propertyEditor);
 	propDock->resize(280, 300);
 	propDock->setMinimumSize(200, 200);
 	m_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());

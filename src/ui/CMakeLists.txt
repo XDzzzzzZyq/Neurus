@@ -5,6 +5,10 @@ add_library(neurus_ui STATIC
 	MainWindow.cpp
 	NeurusMainWindow.h
 	NeurusMainWindow.cpp
+	OutlinerPanel.h
+	OutlinerPanel.cpp
+	PropertyEditor.h
+	PropertyEditor.cpp
 	VulkanWidget.h
 	VulkanWidget.cpp
 )
