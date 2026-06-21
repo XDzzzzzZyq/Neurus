@@ -4,7 +4,6 @@
 
 #include "Log.h"
 
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #include <stdexcept>
@@ -205,6 +204,23 @@ Texture Texture::ForAttachment(const vk::raii::Device& device,
 		return Texture{};
 	}
 
+	return tex;
+}
+
+// ---------------------------------------------------------------------------
+// Factory: FromImage
+// ---------------------------------------------------------------------------
+
+Texture Texture::FromImage(std::unique_ptr<Image> image, vk::raii::Sampler sampler)
+{
+	if (!image)
+	{
+		return Texture{};
+	}
+
+	Texture tex;
+	tex.m_image = std::move(image);
+	tex.m_sampler = std::move(sampler);
 	return tex;
 }
 

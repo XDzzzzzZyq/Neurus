@@ -102,6 +102,23 @@ public:
 	                             uint32_t height,
 	                             const std::string& path);
 
+	/**
+	 * @brief Loads an HDR equirectangular image from a file path.
+	 *
+	 * Calls stbi_loadf() to decode the .hdr file, forcing 4-channel RGBA.
+	 * The pixel data is returned as a flat vector of R32_SFLOAT values
+	 * per channel (float-per-pixel layout). Returns an empty vector on
+	 * failure.
+	 *
+	 * @param path      File path to .hdr file.
+	 * @param outWidth  [out] Image width in pixels.
+	 * @param outHeight [out] Image height in pixels.
+	 * @return Owning vector of float RGBA pixel data, or empty on failure.
+	 */
+	static std::vector<float> LoadFromPath(const std::string& path,
+	                                       uint32_t& outWidth,
+	                                       uint32_t& outHeight);
+
 private:
 	static float HalfToFloat(uint16_t half);
 	static void EnsureDirectory(const std::string& filePath);

@@ -24,8 +24,6 @@
 #include "passes/SSAOPass.h"
 #include "Swapchain.h"
 
-#include "editor/events/EditorEvents.h"
-
 #include <vulkan/vulkan_raii.hpp>
 
 #include <glm/glm.hpp>
@@ -168,44 +166,8 @@ public:
 
 	/**
 	 * @brief Returns the IBL pass (always created — IBL shaders are embedded).
-	 *
-	 * Caller should load an HDR equirect environment map and call
-	 * IBLPass::Generate(), then EnableIBL() to wire cubemaps into lighting.
 	 */
 	IBLPass* GetIBLPass() { return m_iblPass.get(); }
-
-	/**
-	 * @brief Stores a back-pointer to the active Scene for event-driven lookups
-	 *        (e.g., EnvironmentChanged handler needs to look up Environment by ID).
-	 *
-	 * The pointer must remain valid while the DeferredRenderer exists.
-	 *
-	 * @param scene Non-owning pointer to the Scene (nullptr to clear).
-	 */
-	void SetScene(const Scene* scene) { m_scene = scene; }
-
-	/**
-	 * @brief Handles an EnvironmentChanged event by regenerating IBL cubemaps.
-	 *
-	 * Called from the Editor layer (via EventBus subscription) when the active
-	 * IBL environment is loaded or changed. Looks up the Environment object
-	 * by envId from the scene, loads its HDR equirect file, creates a GPU Image,
-	 * generates diffuse+specular cubemaps via IBLPass, and enables IBL in the
-	 * lighting pass. Falls back to a procedural gradient if the HDR file is
-	 * not found.
-	 *
-	 * @param e EnvironmentChanged event carrying sceneId and envId.
-	 * @note SetScene() must be called before this method is invoked.
-	 */
-	void OnEnvironmentChanged(const EnvironmentChanged& e);
-
-	/**
-	 * @brief Enables IBL in the lighting pass using the IBLPass cubemaps.
-	 *
-	 * Must be called after IBLPass::Generate() to activate IBL.
-	 * Safe to call before IBL is generated (uses fallback black cubemaps).
-	 */
-	void EnableIBL();
 
 private:
 	/**
@@ -260,13 +222,6 @@ private:
 	std::unique_ptr<SSAOPass> m_ssaoPass;
 	std::unique_ptr<IBLPass> m_iblPass;
 
-	// --- IBL cubemap Images (64² diffuse, 2048² specular 8-mip) ---
-	std::unique_ptr<Image> m_diffuseCubemap;
-	std::unique_ptr<Image> m_specularCubemap;
-	// --- Cubemap samplers ---
-	vk::raii::Sampler m_diffuseSampler = nullptr;
-	vk::raii::Sampler m_specularSampler = nullptr;
-
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
 
@@ -289,9 +244,6 @@ private:
 	// --- Current swapchain extent ---
 	uint32_t m_width = 800;
 	uint32_t m_height = 600;
-
-	// --- Scene back-pointer (for EnvironmentChanged event lookup) ---
-	const Scene* m_scene = nullptr;
 
 	// --- Last acquired swapchain image index (for screenshot) ---
 	uint32_t m_lastImageIndex = 0;

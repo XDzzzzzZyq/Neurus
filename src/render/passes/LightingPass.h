@@ -72,7 +72,7 @@ static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std1
  *   mat4 view          offset 32  (64 bytes)
  *   int  iblEnabled    offset 96  (4 bytes)
  *          padding     offset 100 (12 bytes, aligns mat4 to 16)
- *   mat4 invProjView   offset 112 (64 bytes – inverse(proj * view) for skybox ray)
+ *   mat4 invProjView   offset 112 (64 bytes - inverse(proj * view) for skybox ray)
  *   Total: 176 bytes. Must NOT use alignas.
  */
 struct LightingPushConstants

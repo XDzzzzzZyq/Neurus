@@ -421,6 +421,39 @@ void Image::UploadPixelData(const vk::raii::Device& device,
 }
 
 // ---------------------------------------------------------------------------
+// Static factory: LoadFromPath
+// ---------------------------------------------------------------------------
+
+std::unique_ptr<Image> Image::LoadFromPath(const vk::raii::Device& device,
+                                           const vk::raii::PhysicalDevice& physicalDevice,
+                                           vk::Queue queue,
+                                           uint32_t queueFamilyIndex,
+                                           const std::string& path,
+                                           const char* debugName)
+{
+	uint32_t w = 0, h = 0;
+	auto pixels = ImageData::LoadFromPath(path, w, h);
+	if (pixels.empty())
+	{
+		return nullptr;
+	}
+
+	auto image = std::make_unique<Image>(
+		device, physicalDevice,
+		vk::Extent2D{w, h},
+		vk::Format::eR32G32B32A32Sfloat,
+		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+		1,
+		ImageType::e2D,
+		debugName);
+
+	image->UploadPixelData(device, physicalDevice, queue, queueFamilyIndex,
+	                       pixels.data(), pixels.size() * sizeof(float));
+
+	return image;
+}
+
+// ---------------------------------------------------------------------------
 // GPU readback
 // ---------------------------------------------------------------------------
 

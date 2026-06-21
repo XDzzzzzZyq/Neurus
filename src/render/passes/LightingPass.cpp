@@ -135,7 +135,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			m_graphicsQueue.waitIdle();
 		}
 
-		// Sampler for fallback cubemaps (maxLod=0 – only mip 0 exists)
+		// Sampler for fallback cubemaps (maxLod=0 - only mip 0 exists)
 		{
 			vk::SamplerCreateInfo samplerCI(
 				{}, vk::Filter::eNearest, vk::Filter::eNearest,
@@ -350,7 +350,6 @@ void LightingPass::SetIBLResources(vk::ImageView irradianceView,
 	m_iblIrradianceSampler  = irradianceSampler;
 	m_iblPrefilteredView    = prefilteredView;
 	m_iblPrefilteredSampler = prefilteredSampler;
-	NEURUS_LOG("[LightingPass] IBL resources set");
 }
 
 // ---------------------------------------------------------------------------

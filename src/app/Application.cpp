@@ -204,9 +204,6 @@ int Application::Run(int argc, char* argv[])
 	m_editor->SetProject(std::move(project));
 	m_editor->Initialize(scene);
 
-	// Set scene back-pointer for renderer (event-driven lookups)
-	m_renderer->SetScene(&m_editor->GetScene());
-
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
 
 	// Window was created hidden - show it now that the renderer is ready

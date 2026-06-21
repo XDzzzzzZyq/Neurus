@@ -9,6 +9,7 @@ class VulkanContext;
 class DeferredRenderer;
 class Context;
 class Scene;
+class Environment;
 }
 
 namespace neurus::project {
@@ -58,6 +59,7 @@ private:
 	void OnScreenshotRequested();
 	void OnScreenshotAllRequested();
 	void OnIBLLoad();
+	void GenerateIBL(const std::shared_ptr<Environment>& env);  ///< Shared IBL generation: loads HDR/fallback, generates cubemaps via IBLPass
 
 	// --- Owned ---
 	std::unique_ptr<neurus::project::Project> m_project;

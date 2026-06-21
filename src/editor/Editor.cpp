@@ -7,8 +7,6 @@
 #include <cstring>
 #include <vector>
 
-#include <stb_image.h>
-
 #include "editor/Context.h"
 #include "editor/events/EventBus.h"
 #include "editor/events/EditorEvents.h"
@@ -18,6 +16,8 @@
 #include "scene/Scene.h"
 #include "render/VulkanContext.h"
 #include "render/DeferredRenderer.h"
+#include "render/Image.h"
+#include "render/passes/IBLPass.h"
 #include "core/Log.h"
 
 namespace {
@@ -105,9 +105,14 @@ void Editor::Initialize(Scene& scene)
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	EventQueue().subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
-		if (m_renderer)
+		auto it = GetScene().env_list.find(e.envId);
+		if (it != GetScene().env_list.end())
 		{
-			m_renderer->OnEnvironmentChanged(e);
+			GenerateIBL(it->second);
+		}
+		else
+		{
+			NEURUS_ERR("[Editor] EnvironmentChanged: env ID " << e.envId << " not found");
 		}
 	});
 
@@ -268,7 +273,7 @@ void Editor::OnIBLLoad()
 	Scene* scene = m_ownerScene;
 	if (!scene)
 	{
-		NEURUS_ERR("[Editor] Cannot load IBL: no scene available");
+		NEURUS_ERR("[Editor] OnIBLLoad: no scene available");
 		return;
 	}
 
@@ -276,7 +281,6 @@ void Editor::OnIBLLoad()
 	Environment::Resource env;
 	if (!scene->env_list.empty())
 	{
-		// Pick the first existing environment
 		env = scene->env_list.begin()->second;
 		NEURUS_LOG("[Editor] Reusing existing environment (ID "
 		           << env->GetObjectID() << ")");
@@ -289,44 +293,47 @@ void Editor::OnIBLLoad()
 		           << env->GetObjectID() << ")");
 	}
 
-	// --- Attempt to load HDR equirect file (CPU-side only) ---
+	// Set the equirect path (resolved from resource directory)
 	const std::string hdrPath =
 		resolveResourcePath("tex/hdr/room.hdr").toStdString();
+	env->SetEquirectPath(hdrPath);
 
-	int w = 0, h = 0, c = 0;
-	float* hdrData = stbi_loadf(hdrPath.c_str(), &w, &h, &c, 4);
+	GenerateIBL(env);
+}
 
-	if (hdrData && w > 0 && h > 0)
+void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
+{
+	if (!m_vkContext || !m_renderer)
 	{
-		NEURUS_LOG("[Editor] Loaded HDR equirect: " << hdrPath
-		           << " (" << w << "x" << h << ", " << c << " channels)");
-
-		// Store the file path on Environment — Renderer will read it
-		// to create GPU resources when it receives EnvironmentChanged.
-		env->SetEquirectPath(hdrPath);
-
-		stbi_image_free(hdrData);
+		NEURUS_ERR("[Editor] GenerateIBL: VulkanContext or Renderer not available");
+		return;
 	}
-	else
+	auto* iblPass = m_renderer->GetIBLPass();
+	if (!iblPass)
 	{
-		// HDR file not found — signal procedural gradient fallback
-		// by storing an empty path. The Renderer will generate a
-		// procedural equirect on receiving EnvironmentChanged.
-		NEURUS_LOG("[Editor] HDR file not found at " << hdrPath
-		           << ", falling back to procedural gradient");
-		env->SetEquirectPath("");
+		NEURUS_ERR("[Editor] GenerateIBL: IBLPass not available");
+		return;
 	}
 
-	// Set default intensity
-	env->SetIntensity(1.0f);
+	auto& device = m_vkContext->device();
+	auto& pd = m_vkContext->physicalDevice();
+	auto queue = m_vkContext->graphicsQueue();
+	uint32_t qfi = m_vkContext->graphicsQueueFamily();
 
-	// --- Fire EnvironmentChanged event so the Renderer picks it up ---
-	EventQueue().enqueue(EnvironmentChanged{
-		scene->GetObjectID(),
-		env->GetObjectID()
-	});
+	// Ensure cubemaps exist (lazily created on first call)
+	env->SetImages(device, pd);
 
-	NEURUS_LOG("[Editor] IBL environment loaded");
+	// Load HDR or fallback
+	auto equirect = Image::LoadFromPath(device, pd, queue, qfi, env->GetEquirectPath());
+	if (!equirect)
+	{
+		equirect = Environment::GenerateFallbackImage(device, pd, queue, qfi);
+	}
+
+	// Generate IBL into cubemaps (owned by Environment, reused across updates)
+	iblPass->Generate(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
+
+	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
 }
 
 } // namespace neurus

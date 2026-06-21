@@ -1,7 +1,11 @@
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
 #include "ImageData.h"
+#include "core/Log.h"
 
 #include <algorithm>
 #include <cmath>
@@ -262,6 +266,33 @@ bool ImageData::SavePixelDataHDR(const void* pixelData,
 
 	file.write(out.data(), out.size());
 	return file.good();
+}
+
+// ===========================================================================
+// LoadFromPath (HDR equirect loader)
+// ===========================================================================
+
+std::vector<float> ImageData::LoadFromPath(const std::string& path,
+                                           uint32_t& outWidth,
+                                           uint32_t& outHeight)
+{
+	int w = 0, h = 0, c = 0;
+	float* hdrData = stbi_loadf(path.c_str(), &w, &h, &c, 4);
+	if (!hdrData || w <= 0 || h <= 0)
+	{
+		return {};
+	}
+
+	NEURUS_LOG("[ImageData] Loaded HDR: " << path << " (" << w << "x" << h << ", " << c << " channels)");
+
+	const size_t pixelCount = static_cast<size_t>(w) * static_cast<size_t>(h);
+	std::vector<float> pixels(pixelCount * 4);
+	std::memcpy(pixels.data(), hdrData, pixels.size() * sizeof(float));
+	stbi_image_free(hdrData);
+
+	outWidth = static_cast<uint32_t>(w);
+	outHeight = static_cast<uint32_t>(h);
+	return pixels;
 }
 
 } // namespace neurus

@@ -1,13 +1,13 @@
 /**
  * @file IBLPass.h
- * @brief Image-Based Lighting generation pass – pure compute service.
+ * @brief Image-Based Lighting generation pass - pure compute service.
  *
  * Converts an equirectangular HDR image into diffuse irradiance and
  * specular prefiltered cubemaps for PBR IBL evaluation.
  *
- * Does NOT own cubemap resources – caller provides output Image
+ * Does NOT own cubemap resources - caller provides output Image
  * references.  Owns only compute pipelines and descriptor management.
- * One-shot generation (not per-frame) – call Generate() once after
+ * One-shot generation (not per-frame) - call Generate() once after
  * loading the HDR environment map.
  *
  * Architecture:
@@ -35,7 +35,7 @@ class Image;
 class ComputePipelineBuilder;
 
 /**
- * @brief IBL generation pass – equirect → diffuse + specular cubemaps.
+ * @brief IBL generation pass - equirect → diffuse + specular cubemaps.
  *
  * Non-copyable, movable.
  */
@@ -54,10 +54,10 @@ public:
 	static constexpr int32_t kDefaultSpecularSteps = 32;
 
 	/**
-	 * @brief Constructs the IBL pass – creates samplers, descriptor sets,
+	 * @brief Constructs the IBL pass - creates samplers, descriptor sets,
 	 *        and compute pipelines.
 	 *
-	 * Does NOT create cubemap Images – the caller provides those to
+	 * Does NOT create cubemap Images - the caller provides those to
 	 * Generate().
 	 *
 	 * @param device          Logical device (retained reference).
@@ -112,9 +112,6 @@ public:
 
 	/** @brief Static factory: creates a linear-clamp equirect sampler. */
 	static vk::raii::Sampler CreateEquirectSampler(const vk::raii::Device& device);
-
-	/** @brief Static factory: creates a cubemap sampler (linear, clamp, mipmapped). */
-	static vk::raii::Sampler CreateCubemapSampler(const vk::raii::Device& device, uint32_t mipLevels);
 
 private:
 	// --- Pipeline / descriptor helpers ---

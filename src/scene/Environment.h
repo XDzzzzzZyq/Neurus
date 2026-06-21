@@ -23,6 +23,8 @@
 #include <memory>
 #include <string>
 
+#include <vulkan/vulkan_raii.hpp>
+
 #include "UID.h"
 #include "Transform.h"
 
@@ -32,6 +34,7 @@ namespace neurus
 // --- Forward declarations -------------------------------------------------
 
 class Texture;
+class Image;
 
 /**
  * @brief IBL environment map providing image-based lighting for the scene.
@@ -42,11 +45,11 @@ class Texture;
  * resources managed by the Renderer.
  *
  * Resource Ownership:
- * - diffuse_texture: Non-owning pointer (owned by Renderer's GpuResourceCache)
- * - specular_texture: Non-owning pointer (owned by Renderer's GpuResourceCache)
- * - m_equirectPath:   Owned string (serialized, used for GPU reload)
- * - Transform:        Owned directly (each environment has unique transform
- *                     via Transform3D for skybox orientation)
+ * - m_diffuseTexture:  Owned std::unique_ptr (GPU cubemap, 64px irradiance)
+ * - m_specularTexture: Owned std::unique_ptr (GPU cubemap, 2048px prefiltered)
+ * - m_equirectPath:    Owned string (serialized, used for GPU reload)
+ * - Transform:         Owned directly (each environment has unique transform
+ *                      via Transform3D for skybox orientation)
  *
  * @note Inheritance: ObjectID for scene identity, Transform3D for rotation.
  * @note Thread-safety: Not thread-safe. Access from main thread only.
@@ -65,21 +68,77 @@ public:
 	/**
 	 * @brief Virtual destructor for polymorphic cleanup.
 	 */
-	~Environment() override = default;
+	~Environment() override;
 
 	// Non-copyable (like all scene objects)
 	Environment(const Environment&) = delete;
 	Environment& operator=(const Environment&) = delete;
 
 	// -----------------------------------------------------------------------
-	// IBL data (non-owning GPU resource pointers)
+	// IBL texture accessors (non-owning raw pointers for Renderer consumption)
 	// -----------------------------------------------------------------------
 
-	/** @brief Diffuse irradiance cubemap (64px, 1 mip level). */
-	Texture* diffuse_texture = nullptr;
+	/** @brief Returns the diffuse irradiance cubemap (64px, 1 mip level). */
+	Texture* GetDiffuseTexture() const;
 
-	/** @brief Specular prefiltered cubemap (2048px, 8 mip levels). */
-	Texture* specular_texture = nullptr;
+	/** @brief Returns the specular prefiltered cubemap (2048px, 8 mip levels). */
+	Texture* GetSpecularTexture() const;
+
+	/**
+	 * @brief Lazily creates cubemap Images, samplers, and Textures if they
+	 *        do not already exist.
+	 *
+	 * On first call, allocates diffuse (64 px, 1 mip) and specular
+	 * (2048 px, 8 mip) cubemap Images, creates cubemap samplers, and
+	 * wraps everything in Texture objects.  Subsequent calls are no-ops.
+	 *
+	 * @param device         Logical device for resource creation.
+	 * @param physicalDevice Physical device for memory allocation.
+	 */
+	void SetImages(const vk::raii::Device& device,
+	               const vk::raii::PhysicalDevice& physicalDevice);
+
+	/**
+	 * @brief Returns a non-owning pointer to the GPU diffuse cubemap Image.
+	 *
+	 * The Image is owned by the internal Texture; the pointer is valid
+	 * for the lifetime of the Environment (or until the Texture is released).
+	 *
+	 * @return Raw Image pointer, or nullptr if SetImages has not been called.
+	 */
+	Image* GetCubemapDiffuse() const;
+
+	/**
+	 * @brief Returns a non-owning pointer to the GPU specular cubemap Image.
+	 *
+	 * The Image is owned by the internal Texture; the pointer is valid
+	 * for the lifetime of the Environment (or until the Texture is released).
+	 *
+	 * @return Raw Image pointer, or nullptr if SetImages has not been called.
+	 */
+	Image* GetCubemapSpecular() const;
+
+	// -----------------------------------------------------------------------
+	// Static factories
+	// -----------------------------------------------------------------------
+
+	/**
+	 * @brief Generates a pink‑purple fallback equirectangular Image.
+	 *
+	 * Used when no HDR environment file is available. Creates a small
+	 * 64×32 equirect filled with a pink‑purple error colour.
+	 *
+	 * @param device           Logical device.
+	 * @param physicalDevice   Physical device for memory allocation.
+	 * @param queue            Queue for staging upload.
+	 * @param queueFamilyIndex Queue family index.
+	 * @return Unique pointer to the fallback GPU Image.
+	 */
+	static std::unique_ptr<Image> GenerateFallbackImage(
+	    const vk::raii::Device& device,
+	    const vk::raii::PhysicalDevice& physicalDevice,
+	    vk::Queue queue,
+	    uint32_t queueFamilyIndex);
 
 	// -----------------------------------------------------------------------
 	// File path
@@ -199,10 +258,23 @@ public:
 	}
 
 private:
+	/**
+	 * @brief Creates a cubemap sampler with linear filtering, linear mipmap
+	 *        mode, clamp-to-edge address modes, and the given mip level count.
+	 * @param device   Logical device for sampler creation.
+	 * @param mipLevels Number of mip levels (sets maxLod to this value).
+	 * @return vk::raii::Sampler configured for cubemap sampling.
+	 */
+	static vk::raii::Sampler CreateCubemapSampler(const vk::raii::Device& device,
+	                                               uint32_t mipLevels);
+
 	std::string m_equirectPath;       ///< Source equirectangular HDR file path
 	float       m_intensity = 1.0f;   ///< IBL intensity multiplier
 	float       m_rotation  = 0.0f;   ///< Y-axis rotation in degrees
 	bool        m_dirty     = false;  ///< Dirty flag for GPU resource reload
+
+	std::unique_ptr<Texture> m_diffuseTexture;   ///< Diffuse irradiance cubemap (owned)
+	std::unique_ptr<Texture> m_specularTexture;  ///< Specular prefiltered cubemap (owned)
 };
 
 } // namespace neurus

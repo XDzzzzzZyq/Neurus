@@ -152,8 +152,8 @@ v.posX = s[0] * 0.25f;  // Scale to 25%
 - Light at distance 3 → attenuation = 1/9 = 11%
 - Light at distance 5 → attenuation = 1/25 = 4%
 
-For visible lighting with typical power values (10–100), keep lights within
-2–4 units of the geometry surface. A light at `(3,3,3)` with the sphere at
+For visible lighting with typical power values (10-100), keep lights within
+2-4 units of the geometry surface. A light at `(3,3,3)` with the sphere at
 origin gives distance ≈ 5.2; moving it to `(2,2,2)` gives distance ≈ 3.5.
 
 **Camera position** relative to geometry also changes what portion of the
@@ -229,7 +229,7 @@ Key things to check:
   normals suggest a transform bug.
 - **Albedo**: white on sphere pixels (255), black (0) on background. If ALL
   pixels are white, the clear isn't working or geometry covers everything.
-- **MetallicRoughness**: R=0 (metallic), G=127–128 (roughness 0.5) on sphere,
+- **MetallicRoughness**: R=0 (metallic), G=127-128 (roughness 0.5) on sphere,
   black on background. If background shows non-zero, clear isn't working.
 - **HDRColor**: should show visible lighting (brighter on the lit side). If
   uniformly dark (~8) everywhere, lighting contribution is zero.
@@ -304,7 +304,7 @@ Checklist (in order):
    of a 256×256 viewport at 60° FOV from distance 5. Scale vertices down with
    `pos * 0.25f`.
 
-4. **Descriptor bindings**: Verify that the compute shader's bindings (0–3 for
+4. **Descriptor bindings**: Verify that the compute shader's bindings (0-3 for
    G-Buffer samplers, 4 for storage image, 5 for light SSBO) match the
    `DescriptorSetLayout` bindings in `LightingPass::CreateDescriptorSetLayout()`.
 
@@ -425,7 +425,7 @@ depending on how the callback is implemented.
 | Pitfall | Symptom | Fix |
 |---------|---------|-----|
 | Object too large | Geometry fills entire viewport, G-Buffer uniform | `pos * 0.25f` |
-| Light too far | HDRColor = ambient only (8,8,8) | Move light to dist 2–4 |
+| Light too far | HDRColor = ambient only (8,8,8) | Move light to dist 2-4 |
 | Light radius too small | Attenuation too strong | Set `light_radius = 10.0f` |
 | Push constants misaligned | Shader reads garbage | Check struct alignment |
 | SSBO struct mismatch | Light data corrupted | `static_assert(sizeof == 48)` |

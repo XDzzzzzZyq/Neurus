@@ -156,6 +156,27 @@ public:
 	                                               vk::Extent2D extent,
 	                                               vk::ImageLayout currentLayout);
 
+	/**
+	 * @brief Loads an equirectangular HDR image from file and uploads to GPU.
+	 *
+	 * Uses ImageData::LoadFromPath() for CPU-side loading, then creates
+	 * an Image with R32G32B32A32_SFLOAT format and uploads pixel data.
+	 *
+	 * @param device           Logical device.
+	 * @param physicalDevice   Physical device for memory allocation.
+	 * @param queue            Queue for staging upload.
+	 * @param queueFamilyIndex Queue family index.
+	 * @param path             File path to .hdr equirectangular map.
+	 * @param debugName        Optional debug name for the image.
+	 * @return Unique pointer to GPU Image, or nullptr on failure.
+	 */
+	static std::unique_ptr<Image> LoadFromPath(const vk::raii::Device& device,
+	                                           const vk::raii::PhysicalDevice& physicalDevice,
+	                                           vk::Queue queue,
+	                                           uint32_t queueFamilyIndex,
+	                                           const std::string& path,
+	                                           const char* debugName = "Equirect_LoadFromPath");
+
 	// --- Getters ---
 
 	/** @brief Underlying vk::raii::Image handle. */

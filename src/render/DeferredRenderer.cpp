@@ -32,11 +32,8 @@
 #include "Log.h"
 
 #include "scene/Camera.h"
-#include "scene/Environment.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
-
-#include <stb_image.h>
 
 #include <algorithm>
 #include <array>
@@ -130,41 +127,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
 	}
 
-	// --- 7d. Create IBL cubemap Images (owned by DeferredRenderer) ---
-	{
-		const vk::ImageUsageFlags cubeUsage =
-			vk::ImageUsageFlagBits::eStorage      // compute write
-			| vk::ImageUsageFlagBits::eSampled    // shader read
-			| vk::ImageUsageFlagBits::eTransferSrc; // readback for saving
-
-		m_diffuseCubemap = std::make_unique<Image>(
-			device, physicalDevice,
-			vk::Extent2D{IBLPass::kDiffuseFaceRes, IBLPass::kDiffuseFaceRes},
-			vk::Format::eR32G32B32A32Sfloat,
-			cubeUsage,
-			/*mipLevels=*/1,
-			Image::ImageType::eCube,
-			"IBL_DiffuseCubemap");
-
-		m_specularCubemap = std::make_unique<Image>(
-			device, physicalDevice,
-			vk::Extent2D{IBLPass::kSpecularFaceRes, IBLPass::kSpecularFaceRes},
-			vk::Format::eR32G32B32A32Sfloat,
-			cubeUsage,
-			/*mipLevels=*/IBLPass::kSpecularMipLevels,
-			Image::ImageType::eCube,
-			"IBL_SpecularCubemap");
-
-		// Create cubemap samplers
-		m_diffuseSampler = IBLPass::CreateCubemapSampler(device, 1);
-		m_specularSampler = IBLPass::CreateCubemapSampler(device, IBLPass::kSpecularMipLevels);
-
-		NEURUS_LOG("[DeferredRenderer] Created IBL cubemaps: diffuse "
-		           << IBLPass::kDiffuseFaceRes << "², specular "
-		           << IBLPass::kSpecularFaceRes << "² x "
-		           << IBLPass::kSpecularMipLevels << " mips");
-	}
-
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
 
@@ -236,152 +198,6 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 	{
 		m_lightingPass->UploadLights(scene);
 	}
-}
-
-// ---------------------------------------------------------------------------
-// IBL wiring
-// ---------------------------------------------------------------------------
-
-void DeferredRenderer::EnableIBL()
-{
-	if (!m_iblPass || !m_lightingPass || !m_diffuseCubemap || !m_specularCubemap)
-	{
-		return;
-	}
-
-	m_lightingPass->SetIBLResources(
-		*m_diffuseCubemap->ImageViewHandle(),
-		*m_diffuseSampler,
-		*m_specularCubemap->ImageViewHandle(),
-		*m_specularSampler);
-
-	NEURUS_LOG("[DeferredRenderer] IBL enabled in lighting pass");
-}
-
-void DeferredRenderer::OnEnvironmentChanged(const EnvironmentChanged& e)
-{
-	NEURUS_LOG("[DeferredRenderer] OnEnvironmentChanged (sceneId="
-	           << e.sceneId << ", envId=" << e.envId
-	           << "), regenerating IBL cubemaps");
-
-	if (!m_scene)
-	{
-		NEURUS_ERR("[DeferredRenderer] OnEnvironmentChanged: no scene set (call SetScene first)");
-		return;
-	}
-
-	// Look up Environment by envId from scene.env_list
-	auto it = m_scene->env_list.find(e.envId);
-	if (it == m_scene->env_list.end())
-	{
-		NEURUS_ERR("[DeferredRenderer] OnEnvironmentChanged: env ID "
-		           << e.envId << " not found in scene");
-		return;
-	}
-
-	const auto& env = it->second;
-	const std::string& hdrPath = env->GetEquirectPath();
-
-	std::unique_ptr<Image> equirect;
-
-	// Try loading HDR file via stbi_loadf
-	int w = 0, h = 0, c = 0;
-	float* hdrData = stbi_loadf(hdrPath.c_str(), &w, &h, &c, 4);
-
-	if (hdrData && w > 0 && h > 0)
-	{
-		NEURUS_LOG("[DeferredRenderer] Loaded HDR equirect: " << hdrPath
-		           << " (" << w << "x" << h << ", " << c << " channels)");
-
-		equirect = std::make_unique<Image>(
-			m_device, m_physicalDevice,
-			vk::Extent2D{static_cast<uint32_t>(w), static_cast<uint32_t>(h)},
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-			/*mipLevels=*/1,
-			Image::ImageType::e2D,
-			"IBL_Equirect_Event");
-
-		const size_t dataSize = static_cast<size_t>(w)
-		                      * static_cast<size_t>(h) * 4 * sizeof(float);
-		equirect->UploadPixelData(m_device, m_physicalDevice,
-		                          m_graphicsQueue, m_queueFamilyIndex,
-		                          hdrData, dataSize);
-
-		stbi_image_free(hdrData);
-		NEURUS_LOG("[DeferredRenderer] HDR equirect uploaded to GPU");
-	}
-	else
-	{
-		NEURUS_LOG("[DeferredRenderer] HDR file not found: '"
-		           << hdrPath << "', falling back to procedural gradient");
-	}
-
-	// Fallback: generate colourful procedural equirectangular gradient
-	if (!equirect)
-	{
-		constexpr uint32_t eqWidth  = 1024;
-		constexpr uint32_t eqHeight = 512;
-
-		std::vector<float> pixels(eqWidth * eqHeight * 4, 0.0f);
-		for (uint32_t y = 0; y < eqHeight; ++y)
-		{
-			for (uint32_t x = 0; x < eqWidth; ++x)
-			{
-				const float u = static_cast<float>(x) / static_cast<float>(eqWidth - 1);
-				const float v = static_cast<float>(y) / static_cast<float>(eqHeight - 1);
-
-				float r = 1.0f - u;
-				float g = v;
-				float b = u;
-
-				const float equator = 1.0f - std::fabs(v - 0.5f) * 3.0f;
-				if (equator > 0.0f)
-				{
-					r = std::max(r, equator);
-					g = std::max(g, equator);
-					b = std::max(b, equator);
-				}
-
-				const size_t idx = (y * eqWidth + x) * 4;
-				pixels[idx + 0] = r;
-				pixels[idx + 1] = g;
-				pixels[idx + 2] = b;
-				pixels[idx + 3] = 1.0f;
-			}
-		}
-
-		equirect = std::make_unique<Image>(
-			m_device, m_physicalDevice,
-			vk::Extent2D{eqWidth, eqHeight},
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-			/*mipLevels=*/1,
-			Image::ImageType::e2D,
-			"IBL_Equirect_Fallback");
-
-		const size_t dataSize = pixels.size() * sizeof(float);
-		equirect->UploadPixelData(m_device, m_physicalDevice,
-		                          m_graphicsQueue, m_queueFamilyIndex,
-		                          pixels.data(), dataSize);
-
-		NEURUS_LOG("[DeferredRenderer] Procedural gradient created ("
-		           << eqWidth << "x" << eqHeight << ")");
-	}
-
-	// Generate IBL cubemaps from equirect
-	if (m_iblPass && m_diffuseCubemap && m_specularCubemap)
-	{
-		m_iblPass->Generate(*equirect, *m_diffuseCubemap, *m_specularCubemap);
-		EnableIBL();
-		NEURUS_LOG("[DeferredRenderer] IBL cubemaps regenerated from environment event");
-	}
-	else
-	{
-		NEURUS_ERR("[DeferredRenderer] OnEnvironmentChanged: IBLPass or cubemaps not available");
-	}
-
-	// equirect Image destroyed here — GPU resources released
 }
 
 // ---------------------------------------------------------------------------
@@ -609,19 +425,21 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	}
 
 	// --- Pull Environment textures from Scene and wire into lighting pass (per-frame) ---
-	//     Cubemaps are generated on EnvironmentChanged and stored as Texture*
-	//     on Environment objects in scene.env_list. When absent, the lighting
-	//     pass falls back to its internal black 1x1 cubemap placeholders.
+	//     Cubemaps are generated on EnvironmentChanged and owned by Environment
+	//     as std::unique_ptr<Texture>. Access via GetDiffuseTexture()/GetSpecularTexture().
+	//     When absent, the lighting pass falls back to its internal black 1x1 cubemap placeholders.
 	if (!scene.env_list.empty())
 	{
 		auto& env = scene.env_list.begin()->second;
-		if (env->diffuse_texture && env->specular_texture)
+		auto* diffuseTex = env->GetDiffuseTexture();
+		auto* specularTex = env->GetSpecularTexture();
+		if (diffuseTex && specularTex)
 		{
 			m_lightingPass->SetIBLResources(
-				*env->diffuse_texture->GetImage()->ImageViewHandle(),
-				*env->diffuse_texture->GetSampler(),
-				*env->specular_texture->GetImage()->ImageViewHandle(),
-				*env->specular_texture->GetSampler());
+				*diffuseTex->GetImage()->ImageViewHandle(),
+				*diffuseTex->GetSampler(),
+				*specularTex->GetImage()->ImageViewHandle(),
+				*specularTex->GetSampler());
 		}
 	}
 

@@ -111,7 +111,7 @@ public:
 	                        uint32_t height,
 	                        const void* pixelData,
 	                        vk::Format format,
-	                        const SamplerConfig& config = {});
+	const SamplerConfig& config = {});
 
 	/**
 	 * @brief Creates a Texture suitable for framebuffer attachment usage.
@@ -134,6 +134,18 @@ public:
 	                             vk::Format format,
 	                             vk::ImageUsageFlags usage,
 	                             const SamplerConfig& config = {});
+
+	/**
+	 * @brief Wraps an existing Image and Sampler into a Texture.
+	 *
+	 * Ownership is transferred into the returned Texture. If image is nullptr
+	 * an invalid Texture{} is returned.
+	 *
+	 * @param image   Unique pointer to an already-created Image (moved in).
+	 * @param sampler A vk::raii::Sampler (moved in).
+	 * @return A Texture owning the Image and Sampler, or an invalid Texture.
+	 */
+	static Texture FromImage(std::unique_ptr<Image> image, vk::raii::Sampler sampler);
 
 	// --- Queries ---
 

@@ -204,8 +204,45 @@ protected:
 				Image::ImageType::eCube,
 				"IBLRenderTest_SpecularCube");
 
-			m_diffuseSampler = IBLPass::CreateCubemapSampler(dev, 1);
-			m_specularSampler = IBLPass::CreateCubemapSampler(dev, IBLPass::kSpecularMipLevels);
+			// Create diffuse sampler (1 mip)
+			vk::SamplerCreateInfo diffuseSamplerCI(
+				{},
+				vk::Filter::eLinear,
+				vk::Filter::eLinear,
+				vk::SamplerMipmapMode::eLinear,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				0.0f,
+				VK_FALSE,
+				0.0f,
+				VK_FALSE,
+				vk::CompareOp::eAlways,
+				0.0f,
+				1.0f,
+				vk::BorderColor::eFloatTransparentBlack,
+				VK_FALSE);
+			m_diffuseSampler = vk::raii::Sampler(dev, diffuseSamplerCI);
+
+			// Create specular sampler (kSpecularMipLevels mips)
+			vk::SamplerCreateInfo specularSamplerCI(
+				{},
+				vk::Filter::eLinear,
+				vk::Filter::eLinear,
+				vk::SamplerMipmapMode::eLinear,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				0.0f,
+				VK_FALSE,
+				0.0f,
+				VK_FALSE,
+				vk::CompareOp::eAlways,
+				0.0f,
+				static_cast<float>(IBLPass::kSpecularMipLevels),
+				vk::BorderColor::eFloatTransparentBlack,
+				VK_FALSE);
+			m_specularSampler = vk::raii::Sampler(dev, specularSamplerCI);
 		}
 
 		// --- Generate equirect gradient & upload to GPU ---

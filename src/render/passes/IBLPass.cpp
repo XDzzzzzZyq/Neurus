@@ -1,6 +1,6 @@
 /**
  * @file IBLPass.cpp
- * @brief Image-Based Lighting generation pass implementation – pure compute service.
+ * @brief Image-Based Lighting generation pass implementation - pure compute service.
  */
 
 #include "passes/IBLPass.h"
@@ -320,7 +320,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		m_graphicsQueue.waitIdle();
 	}
 
-	NEURUS_LOG("[IBLPass] IBL generation complete – diffuse "
+	NEURUS_LOG("[IBLPass] IBL generation complete - diffuse "
 	           << kDiffuseFaceRes << "², specular "
 	           << kSpecularFaceRes << "² x " << kSpecularMipLevels << " mips");
 }
@@ -336,7 +336,7 @@ DescriptorSetLayout IBLPass::CreateDescriptorSetLayout(const vk::raii::Device& d
 		.AddBinding(0,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
-		// Cubemap output (storage image – image2DArray)
+		// Cubemap output (storage image - image2DArray)
 		.AddBinding(1,
 		            vk::DescriptorType::eStorageImage,
 		            vk::ShaderStageFlagBits::eCompute)
@@ -366,30 +366,6 @@ vk::raii::Sampler IBLPass::CreateEquirectSampler(const vk::raii::Device& device)
 		vk::CompareOp::eAlways,
 		0.0f,
 		0.0f,
-		vk::BorderColor::eFloatTransparentBlack,
-		VK_FALSE);
-
-	return vk::raii::Sampler(device, samplerCI);
-}
-
-vk::raii::Sampler IBLPass::CreateCubemapSampler(const vk::raii::Device& device,
-                                                  uint32_t mipLevels)
-{
-	vk::SamplerCreateInfo samplerCI(
-		{},
-		vk::Filter::eLinear,
-		vk::Filter::eLinear,
-		vk::SamplerMipmapMode::eLinear,
-		vk::SamplerAddressMode::eClampToEdge,
-		vk::SamplerAddressMode::eClampToEdge,
-		vk::SamplerAddressMode::eClampToEdge,
-		0.0f,
-		VK_FALSE,
-		0.0f,
-		VK_FALSE,
-		vk::CompareOp::eAlways,
-		0.0f,
-		static_cast<float>(mipLevels),
 		vk::BorderColor::eFloatTransparentBlack,
 		VK_FALSE);
 
