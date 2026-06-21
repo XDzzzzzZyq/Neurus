@@ -33,14 +33,15 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 
 	m_dockManager = new ads::CDockManager(this);
 
-	// Create VulkanWidget BEFORE docks — CreateDocks() places it as viewport content
-	m_vulkanWidget = new VulkanWidget();
-	m_vulkanWidget->resize(800, 600);
-	m_vulkanWidget->winId();  // Force native window handle creation
-
 	CreateDocks();
 	LoadLayout();   // Restore saved layout if available
 	CreateMenus();
+
+	// Create VulkanWidget after docks — CreateDocks() places it as viewport content
+	m_viewportWidget = new VulkanWidget();
+	m_viewportWidget->resize(800, 600);
+	m_viewportWidget->winId();  // Force native window handle creation
+	m_viewportDock->setWidget(m_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
 }
 
 NeurusMainWindow::~NeurusMainWindow() = default;
@@ -51,22 +52,22 @@ NeurusMainWindow::~NeurusMainWindow() = default;
 
 HWND NeurusMainWindow::getViewportHwnd() const
 {
-	return m_vulkanWidget ? m_vulkanWidget->hwnd() : nullptr;
+	return m_viewportWidget ? m_viewportWidget->hwnd() : nullptr;
 }
 
 int NeurusMainWindow::getViewportWidth() const
 {
-	return m_vulkanWidget ? m_vulkanWidget->width() : 0;
+	return m_viewportWidget ? m_viewportWidget->width() : 0;
 }
 
 int NeurusMainWindow::getViewportHeight() const
 {
-	return m_vulkanWidget ? m_vulkanWidget->height() : 0;
+	return m_viewportWidget ? m_viewportWidget->height() : 0;
 }
 
 VulkanWidget* NeurusMainWindow::getVulkanWidget() const
 {
-	return m_vulkanWidget;
+	return m_viewportWidget;
 }
 
 // =========================================================================
@@ -191,15 +192,7 @@ void NeurusMainWindow::CreateDocks()
 {
 	// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
 	m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
-	m_viewportDock->setObjectName("ViewportDock");
-	if (m_vulkanWidget)
-	{
-		m_viewportDock->setWidget(m_vulkanWidget, ads::CDockWidget::ForceNoScrollArea);
-	}
-	else
-	{
-		m_viewportDock->setWidget(makePlaceholder("Viewport"));
-	}
+	m_viewportDock->setWidget(makePlaceholder("Viewport"));  // for restoreState matching
 	m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
 	// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
 	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);

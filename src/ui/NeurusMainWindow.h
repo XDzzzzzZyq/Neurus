@@ -46,7 +46,7 @@ private:
 
 	ads::CDockManager* m_dockManager = nullptr;
 	ads::CDockWidget*  m_viewportDock = nullptr;
-	VulkanWidget*      m_vulkanWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
+	VulkanWidget*      m_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus
