@@ -1,31 +1,31 @@
 /**
  * @file CameraController.h
- * @brief Camera manipulation controller for interactive viewpoint control.
+ * @brief Camera manipulation controller for MMB-based interactive viewpoint control.
  *
- * CameraController translates mouse input into camera transform updates,
- * implementing standard 3D viewport navigation: orbit, pan, and zoom.
+ * CameraController translates mouse input into camera transform updates using the
+ * Middle Mouse Button (MMB) convention, a standard pattern in 3D viewport navigation.
  *
- * Architecture:
- * - Receives InputState each frame via Update()
- * - Modifies active Camera's position and look-at target directly
- * - Notifies Scene of camera changes via Scene::UpdateSceneStatus()
+ * MMB Convention:
+ *   - MMB alone     = Orbit (rotate around target)
+ *   - Ctrl + MMB    = Dolly (move camera forward/back along view direction)
+ *   - Shift + MMB   = Pan (translate camera parallel to view plane)
+ *   - Scroll        = Zoom (move camera toward/away from target)
  *
- * Camera Modes:
- * - Orbit (RMB drag): Rotate camera around look-at target (tumble)
- * - Pan (MMB drag or Shift+RMB): Translate camera parallel to view plane
- * - Zoom (scroll wheel): Move camera toward/away from target (dolly)
+ * Speed modifiers:
+ *   - Ctrl held: 0.25x sensitivity (slow/precise)
+ *   - No ctrl: 1.0x (normal)
  *
  * Coordinate System:
- * - Right-handed Y-up world space
- * - Camera forward: derived from target - position
+ *   - Right-handed Y-up world space
+ *   - Camera forward: derived from target - position
  *
- * Speed Adjustment:
- * - Shift held: 2x sensitivity
- * - Ctrl held: 0.25x sensitivity
+ * Architecture:
+ *   - Receives InputState each frame via Update()
+ *   - Modifies active Camera's position and look-at target directly
+ *   - NotifyCameraChanged() stub for future event notification
  *
  * @note CameraController does not own the camera - it operates on a reference.
- * @note Input system (T55) will provide IsMousePressed, GetDeltaMouse, GetScroll
- *       methods. InputState struct bridges until T55 is implemented.
+ * @note No renderer or event dependency. Uses only Camera and glm.
  */
 #pragma once
 
@@ -34,7 +34,6 @@
 namespace neurus {
 
 class Camera;
-class Scene;
 
 // ---------------------------------------------------------------------------
 // InputState - raw input data consumed by CameraController each frame
@@ -43,26 +42,30 @@ class Scene;
 /**
  * @brief Raw input state consumed by CameraController::Update() each frame.
  *
- * Provides the mouse and keyboard state needed for camera manipulation.
- * This struct is filled by the Input system (T55) and passed to controllers.
+ * Provides mouse and keyboard modifier state needed for MMB-based camera
+ * manipulation. No WASD fields - all navigation is mouse-driven.
  *
  * Field meanings:
- * - mouseDeltaX/Y: Cursor position delta since last frame (pixels)
- * - scrollDelta: Scroll wheel delta (+1 up, -1 down per notch)
- * - rightMouseHeld: RMB currently pressed (orbit mode)
- * - middleMouseHeld: MMB currently pressed (pan mode)
- * - shiftHeld: Shift modifier (fast speed)
- * - ctrlHeld: Ctrl modifier (slow speed)
+ *   - mouseDeltaX/Y: Cursor position delta since last frame (pixels)
+ *   - scrollDelta: Scroll wheel delta (+1 up, -1 down per notch)
+ *   - leftMouseHeld: LMB currently pressed (reserved for future use)
+ *   - middleMouseHeld: MMB currently pressed - primary camera control button
+ *   - rightMouseHeld: RMB currently pressed (reserved for future use)
+ *   - shiftHeld: Shift modifier (Shift+MMB = Pan)
+ *   - ctrlHeld: Ctrl modifier (Ctrl+MMB = Dolly; also 0.25x speed)
+ *   - altHeld: Alt modifier (reserved for future use)
  */
 struct InputState
 {
 	float mouseDeltaX = 0.0f;
 	float mouseDeltaY = 0.0f;
 	float scrollDelta = 0.0f;
-	bool rightMouseHeld = false;
+	bool leftMouseHeld = false;
 	bool middleMouseHeld = false;
+	bool rightMouseHeld = false;
 	bool shiftHeld = false;
 	bool ctrlHeld = false;
+	bool altHeld = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -70,39 +73,36 @@ struct InputState
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Controller for interactive camera manipulation via mouse input.
+ * @brief Controller for MMB-based interactive camera manipulation.
  *
- * CameraController translates mouse input into camera transform updates,
- * implementing standard 3D viewport navigation patterns.
+ * CameraController implements the standard 3D viewport MMB navigation convention:
+ * orbit, dolly, pan (via MMB with modifiers), and zoom (via scroll wheel).
  *
  * Supported Operations:
- * - **Orbit** (RMB drag): Rotate camera around target point. Horizontal
- *   mouse movement rotates around world Y axis; vertical movement rotates
- *   around camera's local right axis.
- * - **Pan** (MMB drag or Shift+RMB): Translate camera and target
- *   perpendicular to the view direction using camera's right and up vectors.
- * - **Zoom** (scroll wheel): Move camera toward or away from target along
- *   the line-of-sight direction.
+ *   - **Orbit** (MMB drag): Rotate camera around look-at target. Horizontal
+ *     mouse movement rotates around world Y axis; vertical movement rotates
+ *     around camera's local right axis.
+ *   - **Dolly** (Ctrl+MMB drag vertical): Move camera forward/backward along
+ *     the line-of-sight direction. Positive deltaY = move forward.
+ *   - **Pan** (Shift+MMB drag): Translate camera and target perpendicular to
+ *     the view direction using camera's right and up vectors.
+ *   - **Zoom** (scroll wheel): Move camera toward or away from target along
+ *     the line-of-sight direction. Always active, no modifier required.
  *
  * Speed Adjustment:
- * - Normal: 1.0x sensitivity
- * - Shift held: 2.0x (fast)
- * - Ctrl held: 0.25x (slow)
- * - Both held: Shift wins (2.0x)
- *
- * Scene Notification:
- * - Each successful modification calls Scene::UpdateSceneStatus(CameraChanged).
+ *   - Normal: 1.0x sensitivity
+ *   - Ctrl held: 0.25x (slow/precise)
  *
  * Usage:
  * @code
  *   CameraController controller;
  *   // ... per frame:
- *   InputState input = inputSystem.GetState();
- *   controller.Update(*activeCamera, *scene, input);
+ *   InputState input = Input::GetInputState();
+ *   controller.Update(camera, input);
  * @endcode
  *
  * @note CameraController does not own the camera - it operates on a reference.
- * @note No renderer dependency. Uses only Camera, Scene, and glm.
+ * @note No renderer or event dependency. Uses only Camera and glm.
  */
 class CameraController
 {
@@ -113,17 +113,22 @@ public:
 	 * @brief Updates the camera transform based on input state.
 	 *
 	 * Reads mouse delta, scroll, and modifier keys from InputState and
-	 * applies the corresponding camera operation (orbit, pan, or zoom).
-	 * Multiple operations can be combined (e.g., orbit + zoom in one frame).
+	 * applies the corresponding camera operation based on MMB convention:
+	 *   - MMB alone        → Orbit()
+	 *   - Ctrl + MMB       → Dolly()
+	 *   - Shift + MMB      → Pan()
+	 *   - Scroll (always)  → Zoom()
+	 *
+	 * Multiple operations can be combined in one frame (e.g., scroll zoom
+	 * while orbiting with MMB).
 	 *
 	 * @param camera Camera to modify (position and target updated in place).
-	 * @param scene Scene to notify of CameraChanged status.
 	 * @param input Current frame's input state from the Input system.
 	 *
 	 * @note No-ops when camera position equals target (degenerate direction).
-	 * @note Elevation is clamped to avoid gimbal-lock at ±89°.
+	 * @note Elevation is clamped to avoid gimbal-lock at +/-89 degrees.
 	 */
-	void Update(Camera& camera, Scene& scene, const InputState& input);
+	void Update(Camera& camera, const InputState& input);
 
 private:
 	// --- Sensitivity constants ---
@@ -137,10 +142,10 @@ private:
 	/** @brief Base sensitivity for zoom (dolly factor per scroll notch). */
 	static constexpr float kZoomSensitivity = 1.0f;
 
-	/** @brief Speed multiplier when Shift is held. */
-	static constexpr float kFastMultiplier = 2.0f;
+	/** @brief Base sensitivity for dolly translation (world units per pixel). */
+	static constexpr float kDollySensitivity = 0.05f;
 
-	/** @brief Speed multiplier when Ctrl is held. */
+	/** @brief Speed multiplier when Ctrl is held (slow/precise). */
 	static constexpr float kSlowMultiplier = 0.25f;
 
 	// --- Speed ---
@@ -148,14 +153,28 @@ private:
 	/**
 	 * @brief Computes the effective speed multiplier from modifier keys.
 	 * @param input Current input state.
-	 * @return 1.0 (normal), 2.0 (fast), or 0.25 (slow).
+	 * @return 1.0f (normal) or kSlowMultiplier (slow when Ctrl held).
 	 */
 	float GetSpeedMultiplier(const InputState& input) const;
+
+	// --- Event notification ---
+
+	/**
+	 * @brief Notifies downstream systems of a camera transform change.
+	 * @param camera Camera that was modified.
+	 * @note Stub - will enqueue a CameraTransformChanged event in the future.
+	 */
+	void NotifyCameraChanged(const Camera& camera);
 
 	// --- Camera operations ---
 
 	/**
-	 * @brief Orbits the camera around its look-at target.
+	 * @brief Orbits the camera around its look-at target (MMB drag).
+	 *
+	 * Horizontal mouse delta rotates azimuth around world Y axis.
+	 * Vertical mouse delta rotates elevation around camera's local right axis.
+	 * Elevation is clamped to +/-89 degrees to avoid gimbal lock.
+	 *
 	 * @param camera Camera to modify.
 	 * @param input Current input state (reads mouseDeltaX/Y).
 	 * @param speed Effective speed multiplier.
@@ -163,20 +182,42 @@ private:
 	void Orbit(Camera& camera, const InputState& input, float speed);
 
 	/**
-	 * @brief Pans the camera parallel to the view plane.
-	 * @param camera Camera to modify (both position and target).
-	 * @param input Current input state (reads mouseDeltaX/Y).
-	 * @param speed Effective speed multiplier.
-	 */
-	void Pan(Camera& camera, const InputState& input, float speed);
-
-	/**
-	 * @brief Zooms the camera toward or away from its look-at target.
+	 * @brief Zooms the camera toward or away from its look-at target (scroll wheel).
+	 *
+	 * Moves camera along the line-of-sight direction. scrollDelta > 0
+	 * moves toward target; scrollDelta < 0 moves away.
+	 *
 	 * @param camera Camera to modify.
 	 * @param input Current input state (reads scrollDelta).
 	 * @param speed Effective speed multiplier.
 	 */
 	void Zoom(Camera& camera, const InputState& input, float speed);
+
+	/**
+	 * @brief Dollies the camera forward/backward along the view direction (Ctrl+MMB drag).
+	 *
+	 * Translates both camera position and target along the line-of-sight
+	 * direction, maintaining the current framing. Positive mouseDeltaY
+	 * moves forward, negative moves backward.
+	 *
+	 * @param camera Camera to modify (both position and target).
+	 * @param input Current input state (reads mouseDeltaY).
+	 * @param speed Effective speed multiplier.
+	 */
+	void Dolly(Camera& camera, const InputState& input, float speed);
+
+	/**
+	 * @brief Pans the camera parallel to the view plane (Shift+MMB drag).
+	 *
+	 * Translates both camera position and target using camera's right
+	 * and up vectors. Horizontal mouse delta pans along right vector;
+	 * vertical mouse delta pans along up vector.
+	 *
+	 * @param camera Camera to modify (both position and target).
+	 * @param input Current input state (reads mouseDeltaX/Y).
+	 * @param speed Effective speed multiplier.
+	 */
+	void Pan(Camera& camera, const InputState& input, float speed);
 };
 
 } // namespace neurus
