@@ -315,21 +315,15 @@ void Editor::OnIBLLoad()
 		return;
 	}
 
-	// --- Find or create an Environment on the scene ---
-	std::shared_ptr<Environment> env;
-	if (!scene->env_list.empty())
+	// IBL is only enabled when the project provides an environment
+	if (scene->env_list.empty())
 	{
-		env = scene->env_list.begin()->second;
-		NEURUS_LOG("[Editor] Reusing existing environment (ID "
-		           << env->GetObjectID() << ")");
+		NEURUS_LOG("[Editor] No environment in scene — IBL disabled (black background)");
+		return;
 	}
-	else
-	{
-		env = std::make_shared<Environment>();
-		scene->UseEnvironment(env);
-		NEURUS_LOG("[Editor] Created new environment (ID "
-		           << env->GetObjectID() << ")");
-	}
+
+	auto env = scene->env_list.begin()->second;
+	NEURUS_LOG("[Editor] Using environment (ID " << env->GetObjectID() << ")");
 
 	// Read the equirect path from the environment object (set by CreateDefault or deserialized)
 	const std::string& envRelPath = env->GetEquirectPath();
