@@ -166,6 +166,7 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 		AttachmentName::HDRColor,
 		AttachmentName::SSAO,
 		AttachmentName::SSR,
+		AttachmentName::ShadowIntensity,
 	};
 
 	int capturedCount = 0;

@@ -447,3 +447,47 @@ These patterns were established during deferred PBR development and apply to all
 | Wrong normal space | Lighting doesn't match geometry | VS stores view-space, compute transforms back |
 | First-run reference stale | Test passed against old reference | Delete PNGs, regenerate, verify |
 | No `VK_EXT_DEBUG_UTILS` | Deferred validation errors | Include in Debug builds |
+
+## Complete Development Cycle Checklist
+
+Every subagent, feature implementation, or bugfix MUST complete ALL of
+the following steps before declaring the task done.  Partial completion
+is NOT acceptable -- skip none of these steps.
+
+1. **Build → 0 errors**
+   ```bash
+   cmake --build build/debug
+   ```
+   No compilation errors, no linker errors.  Warnings should be addressed
+   or justified.
+
+2. **Run `Neurus.exe` → check terminal output**
+   ```powershell
+   $output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
+   ```
+   Scan for:
+   - `VUID-` validation violations
+   - `[VALIDATION]` prefixed errors from the debug messenger
+   - Crashes (access violations, segfaults)
+   - Unexpected `NEURUS_ERR` log lines
+
+3. **Run tests → all pass**
+   ```bash
+   cd build/debug && ctest --output-on-failure
+   ```
+   ALL tests must pass.  Do not ignore failures; fix them or update
+   reference images if the change is intentional.
+
+4. **Verify feature works visually**
+   - Screenshots: check that `TakeScreenshotAllAttachments()` exports
+     all relevant attachments (screenshots/ directory).
+   - Visual check: the rendered viewport shows the expected result
+     (lighting, shadows, geometry, etc.).
+   - Runtime behaviour: resize the window, interact with the viewport,
+     verify no deadlocks or freezes.
+
+5. **No stubs, TODOs, or placeholders remain**
+   - No `// TODO`, `// FIXME`, `// STUB`, or placeholder comments
+     left behind in the changed files.
+   - No hardcoded magic numbers without documentation.
+   - No commented-out code blocks unless explicitly justified.

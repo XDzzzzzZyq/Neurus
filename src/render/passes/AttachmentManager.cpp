@@ -38,9 +38,14 @@ void AttachmentManager::Create(const vk::Extent2D extent)
 	createAttachment(AttachmentName::SSAO);
 	createAttachment(AttachmentName::SSR);
 
+	// --- Shadow ---
+	// ShadowDepth cubemap is owned by ShadowDepthPass (fixed 1024x1024 resolution).
+	// ShadowIntensity is a screen-space R8 attachment written by ShadowEvalPass.
+	createAttachment(AttachmentName::ShadowIntensity);
+
 	NEURUS_LOG("[AttachmentManager] extent=" << m_extent.width << "x" << m_extent.height
-	          << " attachments=8"
-	          << " (position, normal, albedo, metallicRoughness, depth, hdrColor, ssao, ssr)");
+	          << " attachments=9"
+	          << " (position, normal, albedo, metallicRoughness, depth, hdrColor, ssao, ssr, shadowIntensity)");
 }
 
 void AttachmentManager::Resize(const vk::Extent2D extent)
@@ -121,6 +126,7 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 
 	constexpr auto e2D = Image::ImageType::e2D;
 	constexpr auto eDS = Image::ImageType::eDepthStencil;
+	constexpr auto eCube = Image::ImageType::eCube;
 
 	switch (name)
 	{
@@ -146,6 +152,18 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
 	case AttachmentName::SSR:
 		return { vk::Format::eR16G16B16A16Sfloat, kColorAttachmentUsage, e2D };
+
+	// --- Shadow ---
+	case AttachmentName::ShadowDepth:
+		// Cubemap depth attachment: written by ShadowDepthPass, sampled by ShadowEvalPass
+		return { vk::Format::eD32Sfloat,
+		         vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+		         eCube };
+	case AttachmentName::ShadowIntensity:
+		// R8 shadow intensity: written by ShadowEvalPass compute shader
+		return { vk::Format::eR8Unorm,
+		         vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc,
+		         e2D };
 	}
 
 	throw std::invalid_argument("AttachmentManager::ConfigFor: unknown attachment name");
@@ -167,6 +185,8 @@ const char* AttachmentNameToString(const AttachmentName name)
 	case AttachmentName::HDRColor:          return "HDRColor";
 	case AttachmentName::SSAO:              return "SSAO";
 	case AttachmentName::SSR:               return "SSR";
+	case AttachmentName::ShadowDepth:       return "ShadowDepth";
+	case AttachmentName::ShadowIntensity:   return "ShadowIntensity";
 	}
 	return "Unknown";
 }

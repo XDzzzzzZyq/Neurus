@@ -147,7 +147,7 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 	{
 	case ImageType::eCube:
 		viewType = vk::ImageViewType::eCube;
-		aspect = vk::ImageAspectFlagBits::eColor;
+		aspect = AspectFromFormat(m_format);
 		break;
 	case ImageType::eDepthStencil:
 		viewType = vk::ImageViewType::e2D;
@@ -207,12 +207,8 @@ void Image::TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
                                    const uint32_t baseArrayLayer,
                                    const uint32_t layerCount)
 {
-	const auto aspect = (m_imageType == ImageType::eDepthStencil)
-	                        ? AspectFromFormat(m_format)
-	                        : vk::ImageAspectFlagBits::eColor;
-
 	const vk::ImageSubresourceRange subresourceRange(
-		aspect,
+		AspectFromFormat(m_format),
 		baseMipLevel,
 		levelCount,
 		baseArrayLayer,
@@ -250,9 +246,7 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 		return;
 	}
 
-	const auto aspect = (m_imageType == ImageType::eDepthStencil)
-	                        ? AspectFromFormat(m_format)
-	                        : vk::ImageAspectFlagBits::eColor;
+	const auto aspect = AspectFromFormat(m_format);
 
 	int32_t mipWidth  = static_cast<int32_t>(m_extent.width);
 	int32_t mipHeight = static_cast<int32_t>(m_extent.height);

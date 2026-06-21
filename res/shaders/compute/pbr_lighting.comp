@@ -28,6 +28,9 @@ layout(binding = 6) uniform sampler2D U_AO;
 layout(binding = 7) uniform samplerCube U_Irradiance;
 layout(binding = 8) uniform samplerCube U_Prefiltered;
 
+// --- Shadow intensity (R8: 1.0 = fully shadowed, 0.0 = fully lit) ---
+layout(binding = 9) uniform sampler2D U_Shadow;
+
 // --- Point light SSBO (std140) ---
 struct PointLight
 {
@@ -182,6 +185,7 @@ void main()
 
 	// --- Accumulate lighting ---
 	vec3 Lo = vec3(0.0);
+	float shadow = texture(U_Shadow, uv).r;  // 1.0 = shadowed, 0.0 = lit
 
 	for (int i = 0; i < lightCount; ++i)
 	{
@@ -200,8 +204,8 @@ void main()
 		// --- Attenuation (inverse-square falloff) ---
 		float attenuation = 1.0 / (dist * dist);
 
-		// --- Incident radiance ---
-		vec3 radiance = light.power * light.color * attenuation * NdotL;
+		// --- Incident radiance (attenuated by shadow) ---
+		vec3 radiance = light.power * light.color * attenuation * NdotL * (1.0 - shadow);
 
 		// --- Cook-Torrance BRDF ---
 		vec3 H = normalize(L + V);

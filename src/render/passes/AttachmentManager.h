@@ -26,6 +26,13 @@ enum class AttachmentName
 	HDRColor,           ///< HDR color output (RGBA16F)
 	SSAO,               ///< Screen-space ambient occlusion (R8)
 	SSR,                ///< Screen-space reflections (RGBA16F)
+
+	// --- Shadow ---
+	ShadowDepth,        ///< Point light shadow depth cubemap (D32_SFLOAT, eCube)
+	ShadowIntensity,    ///< Per-pixel shadow intensity (R8_UNORM)
+
+	// Count sentinel
+	Count,
 };
 
 /**

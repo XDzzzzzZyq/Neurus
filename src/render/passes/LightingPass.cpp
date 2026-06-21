@@ -263,6 +263,10 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.AddBinding(8,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
+		// Shadow intensity (combined image sampler)
+		.AddBinding(9,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
 		.Build();
 
 	return DescriptorSetLayout(device, bindings);
@@ -446,6 +450,20 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 		dstSet.WriteImage(8, imageInfo,
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
+
+	// --- Write shadow intensity (binding 9) ---
+	{
+		const auto& shadowAtt = m_attachmentManager->GetAttachment(AttachmentName::ShadowIntensity);
+
+		vk::DescriptorImageInfo imageInfo(
+			*m_sampler,                              // sampler
+			*shadowAtt.ImageViewHandle(),            // imageView
+			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
+		);
+
+		dstSet.WriteImage(9, imageInfo,
+		                  vk::DescriptorType::eCombinedImageSampler);
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -465,7 +483,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
 	//     and HDRColor to GENERAL for compute write.
-	//     Also transition SSAO from GENERAL to SHADER_READ_ONLY_OPTIMAL.
+	//     Also transition SSAO and ShadowIntensity from GENERAL to SHADER_READ_ONLY_OPTIMAL.
 	//     Uses pipelineBarrier2 (synchronization2) for correct layout
 	//     tracking with VK_KHR_dynamic_rendering.
 	{
@@ -476,7 +494,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			AttachmentName::MetallicRoughness,
 		};
 
-		std::array<vk::ImageMemoryBarrier2, 6> barriers;
+		std::array<vk::ImageMemoryBarrier2, 7> barriers;
 
 		for (size_t i = 0; i < 4; ++i)
 		{
@@ -584,6 +602,64 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			                          0, 1, 0, 1));
 
 		ssao.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+
+		// ShadowIntensity: GENERAL → SHADER_READ_ONLY (was written by ShadowEvalPass, now read by lighting)
+		auto& shadowAtt = m_attachmentManager->GetAttachment(AttachmentName::ShadowIntensity);
+		vk::ImageLayout shadowOldLayout = shadowAtt.CurrentLayout();
+
+		// If shadow hasn't been computed (layout = UNDEFINED), clear to 0.0 (no shadow)
+		bool shadowWasCleared = false;
+		if (shadowOldLayout == vk::ImageLayout::eUndefined)
+		{
+			const auto preClearBarrier = vk::ImageMemoryBarrier2(
+				vk::PipelineStageFlagBits2::eTopOfPipe,
+				vk::AccessFlagBits2::eNone,
+				vk::PipelineStageFlagBits2::eTransfer,
+				vk::AccessFlagBits2::eTransferWrite,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eTransferDstOptimal,
+				VK_QUEUE_FAMILY_IGNORED,
+				VK_QUEUE_FAMILY_IGNORED,
+				*shadowAtt.ImageHandle(),
+				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+				                          0, 1, 0, 1));
+
+			const vk::DependencyInfo preDep({}, {}, {}, preClearBarrier);
+			cmdBuf.pipelineBarrier2(preDep);
+
+			vk::ClearColorValue clearBlack(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f});
+			cmdBuf.clearColorImage(*shadowAtt.ImageHandle(),
+			                       vk::ImageLayout::eTransferDstOptimal,
+			                       clearBlack,
+			                       vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                                                  0, 1, 0, 1));
+
+			shadowOldLayout = vk::ImageLayout::eTransferDstOptimal;
+			shadowAtt.SetCurrentLayout(vk::ImageLayout::eTransferDstOptimal);
+			shadowWasCleared = true;
+		}
+
+		const vk::PipelineStageFlags2 shadowSrcStage = shadowWasCleared
+			? vk::PipelineStageFlagBits2::eTransfer
+			: vk::PipelineStageFlagBits2::eComputeShader;
+		const vk::AccessFlags2 shadowSrcAccess = shadowWasCleared
+			? vk::AccessFlagBits2::eTransferWrite
+			: vk::AccessFlagBits2::eShaderWrite;
+
+		barriers[6] = vk::ImageMemoryBarrier2(
+			shadowSrcStage,
+			shadowSrcAccess,
+			vk::PipelineStageFlagBits2::eComputeShader,
+			vk::AccessFlagBits2::eShaderRead,
+			shadowOldLayout,
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*shadowAtt.ImageHandle(),
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                          0, 1, 0, 1));
+
+		shadowAtt.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
 		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
 		cmdBuf.pipelineBarrier2(depInfo);

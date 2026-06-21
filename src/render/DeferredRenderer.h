@@ -44,6 +44,8 @@ class GeometryPass;
 class LightingPass;
 class SSAOPass;
 class IBLPass;
+class ShadowDepthPass;
+class ShadowEvalPass;
 struct GeometryRenderItem;
 struct CameraUBOData;
 
@@ -114,11 +116,15 @@ public:
 	void DrawFrame(const Scene& scene);
 
 	/**
-	 * @brief Uploads scene point lights to the LightingPass SSBO.
+	 * @brief Uploads scene point lights to the LightingPass SSBO and configures
+	 *        the shadow passes for the first point light found.
 	 *
 	 * Converts scene.light_list to GPU-compatible PointLightGpu structs
 	 * and uploads them as a storage buffer. Must be called before the
 	 * first DrawFrame() and after any scene light changes.
+	 *
+	 * If a point light with use_shadow enabled is found, configures
+	 * ShadowDepthPass and ShadowEvalPass accordingly.
 	 *
 	 * @param scene Scene containing the light list.
 	 */
@@ -189,6 +195,17 @@ public:
 	 */
 	void ResetIBLResources();
 
+	/**
+	 * @brief Converts the shadow depth cubemap to an equirectangular grayscale PNG.
+	 *
+	 * Creates a temporary rgba32f equirect image, dispatches c2e.comp,
+	 * reads back the depth channel as grayscale, and writes a PNG.
+	 *
+	 * @param filenamePrefix Prefix for the output PNG filename.
+	 * @return The output file path on success, empty string on failure.
+	 */
+	std::string ExportShadowDepthEquirect(const std::string& filenamePrefix);
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
@@ -245,6 +262,8 @@ private:
 	LightingPass* m_lightingPass = nullptr;
 	SSAOPass*   m_ssaoPass     = nullptr;
 	IBLPass*    m_iblPass      = nullptr;
+	ShadowDepthPass* m_shadowDepthPass = nullptr;
+	ShadowEvalPass*  m_shadowEvalPass  = nullptr;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;

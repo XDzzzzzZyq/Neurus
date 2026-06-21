@@ -15,11 +15,17 @@
 #include "Texture.h"
 #include "Screenshot.h"
 #include "passes/SSAOPass.h"
+#include "passes/ShadowDepthPass.h"
+#include "passes/ShadowEvalPass.h"
 #include "Swapchain.h"
 #include "passes/SyncObjects.h"
 #include "VulkanBuffer.h"
 #include "buffers/VertexBuffer.h"
 #include "buffers/IndexBuffer.h"
+#include "shaders/ShaderModule.h"
+#include "ComputePipelineBuilder.h"
+#include "DescriptorManager.h"
+#include "asset/ImageData.h"
 
 // Generated SPIR-V shader headers
 #include "gbuffer.vert.h"
@@ -28,6 +34,10 @@
 #include "ssao.comp.h"
 #include "irradiance_conv.comp.h"
 #include "importance_samp.comp.h"
+#include "shadow_depth.vert.h"
+#include "shadow_depth.frag.h"
+#include "shadow_eval.comp.h"
+#include "c2e.comp.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -139,6 +149,28 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
 	}
 
+	// --- 7d. Create shadow depth pass (cubemap depth from light's POV) ---
+	{
+		auto shadowDepth = std::make_unique<ShadowDepthPass>(
+			device, physicalDevice, graphicsQueue, queueFamilyIndex,
+			ShadowDepthPass::kDefaultResolution,
+			ShadowDepthPass::kDefaultFarPlane);
+		m_shadowDepthPass = shadowDepth.get();
+		m_passes.push_back(std::move(shadowDepth));
+		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
+	}
+
+	// --- 7e. Create shadow eval pass (compute: samples cubemap → shadow intensity) ---
+	{
+		auto shadowEval = std::make_unique<ShadowEvalPass>(
+			device, physicalDevice,
+			m_attachmentManager.get(),
+			kMaxFramesInFlight);
+		m_shadowEvalPass = shadowEval.get();
+		m_passes.push_back(std::move(shadowEval));
+		NEURUS_LOG("[DeferredRenderer] ShadowEvalPass created");
+	}
+
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
 
@@ -209,6 +241,27 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 	if (m_lightingPass)
 	{
 		m_lightingPass->UploadLights(scene);
+	}
+
+	// --- Configure shadow passes from the first point light with use_shadow ---
+	if (m_shadowDepthPass && m_shadowEvalPass)
+	{
+		for (const auto& [id, light] : scene.light_list)
+		{
+			if (!light) continue;
+			if (light->light_type == LightType::POINTLIGHT && light->use_shadow)
+			{
+				const glm::vec3 lightPos = light->GetPosition();
+				const float farPlane = ShadowDepthPass::kDefaultFarPlane;
+				const float bias = 0.005f;
+
+				m_shadowDepthPass->SetLightPosition(lightPos);
+				m_shadowEvalPass->SetLight(
+					m_shadowDepthPass->ShadowCubemap(),
+					lightPos, farPlane, bias);
+				break;  // Only first shadow-casting point light for MVP
+			}
+		}
 	}
 }
 
@@ -650,11 +703,31 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 		.renderItems = &renderItems,
 	});
 
+	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---
+	//     Uses the same render items as the geometry pass (all scene geometry).
+	//     The light position has been set via SetShadowLight() or UpdateFromScene().
+	if (m_shadowDepthPass)
+	{
+		PassContext shadowCtx{};
+		shadowCtx.renderExtent = vk::Extent2D{
+			m_shadowDepthPass->Resolution(),
+			m_shadowDepthPass->Resolution()};
+		shadowCtx.renderItems = &renderItems;
+		shadowCtx.frameIndex = m_currentFrame;
+		m_shadowDepthPass->Record(cmdBuf, shadowCtx);
+	}
+
 	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
 	if (m_ssaoPass)
 	{
 		m_ssaoPass->UpdateParams(viewProj, viewMatrix, cameraPos);
 		m_ssaoPass->Record(cmdBuf, PassContext{extent, m_currentFrame});
+	}
+
+	// --- Phase 2b: ShadowEvalPass → compute shadow intensity from cubemap ---
+	if (m_shadowEvalPass)
+	{
+		m_shadowEvalPass->Record(cmdBuf, PassContext{extent, m_currentFrame});
 	}
 
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
@@ -786,7 +859,202 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 		                                          "screenshots/gbuffer");
 	}
 
+	// Also export shadow cubemap as equirectangular PNG
+	if (m_shadowDepthPass)
+	{
+		ExportShadowDepthEquirect("screenshots/shadow_depth_point_0_equirect");
+	}
+
 	return count;
+}
+
+// ===========================================================================
+// C2E — Shadow cubemap → Equirectangular export
+// ===========================================================================
+
+std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filenamePrefix)
+{
+	if (!m_shadowDepthPass)
+	{
+		return {};
+	}
+
+	auto& cubemap = m_shadowDepthPass->ShadowCubemap();
+	const uint32_t cubeRes = m_shadowDepthPass->Resolution();
+	const uint32_t equiWidth = cubeRes * 2;
+	const uint32_t equiHeight = cubeRes;
+
+	// --- 1. Create temporary equirect output image (rgba32f) ---
+	Image equirectImage(m_device, m_physicalDevice,
+	                    vk::Extent2D{equiWidth, equiHeight},
+	                    vk::Format::eR32G32B32A32Sfloat,
+	                    vk::ImageUsageFlagBits::eStorage |
+	                        vk::ImageUsageFlagBits::eTransferSrc,
+	                    1u, Image::ImageType::e2D,
+	                    "ShadowEquirectTemp");
+
+	// --- 2. Create sampler for depth cubemap ---
+	vk::SamplerCreateInfo samplerCI(
+		{}, vk::Filter::eNearest, vk::Filter::eNearest,
+		vk::SamplerMipmapMode::eNearest,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		0.0f, VK_FALSE, 0.0f, VK_FALSE,
+		vk::CompareOp::eAlways,
+		0.0f, 0.0f, vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+	vk::raii::Sampler cubeSampler(m_device, samplerCI);
+
+	// --- 3. Descriptor set layout (2 bindings) ---
+	auto bindings = BuildLayout()
+		.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		.AddBinding(1, vk::DescriptorType::eStorageImage,
+		            vk::ShaderStageFlagBits::eCompute)
+		.Build();
+	DescriptorSetLayout c2eLayout(m_device, bindings);
+
+	DescriptorPool c2ePool(m_device, 1,
+		DescriptorPool::CalculatePoolSizes({&c2eLayout}, 1));
+	auto c2eSet = std::move(c2ePool.Allocate(c2eLayout, 1).front());
+
+	// Write descriptors
+	{
+		vk::DescriptorImageInfo cubeInfo(cubeSampler, *cubemap.ImageViewHandle(),
+		                                  vk::ImageLayout::eShaderReadOnlyOptimal);
+		c2eSet.WriteImage(0, cubeInfo, vk::DescriptorType::eCombinedImageSampler);
+
+		vk::DescriptorImageInfo equiInfo(nullptr, *equirectImage.ImageViewHandle(),
+		                                  vk::ImageLayout::eGeneral);
+		c2eSet.WriteImage(1, equiInfo, vk::DescriptorType::eStorageImage);
+	}
+
+	// --- 4. Create compute pipeline ---
+	auto compModule = ShaderModule::FromEmbedded(m_device,
+		c2e_comp_spv, sizeof(c2e_comp_spv));
+
+	ComputePipelineBuilder c2eBuilder(m_device);
+	c2eBuilder.SetShaderStage(std::move(compModule), "main");
+	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
+
+	auto c2ePipeline = c2eBuilder.BuildComputePipeline();
+	vk::PipelineLayout c2ePipelineLayout = *c2eBuilder.pipelineLayout();
+
+	// --- 5. Record & dispatch ---
+	{
+		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
+		                                  m_queueFamilyIndex);
+		vk::raii::CommandPool cmdPool(m_device, poolCI);
+		vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+		vk::raii::CommandBuffers cmdBufs(m_device, allocInfo);
+
+		auto& cmd = cmdBufs[0];
+		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+		// Transition cubemap → SHADER_READ_ONLY (if not already)
+		{
+			vk::ImageMemoryBarrier barrier(
+				vk::AccessFlagBits::eShaderRead,
+				vk::AccessFlagBits::eShaderRead,
+				vk::ImageLayout::eShaderReadOnlyOptimal,
+				vk::ImageLayout::eShaderReadOnlyOptimal,
+				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+				*cubemap.ImageHandle(),
+				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
+				                          0, 1, 0, 6));
+			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+			                    vk::PipelineStageFlagBits::eComputeShader,
+			                    {}, {}, {}, barrier);
+		}
+
+		// Transition equirect → GENERAL
+		{
+			vk::ImageMemoryBarrier barrier(
+				{}, vk::AccessFlagBits::eShaderWrite,
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eGeneral,
+				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+				*equirectImage.ImageHandle(),
+				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+				                          0, 1, 0, 1));
+			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+			                    vk::PipelineStageFlagBits::eComputeShader,
+			                    {}, {}, {}, barrier);
+			equirectImage.SetCurrentLayout(vk::ImageLayout::eGeneral);
+		}
+
+		// Bind and dispatch
+		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *c2ePipeline);
+		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+		                       c2ePipelineLayout, 0,
+		                       {c2eSet.handle()}, {});
+
+		uint32_t gx = (equiWidth  + 15) / 16;
+		uint32_t gy = (equiHeight + 15) / 16;
+		cmd.dispatch(gx, gy, 1);
+
+		// Transition equirect → TRANSFER_SRC for readback
+		{
+			vk::ImageMemoryBarrier barrier(
+				vk::AccessFlagBits::eShaderWrite,
+				vk::AccessFlagBits::eTransferRead,
+				vk::ImageLayout::eGeneral,
+				vk::ImageLayout::eTransferSrcOptimal,
+				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+				*equirectImage.ImageHandle(),
+				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+				                          0, 1, 0, 1));
+			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
+			                    vk::PipelineStageFlagBits::eTransfer,
+			                    {}, {}, {}, barrier);
+		}
+
+		cmd.end();
+
+		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
+		m_graphicsQueue.submit(submitInfo);
+		m_graphicsQueue.waitIdle();
+	}
+
+	// --- 6. Read back equirect as grayscale PNG ---
+	//     The C2E output is rgba32f; we read only the R channel (depth value).
+	std::vector<uint8_t> rawData = equirectImage.ReadImageToBuffer(
+		m_device, m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
+		vk::ImageLayout::eTransferSrcOptimal);
+
+	if (rawData.empty())
+	{
+		NEURUS_ERR("[ExportShadowDepthEquirect] Readback failed");
+		return {};
+	}
+
+	// Convert rgba32f → grayscale uint8
+	const size_t pixelCount = static_cast<size_t>(equiWidth) * equiHeight;
+	std::vector<uint8_t> grayPixels(pixelCount);
+
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		// Each pixel is 4 × float = 16 bytes; the R channel is at byte offset 0
+		float r;
+		std::memcpy(&r, &rawData[i * 16], sizeof(float));
+		// Clamp to [0, 1] and convert to uint8
+		r = std::max(0.0f, std::min(1.0f, r));
+		grayPixels[i] = static_cast<uint8_t>(r * 255.0f + 0.5f);
+	}
+
+	const std::string path = Screenshot::timestampedFilename(filenamePrefix, ".png");
+
+	const bool saved = ImageData::SavePixelData(
+		grayPixels.data(), vk::Format::eR8Unorm,
+		vk::Extent2D{equiWidth, equiHeight}, path);
+
+	if (saved)
+	{
+		NEURUS_LOG("[ExportShadowDepthEquirect] Saved " << path
+		           << " (" << equiWidth << "x" << equiHeight << ")");
+		return path;
+	}
+	return {};
 }
 
 } // namespace neurus
