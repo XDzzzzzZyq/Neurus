@@ -64,15 +64,11 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	, m_graphicsQueue(graphicsQueue)
 	, m_queueFamilyIndex(queueFamilyIndex)
 	, m_surface(surface)
-	, m_width(width)
-	, m_height(height)
 	, m_commandPool(createCommandPool(device, queueFamilyIndex))
 {
 	// --- 1. Create swapchain ---
 	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
 	const auto extent = m_swapchain->extent();
-	m_width = extent.width;
-	m_height = extent.height;
 
 	// --- 2. Create G-Buffer attachments ---
 	m_attachmentManager = std::make_unique<AttachmentManager>(device, physicalDevice);
@@ -191,7 +187,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 	}
 
-	NEURUS_LOG("[DeferredRenderer] " << m_width << "x" << m_height
+	NEURUS_LOG("[DeferredRenderer] " << extent.width << "x" << extent.height
 	          << " swapchainImages=" << imageCount
 	          << " transferDst=" << (hasTransferDst ? "yes" : "no"));
 }
@@ -533,9 +529,6 @@ void DeferredRenderer::recreateSwapchain()
 
 	uint32_t newImageCount = m_swapchain->imageCount();
 	vk::Extent2D newExtent = m_swapchain->extent();
-	m_width = newExtent.width;
-	m_height = newExtent.height;
-
 	// Recreate attachments at new extent
 	m_attachmentManager->Resize(newExtent);
 

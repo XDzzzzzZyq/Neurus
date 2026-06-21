@@ -168,11 +168,6 @@ public:
 	void HandleResize(uint32_t width, uint32_t height);
 
 	/**
-	 * @brief Returns the IBL pass (always created — IBL shaders are embedded).
-	 */
-	IBLPass* GetIBLPass() { return m_iblPass; }
-
-	/**
 	 * @brief Generates diffuse + specular cubemaps from an equirect HDR image.
 	 *
 	 * Forwards to IBLPass::Generate().  Editor calls this instead of reaching
@@ -259,10 +254,6 @@ private:
 	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
 	uint32_t m_currentFrame = 0;
 	uint32_t m_swapchainGeneration = 0;
-
-	// --- Current swapchain extent ---
-	uint32_t m_width = 800;
-	uint32_t m_height = 600;
 
 	// --- Last acquired swapchain image index (for screenshot) ---
 	uint32_t m_lastImageIndex = 0;
