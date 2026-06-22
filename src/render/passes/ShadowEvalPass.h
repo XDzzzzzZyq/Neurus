@@ -52,9 +52,12 @@ private:
 	struct PushConstants
 	{
 		float lightPosX, lightPosY, lightPosZ;
+		float _pad0;   // std430 vec3 alignment (16 bytes)
 		float farPlane;
 		float bias;
 	};
+	static_assert(sizeof(PushConstants) == 24,
+	              "PushConstants must match GLSL std430 layout (vec3 has 16-byte alignment)");
 
 	const Image* m_shadowCubemap = nullptr;
 	glm::vec3 m_lightPosition{0.0f};

@@ -490,6 +490,8 @@ std::vector<uint8_t> Image::ReadImageToBuffer(
 		case vk::Format::eR16G16B16A16Unorm:
 		case vk::Format::eR16G16B16A16Snorm:
 			return 8;
+		case vk::Format::eR32G32B32A32Sfloat:
+			return 16;
 		case vk::Format::eR8Unorm:
 		case vk::Format::eR8Srgb:
 			return 1;

@@ -102,7 +102,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 			.SetVertexInput(m_vtxLayout)
 			.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 			.SetRasterization(vk::PolygonMode::eFill,
-			                  vk::CullModeFlagBits::eBack,
+			                  vk::CullModeFlagBits::eNone,
 			                  vk::FrontFace::eClockwise)
 			.SetMultisampling()
 			.SetDepthStencil(true, true, vk::CompareOp::eLess)
