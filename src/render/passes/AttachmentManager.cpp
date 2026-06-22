@@ -122,7 +122,8 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 	//   SAMPLED                  - read by SSAO, SSR, etc.
 	constexpr vk::ImageUsageFlags kDepthAttachmentUsage =
 		vk::ImageUsageFlagBits::eDepthStencilAttachment |
-		vk::ImageUsageFlagBits::eSampled;
+		vk::ImageUsageFlagBits::eSampled |
+		vk::ImageUsageFlagBits::eTransferSrc;
 
 	constexpr auto e2D = Image::ImageType::e2D;
 	constexpr auto eDS = Image::ImageType::eDepthStencil;

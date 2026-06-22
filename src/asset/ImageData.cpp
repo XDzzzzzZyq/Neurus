@@ -80,6 +80,8 @@ uint32_t ImageData::PixelByteSize(vk::Format format)
 	case vk::Format::eR8Unorm:
 	case vk::Format::eR8Srgb:
 		return 1;
+	case vk::Format::eD32Sfloat:
+		return 4;
 	default:
 		return 0;
 	}

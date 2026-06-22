@@ -529,7 +529,7 @@ std::vector<uint8_t> Image::ReadImageToBuffer(
 	copyRegion.bufferOffset = 0;
 	copyRegion.bufferRowLength = 0;
 	copyRegion.bufferImageHeight = 0;
-	copyRegion.imageSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+	copyRegion.imageSubresource = vk::ImageSubresourceLayers(AspectFromFormat(format), 0, 0, 1);
 	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 	copyRegion.imageExtent = vk::Extent3D(extent.width, extent.height, 1);
 
