@@ -4,7 +4,7 @@
  *
  * Provides LoadSimpleShadow() which procedurally generates a unit cube
  * (centered at origin) and a large ground plane (y=0, [-5,5] in XZ),
- * uploads them to GPU vertex/index buffers, and returns render items
+ * uploads them to GPU via Scene/Mesh/Light, and returns render items
  * suitable for ShadowDepthPass.
  *
  * Usage:
@@ -14,69 +14,52 @@
  *   m_shadowPass->Record(cmd, ctx);  // uses scene.renderItems internally
  * @endcode
  *
- * Geometry is 100% procedural — no OBJ files needed.
+ * Geometry is 100% procedural via OBJ strings — no OBJ files needed.
  */
 
 #pragma once
 
 #include "Log.h"
-#include "render/passes/GeometryPass.h"
-#include "render/buffers/IndexBuffer.h"
+#include "scene/Scene.h"
+#include "scene/Mesh.h"
+#include "scene/Light.h"
+#include "asset/MeshData.h"
 #include "render/buffers/VertexBuffer.h"
+#include "render/buffers/IndexBuffer.h"
+#include "render/passes/GeometryPass.h"
 
+#include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
 
 #include <memory>
+#include <sstream>
+#include <string>
 #include <vector>
 
 namespace neurus {
 namespace test {
 
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches ShadowDepthPass::BufferLayout:
-//   pos(3) at offset 0  → eR32G32B32Sfloat
-//   nrm(3) at offset 12 → eR32G32B32Sfloat
-//   uv(2)  at offset 24 → eR32G32Sfloat)
-// ---------------------------------------------------------------------------
-struct SimpleVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
-static_assert(sizeof(SimpleVertex) == 32,
-              "SimpleVertex must be 32 bytes (matches ShadowDepthPass BufferLayout)");
-
-/**
- * @brief Per-mesh entry: owns the GPU buffers and exposes the render item.
- */
-struct SimpleShadowMeshEntry
-{
-	std::unique_ptr<VertexBuffer> vertexBuffer;
-	std::unique_ptr<IndexBuffer>  indexBuffer;
-	GeometryRenderItem            renderItem = {};
-};
-
 /**
  * @brief Aggregated result of building the simple shadow test scene.
  *
- * All GPU buffers are owned by this struct (via meshes vector).
- * renderItems provides a flat list for direct use with ShadowDepthPass.
+ * The Scene owns all GPU resources (meshes hold VertexBuffer/IndexBuffer
+ * internally).  renderItems provides a flat list for direct use with
+ * ShadowDepthPass.
  */
 struct SimpleShadowResources
 {
-	std::vector<SimpleShadowMeshEntry> meshes;
-	std::vector<GeometryRenderItem>    renderItems;
+	std::shared_ptr<Scene> scene;
+	std::vector<GeometryRenderItem> renderItems;
 
-	glm::vec3 lightPosition;
+	glm::vec3 lightPosition{0.0f, 3.0f, 0.0f};
 };
 
 /**
  * @brief Builds the simple shadow-map test scene procedurally.
  *
  * Generates:
- *   - A unit cube (12 triangles, 24 vertices, 36 indices) centered at origin,
- *     with flat-shaded per-face normals.
+ *   - A unit cube (12 triangles, 8 vertices, 36 indices) centered at origin,
+ *     covering [-0.5, +0.5]^3.
  *   - A ground-plane quad (2 triangles, 4 vertices, 6 indices) at y=0,
  *     spanning [-5,5] in XZ, facing +Y.
  *
@@ -84,14 +67,14 @@ struct SimpleShadowResources
  * The light is positioned at (0, 3, 0) — directly above the cube, casting
  * shadows downward onto the plane.
  *
- * @note All buffers use device-local memory. A staging upload is performed
- *       synchronously on the provided graphics queue.
+ * @note All buffers use device-local memory.  A staging upload is performed
+ *       synchronously on the provided graphics queue via Mesh::UploadToGPU().
  *
  * @param device           Logical device.
  * @param physicalDevice   Physical device (for memory properties).
  * @param graphicsQueue    Graphics queue for staging uploads.
  * @param queueFamilyIndex Queue family index for VulkanBuffer creation.
- * @return Fully populated SimpleShadowResources (move-only due to unique_ptr members).
+ * @return Fully populated SimpleShadowResources.
  */
 inline SimpleShadowResources LoadSimpleShadow(
 	const vk::raii::Device& device,
@@ -100,167 +83,115 @@ inline SimpleShadowResources LoadSimpleShadow(
 	uint32_t queueFamilyIndex)
 {
 	SimpleShadowResources res;
+	res.scene = std::make_shared<Scene>();
 
 	// ===================================================================
-	//  1. Cube: unit cube centered at origin [-0.5, +0.5]³
-	//     24 unique vertices (4 per face, flat normals)
-	//     36 indices (6 per face, triangle list, CCW from outside)
+	//  1. Cube: unit cube centred at origin [-0.5, +0.5]^3
+	//     8 unique vertices, 12 triangles (36 indices)
 	// ===================================================================
 
-	// clang-format off
-	const std::vector<SimpleVertex> cubeVertices = {
-		// --- Front (+Z), normal=( 0, 0, 1) ---
-		{-0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 0.0f},  // 0: bottom-left
-		{ 0.5f, -0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 0.0f},  // 1: bottom-right
-		{ 0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  1.0f, 1.0f},  // 2: top-right
-		{-0.5f,  0.5f,  0.5f,  0.0f, 0.0f, 1.0f,  0.0f, 1.0f},  // 3: top-left
+	const char* kCubeObj = R"OBJ(
+v -0.5 -0.5 -0.5
+v 0.5 -0.5 -0.5
+v 0.5 -0.5 0.5
+v -0.5 -0.5 0.5
+v -0.5 0.5 -0.5
+v 0.5 0.5 -0.5
+v 0.5 0.5 0.5
+v -0.5 0.5 0.5
 
-		// --- Back (-Z),  normal=( 0, 0,-1) ---
-		{ 0.5f, -0.5f, -0.5f,  0.0f, 0.0f,-1.0f,  0.0f, 0.0f},  // 4: bottom-left (from back)
-		{-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,-1.0f,  1.0f, 0.0f},  // 5: bottom-right
-		{-0.5f,  0.5f, -0.5f,  0.0f, 0.0f,-1.0f,  1.0f, 1.0f},  // 6: top-right
-		{ 0.5f,  0.5f, -0.5f,  0.0f, 0.0f,-1.0f,  0.0f, 1.0f},  // 7: top-left
+f 1 2 3 4
+f 5 8 7 6
+f 1 5 6 2
+f 4 3 7 8
+f 1 4 8 5
+f 2 6 7 3
+)OBJ";
 
-		// --- Right (+X), normal=( 1, 0, 0) ---
-		{ 0.5f, -0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 0.0f},  // 8: bottom-left (from right)
-		{ 0.5f, -0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 0.0f},  // 9: bottom-right
-		{ 0.5f,  0.5f, -0.5f,  1.0f, 0.0f, 0.0f,  1.0f, 1.0f},  // 10: top-right
-		{ 0.5f,  0.5f,  0.5f,  1.0f, 0.0f, 0.0f,  0.0f, 1.0f},  // 11: top-left
+	{
+		auto cubeMeshData = std::make_shared<MeshData>();
+		const bool ok = cubeMeshData->LoadObjFromString(kCubeObj);
+		if (!ok)
+		{
+			NEURUS_ERR("[LoadSimpleShadow] Failed to parse cube OBJ string");
+			return res;
+		}
 
-		// --- Left (-X),  normal=(-1, 0, 0) ---
-		{-0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f,  0.0f, 0.0f},  // 12: bottom-left (from left)
-		{-0.5f, -0.5f,  0.5f, -1.0f, 0.0f, 0.0f,  1.0f, 0.0f},  // 13: bottom-right
-		{-0.5f,  0.5f,  0.5f, -1.0f, 0.0f, 0.0f,  1.0f, 1.0f},  // 14: top-right
-		{-0.5f,  0.5f, -0.5f, -1.0f, 0.0f, 0.0f,  0.0f, 1.0f},  // 15: top-left
+		auto cubeMesh = std::make_shared<Mesh>();
+		cubeMesh->o_name = "SimpleShadowCube";
+		cubeMesh->o_mesh = cubeMeshData;
+		cubeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 
-		// --- Top (+Y),   normal=( 0, 1, 0) ---
-		{-0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f},  // 16: bottom-left (from top)
-		{ 0.5f,  0.5f,  0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f},  // 17: bottom-right
-		{ 0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  1.0f, 1.0f},  // 18: top-right
-		{-0.5f,  0.5f, -0.5f,  0.0f, 1.0f, 0.0f,  0.0f, 1.0f},  // 19: top-left
+		res.scene->UseMesh(cubeMesh);
 
-		// --- Bottom (-Y), normal=( 0,-1, 0) ---
-		{-0.5f, -0.5f, -0.5f,  0.0f,-1.0f, 0.0f,  0.0f, 0.0f},  // 20: bottom-left (from below)
-		{ 0.5f, -0.5f, -0.5f,  0.0f,-1.0f, 0.0f,  1.0f, 0.0f},  // 21: bottom-right
-		{ 0.5f, -0.5f,  0.5f,  0.0f,-1.0f, 0.0f,  1.0f, 1.0f},  // 22: top-right
-		{-0.5f, -0.5f,  0.5f,  0.0f,-1.0f, 0.0f,  0.0f, 1.0f},  // 23: top-left
-	};
+		GeometryRenderItem item{};
+		item.vertexBuffer = cubeMesh->GetVertexBuffer()->buffer();
+		item.indexBuffer  = cubeMesh->GetIndexBuffer()->buffer();
+		item.indexCount   = cubeMesh->GetGPUIndexCount();
+		item.indexType    = vk::IndexType::eUint32;
+		// Identity: cube geometry is already in world space at origin.
+		item.pushConstants.model        = glm::mat4(1.0f);
+		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
-	const std::vector<uint32_t> cubeIndices = {
-		// Front (+Z): 0,1,2, 0,2,3
-		 0,  1,  2,   0,  2,  3,
-		// Back (-Z):  4,5,6, 4,6,7
-		 4,  5,  6,   4,  6,  7,
-		// Right (+X): 8,9,10, 8,10,11
-		 8,  9, 10,   8, 10, 11,
-		// Left (-X):  12,13,14, 12,14,15
-		12, 13, 14,  12, 14, 15,
-		// Top (+Y):   16,17,18, 16,18,19
-		16, 17, 18,  16, 18, 19,
-		// Bottom (-Y):20,21,22, 20,22,23
-		20, 21, 22,  20, 22, 23,
-	};
-	// clang-format on
+		res.renderItems.push_back(item);
+	}
 
 	// ===================================================================
 	//  2. Plane: large quad at y=0, [-5,5] in XZ, facing +Y
-	//     4 vertices, 6 indices (2 triangles, CCW from above)
+	//     4 vertices, 2 triangles (6 indices)
 	// ===================================================================
 
-	// clang-format off
-	const std::vector<SimpleVertex> planeVertices = {
-		{-5.0f, 0.0f, -5.0f,  0.0f, 1.0f, 0.0f,  0.0f, 0.0f},  // 0: bottom-left
-		{ 5.0f, 0.0f, -5.0f,  0.0f, 1.0f, 0.0f,  1.0f, 0.0f},  // 1: bottom-right
-		{ 5.0f, 0.0f,  5.0f,  0.0f, 1.0f, 0.0f,  1.0f, 1.0f},  // 2: top-right
-		{-5.0f, 0.0f,  5.0f,  0.0f, 1.0f, 0.0f,  0.0f, 1.0f},  // 3: top-left
-	};
+	const char* kPlaneObj = R"OBJ(
+v -5 0 -5
+v 5 0 -5
+v 5 0 5
+v -5 0 5
 
-	// CCW from above (+Y): 0,2,1, 0,3,2
-	const std::vector<uint32_t> planeIndices = {
-		0, 2, 1,   0, 3, 2,
-	};
-	// clang-format on
+f 1 2 3 4
+)OBJ";
 
-	// ===================================================================
-	//  3. Upload to GPU and build render items
-	// ===================================================================
-
-	res.meshes.reserve(2);
-	res.renderItems.reserve(2);
-
-	// --- Cube ---
 	{
-		SimpleShadowMeshEntry entry;
+		auto planeMeshData = std::make_shared<MeshData>();
+		const bool ok = planeMeshData->LoadObjFromString(kPlaneObj);
+		if (!ok)
+		{
+			NEURUS_ERR("[LoadSimpleShadow] Failed to parse plane OBJ string");
+			return res;
+		}
 
-		entry.vertexBuffer = std::make_unique<VertexBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			cubeVertices.data(),
-			cubeVertices.size() * sizeof(SimpleVertex),
-			sizeof(SimpleVertex),
-			static_cast<uint32_t>(cubeVertices.size()),
-			"SimpleShadowCube");
+		auto planeMesh = std::make_shared<Mesh>();
+		planeMesh->o_name = "SimpleShadowPlane";
+		planeMesh->o_mesh = planeMeshData;
+		planeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 
-		entry.indexBuffer = std::make_unique<IndexBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			cubeIndices.data(),
-			cubeIndices.size() * sizeof(uint32_t),
-			static_cast<uint32_t>(cubeIndices.size()),
-			"SimpleShadowCube");
+		res.scene->UseMesh(planeMesh);
 
-		GeometryRenderItem& item = entry.renderItem;
-		item.vertexBuffer = entry.vertexBuffer->buffer();
-		item.indexBuffer  = entry.indexBuffer->buffer();
-		item.indexCount   = entry.indexBuffer->GetIndexCount();
-		item.indexType    = entry.indexBuffer->GetIndexType();
-		// Identity: cube geometry is already in world space at origin.
-		item.pushConstants.model = glm::mat4(1.0f);
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-		res.meshes.push_back(std::move(entry));
-		res.renderItems.push_back(res.meshes.back().renderItem);
-	}
-
-	// --- Plane ---
-	{
-		SimpleShadowMeshEntry entry;
-
-		entry.vertexBuffer = std::make_unique<VertexBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			planeVertices.data(),
-			planeVertices.size() * sizeof(SimpleVertex),
-			sizeof(SimpleVertex),
-			static_cast<uint32_t>(planeVertices.size()),
-			"SimpleShadowPlane");
-
-		entry.indexBuffer = std::make_unique<IndexBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			planeIndices.data(),
-			planeIndices.size() * sizeof(uint32_t),
-			static_cast<uint32_t>(planeIndices.size()),
-			"SimpleShadowPlane");
-
-		GeometryRenderItem& item = entry.renderItem;
-		item.vertexBuffer = entry.vertexBuffer->buffer();
-		item.indexBuffer  = entry.indexBuffer->buffer();
-		item.indexCount   = entry.indexBuffer->GetIndexCount();
-		item.indexType    = entry.indexBuffer->GetIndexType();
+		GeometryRenderItem item{};
+		item.vertexBuffer = planeMesh->GetVertexBuffer()->buffer();
+		item.indexBuffer  = planeMesh->GetIndexBuffer()->buffer();
+		item.indexCount   = planeMesh->GetGPUIndexCount();
+		item.indexType    = vk::IndexType::eUint32;
 		// Identity: plane geometry is already in world space (y=0, spans ±5 in XZ).
-		item.pushConstants.model = glm::mat4(1.0f);
+		item.pushConstants.model        = glm::mat4(1.0f);
 		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
-		res.meshes.push_back(std::move(entry));
-		res.renderItems.push_back(res.meshes.back().renderItem);
+		res.renderItems.push_back(item);
 	}
 
 	// ===================================================================
-	//  4. Light position
-	//     Above the cube at (0, 3, 0), casting shadows downward onto the plane.
+	//  3. Point light at (0, 3, 0) — above the cube, casting shadows
+	//     downward onto the plane.
 	// ===================================================================
-	res.lightPosition = glm::vec3(0.0f, 3.0f, 0.0f);
 
-	NEURUS_LOG("[LoadSimpleShadow] Built 2 meshes (cube + plane) — "
-	           << cubeVertices.size() << " cube vertices, "
-	           << planeVertices.size() << " plane vertices");
+	{
+		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
+		light->o_name = "SimpleShadowLight";
+		light->SetPosition(res.lightPosition);
+		res.scene->UseLight(light);
+	}
+
+	NEURUS_LOG("[LoadSimpleShadow] Built 2 meshes (cube + plane) + 1 point light — "
+	           << res.renderItems.size() << " render items");
 
 	return res;
 }

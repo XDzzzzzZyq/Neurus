@@ -1,20 +1,25 @@
 /**
- * @file test_shadow_cubemap_depth_verify.cpp
+ * @file test_shadow_cubemap.cpp
  * @brief GPU test: renders cube+plane scene into ShadowDepthPass cubemap,
  *        reads back face 3 (-Y) raw float depth data, and verifies every
  *        pixel against mathematically-computed expected depth values.
  *
- * Mathematical verification (no reference PNGs):
+ * Mathematical verification:
  *   - Cube unit at [-0.5, +0.5]^3, plane at y=0 spanning [-5,5] in XZ
  *   - Point light at (0, 3, 0), farPlane=25.0
  *   - Depth = dist(lightPos, worldPos) / farPlane written by fragment shader
  *   - For each pixel (px,py), ray-cast from light to determine expected depth
  *   - Compare pixel-by-pixel with tolerance +/-3/255 (~0.01176)
+ *
+ * Reference image regression (appended after mathematical verification):
+ *   - First run: generates reference PNG → GTEST_SKIP
+ *   - Second run: compares pixel-by-pixel with ±2 tolerance → PASS
  */
 
 #include <gtest/gtest.h>
 
 #include "shared/TestVulkanShared.h"
+#include "shared/TestSimpleShadow.h"
 
 #include "render/passes/ShadowDepthPass.h"
 #include "render/passes/GeometryPass.h"    // for GeometryRenderItem definition
@@ -23,10 +28,10 @@
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/shaders/ShaderModule.h"
-#include "render/buffers/IndexBuffer.h"
-#include "render/buffers/VertexBuffer.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/VulkanBuffer.h"
+
+#include <stb_image.h>
 #include <filesystem>
 
 #include "shadow_depth.vert.h"
@@ -38,6 +43,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -45,23 +51,15 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
-// Test vertex structure (matches ShadowDepthPass vertex layout:
-//   pos(3) + normal(3) + uv(2) = 8 floats = 32 bytes)
-// Only position is consumed by the shadow depth shader; normals/uvs are
-// unused padding required by the pipeline's vertex input state.
+// Reference image directory
 // ---------------------------------------------------------------------------
-struct TestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
+static const char* kReferenceDir = "../../../test/render/reference/";
 
 // ---------------------------------------------------------------------------
 // Test fixture
 // ---------------------------------------------------------------------------
 
-class ShadowCubemapDepthVerifyTest : public VulkanTestShared
+class ShadowCubemapTest : public VulkanTestShared
 {
 protected:
 	static constexpr uint32_t kRes        = 256;
@@ -196,6 +194,53 @@ protected:
 		return 1.0f;
 	}
 
+	// --- Reference image comparison ---
+	static bool LoadPng(const std::string& path,
+	                    std::vector<uint8_t>& pixels,
+	                    int& width, int& height, int& channels)
+	{
+		int w, h, c;
+		unsigned char* data = stbi_load(path.c_str(), &w, &h, &c, 4);
+		if (!data) return false;
+
+		width = w;
+		height = h;
+		channels = 4;
+		const size_t byteCount = static_cast<size_t>(w) * h * 4;
+		pixels.assign(data, data + byteCount);
+		stbi_image_free(data);
+		return true;
+	}
+
+	static int ComparePixels(const std::vector<uint8_t>& a,
+	                         const std::vector<uint8_t>& b,
+	                         int width, int height,
+	                         int maxDiffPerChannel = 2)
+	{
+		const size_t count = static_cast<size_t>(width) * height * 4;
+		if (a.size() != count || b.size() != count) return -1;
+
+		int badPixels = 0;
+		for (size_t i = 0; i < count; i += 4)
+		{
+			for (int c = 0; c < 4; ++c)
+			{
+				const int delta = std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c]));
+				if (delta > maxDiffPerChannel)
+				{
+					++badPixels;
+					break;
+				}
+			}
+		}
+		return badPixels;
+	}
+
+	static std::string ReferencePath()
+	{
+		return std::string(kReferenceDir) + "shadow/CubemapDepth_Face3.png";
+	}
+
 	// --- Render data ---
 	std::unique_ptr<ShadowDepthPass> m_shadowDepthPass;
 };
@@ -204,7 +249,7 @@ protected:
 // Cubemap Depth Verification Test
 // ===========================================================================
 
-TEST_F(ShadowCubemapDepthVerifyTest, Face3Depth_MatchesExpectedValues)
+TEST_F(ShadowCubemapTest, Face3Depth)
 {
 	if (!m_hasVulkan)
 	{
@@ -214,81 +259,15 @@ TEST_F(ShadowCubemapDepthVerifyTest, Face3Depth_MatchesExpectedValues)
 	auto& pd = PhysicalDevice();
 
 	// -------------------------------------------------------------------
-	// Step 1: Build scene geometry (cube + plane)
-	// Buffers are created here and live for the full test duration.
+	// Step 1: Build scene geometry (cube + plane via Scene/Mesh/Light)
+	// Scene owns all GPU resources and must outlive the render items.
 	// -------------------------------------------------------------------
 
-	// --- Cube vertices (8 corners, pos + unused normals/uvs) ---
-	const TestVertex cubeVertices[] = {
-		{-0.5f, -0.5f, -0.5f, 0,0,0, 0,0},  // v0
-		{ 0.5f, -0.5f, -0.5f, 0,0,0, 0,0},  // v1
-		{ 0.5f, -0.5f,  0.5f, 0,0,0, 0,0},  // v2
-		{-0.5f, -0.5f,  0.5f, 0,0,0, 0,0},  // v3
-		{-0.5f,  0.5f, -0.5f, 0,0,0, 0,0},  // v4
-		{ 0.5f,  0.5f, -0.5f, 0,0,0, 0,0},  // v5
-		{ 0.5f,  0.5f,  0.5f, 0,0,0, 0,0},  // v6
-		{-0.5f,  0.5f,  0.5f, 0,0,0, 0,0},  // v7
-	};
+	auto shadowRes = neurus::test::LoadSimpleShadow(
+		*m_device, pd, m_queue, m_graphicsQueueFamily);
 
-	// 12 triangles = 36 indices
-	const uint32_t cubeIndices[] = {
-		// Front  (-Z): 0,1,5, 0,5,4
-		0,1,5, 0,5,4,
-		// Back   (+Z): 2,3,7, 2,7,6
-		2,3,7, 2,7,6,
-		// Left   (-X): 3,0,4, 3,4,7
-		3,0,4, 3,4,7,
-		// Right  (+X): 1,2,6, 1,6,5
-		1,2,6, 1,6,5,
-		// Bottom (-Y): 3,2,1, 3,1,0
-		3,2,1, 3,1,0,
-		// Top    (+Y): 4,5,6, 4,6,7
-		4,5,6, 4,6,7,
-	};
-
-	// --- Plane vertices (y=0, [-5,+5] in XZ) ---
-	const TestVertex planeVertices[] = {
-		{-5.0f, 0.0f, -5.0f, 0,0,0, 0,0},
-		{ 5.0f, 0.0f, -5.0f, 0,0,0, 0,0},
-		{ 5.0f, 0.0f,  5.0f, 0,0,0, 0,0},
-		{-5.0f, 0.0f,  5.0f, 0,0,0, 0,0},
-	};
-
-	const uint32_t planeIndices[] = {0, 1, 2, 0, 2, 3};
-
-	// --- Upload GPU buffers (live for test duration) ---
-	VertexBuffer cubeVBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		cubeVertices, sizeof(cubeVertices),
-		sizeof(TestVertex), 8u);
-	IndexBuffer cubeIBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		cubeIndices, sizeof(cubeIndices), 36u);
-
-	VertexBuffer planeVBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		planeVertices, sizeof(planeVertices),
-		sizeof(TestVertex), 4u);
-	IndexBuffer planeIBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		planeIndices, sizeof(planeIndices), 6u);
-
-	// --- Assemble render items ---
-	const glm::mat4 identity(1.0f);
-
-	GeometryRenderItem cubeItem{};
-	cubeItem.vertexBuffer = cubeVBO.buffer();
-	cubeItem.indexBuffer  = cubeIBO.buffer();
-	cubeItem.indexCount   = cubeIBO.GetIndexCount();
-	cubeItem.indexType    = cubeIBO.GetIndexType();
-	cubeItem.pushConstants.model       = identity;
-	cubeItem.pushConstants.normalMatrix = identity;
-
-	GeometryRenderItem planeItem{};
-	planeItem.vertexBuffer = planeVBO.buffer();
-	planeItem.indexBuffer  = planeIBO.buffer();
-	planeItem.indexCount   = planeIBO.GetIndexCount();
-	planeItem.indexType    = planeIBO.GetIndexType();
-	planeItem.pushConstants.model       = identity;
-	planeItem.pushConstants.normalMatrix = identity;
-
-	std::vector<GeometryRenderItem> renderItems = {cubeItem, planeItem};
+	const auto& renderItems = shadowRes.renderItems;
+	ASSERT_EQ(renderItems.size(), 2u) << "Expected 2 meshes (cube + plane)";
 
 	// -------------------------------------------------------------------
 	// Step 2: Record shadow depth pass into cubemap
@@ -712,21 +691,58 @@ TEST_F(ShadowCubemapDepthVerifyTest, Face3Depth_MatchesExpectedValues)
 	          << " (tolerance=" << kTolerance << ")"
 	          << std::endl;
 
-	// Save depth map as grayscale PNG for visual inspection
+	// Convert depth to u8 for reference image regression
+	std::vector<uint8_t> u8Data(kRes * kRes);
+	for (uint32_t i = 0; i < kRes * kRes; ++i)
 	{
-		std::vector<uint8_t> u8Data(kRes * kRes);
-		for (uint32_t i = 0; i < kRes * kRes; ++i)
-		{
-			float v = depthData[i];
-			v = std::max(0.0f, std::min(1.0f, v));  // clamp
-			u8Data[i] = static_cast<uint8_t>(v * 255.0f + 0.5f);
-		}
+		float v = depthData[i];
+		v = std::max(0.0f, std::min(1.0f, v));  // clamp
+		u8Data[i] = static_cast<uint8_t>(v * 255.0f + 0.5f);
+	}
 
-		std::filesystem::create_directories("screenshots");
-		bool saved = ImageData::SavePixelData(
+	// -------------------------------------------------------------------
+	// Reference image regression
+	// -------------------------------------------------------------------
+	{
+		const std::string refPath = ReferencePath();
+		const bool refExists = std::filesystem::exists(refPath);
+		std::filesystem::create_directories(std::string(kReferenceDir) + "shadow/");
+
+		const std::string tmpPath = refPath + ".tmp";
+
+		// Save captured depth as PNG (reuse u8Data)
+		const bool captured = ImageData::SavePixelData(
 			u8Data.data(), vk::Format::eR8Unorm,
-			vk::Extent2D(kRes, kRes), "screenshots/shadow_depth_face3.png");
-		std::cout << "Depth map saved: " << (saved ? "yes" : "FAILED") << std::endl;
+			vk::Extent2D(kRes, kRes), tmpPath);
+		ASSERT_TRUE(captured) << "Failed to capture depth map for reference";
+
+		if (!refExists)
+		{
+			std::rename(tmpPath.c_str(), refPath.c_str());
+			GTEST_SKIP() << "Reference image generated. Re-run the test to compare.";
+		}
+		else
+		{
+			// Load both and compare
+			std::vector<uint8_t> tmpPixels, refPixels;
+			int tmpW, tmpH, tmpC, refW, refH, refC;
+
+			const bool tmpLoaded = LoadPng(tmpPath, tmpPixels, tmpW, tmpH, tmpC);
+			const bool refLoaded = LoadPng(refPath, refPixels, refW, refH, refC);
+
+			ASSERT_TRUE(tmpLoaded);
+			ASSERT_TRUE(refLoaded);
+			ASSERT_EQ(tmpW, refW);
+			ASSERT_EQ(tmpH, refH);
+
+			const int refBadPixels = ComparePixels(tmpPixels, refPixels, tmpW, tmpH, 2);
+
+			// Clean up temp file
+			std::remove(tmpPath.c_str());
+
+			EXPECT_EQ(refBadPixels, 0)
+				<< refBadPixels << " pixel(s) differ in cubemap depth (threshold: 2 per channel).";
+		}
 	}
 
 	// Sanity checks

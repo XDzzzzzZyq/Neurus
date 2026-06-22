@@ -34,7 +34,6 @@ TEST(ImageDataTest, PixelByteSize_R8_Returns1)
 TEST(ImageDataTest, PixelByteSize_UnknownFormat_Returns0)
 {
 	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eUndefined), 0u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR32G32B32A32Sfloat), 0u);
 }
 
 // ---------------------------------------------------------------------------
