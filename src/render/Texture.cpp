@@ -386,7 +386,7 @@ bool Texture::SaveImage(Image& image,
 			srcAccess, vk::AccessFlagBits::eTransferRead,
 			prevLayout, vk::ImageLayout::eTransferSrcOptimal,
 			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, vkImage,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+			vk::ImageSubresourceRange(Image::AspectFromFormat(image.Format()), 0, 1, 0, 1));
 		cmdBufs[0].pipelineBarrier(srcStage, vk::PipelineStageFlagBits::eTransfer,
 		                           {}, {}, {}, barrier);
 		cmdBufs[0].end();
@@ -423,7 +423,7 @@ bool Texture::SaveImage(Image& image,
 			vk::AccessFlagBits::eTransferRead, dstAccess,
 			vk::ImageLayout::eTransferSrcOptimal, prevLayout,
 			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, vkImage,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+			vk::ImageSubresourceRange(Image::AspectFromFormat(image.Format()), 0, 1, 0, 1));
 		cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
 		                           dstStage, {}, {}, {}, barrier);
 		cmdBufs[0].end();

@@ -82,6 +82,7 @@ target_include_directories(neurus_test PRIVATE
 
 target_compile_definitions(neurus_test PRIVATE
 	TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+	GLM_FORCE_DEPTH_ZERO_TO_ONE
 )
 
 # Enable Qt MOC for test files containing QObject subclasses

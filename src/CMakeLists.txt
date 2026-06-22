@@ -60,6 +60,9 @@ target_include_directories(Neurus PRIVATE
 # ADS_STATIC: tell Qt-Advanced-Docking-System headers to use static linkage
 target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 
+# GLM_FORCE_DEPTH_ZERO_TO_ONE: glm::perspective() produces Vulkan [0,1] depth range
+target_compile_definitions(Neurus PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)
+
 # Windows: mark as GUI application (no console window in Release)
 if(WIN32)
 	set_target_properties(Neurus PROPERTIES

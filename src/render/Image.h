@@ -207,6 +207,14 @@ public:
 	/** @brief CPU-side pixel data used to create this image (may be default-constructed). */
 	const ImageData& GetImageData() const { return m_imageData; }
 
+	/**
+	 * @brief Returns the Vulkan image aspect flags for a given format.
+	 *
+	 * Maps D16_UNORM / D32_SFLOAT to eDepth, D24_UNORM_S8_UINT / D32_SFLOAT_S8_UINT
+	 * to eDepth | eStencil, and all other formats to eColor.
+	 */
+	static vk::ImageAspectFlags AspectFromFormat(vk::Format format);
+
 	// --- Layout state ---
 
 	/**
@@ -237,7 +245,6 @@ private:
 	// --- Layout helpers ---
 	static vk::AccessFlags AccessFlagsForLayout(vk::ImageLayout layout);
 	static vk::PipelineStageFlags PipelineStageForLayout(vk::ImageLayout layout);
-	static vk::ImageAspectFlags AspectFromFormat(vk::Format format);
 	static uint32_t FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
 	                               uint32_t typeFilter,
 	                               vk::MemoryPropertyFlags properties);
