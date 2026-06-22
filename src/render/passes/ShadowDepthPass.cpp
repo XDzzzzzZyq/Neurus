@@ -200,7 +200,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
 			                          0, 1, 0, kShadowFaceCount));
 		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-		                       vk::PipelineStageFlagBits::eEarlyFragmentTests,
+		                       vk::PipelineStageFlagBits::eLateFragmentTests,
 		                       {}, {}, {}, barrier);
 		m_cubemap.SetCurrentLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 	}
@@ -269,7 +269,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			*m_cubemap.ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
 			                          0, 1, 0, kShadowFaceCount));
-		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eEarlyFragmentTests,
+		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eLateFragmentTests,
 		                       vk::PipelineStageFlagBits::eComputeShader,
 		                       {}, {}, {}, barrier);
 		m_cubemap.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
