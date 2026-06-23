@@ -109,8 +109,9 @@ Follow Karpathy Guidelines. For each task:
 3. Test and Verify. Do not just run unit tests -- **always launch `Neurus.exe`** to check:
    - Terminal output for validation errors (`VUID-...`), crashes, or unexpected log messages
    - Visual correctness in the rendered viewport (use screenshots for analysis)
-   - Runtime behavior: resize the window, interact with the viewport, verify no deadlocks or freezes
-4. Before committing, keep all relevant documents updated.
+   - Runtime behavior: resize the window, interact with the viewport, verify no deadlocks or freezes.
+   Most importantly, the design of test should be comprehensive (mathematical verification, reference image test, etc.), forming a logic chain that proves the correctness of each component.
+4. Before committing, keep ALL relevant documents updated.
 
 ```
 $output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
