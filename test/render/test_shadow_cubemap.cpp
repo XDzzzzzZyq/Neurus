@@ -31,8 +31,7 @@
 #include "render/buffers/BufferLayout.h"
 #include "render/VulkanBuffer.h"
 
-#include <stb_image.h>
-#include <filesystem>
+#include "shared/TestReferenceImage.h"
 
 #include "shadow_depth.vert.h"
 #include "depth_to_color.frag.h"
@@ -49,11 +48,6 @@
 #include <vector>
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Reference image directory
-// ---------------------------------------------------------------------------
-static const char* kReferenceDir = "../../../test/render/reference/";
 
 // ---------------------------------------------------------------------------
 // Test fixture
@@ -194,53 +188,6 @@ protected:
 		return 1.0f;
 	}
 
-	// --- Reference image comparison ---
-	static bool LoadPng(const std::string& path,
-	                    std::vector<uint8_t>& pixels,
-	                    int& width, int& height, int& channels)
-	{
-		int w, h, c;
-		unsigned char* data = stbi_load(path.c_str(), &w, &h, &c, 4);
-		if (!data) return false;
-
-		width = w;
-		height = h;
-		channels = 4;
-		const size_t byteCount = static_cast<size_t>(w) * h * 4;
-		pixels.assign(data, data + byteCount);
-		stbi_image_free(data);
-		return true;
-	}
-
-	static int ComparePixels(const std::vector<uint8_t>& a,
-	                         const std::vector<uint8_t>& b,
-	                         int width, int height,
-	                         int maxDiffPerChannel = 2)
-	{
-		const size_t count = static_cast<size_t>(width) * height * 4;
-		if (a.size() != count || b.size() != count) return -1;
-
-		int badPixels = 0;
-		for (size_t i = 0; i < count; i += 4)
-		{
-			for (int c = 0; c < 4; ++c)
-			{
-				const int delta = std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c]));
-				if (delta > maxDiffPerChannel)
-				{
-					++badPixels;
-					break;
-				}
-			}
-		}
-		return badPixels;
-	}
-
-	static std::string ReferencePath()
-	{
-		return std::string(kReferenceDir) + "shadow/CubemapDepth_Face3.png";
-	}
-
 	// --- Render data ---
 	std::unique_ptr<ShadowDepthPass> m_shadowDepthPass;
 };
@@ -359,7 +306,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		"Face3UBO");
 
 	{
-		const glm::vec3 lightPos(0.0f, 3.0f, 0.0f);
+		const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
 		const float kNearPlane = 0.1f;
 		const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, kNearPlane, kFarPlane);
 
@@ -599,7 +546,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	// -------------------------------------------------------------------
 	// Step 9: Pixel-by-pixel verification
 	// -------------------------------------------------------------------
-	const glm::vec3 lightPos(0.0f, 3.0f, 0.0f);
+	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
 
 	int cubePixels  = 0;
 	int planePixels = 0;
@@ -704,10 +651,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	// Reference image regression
 	// -------------------------------------------------------------------
 	{
-		const std::string refPath = ReferencePath();
-		const bool refExists = std::filesystem::exists(refPath);
-		std::filesystem::create_directories(std::string(kReferenceDir) + "shadow/");
-
+		const std::string refPath = std::string(neurus::test::kReferenceDir) + "shadow/CubemapDepth_Face3.png";
 		const std::string tmpPath = refPath + ".tmp";
 
 		// Save captured depth as PNG (reuse u8Data)
@@ -716,33 +660,11 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 			vk::Extent2D(kRes, kRes), tmpPath);
 		ASSERT_TRUE(captured) << "Failed to capture depth map for reference";
 
-		if (!refExists)
-		{
-			std::rename(tmpPath.c_str(), refPath.c_str());
+		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+		if (refResult < 0)
 			GTEST_SKIP() << "Reference image generated. Re-run the test to compare.";
-		}
-		else
-		{
-			// Load both and compare
-			std::vector<uint8_t> tmpPixels, refPixels;
-			int tmpW, tmpH, tmpC, refW, refH, refC;
-
-			const bool tmpLoaded = LoadPng(tmpPath, tmpPixels, tmpW, tmpH, tmpC);
-			const bool refLoaded = LoadPng(refPath, refPixels, refW, refH, refC);
-
-			ASSERT_TRUE(tmpLoaded);
-			ASSERT_TRUE(refLoaded);
-			ASSERT_EQ(tmpW, refW);
-			ASSERT_EQ(tmpH, refH);
-
-			const int refBadPixels = ComparePixels(tmpPixels, refPixels, tmpW, tmpH, 2);
-
-			// Clean up temp file
-			std::remove(tmpPath.c_str());
-
-			EXPECT_EQ(refBadPixels, 0)
-				<< refBadPixels << " pixel(s) differ in cubemap depth (threshold: 2 per channel).";
-		}
+		EXPECT_EQ(refResult, 0)
+			<< refResult << " pixel(s) differ in cubemap depth (threshold: 2 per channel).";
 	}
 
 	// Sanity checks

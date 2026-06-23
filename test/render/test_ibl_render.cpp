@@ -48,8 +48,7 @@
 #include <irradiance_conv.comp.h>
 #include <importance_samp.comp.h>
 
-// --- STB image load ---
-#include <stb_image.h>
+#include "shared/TestReferenceImage.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -57,7 +56,6 @@
 #include <array>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -73,11 +71,6 @@ struct IBLTestVertex
 	float nrmX, nrmY, nrmZ;
 	float uvX,  uvY;
 };
-
-// ---------------------------------------------------------------------------
-// Reference image directory (relative to build/debug/test/)
-// ---------------------------------------------------------------------------
-static const char* kReferenceDir = "../../../test/render/reference/";
 
 // ---------------------------------------------------------------------------
 // Procedural colourful gradient equirectangular image
@@ -314,53 +307,6 @@ protected:
 		EndSubmitWait(cmd);
 	}
 
-	// --- Reference image comparison ---
-	static bool LoadPng(const std::string& path,
-	                    std::vector<uint8_t>& pixels,
-	                    int& width, int& height, int& channels)
-	{
-		int w, h, c;
-		unsigned char* data = stbi_load(path.c_str(), &w, &h, &c, 4);
-		if (!data) return false;
-
-		width = w;
-		height = h;
-		channels = 4;
-		const size_t byteCount = static_cast<size_t>(w) * h * 4;
-		pixels.assign(data, data + byteCount);
-		stbi_image_free(data);
-		return true;
-	}
-
-	static int ComparePixels(const std::vector<uint8_t>& a,
-	                         const std::vector<uint8_t>& b,
-	                         int width, int height,
-	                         int maxDiffPerChannel = 3)
-	{
-		const size_t count = static_cast<size_t>(width) * height * 4;
-		if (a.size() != count || b.size() != count) return -1;
-
-		int badPixels = 0;
-		for (size_t i = 0; i < count; i += 4)
-		{
-			for (int c = 0; c < 4; ++c)
-			{
-				const int delta = std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c]));
-				if (delta > maxDiffPerChannel)
-				{
-					++badPixels;
-					break;
-				}
-			}
-		}
-		return badPixels;
-	}
-
-	static std::string ReferencePath()
-	{
-		return std::string(kReferenceDir) + "ibl/ibl_render.png";
-	}
-
 	// --- Render pass infrastructure ---
 	std::unique_ptr<AttachmentManager>  m_attachmentManager;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
@@ -513,12 +459,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	// Step 9: Capture HDRColor & compare with reference
 	// -------------------------------------------------------------------
-	const std::string refPath = ReferencePath();
-	const bool refExists = std::ifstream(refPath).good();
-
-	// Create reference sub-directory if needed
-	std::filesystem::create_directories(std::string(kReferenceDir) + "ibl/");
-
+	const std::string refPath = std::string(neurus::test::kReferenceDir) + "ibl/ibl_render.png";
 	const std::string tmpPath = refPath + ".tmp";
 
 	Image& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
@@ -528,34 +469,10 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 
 	ASSERT_TRUE(captured) << "Failed to capture HDRColor attachment";
 
-	if (!refExists)
-	{
-		// First run — rename .tmp → .png to generate reference
-		std::rename(tmpPath.c_str(), refPath.c_str());
+	const int result = neurus::test::CheckReferenceOrGenerate(refPath, 3);
+	if (result < 0)
 		GTEST_SKIP() << "Reference image generated. Re-run the test to compare.";
-	}
-	else
-	{
-		// Compare against reference
-		std::vector<uint8_t> tmpPixels, refPixels;
-		int tmpW, tmpH, tmpC, refW, refH, refC;
-
-		const bool tmpLoaded = LoadPng(tmpPath, tmpPixels, tmpW, tmpH, tmpC);
-		const bool refLoaded = LoadPng(refPath, refPixels, refW, refH, refC);
-
-		ASSERT_TRUE(tmpLoaded) << "Failed to load captured PNG: " << tmpPath;
-		ASSERT_TRUE(refLoaded) << "Failed to load reference PNG: " << refPath;
-		ASSERT_EQ(tmpW, refW) << "Width mismatch";
-		ASSERT_EQ(tmpH, refH) << "Height mismatch";
-
-		const int badPixels = ComparePixels(tmpPixels, refPixels, tmpW, tmpH, 3);
-
-		// Clean up temp file
-		std::remove(tmpPath.c_str());
-
-		EXPECT_EQ(badPixels, 0)
-			<< badPixels << " pixel(s) differ in IBL render (threshold: 3 per channel).";
-	}
+	EXPECT_EQ(result, 0) << result << " pixel(s) differ in IBL render (threshold: 3 per channel).";
 }
 
 // ===========================================================================

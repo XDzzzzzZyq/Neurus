@@ -10,7 +10,7 @@
  * Usage:
  * @code
  *   auto scene = LoadSimpleShadow(device, pd, queue, qfi);
- *   m_shadowPass->SetLightPosition(scene.lightPosition);
+ *   m_shadowPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
  *   m_shadowPass->Record(cmd, ctx);  // uses scene.renderItems internally
  * @endcode
  *
@@ -50,8 +50,6 @@ struct SimpleShadowResources
 {
 	std::shared_ptr<Scene> scene;
 	std::vector<GeometryRenderItem> renderItems;
-
-	glm::vec3 lightPosition{0.0f, 3.0f, 0.0f};
 };
 
 /**
@@ -186,7 +184,7 @@ f 1 2 3 4
 	{
 		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->o_name = "SimpleShadowLight";
-		light->SetPosition(res.lightPosition);
+		light->SetPosition(glm::vec3(0.0f, 3.0f, 0.0f));
 		res.scene->UseLight(light);
 	}
 

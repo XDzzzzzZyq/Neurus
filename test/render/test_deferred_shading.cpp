@@ -45,8 +45,7 @@
 #include <gbuffer.frag.h>
 #include <pbr_lighting.comp.h>
 
-// --- STB image load (declaration only — implementation in Texture.cpp) ---
-#include <stb_image.h>
+#include "shared/TestReferenceImage.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -54,7 +53,6 @@
 #include <array>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -70,12 +68,6 @@ struct TestVertex
 	float nrmX, nrmY, nrmZ;
 	float uvX,  uvY;
 };
-
-// ---------------------------------------------------------------------------
-// Reference image directory.
-// ctest runs from build/debug/test/ → walk 3 levels to project root
-// ---------------------------------------------------------------------------
-static const char* kReferenceDir = "../../../test/render/reference/";
 
 // ---------------------------------------------------------------------------
 // Attachment list for reference comparison
@@ -175,65 +167,6 @@ protected:
 			vk::ImageLayout::eDepthStencilAttachmentOptimal);
 
 		EndSubmitWait(cmd);
-	}
-
-	// --- Reference image comparison ---
-
-	/**
-	 * @brief Loads a PNG into RGBA8 pixels, returns true on success.
-	 */
-	static bool LoadPng(const std::string& path,
-	                    std::vector<uint8_t>& pixels,
-	                    int& width, int& height, int& channels)
-	{
-		int w, h, c;
-		unsigned char* data = stbi_load(path.c_str(), &w, &h, &c, 4);  // force RGBA
-		if (!data) return false;
-
-		width = w;
-		height = h;
-		channels = 4;
-		const size_t byteCount = static_cast<size_t>(w) * h * 4;
-		pixels.assign(data, data + byteCount);
-		stbi_image_free(data);
-		return true;
-	}
-
-	/**
-	 * @brief Compares two RGBA8 images pixel‑wise within a tolerance.
-	 * @return Number of differing pixels (0 = identical).
-	 */
-	static int ComparePixels(const std::vector<uint8_t>& a,
-	                         const std::vector<uint8_t>& b,
-	                         int width, int height,
-	                         int maxDiffPerChannel = 2)
-	{
-		const size_t count = static_cast<size_t>(width) * height * 4;
-		if (a.size() != count || b.size() != count) return -1;
-
-		int badPixels = 0;
-		for (size_t i = 0; i < count; i += 4)
-		{
-			for (int c = 0; c < 4; ++c)
-			{
-				const int delta = std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c]));
-				if (delta > maxDiffPerChannel)
-				{
-					++badPixels;
-					break;
-				}
-			}
-		}
-		return badPixels;
-	}
-
-	/**
-	 * @brief Returns the reference PNG path for a given attachment name.
-	 * All deferred-shading references live under reference/deferred/.
-	 */
-	static std::string ReferencePath(AttachmentName name)
-	{
-		return std::string(kReferenceDir) + "deferred/" + AttachmentNameToString(name) + ".png";
 	}
 
 	// --- Render pass infrastructure ---
@@ -381,30 +314,16 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// -------------------------------------------------------------------
 	// Step 9: Capture attachment screenshots & compare with reference images
 	// -------------------------------------------------------------------
-	bool allReferenceExist = true;
-	for (int i = 0; i < kReferenceAttachmentCount; ++i)
-	{
-		if (!std::ifstream(ReferencePath(kReferenceAttachments[i])).good())
-		{
-			allReferenceExist = false;
-			break;
-		}
-	}
-
-	// Create reference sub-directory if needed
-	{
-		std::filesystem::create_directories(
-			std::string(kReferenceDir) + "deferred/");
-	}
+	int totalBadPixels = 0;
+	bool anyGenerated = false;
 
 	for (int i = 0; i < kReferenceAttachmentCount; ++i)
 	{
 		const AttachmentName name = kReferenceAttachments[i];
 		const bool isNormal = (name == AttachmentName::Normal);
 
-		const std::string refPath = ReferencePath(name);
-
-		// Temp path next to the reference image
+		const std::string refPath = std::string(neurus::test::kReferenceDir)
+			+ "deferred/" + AttachmentNameToString(name) + ".png";
 		const std::string tmpPath = refPath + ".tmp";
 
 		Image& attachment = m_attachmentManager->GetAttachment(name);
@@ -415,38 +334,24 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 		ASSERT_TRUE(captured) << "Failed to capture attachment: "
 		                      << AttachmentNameToString(name);
 
-		if (!allReferenceExist)
+		const int result = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+		if (result < 0)
 		{
-			// First run — rename .tmp → .png to generate reference image
-			std::rename(tmpPath.c_str(), refPath.c_str());
+			if (result == -1)
+				anyGenerated = true;
+			else
+				FAIL() << "Failed to load reference image for " << AttachmentNameToString(name);
 		}
 		else
 		{
-			// Compare against reference image
-			std::vector<uint8_t> tmpPixels, refPixels;
-			int tmpW, tmpH, tmpC, refW, refH, refC;
-
-			const bool tmpLoaded = LoadPng(tmpPath, tmpPixels, tmpW, tmpH, tmpC);
-			const bool refLoaded = LoadPng(refPath, refPixels, refW, refH, refC);
-
-			ASSERT_TRUE(tmpLoaded) << "Failed to load captured PNG: " << tmpPath;
-			ASSERT_TRUE(refLoaded) << "Failed to load reference PNG: " << refPath;
-			ASSERT_EQ(tmpW, refW) << "Width mismatch for " << AttachmentNameToString(name);
-			ASSERT_EQ(tmpH, refH) << "Height mismatch for " << AttachmentNameToString(name);
-
-			const int badPixels = ComparePixels(tmpPixels, refPixels, tmpW, tmpH, 2);
-
-			// Clean up temp file
-			std::remove(tmpPath.c_str());
-
-			EXPECT_EQ(badPixels, 0)
-				<< badPixels << " pixel(s) differ in " << AttachmentNameToString(name)
-				<< " (threshold: 2 per channel).";
+			totalBadPixels += result;
 		}
 	}
 
-	if (!allReferenceExist)
+	if (anyGenerated)
 	{
 		GTEST_SKIP() << "Reference images generated.  Re-run the test to compare.";
 	}
+	EXPECT_EQ(totalBadPixels, 0)
+		<< totalBadPixels << " pixel(s) differ in reference comparison.";
 }
