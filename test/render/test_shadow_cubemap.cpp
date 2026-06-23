@@ -34,7 +34,6 @@
 #include "shared/TestReferenceImage.h"
 
 #include "shadow_depth.vert.h"
-#include "shadow_depth_multiview.vert.h"
 #include "depth_to_color.frag.h"
 
 #include <glm/glm.hpp>
@@ -154,6 +153,14 @@ protected:
 			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes, kFarPlane);
 
 		m_shadowDepthPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
+
+		if (m_multiviewAvailable)
+		{
+			m_multiviewDepthPass = std::make_unique<ShadowDepthPass>(
+				*m_device, pd, m_queue, m_graphicsQueueFamily,
+				kRes, kFarPlane, ShadowMode::Multiview);
+			m_multiviewDepthPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
+		}
 	}
 
 	void TearDown() override
@@ -355,6 +362,7 @@ protected:
 
 	// --- Render data ---
 	std::unique_ptr<ShadowDepthPass> m_shadowDepthPass;
+	std::unique_ptr<ShadowDepthPass> m_multiviewDepthPass;
 	bool m_multiviewAvailable = false;
 };
 
@@ -436,9 +444,6 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		EndSubmitWait(cmd);
 	}
 
-	// -------------------------------------------------------------------
-	// Step 4: Create LightUBO populated with face 3 (-Y) VP matrix
-	// -------------------------------------------------------------------
 	// -------------------------------------------------------------------
 	// Step 4: Reuse ShadowDepthPass's UBO — update face 3 VP matrix
 	// -------------------------------------------------------------------
@@ -770,80 +775,8 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	ASSERT_EQ(renderItems.size(), 2u) << "Expected 2 meshes (cube + plane)";
 
 	// -------------------------------------------------------------------
-	// Step 2: Record shadow depth pass into cubemap (sanity)
+	// Step 2: Create colour cubemap for verification readback
 	// -------------------------------------------------------------------
-	{
-		auto& cmd = BeginCmd();
-		PassContext ctx{};
-		ctx.renderExtent = vk::Extent2D(kRes, kRes);
-		ctx.renderItems  = &renderItems;
-		m_shadowDepthPass->Record(*cmd, ctx);
-		EndSubmitWait(cmd);
-	}
-
-	// -------------------------------------------------------------------
-	// Step 3: Reuse pass's UBO + descriptor set
-	// -------------------------------------------------------------------
-	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
-
-	// Reuse pass's UBO (already filled with all 6 faces from SetUp's SetLightPosition)
-	const auto& lightLayout = m_shadowDepthPass->GetLightLayout();
-	vk::DescriptorSet lightSetHandle = m_shadowDepthPass->GetLightSetHandle();
-
-	// Shader modules — use multiview vertex shader
-	auto vertModule = ShaderModule::FromEmbedded(*m_device,
-		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
-	auto fragModule = ShaderModule::FromEmbedded(*m_device,
-		depth_to_color_frag_spv, sizeof(depth_to_color_frag_spv));
-
-	// Vertex layout
-	BufferLayout vtxLayout;
-	vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);   // inPosition
-	vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // inNormal (unused)
-	vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // inUV (unused)
-
-	// Push constant range: mat4 model only (64 bytes), no faceIndex needed
-	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4))
-	};
-
-	std::vector<vk::DescriptorSetLayout> dslayouts = { *lightLayout.layout() };
-
-	// Pipeline (multiview vertex shader — gl_ViewIndex selects VP matrix)
-	PipelineBuilder builder;
-	auto pipeline = builder
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(vtxLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLess)
-		.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
-			VK_FALSE,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-			vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA))
-		.SetColorFormats({vk::Format::eR32G32B32A32Sfloat})
-		.SetDepthFormat(vk::Format::eD32Sfloat)
-		.SetDescriptorSetLayouts(dslayouts)
-		.SetPushConstantRanges(pushRanges)
-		.BuildGraphicsPipeline(*m_device);
-
-	vk::PipelineLayoutCreateInfo plCI({}, dslayouts, pushRanges);
-	vk::raii::PipelineLayout pipelineLayout(*m_device, plCI);
-
-	// -------------------------------------------------------------------
-	// Step 4: Create single color cubemap (RGBA32F) + depth cubemap (D32)
-	// -------------------------------------------------------------------
-	// Must have VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT for multiview.
-
-	// --- Color cubemap ---
 	Image verifyCube(*m_device, pd,
 		vk::Extent2D(kRes, kRes),
 		vk::Format::eR32G32B32A32Sfloat,
@@ -851,17 +784,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		1u, Image::ImageType::eCube,
 		"VerificationCubemap");
 
-	// --- Depth cubemap ---
-	Image depthCube(*m_device, pd,
-		vk::Extent2D(kRes, kRes),
-		vk::Format::eD32Sfloat,
-		vk::ImageUsageFlagBits::eDepthStencilAttachment,
-		1u, Image::ImageType::eCube,
-		"DepthVerificationCubemap");
-
-	// -------------------------------------------------------------------
-	// Step 5: Transition cubemaps to attachment layouts
-	// -------------------------------------------------------------------
+	// Transition colour cubemap to colour-attachment layout
 	{
 		auto& cmd = BeginCmd();
 		verifyCube.TransitionLayout(cmd,
@@ -869,82 +792,30 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			vk::ImageLayout::eColorAttachmentOptimal,
 			0, 1,  // mip 0, 1 level
 			0, 6); // all 6 array layers
-		depthCube.TransitionLayout(cmd,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			0, 1,  // mip 0, 1 level
-			0, 6); // all 6 array layers
 		EndSubmitWait(cmd);
 	}
 
 	// -------------------------------------------------------------------
-	// Step 6: Ensure pass UBO reflects the scene's light position
+	// Step 3: Ensure pass UBO reflects the scene's light position
 	// -------------------------------------------------------------------
-	m_shadowDepthPass->SetLightPosition(lightPos);
+	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
+	m_multiviewDepthPass->SetLightPosition(lightPos);
 
 	// -------------------------------------------------------------------
-	// Step 7: Render all 6 faces in ONE pass via multiview (viewMask = 0x3F)
+	// Step 4: Render all 6 faces in ONE pass via multiview (colour+depth)
+	//         The pass handles viewport, scissor, pipeline, descriptors.
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
 
-		const vk::Viewport viewport(0.f, 0.f,
-			static_cast<float>(kRes), static_cast<float>(kRes), 0.f, 1.f);
-		const vk::Rect2D scissor({0, 0}, {kRes, kRes});
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, scissor);
+		PassContext ctx{};
+		ctx.renderExtent = vk::Extent2D(kRes, kRes);
+		ctx.renderItems  = &renderItems;
+		ctx.optionalColorView   = verifyCube.ArrayView();  // implicit VkImageView
+		ctx.optionalColorFormat = vk::Format::eR32G32B32A32Sfloat;
+		m_multiviewDepthPass->Record(*cmd, ctx);
 
-		// Clear color = (1,1,1,1) so background pixels match expected depth of 1.0
-		const vk::ClearValue colorClear =
-			vk::ClearColorValue(std::array<float, 4>{1.f, 1.f, 1.f, 1.f});
-		const vk::ClearValue depthClear = vk::ClearDepthStencilValue(1.0f, 0);
-
-		vk::RenderingAttachmentInfo colorAtt(
-			verifyCube.ArrayView(),
-			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			colorClear);
-
-		vk::RenderingAttachmentInfo depthAtt(
-			depthCube.ArrayView(),
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			depthClear);
-
-		// viewMask = 0x3F: all 6 faces rendered simultaneously
-		// layerCount = 1:  the multiview extension maps views → layers
-		vk::RenderingInfo renderInfo(
-			vk::RenderingFlags{},
-			{{0, 0}, {kRes, kRes}},
-			1u,                 // layerCount
-			0x3Fu,              // viewMask: bits 0-5 = faces 0-5
-			colorAtt, &depthAtt, nullptr);
-
-		cmd.beginRendering(renderInfo);
-
-		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			pipelineLayout, 0, {lightSetHandle}, {});
-
-		// No faceIndex push constant — gl_ViewIndex handles it per-view
-		for (const auto& item : renderItems)
-		{
-			cmd.pushConstants<glm::mat4>(pipelineLayout,
-				vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
-			cmd.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-			cmd.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-			cmd.drawIndexed(item.indexCount, 1, 0, 0, 0);
-		}
-
-		cmd.endRendering();
-
-		// Transition color cubemap for readback (all layers)
+		// Transition colour cubemap for readback (must happen after rendering)
 		verifyCube.TransitionLayout(cmd,
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::ImageLayout::eTransferSrcOptimal,
@@ -955,7 +826,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 8: Read back each face layer and verify against expected depth
+	// Step 5: Read back each face layer and verify against expected depth
 	// -------------------------------------------------------------------
 	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRes) * kRes * 4 * sizeof(float);
 	bool anyReferenceGenerated = false;

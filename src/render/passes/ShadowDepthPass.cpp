@@ -10,6 +10,8 @@
 
 #include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
+#include "shadow_depth_multiview.vert.h"
+#include "depth_to_color.frag.h"
 
 #include "Log.h"
 
@@ -42,16 +44,22 @@ DescriptorSetLayout ShadowDepthPass::CreateLightLayout(const vk::raii::Device& d
 // ===========================================================================
 
 ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
-                                  const vk::raii::PhysicalDevice& physicalDevice,
-                                  vk::Queue graphicsQueue,
-                                  uint32_t queueFamilyIndex,
-                                  uint32_t resolution,
-                                  float farPlane)
+                                   const vk::raii::PhysicalDevice& physicalDevice,
+                                   vk::Queue graphicsQueue,
+                                   uint32_t queueFamilyIndex,
+                                   uint32_t resolution,
+                                   float farPlane,
+                                   ShadowMode mode)
 	: Pass()
 	, m_resolution(resolution)
 	, m_farPlane(farPlane)
+	, m_mode(mode)
 	, m_pipelineLayout(nullptr)
 	, m_pipeline(nullptr)
+	, m_multiviewPipelineLayout(nullptr)
+	, m_multiviewPipeline(nullptr)
+	, m_multiviewColorPipelineLayout(nullptr)
+	, m_multiviewColorPipeline(nullptr)
 {
 	m_device = &device;
 
@@ -61,7 +69,15 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 
 	createDepthCubemap(device, physicalDevice);
 	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
-	createPipeline(device);
+
+	if (m_mode == ShadowMode::Multiview)
+	{
+		createMultiviewPipeline(device);
+		createMultiviewColorPipeline(device);
+	}
+	else
+		createSingleFacePipeline(device);
+
 	updateUBO();
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution << " farPlane=" << farPlane
@@ -128,10 +144,10 @@ void ShadowDepthPass::createUniforms(const vk::raii::Device& device,
 }
 
 // ===========================================================================
-// createPipeline — graphics pipeline + layout
+// createSingleFacePipeline — graphics pipeline + layout (6 face passes)
 // ===========================================================================
 
-void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
+void ShadowDepthPass::createSingleFacePipeline(const vk::raii::Device& device)
 {
 	auto vertModule = ShaderModule::FromEmbedded(device, shadow_depth_vert_spv, sizeof(shadow_depth_vert_spv));
 	auto fragModule = ShaderModule::FromEmbedded(device, shadow_depth_frag_spv, sizeof(shadow_depth_frag_spv));
@@ -161,6 +177,95 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 
 	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
 	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
+}
+
+// ===========================================================================
+// createMultiviewPipeline — graphics pipeline + layout (single pass, viewMask)
+// ===========================================================================
+
+void ShadowDepthPass::createMultiviewPipeline(const vk::raii::Device& device)
+{
+	auto vertModule = ShaderModule::FromEmbedded(device,
+		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
+	auto fragModule = ShaderModule::FromEmbedded(device,
+		shadow_depth_frag_spv, sizeof(shadow_depth_frag_spv));
+
+	// Push constant: mat4 model only (64 bytes), no faceIndex needed
+	std::vector<vk::PushConstantRange> pushRanges = {
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4))
+	};
+
+	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
+
+	PipelineBuilder builder;
+	m_multiviewPipeline = builder
+		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.SetVertexInput(m_vtxLayout)
+		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+		.SetRasterization(vk::PolygonMode::eFill,
+		                  vk::CullModeFlagBits::eNone,
+		                  vk::FrontFace::eClockwise)
+		.SetMultisampling()
+		.SetDepthStencil(true, true, vk::CompareOp::eLess)
+		.SetColorFormats({})
+		.SetDepthFormat(kDepthFmt)
+		.SetDescriptorSetLayouts(dslayouts)
+		.SetPushConstantRanges(pushRanges)
+		.BuildGraphicsPipeline(device);
+
+	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
+	m_multiviewPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
+
+	NEURUS_LOG("[ShadowDepthPass] Multiview pipeline created");
+}
+
+// ===========================================================================
+// createMultiviewColorPipeline — colour+depth pipeline for verification
+// ===========================================================================
+
+void ShadowDepthPass::createMultiviewColorPipeline(const vk::raii::Device& device)
+{
+	auto vertModule = ShaderModule::FromEmbedded(device,
+		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
+	auto fragModule = ShaderModule::FromEmbedded(device,
+		depth_to_color_frag_spv, sizeof(depth_to_color_frag_spv));
+
+	std::vector<vk::PushConstantRange> pushRanges = {
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4))
+	};
+
+	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
+
+	PipelineBuilder builder;
+	m_multiviewColorPipeline = builder
+		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.SetVertexInput(m_vtxLayout)
+		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+		.SetRasterization(vk::PolygonMode::eFill,
+		                  vk::CullModeFlagBits::eNone,
+		                  vk::FrontFace::eClockwise)
+		.SetMultisampling()
+		.SetDepthStencil(true, true, vk::CompareOp::eLess)
+		.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
+			VK_FALSE,
+			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
+			vk::BlendOp::eAdd,
+			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
+			vk::BlendOp::eAdd,
+			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+			vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA))
+		.SetColorFormats({vk::Format::eR32G32B32A32Sfloat})
+		.SetDepthFormat(kDepthFmt)
+		.SetDescriptorSetLayouts(dslayouts)
+		.SetPushConstantRanges(pushRanges)
+		.BuildGraphicsPipeline(device);
+
+	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
+	m_multiviewColorPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
+
+	NEURUS_LOG("[ShadowDepthPass] Multiview colour+depth pipeline created");
 }
 
 // ===========================================================================
@@ -200,14 +305,15 @@ void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
 }
 
 // ===========================================================================
-// Record — 6 face passes
+// Record
 // ===========================================================================
 
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 {
 	const size_t itemCount = ctx.renderItems ? ctx.renderItems->size() : 0;
 	NEURUS_LOG("[ShadowDepthPass] Record: " << itemCount << " render items, "
-	           << m_resolution << "x" << m_resolution << " faces");
+	           << m_resolution << "x" << m_resolution
+	           << " mode=" << (m_mode == ShadowMode::Multiview ? "Multiview" : "SingleFace"));
 
 	// Transition cubemap to depth attachment layout (all faces/layers)
 	{
@@ -233,41 +339,63 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 	cmdBuf.setViewport(0, viewport);
 	cmdBuf.setScissor(0, scissor);
 
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
-	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-	                          m_pipelineLayout, 0,
-	                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
-
 	const vk::ClearValue clearValue = vk::ClearDepthStencilValue(1.0f, 0);
 
-	for (uint32_t face = 0; face < kShadowFaceCount; ++face)
+	if (m_mode == ShadowMode::Multiview)
 	{
+		// --- Multiview: render all 6 faces in a single pass ---
+
+		const bool hasColor = (ctx.optionalColorView &&
+		                       ctx.optionalColorFormat != vk::Format::eUndefined);
+
+		const auto& pipeline       = hasColor ? m_multiviewColorPipeline       : m_multiviewPipeline;
+		const auto& pipelineLayout = hasColor ? m_multiviewColorPipelineLayout : m_multiviewPipelineLayout;
+
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+		                          pipelineLayout, 0,
+		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+
 		vk::RenderingAttachmentInfo depthAtt(
-			*m_cubemap->FaceView(face),
+			m_cubemap->ArrayView(),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
 			vk::AttachmentLoadOp::eClear,
 			vk::AttachmentStoreOp::eStore,
-			clearValue);
+			vk::ClearDepthStencilValue(1.0f, 0));
 
-		vk::RenderingInfo renderInfo(
-			{}, {{0, 0}, {m_resolution, m_resolution}},
-			1, 0, {}, &depthAtt, nullptr);
+		if (hasColor)
+		{
+			vk::RenderingAttachmentInfo colorAtt(
+				ctx.optionalColorView,
+				vk::ImageLayout::eColorAttachmentOptimal,
+				vk::ResolveModeFlagBits::eNone, nullptr,
+				vk::ImageLayout::eUndefined,
+				vk::AttachmentLoadOp::eClear,
+				vk::AttachmentStoreOp::eStore,
+				vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
 
-		cmdBuf.beginRendering(renderInfo);
+			vk::RenderingInfo renderInfo(
+				{}, {{0, 0}, {m_resolution, m_resolution}},
+				1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
 
-		// Push face index at offset 64 (after model)
-		const int32_t faceIdx = static_cast<int32_t>(face);
-		cmdBuf.pushConstants<int32_t>(m_pipelineLayout,
-		                              vk::ShaderStageFlagBits::eVertex,
-		                              sizeof(glm::mat4), faceIdx);
+			cmdBuf.beginRendering(renderInfo);
+		}
+		else
+		{
+			vk::RenderingInfo renderInfo(
+				{}, {{0, 0}, {m_resolution, m_resolution}},
+				1u, 0x3Fu, {}, &depthAtt, nullptr);
+
+			cmdBuf.beginRendering(renderInfo);
+		}
 
 		if (ctx.renderItems)
 		{
 			for (const auto& item : *ctx.renderItems)
 			{
-				cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
+				cmdBuf.pushConstants<glm::mat4>(pipelineLayout,
 				    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
 				cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
 				cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
@@ -276,6 +404,53 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		}
 
 		cmdBuf.endRendering();
+	}
+	else
+	{
+		// --- SingleFace: 6 sequential passes, one per cubemap face ---
+
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
+		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+		                          m_pipelineLayout, 0,
+		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+
+		for (uint32_t face = 0; face < kShadowFaceCount; ++face)
+		{
+			vk::RenderingAttachmentInfo depthAtt(
+				*m_cubemap->FaceView(face),
+				vk::ImageLayout::eDepthStencilAttachmentOptimal,
+				vk::ResolveModeFlagBits::eNone, nullptr,
+				vk::ImageLayout::eUndefined,
+				vk::AttachmentLoadOp::eClear,
+				vk::AttachmentStoreOp::eStore,
+				clearValue);
+
+			vk::RenderingInfo renderInfo(
+				{}, {{0, 0}, {m_resolution, m_resolution}},
+				1, 0, {}, &depthAtt, nullptr);
+
+			cmdBuf.beginRendering(renderInfo);
+
+			// Push face index at offset 64 (after model)
+			const int32_t faceIdx = static_cast<int32_t>(face);
+			cmdBuf.pushConstants<int32_t>(m_pipelineLayout,
+			                              vk::ShaderStageFlagBits::eVertex,
+			                              sizeof(glm::mat4), faceIdx);
+
+			if (ctx.renderItems)
+			{
+				for (const auto& item : *ctx.renderItems)
+				{
+					cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
+					    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
+					cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
+					cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
+					cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+				}
+			}
+
+			cmdBuf.endRendering();
+		}
 	}
 
 	// Transition cubemap to SHADER_READ_ONLY for sampling

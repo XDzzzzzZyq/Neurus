@@ -23,6 +23,13 @@ struct GeometryRenderItem;
 
 constexpr uint32_t kShadowFaceCount = 6;
 
+/** @brief Shadow depth pass rendering mode. */
+enum class ShadowMode
+{
+	SingleFace,  ///< 6 sequential passes, one per cubemap face (default)
+	Multiview    ///< Single pass via VK_KHR_multiview, all 6 faces at once
+};
+
 class ShadowDepthPass : public Pass
 {
 public:
@@ -34,7 +41,8 @@ public:
 	                vk::Queue graphicsQueue,
 	                uint32_t queueFamilyIndex,
 	                uint32_t resolution = kDefaultResolution,
-	                float farPlane = kDefaultFarPlane);
+	                float farPlane = kDefaultFarPlane,
+	                ShadowMode mode = ShadowMode::SingleFace);
 
 	~ShadowDepthPass() override = default;
 	ShadowDepthPass(const ShadowDepthPass&) = delete;
@@ -49,6 +57,7 @@ public:
 	                    const vk::raii::PhysicalDevice& physicalDevice);
 
 	// --- Accessors ---
+	ShadowMode Mode() const { return m_mode; }
 	Image& ShadowCubemap() { return *m_cubemap; }
 	Image& Depthmap() { return *m_depthmap; }
 	uint32_t Resolution() const { return m_resolution; }
@@ -57,6 +66,14 @@ public:
 	const DescriptorSetLayout& GetLightLayout() const { return m_layout; }
 	vk::DescriptorSet GetLightSetHandle() const { return m_set->handle(); }
 	VulkanBuffer& GetUBO() { return *m_ubo; }
+	const vk::raii::Pipeline& GetPipeline() const
+	{
+		return m_mode == ShadowMode::Multiview ? m_multiviewPipeline : m_pipeline;
+	}
+	const vk::raii::PipelineLayout& GetPipelineLayout() const
+	{
+		return m_mode == ShadowMode::Multiview ? m_multiviewPipelineLayout : m_pipelineLayout;
+	}
 
 	// Must match std140 layout in shadow shaders:
 	//   mat4 faceViewProj[6];  // 384 bytes (offset 0)
@@ -75,13 +92,16 @@ private:
 	void createUniforms(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice,
 	                    vk::Queue queue, uint32_t qfi);
-	void createPipeline(const vk::raii::Device& device);
+	void createSingleFacePipeline(const vk::raii::Device& device);
+	void createMultiviewPipeline(const vk::raii::Device& device);
+	void createMultiviewColorPipeline(const vk::raii::Device& device);
 	void updateUBO();
 
 	// --- Parameters ---
 	uint32_t m_resolution;
 	float m_farPlane;
 	glm::vec3 m_lightPosition{0.0f};
+	ShadowMode m_mode = ShadowMode::SingleFace;
 
 	// --- GPU resources ---
 	std::unique_ptr<Image> m_cubemap;
@@ -93,6 +113,14 @@ private:
 	BufferLayout m_vtxLayout;
 	vk::raii::PipelineLayout m_pipelineLayout = nullptr;
 	vk::raii::Pipeline m_pipeline = nullptr;
+
+	// Multiview resources (only allocated when mode == Multiview)
+	vk::raii::PipelineLayout m_multiviewPipelineLayout = nullptr;
+	vk::raii::Pipeline m_multiviewPipeline = nullptr;
+
+	// Multiview colour+depth pipeline (for optional colour-output verification)
+	vk::raii::PipelineLayout m_multiviewColorPipelineLayout = nullptr;
+	vk::raii::Pipeline m_multiviewColorPipeline = nullptr;
 };
 
 } // namespace neurus
