@@ -5,7 +5,11 @@
 
 #include "TestVulkanShared.h"
 
+#include "render/Image.h"
+
 #include <iostream>
+
+using namespace neurus;
 
 // ===========================================================================
 // SetUp — standard Vulkan bootstrap
@@ -153,4 +157,187 @@ std::string VulkanTestShared::ResolveAssetPath(const char* assetRelative)
 	}
 	// Fallback: return the primary path and let the caller handle failure
 	return path1;
+}
+
+// ===========================================================================
+// HalfToFloat — IEEE 754 half-float conversion
+// ===========================================================================
+
+float VulkanTestShared::HalfToFloat(uint16_t half)
+{
+	const uint32_t h = half;
+	const uint32_t sign     = (h >> 15) & 0x0001;
+	const uint32_t exp      = (h >> 10) & 0x001F;
+	const uint32_t mantissa =  h        & 0x03FF;
+
+	uint32_t f32;
+
+	if (exp == 0)
+	{
+		if (mantissa == 0)
+		{
+			f32 = sign << 31;
+		}
+		else
+		{
+			int e = -14;
+			uint32_t m = mantissa;
+			while ((m & 0x0400) == 0)
+			{
+				m <<= 1;
+				--e;
+			}
+			m &= 0x03FF;
+			f32 = (sign << 31) | ((uint32_t)(e + 127) << 23) | (m << 13);
+		}
+	}
+	else if (exp == 0x1F)
+	{
+		f32 = (sign << 31) | (0xFFu << 23) | (mantissa << 13);
+	}
+	else
+	{
+		f32 = (sign << 31) | ((uint32_t)(exp + 112) << 23) | (mantissa << 13);
+	}
+
+	float result;
+	std::memcpy(&result, &f32, sizeof(float));
+	return result;
+}
+
+// ===========================================================================
+// ComputeCameraUBO
+// ===========================================================================
+
+CameraUBOData VulkanTestShared::ComputeCameraUBO(Camera& cam)
+{
+	CameraUBOData ubo;
+	ubo.view = cam.GetViewMatrix();
+	ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
+	return ubo;
+}
+
+// ===========================================================================
+// MakeTestCamera
+// ===========================================================================
+
+CameraUBOData VulkanTestShared::MakeTestCamera(uint32_t width, uint32_t height)
+{
+	CameraUBOData cam;
+	const glm::mat4 proj = glm::perspective(
+		glm::radians(60.0f),
+		static_cast<float>(width) / static_cast<float>(height),
+		0.1f, 100.0f);
+	const glm::mat4 view = glm::lookAt(
+		glm::vec3(0.0f, 0.0f, 2.0f),
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		glm::vec3(0.0f, 1.0f, 0.0f));
+	cam.viewProj = proj * view;
+	cam.view = view;
+	return cam;
+}
+
+// ===========================================================================
+// TestTriangle
+// ===========================================================================
+
+std::pair<std::vector<TestVertex>, std::vector<uint32_t>> VulkanTestShared::TestTriangle()
+{
+	std::vector<TestVertex> verts = {
+		//  posX  posY posZ    nrmX nrmY nrmZ    uvX  uvY
+		{   0.0f,-0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.5f, 1.0f },
+		{   0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 1.0f, 0.0f },
+		{  -0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f },
+	};
+	std::vector<uint32_t> indices = { 0, 1, 2 };
+	return { verts, indices };
+}
+
+// ===========================================================================
+// ReadbackHdrOutput
+// ===========================================================================
+
+std::vector<float> VulkanTestShared::ReadbackHdrOutput(
+	const vk::raii::Device& device,
+	const vk::raii::PhysicalDevice& pd,
+	vk::Queue queue,
+	uint32_t qfi,
+	AttachmentManager& am,
+	uint32_t renderWidth,
+	uint32_t renderHeight)
+{
+	const vk::DeviceSize imageByteSize = renderWidth * renderHeight * 8; // RGBA16F = 8 B/px
+
+	// Staging buffer: host-visible, TRANSFER_DST
+	VulkanBuffer stagingBuf(device, pd, queue, qfi,
+	                        imageByteSize,
+	                        vk::BufferUsageFlagBits::eTransferDst,
+	                        vk::MemoryPropertyFlagBits::eHostVisible |
+	                            vk::MemoryPropertyFlagBits::eHostCoherent);
+
+	// Transition HDR output: GENERAL → TRANSFER_SRC_OPTIMAL
+	{
+		// Transient command pool for one-shot operations
+		vk::raii::CommandPool tempPool(device,
+			vk::CommandPoolCreateInfo(
+				vk::CommandPoolCreateFlagBits::eTransient, qfi));
+		vk::raii::CommandBuffers cmdBufs(device,
+			vk::CommandBufferAllocateInfo(*tempPool,
+				vk::CommandBufferLevel::ePrimary, 1));
+		auto& cmd = cmdBufs[0];
+		cmd.begin(vk::CommandBufferBeginInfo(
+			vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+		auto& hdrColor = am.GetAttachment(AttachmentName::HDRColor);
+
+		vk::ImageMemoryBarrier barrier(
+			vk::AccessFlagBits::eShaderWrite,
+			vk::AccessFlagBits::eTransferRead,
+			vk::ImageLayout::eGeneral,
+			vk::ImageLayout::eTransferSrcOptimal,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			*hdrColor.ImageHandle(),
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+			                          0, 1, 0, 1));
+
+		cmd.pipelineBarrier(
+			vk::PipelineStageFlagBits::eComputeShader,
+			vk::PipelineStageFlagBits::eTransfer,
+			{},
+			{},
+			{},
+			{barrier});
+
+		// Copy image → buffer
+		vk::BufferImageCopy copyRegion(
+			0, 0, 0,
+			vk::ImageSubresourceLayers(
+				vk::ImageAspectFlagBits::eColor, 0, 0, 1),
+			vk::Offset3D(0, 0, 0),
+			vk::Extent3D(renderWidth, renderHeight, 1));
+
+		cmd.copyImageToBuffer(*hdrColor.ImageHandle(),
+		                      vk::ImageLayout::eTransferSrcOptimal,
+		                      stagingBuf.buffer(),
+		                      {copyRegion});
+
+		cmd.end();
+		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
+		queue.submit(submitInfo, nullptr);
+		device.waitIdle();
+	}
+
+	// Map, convert half-float → float
+	const uint32_t pixelCount = renderWidth * renderHeight;
+	std::vector<float> result(pixelCount * 4);
+	void* mapped = stagingBuf.Map();
+	const auto* src = static_cast<const uint16_t*>(mapped);
+	for (size_t i = 0; i < pixelCount * 4; ++i)
+	{
+		result[i] = HalfToFloat(src[i]);
+	}
+	stagingBuf.Unmap();
+
+	return result;
 }

@@ -85,41 +85,6 @@ protected:
 		VulkanTestShared::TearDown();
 	}
 
-	// --- Camera UBO ---
-	static CameraUBOData ComputeCameraUBO(Camera& cam)
-	{
-		CameraUBOData ubo;
-		ubo.view = cam.GetViewMatrix();
-		ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
-		return ubo;
-	}
-
-	// --- G-Buffer transition helper ---
-	void TransitionGbufferToColorAttachment()
-	{
-		auto& cmd = BeginCmd();
-
-		const std::array<AttachmentName, 4> colorAtts = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		for (const auto& att : colorAtts)
-		{
-			m_attachmentManager->GetAttachment(att).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		m_attachmentManager->GetAttachment(AttachmentName::Depth).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-		EndSubmitWait(cmd);
-	}
-
 	// --- Render pass infrastructure ---
 	std::unique_ptr<AttachmentManager>  m_attachmentManager;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
@@ -152,12 +117,12 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 		static_cast<float>(kRenderWidth),
 		static_cast<float>(kRenderHeight));
 
-	const CameraUBOData camUBO = ComputeCameraUBO(*cb.camera);
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*cb.camera);
 
 	// -------------------------------------------------------------------
 	// Step 2: Transition G-Buffer & record geometry pass
 	// -------------------------------------------------------------------
-	TransitionGbufferToColorAttachment();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
 	{
 		auto& cmd = BeginCmd();

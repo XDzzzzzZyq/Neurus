@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include "shared/TestVulkanShared.h"
 #include "render/passes/SyncObjects.h"
 
 #include <chrono>
@@ -98,74 +99,11 @@ TEST(SyncObjectsTest, BufferBarrier_CustomStages)
 // Device-dependent tests - require a Vulkan-capable GPU
 // ============================================================================
 
-class SyncObjectsDeviceTest : public ::testing::Test
+class SyncObjectsDeviceTest : public VulkanTestShared
 {
 protected:
-	void SetUp() override
-	{
-		try
-		{
-			m_context = std::make_unique<vk::raii::Context>();
-
-			vk::ApplicationInfo appInfo(
-				"SyncObjectsTest", 1,
-				"SyncObjectsTest", 1,
-				VK_API_VERSION_1_4);
-			vk::InstanceCreateInfo instCI({}, &appInfo);
-			auto instance = vk::raii::Instance(*m_context, instCI);
-			m_instance = std::make_unique<vk::raii::Instance>(std::move(instance));
-
-			auto physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			auto& pd = physicalDevices[0];
-
-			// Find a graphics queue family
-			auto queueFamilies = pd.getQueueFamilyProperties();
-			m_queueFamily = UINT32_MAX;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(queueFamilies.size()); ++i)
-			{
-				if (queueFamilies[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamily = i;
-					break;
-				}
-			}
-
-			if (m_queueFamily == UINT32_MAX)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			float priority = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamily, 1, &priority);
-			m_device = std::make_unique<vk::raii::Device>(pd, vk::DeviceCreateInfo({}, qCI));
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		m_device.reset();
-		m_instance.reset();
-		m_context.reset();
-	}
-
-	bool m_hasVulkan = false;
-	std::unique_ptr<vk::raii::Context> m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	uint32_t m_queueFamily = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
+	// VulkanTestShared provides SetUp/TearDown with full Vulkan bootstrap,
+	// plus m_hasVulkan, m_device, PhysicalDevice(), and graphics queue helpers.
 };
 
 /**

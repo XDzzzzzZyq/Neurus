@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 
+#include "shared/TestVulkanShared.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Image.h"
 
@@ -21,140 +22,8 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class RenderPassManagerTest : public ::testing::Test
+class RenderPassManagerTest : public VulkanTestShared
 {
-protected:
-	void SetUp() override
-	{
-		try
-		{
-			// --- Instance ---
-			vk::ApplicationInfo appInfo("NeurusTest_RPass", VK_MAKE_VERSION(0, 1, 0),
-			                            "NeurusTest_RPass", VK_MAKE_VERSION(0, 1, 0),
-			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
-			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
-
-			// --- Physical device ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// Pick discrete GPU if available, otherwise first
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				if (m_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_graphicsQueueFamily = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Device (Vulkan 1.4 includes dynamic rendering as core) ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-
-			// --- Command pool ---
-			vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			                                 m_graphicsQueueFamily);
-			m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
-
-			// --- Command buffers ---
-			vk::CommandBufferAllocateInfo allocInfo(*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
-			m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-		// RAII handles cleanup in reverse declaration order
-	}
-
-	/** Helper: begin one-shot command buffer. */
-	vk::raii::CommandBuffer& BeginCmd()
-	{
-		auto& cmd = m_commandBuffers[0];
-		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-		return cmd;
-	}
-
-	/** Helper: end and submit one-shot command buffer, then wait. */
-	void EndCmd(vk::raii::CommandBuffer& cmd)
-	{
-		cmd.end();
-		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		auto queue = m_device->getQueue(m_graphicsQueueFamily, 0);
-		queue.submit(submitInfo, nullptr);
-		queue.waitIdle();
-	}
-
-	/** Helper: create a simple color attachment image for testing. */
-	Image CreateColorAttachment(uint32_t width, uint32_t height, vk::Format format)
-	{
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
-		return Image(*m_device, pd, vk::Extent2D(width, height), format,
-		                   vk::ImageUsageFlagBits::eColorAttachment, 1);
-	}
-
-	/** Helper: create a simple depth attachment image for testing. */
-	Image CreateDepthAttachment(uint32_t width, uint32_t height, vk::Format format)
-	{
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
-		return Image(*m_device, pd, vk::Extent2D(width, height), format,
-		                   vk::ImageUsageFlagBits::eDepthStencilAttachment, 1,
-		                   Image::ImageType::eDepthStencil);
-	}
-
-	bool m_hasVulkan = false;
-
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_graphicsQueueFamily = 0;
-	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
-	vk::raii::CommandBuffers m_commandBuffers = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -283,10 +152,10 @@ TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
-
 	// Create a simple color attachment
-	auto colorAttachment = CreateColorAttachment(128, 128, vk::Format::eR8G8B8A8Unorm);
+	auto colorAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
+	                             vk::Format::eR8G8B8A8Unorm,
+	                             vk::ImageUsageFlagBits::eColorAttachment, 1);
 
 	// Transition to color attachment optimal layout
 	{
@@ -294,7 +163,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
 		colorAttachment.TransitionLayout(cmd,
 		                                 vk::ImageLayout::eUndefined,
 		                                 vk::ImageLayout::eColorAttachmentOptimal);
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	// Begin and end a rendering pass
@@ -316,7 +185,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
 
 		rpManager.EndPass(cmd);
 
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	SUCCEED();
@@ -333,7 +202,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	// Check depth format support
 	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
@@ -343,8 +212,13 @@ TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
 	}
 
 	// Create color + depth attachments
-	auto colorAttachment = CreateColorAttachment(128, 128, vk::Format::eR8G8B8A8Unorm);
-	auto depthAttachment = CreateDepthAttachment(128, 128, vk::Format::eD32Sfloat);
+	auto colorAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
+	                             vk::Format::eR8G8B8A8Unorm,
+	                             vk::ImageUsageFlagBits::eColorAttachment, 1);
+	auto depthAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
+	                             vk::Format::eD32Sfloat,
+	                             vk::ImageUsageFlagBits::eDepthStencilAttachment, 1,
+	                             Image::ImageType::eDepthStencil);
 
 	// Transition layouts
 	{
@@ -355,7 +229,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
 		depthAttachment.TransitionLayout(cmd,
 		                                 vk::ImageLayout::eUndefined,
 		                                 vk::ImageLayout::eDepthStencilAttachmentOptimal);
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	// Begin/end pass with depth (using SHADOW pass type which has depth)
@@ -377,7 +251,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
 
 		rpManager.EndPass(cmd);
 
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	SUCCEED();
@@ -394,7 +268,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
 	if (!(depthFmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
@@ -419,7 +293,10 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 			            vk::ImageUsageFlagBits::eColorAttachment, 1));
 	}
 
-	auto depthAttachment = CreateDepthAttachment(128, 128, vk::Format::eD32Sfloat);
+	auto depthAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
+	                             vk::Format::eD32Sfloat,
+	                             vk::ImageUsageFlagBits::eDepthStencilAttachment, 1,
+	                             Image::ImageType::eDepthStencil);
 
 	// Transition all layouts
 	{
@@ -431,7 +308,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 		}
 		depthAttachment.TransitionLayout(cmd, vk::ImageLayout::eUndefined,
 		                                 vk::ImageLayout::eDepthStencilAttachmentOptimal);
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	// Begin/end G-Buffer pass
@@ -458,7 +335,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 
 		rpManager.EndPass(cmd);
 
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	SUCCEED();
@@ -475,16 +352,16 @@ TEST_F(RenderPassManagerTest, BeginEndPass_PostFX_NoValidationError)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-	auto colorAttachment = CreateColorAttachment(128, 128, vk::Format::eR8G8B8A8Unorm);
+	auto colorAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
+	                             vk::Format::eR8G8B8A8Unorm,
+	                             vk::ImageUsageFlagBits::eColorAttachment, 1);
 
 	{
 		auto& cmd = BeginCmd();
 		colorAttachment.TransitionLayout(cmd,
 		                                 vk::ImageLayout::eUndefined,
 		                                 vk::ImageLayout::eColorAttachmentOptimal);
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	RenderPassManager rpManager;
@@ -504,7 +381,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_PostFX_NoValidationError)
 
 		rpManager.EndPass(cmd);
 
-		EndCmd(cmd);
+		EndSubmitWait(cmd);
 	}
 
 	SUCCEED();

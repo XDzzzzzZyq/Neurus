@@ -1,13 +1,10 @@
-// Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
 
 #include <array>
 #include <cstring>
 
+#include "shared/TestVulkanShared.h"
 #include "render/CommandBuffer.h"
-#include "render/VulkanContext.h"
 
 using namespace neurus;
 
@@ -20,85 +17,9 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class CommandBufferTest : public ::testing::Test
+class CommandBufferTest : public VulkanTestShared
 {
-protected:
-	void SetUp() override
-	{
-		try
-		{
-			// --- Create instance ---
-			m_instance = std::make_unique<vk::raii::Instance>(VulkanContext::CreateInstance());
 
-			// --- Enumerate physical devices ---
-			m_physicalDevices = std::make_unique<vk::raii::PhysicalDevices>(*m_instance);
-			if (m_physicalDevices->empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Find a queue family with graphics bit ---
-			auto qfProps = (*m_physicalDevices)[0].getQueueFamilyProperties();
-			m_queueFamilyIndex = UINT32_MAX;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					break;
-				}
-			}
-
-			if (m_queueFamilyIndex == UINT32_MAX)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Create logical device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
-			vk::DeviceCreateInfo devCI({}, qCI);
-
-			m_device = std::make_unique<vk::raii::Device>(
-				(*m_physicalDevices)[0], devCI);
-
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
-
-			// --- Create command pool ---
-			vk::CommandPoolCreateInfo poolInfo(
-				vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-				m_queueFamilyIndex);
-			m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolInfo);
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-		m_commandPool.reset();
-		m_device.reset();
-		m_physicalDevices.reset();
-		m_instance.reset();
-	}
-
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	std::unique_ptr<vk::raii::PhysicalDevices> m_physicalDevices;
-	std::unique_ptr<vk::raii::Device> m_device;
-	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
-	bool m_hasVulkan = false;
 };
 
 // ---------------------------------------------------------------------------

@@ -26,7 +26,6 @@
 #include "render/passes/RenderPassManager.h"
 #include "render/Material.h"
 #include "render/Screenshot.h"
-#include "render/VulkanBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/Texture.h"
@@ -51,23 +50,12 @@
 
 #include <algorithm>
 #include <array>
-#include <cstring>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-struct TestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
 
 // ---------------------------------------------------------------------------
 // Attachment list for reference comparison
@@ -132,43 +120,6 @@ protected:
 		VulkanTestShared::TearDown();
 	}
 
-	// --- Camera UBO ---
-
-	static CameraUBOData ComputeCameraUBO(Camera& cam)
-	{
-		CameraUBOData ubo;
-		ubo.view = cam.GetViewMatrix();
-		ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
-		return ubo;
-	}
-
-	// --- G-Buffer transition helper ---
-
-	void TransitionGbufferToColorAttachment()
-	{
-		auto& cmd = BeginCmd();
-
-		const std::array<AttachmentName, 4> colorAtts = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		for (const auto& att : colorAtts)
-		{
-			m_attachmentManager->GetAttachment(att).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		m_attachmentManager->GetAttachment(AttachmentName::Depth).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-		EndSubmitWait(cmd);
-	}
-
 	// --- Render pass infrastructure ---
 	std::unique_ptr<AttachmentManager>  m_attachmentManager;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
@@ -199,14 +150,8 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	ASSERT_TRUE(loaded) << "Failed to load OBJ: " << objPath;
 
 	const auto& rawMesh = meshData->GetMeshData();
-	const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
-	const size_t indexCount = rawMesh.indexArray.size();
-	ASSERT_GT(srcVertexCount, 0u);
-	ASSERT_GT(indexCount, 0u);
-
-	// Copy vertex/index data (meshData shared into Mesh later)
-	std::vector<float>    srcVertexData = rawMesh.dataArray;
-	std::vector<uint32_t> srcIndexData  = rawMesh.indexArray;
+	ASSERT_GT(rawMesh.dataArray.size() / 14, 0u);
+	ASSERT_GT(rawMesh.indexArray.size(), 0u);
 
 	// -------------------------------------------------------------------
 	// Step 2: Create camera (same as default scene: pos (0,2,5), target origin)
@@ -218,7 +163,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	const CameraUBOData camUBO = ComputeCameraUBO(*camera);
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -------------------------------------------------------------------
 	// Step 3: Create point light
@@ -240,43 +185,24 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	mesh->o_material = material;
 
 	// -------------------------------------------------------------------
-	// Step 5: Convert vertex data (14 floats → 8: pos+normal+uv)
+	// Step 5: Upload mesh to GPU via Mesh::UploadToGPU()
 	// -------------------------------------------------------------------
-	std::vector<TestVertex> vertices(srcVertexCount);
-	for (size_t i = 0; i < srcVertexCount; ++i)
-	{
-		const float* s = &srcVertexData[i * 14];
-		TestVertex& v = vertices[i];
-		v.posX = s[0] * 0.25f; v.posY = s[1] * 0.25f; v.posZ = s[2] * 0.25f;
-		v.nrmX = s[3]; v.nrmY = s[4]; v.nrmZ = s[5];
-		v.uvX  = s[6]; v.uvY  = s[7];
-	}
-
-	std::vector<uint32_t> indices = srcIndexData;
-
-	// -------------------------------------------------------------------
-	// Step 6: Upload vertex + index buffers to GPU
-	// -------------------------------------------------------------------
-	VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                 vertices.data(), vertices.size() * sizeof(TestVertex),
-	                 sizeof(TestVertex), static_cast<uint32_t>(vertices.size()));
-
-	IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(), indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
+	mesh->UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = vbo.buffer();
-	renderItem.indexBuffer  = ibo.buffer();
-	renderItem.indexCount   = ibo.GetIndexCount();
-	renderItem.indexType    = ibo.GetIndexType();
-	renderItem.pushConstants.model = glm::mat4(1.0f);
+	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
+	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
+	renderItem.indexCount   = mesh->GetGPUIndexCount();
+	renderItem.indexType    = mesh->GetIndexBuffer()->GetIndexType();
+	// Scale by 0.25 to match original vertex-scaling behaviour (positions
+	// were multiplied by 0.25 in the manual conversion that this replace).
+	renderItem.pushConstants.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.25f));
 	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer attachments & record geometry pass
 	// -------------------------------------------------------------------
-	TransitionGbufferToColorAttachment();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
 	{
 		auto& cmd = BeginCmd();

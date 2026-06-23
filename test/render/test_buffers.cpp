@@ -1,7 +1,4 @@
-// Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
-
-#include <gtest/gtest.h>
+#include "shared/TestVulkanShared.h"
 
 #include <array>
 #include <cstring>
@@ -10,7 +7,6 @@
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/buffers/IndexBuffer.h"
-#include "render/VulkanContext.h"
 
 using namespace neurus;
 
@@ -103,79 +99,13 @@ TEST(BufferLayoutTest, GetFormatSize_CommonFormats)
 // ===========================================================================
 
 /**
- * @brief GPU test fixture: creates Vulkan instance + device + queue
- *        (no surface needed for buffer operations).
+ * @brief GPU test fixture for buffer operations (VBO/IBO).
+ *
+ * Inherits Vulkan bootstrap (instance, device, queue) from VulkanTestShared.
  */
-class BufferGpuTest : public ::testing::Test
+class BufferGpuTest : public VulkanTestShared
 {
 protected:
-	void SetUp() override
-	{
-		try
-		{
-			// --- Create instance ---
-			m_instance = std::make_unique<vk::raii::Instance>(VulkanContext::CreateInstance());
-
-			// --- Enumerate physical devices ---
-			m_physicalDevices = std::make_unique<vk::raii::PhysicalDevices>(*m_instance);
-			if (m_physicalDevices->empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Find a queue family with graphics bit ---
-			auto qfProps = (*m_physicalDevices)[0].getQueueFamilyProperties();
-			m_queueFamilyIndex = UINT32_MAX;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					break;
-				}
-			}
-
-			if (m_queueFamilyIndex == UINT32_MAX)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Create logical device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
-			vk::DeviceCreateInfo devCI({}, qCI);
-
-			m_device = std::make_unique<vk::raii::Device>(
-				(*m_physicalDevices)[0], devCI);
-
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-		m_device.reset();
-		m_physicalDevices.reset();
-		m_instance.reset();
-	}
-
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	std::unique_ptr<vk::raii::PhysicalDevices> m_physicalDevices;
-	std::unique_ptr<vk::raii::Device> m_device;
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
-	bool m_hasVulkan = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -201,9 +131,9 @@ TEST_F(BufferGpuTest, VertexBuffer_CreateAndUpload_StoresCorrectMetadata)
 	};
 
 	VertexBuffer vbo(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 vertexData.data(),
 	                 kSize,
 	                 kStride,
@@ -232,9 +162,9 @@ TEST_F(BufferGpuTest, IndexBuffer_CreateAndUpload_StoresCorrectMetadata)
 	std::array<uint32_t, kIndexCount> indexData = { 0, 1, 2, 0, 2, 3 };
 
 	IndexBuffer ibo(*m_device,
-	                (*m_physicalDevices)[0],
+	                PhysicalDevice(),
 	                m_queue,
-	                m_queueFamilyIndex,
+	                m_graphicsQueueFamily,
 	                indexData.data(),
 	                kSize,
 	                kIndexCount);
@@ -275,18 +205,18 @@ TEST_F(BufferGpuTest, VertexAndIndexBuffer_TypicalMesh)
 	vk::DeviceSize indexDataSize = kIndexCount * sizeof(uint32_t);
 
 	VertexBuffer vbo(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 vertexData.data(),
 	                 vertexDataSize,
 	                 kStride,
 	                 kVertexCount);
 
 	IndexBuffer ibo(*m_device,
-	                (*m_physicalDevices)[0],
+	                PhysicalDevice(),
 	                m_queue,
-	                m_queueFamilyIndex,
+	                m_graphicsQueueFamily,
 	                indexData.data(),
 	                indexDataSize,
 	                kIndexCount);

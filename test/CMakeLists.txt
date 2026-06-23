@@ -7,11 +7,9 @@ add_executable(neurus_test
 	render/test_buffers.cpp
 	render/test_vulkan_buffer.cpp
 	render/test_vulkan_context.cpp
-	render/test_shader_program.cpp
 	asset/test_meshdata.cpp
 	asset/test_imagedata.cpp
 	render/test_shader_module.cpp
-	render/test_swapchain.cpp
 	render/test_syncobjects.cpp
 	render/test_image.cpp
 	render/test_descriptor.cpp
@@ -36,10 +34,7 @@ add_executable(neurus_test
 	editor/test_camera_controller.cpp
 	editor/test_input.cpp
 	editor/test_event_bus.cpp
-	editor/test_event_bus_expanded.cpp
 	editor/test_event_bus_typed.cpp
-	editor/test_editor_context.cpp
-	editor/test_scene_status.cpp
 	editor/test_context.cpp
 	editor/test_selection.cpp
 	scene/test_camera.cpp
@@ -50,7 +45,6 @@ add_executable(neurus_test
 	scene/test_sprite.cpp
 	scene/test_scene.cpp
 	scene/test_scene_integration.cpp
-	scene/test_scene_const_access.cpp
 	scene/test_debug.cpp
 	project/test_project_roundtrip.cpp
 	project/test_default_project.cpp
@@ -88,7 +82,7 @@ set_target_properties(neurus_test PROPERTIES AUTOMOC ON)
 
 # MSVC: disable Qt's MOC warnings in test code
 if(MSVC)
-	target_compile_options(neurus_test PRIVATE /wd4100 /wd4189)
+	target_compile_options(neurus_test PRIVATE /wd4100 /wd4189 /FS)
 endif()
 
 # Windows: deploy Qt DLLs so test executable can run standalone

@@ -51,6 +51,31 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
+// File-level helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Finds a host-visible, host-coherent memory type index.
+ * @param pd         Physical device for memory property query.
+ * @param memReqs    Memory requirements from a buffer allocation.
+ * @return Memory type index, or UINT32_MAX if none found.
+ */
+static uint32_t FindHostVisibleMemType(const vk::raii::PhysicalDevice& pd,
+                                        const vk::MemoryRequirements& memReqs)
+{
+	auto memProps = pd.getMemoryProperties();
+	for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+	{
+		if ((memReqs.memoryTypeBits & (1u << i)) &&
+		    (memProps.memoryTypes[i].propertyFlags &
+		     (vk::MemoryPropertyFlagBits::eHostVisible |
+		      vk::MemoryPropertyFlagBits::eHostCoherent)))
+			return i;
+	}
+	return UINT32_MAX;
+}
+
+// ---------------------------------------------------------------------------
 // Test fixture
 // ---------------------------------------------------------------------------
 
@@ -181,93 +206,79 @@ protected:
 		return glm::normalize(sx * right + sy * actualUp + fc.fwd);
 	}
 
+	// --- Pixel categorization for diagnostic summary ---
+
+	enum class PixelCategory { Cube, Plane, Background };
+
+	/**
+	 * @brief Categorize a pixel as cube, plane, or background based on ray intersection.
+	 * @param dir       Normalized world-space direction from light through pixel.
+	 * @param lightPos  World-space position of the point light.
+	 * @return PixelCategory indicating what geometry (if any) the ray hits first.
+	 */
+	static PixelCategory CategorizePixel(const glm::vec3& dir, const glm::vec3& lightPos)
+	{
+		// Plane y=0 intersection (bounded to [-5, 5] in XZ)
+		const float t_plane = -lightPos.y / dir.y;
+		bool hitsPlane = false;
+		if (t_plane > 0.0f)
+		{
+			const glm::vec3 hp = lightPos + t_plane * dir;
+			hitsPlane = (std::abs(hp.x) <= 5.0f && std::abs(hp.z) <= 5.0f);
+		}
+
+		// Cube AABB [-0.5, 0.5]^3 slab test
+		const float eps = 0.001f;
+		float tMin = eps, tMax = 1e10f;
+		bool parallelMiss = false;
+		for (int axis = 0; axis < 3; ++axis)
+		{
+			const float lo = -0.5f, hi = 0.5f;
+			const float origin = (&lightPos.x)[axis];
+			const float d       = (&dir.x)[axis];
+			if (std::abs(d) > 1e-7f)
+			{
+				const float t1 = (lo - origin) / d;
+				const float t2 = (hi - origin) / d;
+				tMin = std::max(tMin, std::min(t1, t2));
+				tMax = std::min(tMax, std::max(t1, t2));
+			}
+			else if (origin < lo || origin > hi)
+				parallelMiss = true;
+		}
+		const bool hitsCube = (!parallelMiss && tMin < tMax && tMin > eps);
+
+		if (hitsCube && tMin < t_plane)
+			return PixelCategory::Cube;
+		if (hitsPlane)
+			return PixelCategory::Plane;
+		return PixelCategory::Background;
+	}
+
+	// --- Depth-to-u8 conversion for reference image regression ---
+
+	/**
+	 * @brief Converts a vector of float depth values [0,1] to uint8_t.
+	 * @param depthData  Float depth data (one value per pixel).
+	 * @return uint8_t data, clamped and quantized to [0, 255].
+	 */
+	static std::vector<uint8_t> DepthToU8(const std::vector<float>& depthData)
+	{
+		std::vector<uint8_t> u8Data(depthData.size());
+		for (size_t i = 0; i < depthData.size(); ++i)
+		{
+			float v = depthData[i];
+			v = std::max(0.0f, std::min(1.0f, v));
+			u8Data[i] = static_cast<uint8_t>(v * 255.0f + 0.5f);
+		}
+		return u8Data;
+	}
+
 	static float ComputeExpectedDepth(uint32_t px, uint32_t py,
 	                                  const glm::vec3& lightPos,
 	                                  float farPlane, uint32_t res)
 	{
-		// NDC coordinates at pixel centre
-		const float sx = (2.0f * static_cast<float>(px) + 1.0f) / static_cast<float>(res) - 1.0f;
-		const float sy = (2.0f * static_cast<float>(py) + 1.0f) / static_cast<float>(res) - 1.0f;
-
-		// World-space direction from light for -Y face:
-		//   dir = normalize(sx * right + sy * up + 1 * (-forward))
-		//       = normalize(sx * (1,0,0) + sy * (0,0,-1) + 1 * (0,-1,0))
-		//       = normalize(sx, -1, -sy)
-		const glm::vec3 dir = glm::normalize(glm::vec3(sx, -1.0f, -sy));
-
-		// --- Plane y=0 intersection ---
-		// lightPos.y + t * dir.y = 0  ->  t_plane = -lightPos.y / dir.y
-		// (dir.y < 0 always for -Y face, so t_plane > 0)
-		const float t_plane = -lightPos.y / dir.y;
-		bool hitsPlaneInBounds = false;
-		if (t_plane > 0.0f)
-		{
-			const glm::vec3 hitPoint = lightPos + t_plane * dir;
-			if (std::abs(hitPoint.x) <= 5.0f && std::abs(hitPoint.z) <= 5.0f)
-			{
-				hitsPlaneInBounds = true;
-			}
-		}
-
-		// --- Cube AABB [-0.5, 0.5]^3 slab test ---
-		const float eps = 0.001f;  // avoid self-intersection at light source
-		float t_min_cube = eps;
-		float t_max_cube = 1e10f;
-
-		// X slab
-		if (std::abs(dir.x) > 1e-7f)
-		{
-			const float t1 = (-0.5f - lightPos.x) / dir.x;
-			const float t2 = ( 0.5f - lightPos.x) / dir.x;
-			t_min_cube = std::max(t_min_cube, std::min(t1, t2));
-			t_max_cube = std::min(t_max_cube, std::max(t1, t2));
-		}
-		else if (lightPos.x < -0.5f || lightPos.x > 0.5f)
-		{
-			t_min_cube = 1e10f;  // ray parallel to X, outside slab -> no hit
-		}
-
-		// Y slab
-		if (std::abs(dir.y) > 1e-7f)
-		{
-			const float t1 = (-0.5f - lightPos.y) / dir.y;
-			const float t2 = ( 0.5f - lightPos.y) / dir.y;
-			t_min_cube = std::max(t_min_cube, std::min(t1, t2));
-			t_max_cube = std::min(t_max_cube, std::max(t1, t2));
-		}
-		else if (lightPos.y < -0.5f || lightPos.y > 0.5f)
-		{
-			t_min_cube = 1e10f;
-		}
-
-		// Z slab
-		if (std::abs(dir.z) > 1e-7f)
-		{
-			const float t1 = (-0.5f - lightPos.z) / dir.z;
-			const float t2 = ( 0.5f - lightPos.z) / dir.z;
-			t_min_cube = std::max(t_min_cube, std::min(t1, t2));
-			t_max_cube = std::min(t_max_cube, std::max(t1, t2));
-		}
-		else if (lightPos.z < -0.5f || lightPos.z > 0.5f)
-		{
-			t_min_cube = 1e10f;
-		}
-
-		const bool hitsCube = (t_min_cube < t_max_cube && t_min_cube > eps);
-
-		// Determine which intersection is first (smaller t)
-		if (hitsCube && t_min_cube < t_plane)
-		{
-			return t_min_cube / farPlane;
-		}
-
-		if (hitsPlaneInBounds)
-		{
-			return t_plane / farPlane;
-		}
-
-		// No geometry hit -> clear value
-		return 1.0f;
+		return ComputeExpectedDepth(3, px, py, lightPos, farPlane, res);
 	}
 
 	/**
@@ -578,19 +589,8 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	vk::raii::Buffer stagingBuf(*m_device, stagingCI);
 
 	auto memReqs = stagingBuf.getMemoryRequirements();
-	auto memProps = pd.getMemoryProperties();
-	uint32_t memType = 0;
-	for (; memType < memProps.memoryTypeCount; ++memType)
-	{
-		if ((memReqs.memoryTypeBits & (1u << memType)) &&
-		    (memProps.memoryTypes[memType].propertyFlags &
-		     (vk::MemoryPropertyFlagBits::eHostVisible |
-		      vk::MemoryPropertyFlagBits::eHostCoherent)))
-		{
-			break;
-		}
-	}
-	ASSERT_LT(memType, memProps.memoryTypeCount) << "No host-visible+coherent memory type";
+	uint32_t memType = FindHostVisibleMemType(pd, memReqs);
+	ASSERT_LT(memType, UINT32_MAX) << "No host-visible+coherent memory type";
 
 	vk::MemoryAllocateInfo allocInfo(memReqs.size, memType);
 	vk::raii::DeviceMemory stagingMem(*m_device, allocInfo);
@@ -671,56 +671,15 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 			const float actual   = depthData[py * kRes + px];
 			const float expected = ComputeExpectedDepth(px, py, lightPos, kFarPlane, kRes);
 
-			// Determine pixel category (for diagnostic summary only)
+			// Categorize pixel
 			const float sx = (2.0f * static_cast<float>(px) + 1.0f) / static_cast<float>(kRes) - 1.0f;
 			const float sy = (2.0f * static_cast<float>(py) + 1.0f) / static_cast<float>(kRes) - 1.0f;
-			const glm::vec3 dir = glm::normalize(glm::vec3(sx, -1.0f, -sy));
+			const glm::vec3 dir = glm::normalize(FaceDirection(3, sx, sy));
+			auto cat = CategorizePixel(dir, lightPos);
 
-			// Plane hit check
-			const float t_plane = -lightPos.y / dir.y;
-			bool hitsPlane = false;
-			if (t_plane > 0.0f)
-			{
-				const glm::vec3 hp = lightPos + t_plane * dir;
-				hitsPlane = (std::abs(hp.x) <= 5.0f && std::abs(hp.z) <= 5.0f);
-			}
-
-			// Cube hit check (simplified slab -- just need category, not exact t)
-			const float eps = 0.001f;
-			float tMin = eps, tMax = 1e10f;
-			bool parallelMiss = false;
-			for (int axis = 0; axis < 3; ++axis)
-			{
-				const float lo = -0.5f, hi = 0.5f;
-				const float origin = (&lightPos.x)[axis];
-				const float d       = (&dir.x)[axis];
-				if (std::abs(d) > 1e-7f)
-				{
-					const float t1 = (lo - origin) / d;
-					const float t2 = (hi - origin) / d;
-					tMin = std::max(tMin, std::min(t1, t2));
-					tMax = std::min(tMax, std::max(t1, t2));
-				}
-				else if (origin < lo || origin > hi)
-				{
-					parallelMiss = true;
-				}
-			}
-			const bool hitsCube = (!parallelMiss && tMin < tMax && tMin > eps);
-
-			// Categorize
-			if (hitsCube && tMin < t_plane)
-			{
-				cubePixels++;
-			}
-			else if (hitsPlane)
-			{
-				planePixels++;
-			}
-			else
-			{
-				bgPixels++;
-			}
+			if (cat == PixelCategory::Cube)       cubePixels++;
+			else if (cat == PixelCategory::Plane)  planePixels++;
+			else                                   bgPixels++;
 
 			// Compare actual vs expected
 			const float diff = std::abs(actual - expected);
@@ -729,12 +688,13 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 				badPixels++;
 				if (badPixels <= 10)
 				{
+					const char* catStr = (cat == PixelCategory::Cube) ? "cube"
+					                   : (cat == PixelCategory::Plane) ? "plane" : "bg";
 					std::cout << "BAD PIXEL (" << px << "," << py
 					          << "): actual=" << actual
 					          << " expected=" << expected
 					          << " diff=" << diff
-					          << " category="
-					          << (hitsCube && tMin < t_plane ? "cube" : hitsPlane ? "plane" : "bg")
+					          << " category=" << catStr
 					          << std::endl;
 				}
 			}
@@ -750,13 +710,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	          << std::endl;
 
 	// Convert depth to u8 for reference image regression
-	std::vector<uint8_t> u8Data(kRes * kRes);
-	for (uint32_t i = 0; i < kRes * kRes; ++i)
-	{
-		float v = depthData[i];
-		v = std::max(0.0f, std::min(1.0f, v));  // clamp
-		u8Data[i] = static_cast<uint8_t>(v * 255.0f + 0.5f);
-	}
+	std::vector<uint8_t> u8Data = DepthToU8(depthData);
 
 	// -------------------------------------------------------------------
 	// Reference image regression
@@ -1006,20 +960,6 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRes) * kRes * 4 * sizeof(float);
 	bool anyReferenceGenerated = false;
 
-	auto FindHostVisibleMemType = [&](const vk::MemoryRequirements& memReqs)
-	{
-		auto memProps = pd.getMemoryProperties();
-		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-		{
-			if ((memReqs.memoryTypeBits & (1u << i)) &&
-			    (memProps.memoryTypes[i].propertyFlags &
-			     (vk::MemoryPropertyFlagBits::eHostVisible |
-			      vk::MemoryPropertyFlagBits::eHostCoherent)))
-				return i;
-		}
-		return UINT32_MAX;
-	};
-
 	for (uint32_t face = 0; face < 6; ++face)
 	{
 		NEURUS_LOG("[AllFacesDepth] Reading back face " << face);
@@ -1029,7 +969,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		vk::raii::Buffer stagingBuf(*m_device, stagingCI);
 
 		auto memReqs = stagingBuf.getMemoryRequirements();
-		uint32_t memType = FindHostVisibleMemType(memReqs);
+		uint32_t memType = FindHostVisibleMemType(pd, memReqs);
 		ASSERT_LT(memType, UINT32_MAX) << "No host-visible+coherent memory type";
 
 		vk::MemoryAllocateInfo allocInfo(memReqs.size, memType);
@@ -1096,49 +1036,15 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 				const float expected =
 					ComputeExpectedDepth(face, px, py, lightPos, kFarPlane, kRes);
 
-				// Categorize pixel (for diagnostic summary only)
+				// Categorize pixel
 				const float sxV = (2.f * static_cast<float>(px) + 1.f) / static_cast<float>(kRes) - 1.f;
 				const float syV = (2.f * static_cast<float>(py) + 1.f) / static_cast<float>(kRes) - 1.f;
 				const glm::vec3 dir = glm::normalize(FaceDirection(face, sxV, syV));
+				auto cat = CategorizePixel(dir, lightPos);
 
-				// Plane hit check
-				const float t_plane = -lightPos.y / dir.y;
-				bool hitsPlane = false;
-				if (t_plane > 0.0f)
-				{
-					const glm::vec3 hp = lightPos + t_plane * dir;
-					hitsPlane = (std::abs(hp.x) <= 5.0f && std::abs(hp.z) <= 5.0f);
-				}
-
-				// Cube hit check (simplified — category only, not exact t)
-				const float eps = 0.001f;
-				float tMin = eps, tMax = 1e10f;
-				bool parallelMiss = false;
-				for (int axis = 0; axis < 3; ++axis)
-				{
-					const float lo = -0.5f, hi = 0.5f;
-					const float origin = (&lightPos.x)[axis];
-					const float d       = (&dir.x)[axis];
-					if (std::abs(d) > 1e-7f)
-					{
-						const float t1 = (lo - origin) / d;
-						const float t2 = (hi - origin) / d;
-						tMin = std::max(tMin, std::min(t1, t2));
-						tMax = std::min(tMax, std::max(t1, t2));
-					}
-					else if (origin < lo || origin > hi)
-					{
-						parallelMiss = true;
-					}
-				}
-				const bool hitsCube = (!parallelMiss && tMin < tMax && tMin > eps);
-
-				if (hitsCube && tMin < t_plane)
-					cubePixels++;
-				else if (hitsPlane)
-					planePixels++;
-				else
-					bgPixels++;
+				if (cat == PixelCategory::Cube)       cubePixels++;
+				else if (cat == PixelCategory::Plane)  planePixels++;
+				else                                   bgPixels++;
 
 				const float diff = std::abs(actual - expected);
 				if (diff > kTolerance)
@@ -1146,14 +1052,14 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 					badPixels++;
 					if (badPixels <= 10)
 					{
+						const char* catStr = (cat == PixelCategory::Cube) ? "cube"
+						                   : (cat == PixelCategory::Plane) ? "plane" : "bg";
 						std::cout << "BAD PIXEL (face=" << face
 						          << " px=" << px << " py=" << py
 						          << "): actual=" << actual
 						          << " expected=" << expected
 						          << " diff=" << diff
-						          << " category="
-						          << (hitsCube && tMin < t_plane ? "cube"
-						              : hitsPlane ? "plane" : "bg")
+						          << " category=" << catStr
 						          << std::endl;
 					}
 				}
@@ -1192,13 +1098,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			const std::string tmpPath = refPath + ".tmp";
 
 			// Convert depth to u8
-			std::vector<uint8_t> u8Data(kRes * kRes);
-			for (uint32_t i = 0; i < kRes * kRes; ++i)
-			{
-				float v = depthData[i];
-				v = std::max(0.0f, std::min(1.0f, v));
-				u8Data[i] = static_cast<uint8_t>(v * 255.0f + 0.5f);
-			}
+			std::vector<uint8_t> u8Data = DepthToU8(depthData);
 
 			const bool captured = ImageData::SavePixelData(
 				u8Data.data(), vk::Format::eR8Unorm,

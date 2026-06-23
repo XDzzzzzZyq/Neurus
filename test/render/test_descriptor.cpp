@@ -8,6 +8,8 @@
 #include <memory>
 #include <vector>
 
+#include "shared/TestVulkanShared.h"
+
 #include "render/DescriptorManager.h"
 #include "render/VulkanBuffer.h"
 #include "render/VulkanContext.h"
@@ -97,84 +99,18 @@ TEST(DescriptorSetLayoutBuilderTest, ChainedAddBinding_ReturnsBuilderReference)
  * Creates an instance and device. Tests are skipped if no Vulkan-capable
  * GPU is available.
  */
-class DescriptorManagerTest : public ::testing::Test
+class DescriptorManagerTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		try
-		{
-			// --- Create instance ---
-			m_instance = std::make_unique<vk::raii::Instance>(
-				VulkanContext::CreateInstance());
-
-			// --- Enumerate physical devices ---
-			m_physicalDevices =
-				std::make_unique<vk::raii::PhysicalDevices>(*m_instance);
-			if (m_physicalDevices->empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Find a queue family with graphics bit ---
-			auto qfProps =
-				(*m_physicalDevices)[0].getQueueFamilyProperties();
-			m_queueFamilyIndex = UINT32_MAX;
-			for (uint32_t i = 0;
-			     i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags &
-				    vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					break;
-				}
-			}
-
-			if (m_queueFamilyIndex == UINT32_MAX)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Create logical device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI(
-				{}, m_queueFamilyIndex, 1, &prio);
-			vk::DeviceCreateInfo devCI({}, qCI);
-
-			m_device = std::make_unique<vk::raii::Device>(
-				(*m_physicalDevices)[0], devCI);
-
-			m_queue =
-				m_device->getQueue(m_queueFamilyIndex, 0);
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
+		VulkanTestShared::SetUp();
 	}
 
 	void TearDown() override
 	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-		// Destroy in reverse order (RAII)
-		m_device.reset();
-		m_physicalDevices.reset();
-		m_instance.reset();
+		VulkanTestShared::TearDown();
 	}
-
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	std::unique_ptr<vk::raii::PhysicalDevices> m_physicalDevices;
-	std::unique_ptr<vk::raii::Device> m_device;
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
-	bool m_hasVulkan = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -183,7 +119,7 @@ protected:
 
 TEST_F(DescriptorManagerTest, CreateDescriptorSetLayout_WithSingleBinding)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -201,7 +137,7 @@ TEST_F(DescriptorManagerTest, CreateDescriptorSetLayout_WithSingleBinding)
 
 TEST_F(DescriptorManagerTest, CreateDescriptorSetLayout_WithMultipleBindings)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -221,7 +157,7 @@ TEST_F(DescriptorManagerTest, CreateDescriptorSetLayout_WithMultipleBindings)
 
 TEST_F(DescriptorManagerTest, DescriptorSetLayout_ReturnsValidVkLayout)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -244,7 +180,7 @@ TEST_F(DescriptorManagerTest, DescriptorSetLayout_ReturnsValidVkLayout)
 
 TEST_F(DescriptorManagerTest, CreateDescriptorPool_WithPoolSizes)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -261,7 +197,7 @@ TEST_F(DescriptorManagerTest, CreateDescriptorPool_WithPoolSizes)
 
 TEST_F(DescriptorManagerTest, CreateDescriptorPool_WithZeroMaxSets)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -282,7 +218,7 @@ TEST_F(DescriptorManagerTest, CreateDescriptorPool_WithZeroMaxSets)
 
 TEST_F(DescriptorManagerTest, CalculatePoolSizes_SingleLayout)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -321,7 +257,7 @@ TEST_F(DescriptorManagerTest, CalculatePoolSizes_SingleLayout)
 
 TEST_F(DescriptorManagerTest, CalculatePoolSizes_MultipleLayouts)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -366,7 +302,7 @@ TEST_F(DescriptorManagerTest, CalculatePoolSizes_MultipleLayouts)
 
 TEST_F(DescriptorManagerTest, Allocate_SingleDescriptorSet_Succeeds)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -392,7 +328,7 @@ TEST_F(DescriptorManagerTest, Allocate_SingleDescriptorSet_Succeeds)
 
 TEST_F(DescriptorManagerTest, Allocate_MultipleDescriptorSets_Succeeds)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -423,7 +359,7 @@ TEST_F(DescriptorManagerTest, Allocate_MultipleDescriptorSets_Succeeds)
 
 TEST_F(DescriptorManagerTest, Allocate_ZeroCount_ReturnsEmpty)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -450,7 +386,7 @@ TEST_F(DescriptorManagerTest, Allocate_ZeroCount_ReturnsEmpty)
 
 TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -458,9 +394,9 @@ TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 	// Create a host-visible uniform buffer
 	constexpr vk::DeviceSize kBufSize = 256;
 	VulkanBuffer buf(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 kBufSize,
 	                 vk::BufferUsageFlagBits::eUniformBuffer,
 	                 vk::MemoryPropertyFlagBits::eHostVisible |
@@ -493,16 +429,16 @@ TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 
 TEST_F(DescriptorManagerTest, WriteBuffer_DefaultType_UniformBuffer)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
 	constexpr vk::DeviceSize kBufSize = 128;
 	VulkanBuffer buf(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 kBufSize,
 	                 vk::BufferUsageFlagBits::eStorageBuffer,
 	                 vk::MemoryPropertyFlagBits::eHostVisible |
@@ -538,7 +474,7 @@ TEST_F(DescriptorManagerTest, WriteBuffer_DefaultType_UniformBuffer)
 
 TEST_F(DescriptorManagerTest, StandardLayout_CameraUBO)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
@@ -559,7 +495,7 @@ TEST_F(DescriptorManagerTest, StandardLayout_CameraUBO)
 
 TEST_F(DescriptorManagerTest, StandardLayout_MaterialUBOAndTexture)
 {
-	if (!m_hasVulkan)
+	if (!HasVulkan())
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}

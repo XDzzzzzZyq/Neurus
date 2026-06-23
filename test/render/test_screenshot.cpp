@@ -41,95 +41,7 @@ protected:
 		VulkanTestShared::TearDown();
 	}
 
-	/** Shortcut: record commands inside a one-shot buffer. */
-	template <typename F>
-	void OneShotSubmit(F&& recordFn)
-	{
-		auto& cmd = BeginCmd();
-		recordFn(cmd);
-		EndSubmitWait(cmd);
-	}
 
-	/**
-	 * @brief Uploads pixel data into an Image via staging buffer.
-	 *
-	 * Creates a staging buffer, copies data via vkCmdCopyBufferToImage,
-	 * then transitions the image to TRANSFER_SRC_OPTIMAL for readback.
-	 */
-	void uploadImageData(vk::Image image, vk::Extent2D extent, vk::Format format,
-	                     const void* data, size_t dataSize)
-	{
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-		// --- Create staging buffer ---
-		vk::BufferCreateInfo stagingCI({}, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
-		vk::raii::Buffer stagingBuffer(*m_device, stagingCI);
-
-		auto stagingMemReqs = stagingBuffer.getMemoryRequirements();
-		uint32_t stagingMemType = findMemoryType(pd, stagingMemReqs.memoryTypeBits,
-			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-
-		vk::MemoryAllocateInfo stagingAlloc(stagingMemReqs.size, stagingMemType);
-		vk::raii::DeviceMemory stagingMemory(*m_device, stagingAlloc);
-		stagingBuffer.bindMemory(*stagingMemory, 0);
-
-		void* mapped = stagingMemory.mapMemory(0, dataSize);
-		std::memcpy(mapped, data, dataSize);
-		stagingMemory.unmapMemory();
-
-		OneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
-			// Transition image to TRANSFER_DST
-			vk::ImageMemoryBarrier barrier1(
-				vk::AccessFlagBits::eNone,
-				vk::AccessFlagBits::eTransferWrite,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eTransferDstOptimal,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				image,
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-			                    vk::PipelineStageFlagBits::eTransfer,
-			                    {}, {}, {}, barrier1);
-
-			// Copy buffer to image
-			vk::BufferImageCopy copyRegion(0, 0, 0,
-				vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-				vk::Offset3D(0, 0, 0),
-				vk::Extent3D(extent.width, extent.height, 1));
-			cmd.copyBufferToImage(*stagingBuffer, image,
-			                      vk::ImageLayout::eTransferDstOptimal, copyRegion);
-
-			// Transition to SHADER_READ_ONLY (simulating post-render state)
-			vk::ImageMemoryBarrier barrier2(
-				vk::AccessFlagBits::eTransferWrite,
-				vk::AccessFlagBits::eShaderRead,
-				vk::ImageLayout::eTransferDstOptimal,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				image,
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-			                    vk::PipelineStageFlagBits::eFragmentShader,
-			                    {}, {}, {}, barrier2);
-		});
-	}
-
-	static uint32_t findMemoryType(const vk::raii::PhysicalDevice& pd,
-	                               uint32_t typeBits,
-	                               vk::MemoryPropertyFlags required)
-	{
-		auto memProps = pd.getMemoryProperties();
-		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-		{
-			if ((typeBits & (1u << i)) && (memProps.memoryTypes[i].propertyFlags & required) == required)
-			{
-				return i;
-			}
-		}
-		throw std::runtime_error("No suitable memory type found");
-	}
 
 	std::string m_testOutputPath;
 };
@@ -165,8 +77,8 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 		redPixels[i * 4 + 2] = 0;    // B
 		redPixels[i * 4 + 3] = 255;  // A
 	}
-	uploadImageData(*image.ImageHandle(), extent, vk::Format::eR8G8B8A8Unorm,
-	                redPixels.data(), redPixels.size());
+	image.UploadPixelData(*m_device, pd, m_queue, m_graphicsQueueFamily,
+	                      redPixels.data(), redPixels.size());
 
 	// --- Capture to PNG ---
 	m_testOutputPath = "screenshots/test_rgba8.png";
@@ -225,8 +137,8 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 		halfData[i * 4 + 2] = h0_75;
 		halfData[i * 4 + 3] = h1_0;
 	}
-	uploadImageData(*image.ImageHandle(), extent, vk::Format::eR16G16B16A16Sfloat,
-	                halfData.data(), halfData.size() * sizeof(uint16_t));
+	image.UploadPixelData(*m_device, pd, m_queue, m_graphicsQueueFamily,
+	                      halfData.data(), halfData.size() * sizeof(uint16_t));
 
 	// --- Capture to PNG ---
 	m_testOutputPath = "screenshots/test_rgba16f.png";
@@ -263,8 +175,8 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
 	std::vector<uint8_t> pixels(pixelCount * 4, 128);
-	uploadImageData(*image.ImageHandle(), extent, vk::Format::eR8G8B8A8Unorm,
-	                pixels.data(), pixels.size());
+	image.UploadPixelData(*m_device, pd, m_queue, m_graphicsQueueFamily,
+	                      pixels.data(), pixels.size());
 
 	// --- Use a nested directory that doesn't exist ---
 	const std::string nestedPath = "screenshots/nested/subdir/test_auto_dir.png";

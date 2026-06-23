@@ -63,16 +63,6 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-struct IBLTestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
-
-// ---------------------------------------------------------------------------
 // Procedural colourful gradient equirectangular image
 //
 // Horizontal: red (left) → blue (right)
@@ -272,41 +262,6 @@ protected:
 		VulkanTestShared::TearDown();
 	}
 
-	// --- Camera UBO ---
-	static CameraUBOData ComputeCameraUBO(Camera& cam)
-	{
-		CameraUBOData ubo;
-		ubo.view = cam.GetViewMatrix();
-		ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
-		return ubo;
-	}
-
-	// --- G-Buffer transition helper ---
-	void TransitionGbufferToColorAttachment()
-	{
-		auto& cmd = BeginCmd();
-
-		const std::array<AttachmentName, 4> colorAtts = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		for (const auto& att : colorAtts)
-		{
-			m_attachmentManager->GetAttachment(att).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		m_attachmentManager->GetAttachment(AttachmentName::Depth).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-		EndSubmitWait(cmd);
-	}
-
 	// --- Render pass infrastructure ---
 	std::unique_ptr<AttachmentManager>  m_attachmentManager;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
@@ -344,14 +299,19 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	const bool loaded = meshData->LoadObj(objPath);
 	ASSERT_TRUE(loaded) << "Failed to load OBJ: " << objPath;
 
-	const auto& rawMesh = meshData->GetMeshData();
-	const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
-	const size_t indexCount = rawMesh.indexArray.size();
-	ASSERT_GT(srcVertexCount, 0u);
-	ASSERT_GT(indexCount, 0u);
-
-	std::vector<float>    srcVertexData = rawMesh.dataArray;
-	std::vector<uint32_t> srcIndexData  = rawMesh.indexArray;
+	// Scale positions 0.25x (matches original manual vertex extraction scaling)
+	{
+		auto& raw = const_cast<MeshData::ByteArray&>(meshData->GetMeshData());
+		const size_t vertexCount = raw.dataArray.size() / 14;
+		ASSERT_GT(vertexCount, 0u);
+		ASSERT_GT(raw.indexArray.size(), 0u);
+		for (size_t i = 0; i < vertexCount; ++i)
+		{
+			raw.dataArray[i * 14 + 0] *= 0.25f;
+			raw.dataArray[i * 14 + 1] *= 0.25f;
+			raw.dataArray[i * 14 + 2] *= 0.25f;
+		}
+	}
 
 	// -------------------------------------------------------------------
 	// Step 2: Create camera (pos (0, 2, 5), looking at origin)
@@ -363,7 +323,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	const CameraUBOData camUBO = ComputeCameraUBO(*camera);
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -------------------------------------------------------------------
 	// Step 3: Create point light (for mixed direct + IBL lighting)
@@ -373,7 +333,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	light->light_radius = 10.0f;
 
 	// -------------------------------------------------------------------
-	// Step 4: Build mesh + material
+	// Step 4: Build mesh + material + upload to GPU
 	// -------------------------------------------------------------------
 	auto material = std::make_shared<Material>();
 	material->SetMatParam(Material::MAT_METAL, 0.0f);
@@ -383,45 +343,20 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	auto mesh = std::make_shared<Mesh>();
 	mesh->o_mesh = meshData;
 	mesh->o_material = material;
-
-	// -------------------------------------------------------------------
-	// Step 5: Convert vertex data (14 floats → 8: pos+normal+uv)
-	// -------------------------------------------------------------------
-	std::vector<IBLTestVertex> vertices(srcVertexCount);
-	for (size_t i = 0; i < srcVertexCount; ++i)
-	{
-		const float* s = &srcVertexData[i * 14];
-		IBLTestVertex& v = vertices[i];
-		v.posX = s[0] * 0.25f; v.posY = s[1] * 0.25f; v.posZ = s[2] * 0.25f;
-		v.nrmX = s[3]; v.nrmY = s[4]; v.nrmZ = s[5];
-		v.uvX  = s[6]; v.uvY  = s[7];
-	}
-
-	std::vector<uint32_t> indices = srcIndexData;
-
-	// -------------------------------------------------------------------
-	// Step 6: Upload vertex + index buffers to GPU
-	// -------------------------------------------------------------------
-	VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                 vertices.data(), vertices.size() * sizeof(IBLTestVertex),
-	                 sizeof(IBLTestVertex), static_cast<uint32_t>(vertices.size()));
-
-	IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(), indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
+	mesh->UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = vbo.buffer();
-	renderItem.indexBuffer  = ibo.buffer();
-	renderItem.indexCount   = ibo.GetIndexCount();
-	renderItem.indexType    = ibo.GetIndexType();
+	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
+	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
+	renderItem.indexCount   = mesh->GetGPUIndexCount();
+	renderItem.indexType    = vk::IndexType::eUint32;
 	renderItem.pushConstants.model = glm::mat4(1.0f);
 	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer & record geometry pass
 	// -------------------------------------------------------------------
-	TransitionGbufferToColorAttachment();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
 	{
 		auto& cmd = BeginCmd();
@@ -498,14 +433,19 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	auto meshData = std::make_shared<MeshData>();
 	ASSERT_TRUE(meshData->LoadObj(objPath)) << "Failed to load OBJ: " << objPath;
 
-	const auto& rawMesh = meshData->GetMeshData();
-	const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
-	const size_t indexCount = rawMesh.indexArray.size();
-	ASSERT_GT(srcVertexCount, 0u);
-	ASSERT_GT(indexCount, 0u);
-
-	std::vector<float>    srcVertexData = rawMesh.dataArray;
-	std::vector<uint32_t> srcIndexData  = rawMesh.indexArray;
+	// Scale positions 0.25x (matches original manual vertex extraction scaling)
+	{
+		auto& raw = const_cast<MeshData::ByteArray&>(meshData->GetMeshData());
+		const size_t vertexCount = raw.dataArray.size() / 14;
+		ASSERT_GT(vertexCount, 0u);
+		ASSERT_GT(raw.indexArray.size(), 0u);
+		for (size_t i = 0; i < vertexCount; ++i)
+		{
+			raw.dataArray[i * 14 + 0] *= 0.25f;
+			raw.dataArray[i * 14 + 1] *= 0.25f;
+			raw.dataArray[i * 14 + 2] *= 0.25f;
+		}
+	}
 
 	// --- Camera ---
 	auto camera = std::make_shared<Camera>(
@@ -514,7 +454,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		60.0f, 0.1f, 100.0f);
 	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
-	const CameraUBOData camUBO = ComputeCameraUBO(*camera);
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// --- Light ---
 	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
@@ -527,41 +467,23 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	material->SetMatParam(Material::MAT_ROUGH, 0.5f);
 	material->SetMatParam(Material::MAT_ALBEDO, glm::vec3(1.0f, 1.0f, 1.0f));
 
-	// --- Mesh ---
+	// --- Mesh + UploadToGPU ---
 	auto mesh = std::make_shared<Mesh>();
 	mesh->o_mesh = meshData;
 	mesh->o_material = material;
-
-	// --- Vertex / index buffers ---
-	std::vector<IBLTestVertex> vertices(srcVertexCount);
-	for (size_t i = 0; i < srcVertexCount; ++i)
-	{
-		const float* s = &srcVertexData[i * 14];
-		IBLTestVertex& v = vertices[i];
-		v.posX = s[0] * 0.25f; v.posY = s[1] * 0.25f; v.posZ = s[2] * 0.25f;
-		v.nrmX = s[3]; v.nrmY = s[4]; v.nrmZ = s[5];
-		v.uvX  = s[6]; v.uvY  = s[7];
-	}
-	std::vector<uint32_t> indices = srcIndexData;
-
-	VertexBuffer vbo(dev, pd, m_queue, m_graphicsQueueFamily,
-	                 vertices.data(), vertices.size() * sizeof(IBLTestVertex),
-	                 sizeof(IBLTestVertex), static_cast<uint32_t>(vertices.size()));
-	IndexBuffer ibo(dev, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(), indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
+	mesh->UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = vbo.buffer();
-	renderItem.indexBuffer  = ibo.buffer();
-	renderItem.indexCount   = ibo.GetIndexCount();
-	renderItem.indexType    = ibo.GetIndexType();
+	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
+	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
+	renderItem.indexCount   = mesh->GetGPUIndexCount();
+	renderItem.indexType    = vk::IndexType::eUint32;
 	renderItem.pushConstants.model = glm::mat4(1.0f);
 	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// --- Render Frame 1 (IBL active) ---
 	{
-		TransitionGbufferToColorAttachment();
+		VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };
@@ -729,7 +651,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 	SCOPED_TRACE("Render Frame 2");
 	{
-		TransitionGbufferToColorAttachment();
+		VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };

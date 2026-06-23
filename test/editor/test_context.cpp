@@ -216,6 +216,93 @@ TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventQueue)
 }
 
 // ===========================================================================
+// SceneStatusTest — SceneStatusChanged propagation from EditorContext
+// ===========================================================================
+
+class SceneStatusTest : public ::testing::Test
+{
+protected:
+	void SetUp() override
+	{
+		m_context = std::make_unique<EditorContext>();
+		m_scene = std::make_unique<Scene>();
+		m_queue = &EventQueue();
+	}
+
+	void TearDown() override
+	{
+		// Process any remaining events
+		m_queue->Process();
+	}
+
+	std::unique_ptr<EditorContext> m_context;
+	std::unique_ptr<Scene> m_scene;
+	class EventQueue* m_queue = nullptr;
+};
+
+TEST_F(SceneStatusTest, NotifySceneChanged_EmitsViaEventQueue)
+{
+	int receivedStatus = -1;
+
+	m_queue->subscribe<SceneStatusChanged>(
+		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
+
+	m_context->NotifySceneChanged(Scene::SceneChanged);
+
+	// Event is enqueued, not yet dispatched
+	m_queue->Process();
+
+	EXPECT_EQ(receivedStatus, Scene::SceneChanged);
+}
+
+TEST_F(SceneStatusTest, NotifySceneChanged_MultipleStatusValues)
+{
+	std::vector<int> receivedStatuses;
+
+	m_queue->subscribe<SceneStatusChanged>(
+		[&](const SceneStatusChanged& e) { receivedStatuses.push_back(e.status); });
+
+	m_context->NotifySceneChanged(Scene::ObjectTransChanged);
+	m_context->NotifySceneChanged(Scene::LightChanged | Scene::CameraChanged);
+	m_context->NotifySceneChanged(Scene::NoChanges);
+
+	m_queue->Process();
+
+	ASSERT_EQ(receivedStatuses.size(), 3);
+	EXPECT_EQ(receivedStatuses[0], Scene::ObjectTransChanged);
+	EXPECT_EQ(receivedStatuses[1], Scene::LightChanged | Scene::CameraChanged);
+	EXPECT_EQ(receivedStatuses[2], Scene::NoChanges);
+}
+
+TEST_F(SceneStatusTest, SetScene_StoresPointer)
+{
+	EXPECT_NO_THROW({ m_context->SetScene(m_scene.get()); });
+}
+
+TEST_F(SceneStatusTest, SetScene_Nullptr)
+{
+	EXPECT_NO_THROW({ m_context->SetScene(nullptr); });
+}
+
+TEST_F(SceneStatusTest, NoCrossContaminationWithOtherSignals)
+{
+	int sceneStatusCount = 0;
+	int objectSelectedCount = 0;
+
+	m_queue->subscribe<SceneStatusChanged>([&](const SceneStatusChanged&) { sceneStatusCount++; });
+	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { objectSelectedCount++; });
+
+	m_context->NotifySceneChanged(Scene::MaterialChanged);
+
+	m_queue->Process();
+
+	// SceneStatusChanged should have fired
+	EXPECT_EQ(sceneStatusCount, 1);
+	// ObjectSelected should NOT have fired
+	EXPECT_EQ(objectSelectedCount, 0);
+}
+
+// ===========================================================================
 // RenderContext tests
 // ===========================================================================
 

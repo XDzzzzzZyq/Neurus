@@ -22,12 +22,14 @@
 #include "render/passes/PassContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/VulkanBuffer.h"
-#include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
 #include "scene/Light.h"
+#include "scene/Mesh.h"
 #include "scene/Scene.h"
+
+#include "asset/MeshData.h"
 
 #include <gbuffer.vert.h>
 #include <gbuffer.frag.h>
@@ -36,21 +38,9 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
-#include <cstring>
 #include <memory>
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-
-struct TestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
 
 // ---------------------------------------------------------------------------
 // Test fixture
@@ -106,40 +96,6 @@ protected:
 	}
 
 	/**
-	 * @brief Creates a default camera looking at the triangle at the origin.
-	 */
-	CameraUBOData MakeTestCamera() const
-	{
-		CameraUBOData cam;
-		const glm::mat4 proj = glm::perspective(
-			glm::radians(60.0f),
-			static_cast<float>(kRenderWidth) / static_cast<float>(kRenderHeight),
-			0.1f, 100.0f);
-		const glm::mat4 view = glm::lookAt(
-			glm::vec3(0.0f, 0.0f, 2.0f),    // eye
-			glm::vec3(0.0f, 0.0f, 0.0f),    // target
-			glm::vec3(0.0f, 1.0f, 0.0f));    // up
-		cam.viewProj = proj * view;
-		cam.view = view;
-		return cam;
-	}
-
-	/**
-	 * @brief Creates a single test triangle in the XY plane facing +Z.
-	 */
-	static std::pair<std::vector<TestVertex>, std::vector<uint32_t>> TestTriangle()
-	{
-		std::vector<TestVertex> verts = {
-			//  posX  posY posZ    nrmX nrmY nrmZ    uvX  uvY
-			{   0.0f,-0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.5f, 1.0f },
-			{   0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 1.0f, 0.0f },
-			{  -0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f },
-		};
-		std::vector<uint32_t> indices = { 0, 1, 2 };
-		return { verts, indices };
-	}
-
-	/**
 	 * @brief Renders the test triangle into the G-Buffer.
 	 *
 	 * Transitions attachments, creates buffers, records geometry pass.
@@ -147,31 +103,40 @@ protected:
 	 */
 	CameraUBOData RenderTestTriangle()
 	{
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
+		auto& pd = PhysicalDevice();
 
 		// Transition GBuffer → renderable
-		TransitionGbufferToColorAttachment();
+		VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
-		auto [verts, indices] = TestTriangle();
-		const uint32_t vStride = sizeof(TestVertex);
+		// Build test triangle mesh from inline OBJ data → Mesh → UploadToGPU
+		const std::string triObj =
+			"o TestTriangle\n"
+			"v 0.0 -0.5 0.0\n"
+			"v 0.5 0.5 0.0\n"
+			"v -0.5 0.5 0.0\n"
+			"vn 0.0 0.0 1.0\n"
+			"vn 0.0 0.0 1.0\n"
+			"vn 0.0 0.0 1.0\n"
+			"vt 0.5 1.0\n"
+			"vt 1.0 0.0\n"
+			"vt 0.0 0.0\n"
+			"f 1/1/1 2/2/2 3/3/3\n";
 
-		VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		                 verts.data(), verts.size() * vStride,
-		                 vStride, static_cast<uint32_t>(verts.size()));
-
-		IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		                indices.data(), indices.size() * sizeof(uint32_t),
-		                static_cast<uint32_t>(indices.size()));
+		auto meshData = std::make_shared<MeshData>();
+		meshData->LoadObjFromString(triObj);
+		Mesh mesh;
+		mesh.o_mesh = meshData;
+		mesh.UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 		GeometryRenderItem item;
-		item.vertexBuffer = vbo.buffer();
-		item.indexBuffer  = ibo.buffer();
-		item.indexCount   = ibo.GetIndexCount();
-		item.indexType    = ibo.GetIndexType();
+		item.vertexBuffer = mesh.GetVertexBuffer()->buffer();
+		item.indexBuffer  = mesh.GetIndexBuffer()->buffer();
+		item.indexCount   = mesh.GetGPUIndexCount();
+		item.indexType    = mesh.GetIndexBuffer()->GetIndexType();
 		item.pushConstants.model = glm::mat4(1.0f);
 		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
-		const auto camera = MakeTestCamera();
+		const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 		{
 			auto& cmd = BeginCmd();
@@ -219,152 +184,11 @@ protected:
 	}
 
 	/**
-	 * @brief Converts an IEEE 754 half-float (16-bit) to a 32-bit float.
-	 */
-	static float HalfToFloat(uint16_t half)
-	{
-		const uint32_t h = half;
-		const uint32_t sign     = (h >> 15) & 0x0001;
-		const uint32_t exp      = (h >> 10) & 0x001F;
-		const uint32_t mantissa =  h        & 0x03FF;
-
-		uint32_t f32;
-
-		if (exp == 0)
-		{
-			// Zero or denormalized
-			if (mantissa == 0)
-			{
-				f32 = sign << 31;
-			}
-			else
-			{
-				// Normalize denormal
-				int e = -14;
-				uint32_t m = mantissa;
-				while ((m & 0x0400) == 0)
-				{
-					m <<= 1;
-					--e;
-				}
-				m &= 0x03FF;  // Remove leading 1
-				f32 = (sign << 31) | ((uint32_t)(e + 127) << 23) | (m << 13);
-			}
-		}
-		else if (exp == 0x1F)
-		{
-			// Infinity or NaN
-			f32 = (sign << 31) | (0xFFu << 23) | (mantissa << 13);
-		}
-		else
-		{
-			// Normalized
-			f32 = (sign << 31) | ((uint32_t)(exp + 112) << 23) | (mantissa << 13);
-		}
-
-		float result;
-		std::memcpy(&result, &f32, sizeof(float));
-		return result;
-	}
-
-	/**
 	 * @brief Reads back HDR colour output into a float array.
 	 *
 	 * Assumes RGBA16F format (8 bytes per pixel). Converts half-floats to
 	 * single-precision floats.
 	 */
-	std::vector<float> ReadbackHdrOutput()
-	{
-		auto& pd = m_physicalDevices[m_selectedPdIndex];
-		const vk::DeviceSize imageByteSize = kRenderWidth * kRenderHeight * 8; // RGBA16F = 8 B/px
-
-		// Staging buffer: host-visible, TRANSFER_DST
-		VulkanBuffer stagingBuf(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		                        imageByteSize,
-		                        vk::BufferUsageFlagBits::eTransferDst,
-		                        vk::MemoryPropertyFlagBits::eHostVisible |
-		                            vk::MemoryPropertyFlagBits::eHostCoherent);
-
-		// Transition HDR output: GENERAL → TRANSFER_SRC_OPTIMAL
-		{
-			auto& cmd = BeginCmd();
-			auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
-
-			vk::ImageMemoryBarrier barrier(
-				vk::AccessFlagBits::eShaderWrite,
-				vk::AccessFlagBits::eTransferRead,
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eTransferSrcOptimal,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*hdrColor.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-
-			cmd.pipelineBarrier(
-				vk::PipelineStageFlagBits::eComputeShader,
-				vk::PipelineStageFlagBits::eTransfer,
-				{},
-				{},
-				{},
-				{barrier});
-
-			// Copy image → buffer
-			vk::BufferImageCopy copyRegion(
-				0, 0, 0,
-				vk::ImageSubresourceLayers(
-					vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-				vk::Offset3D(0, 0, 0),
-				vk::Extent3D(kRenderWidth, kRenderHeight, 1));
-
-			cmd.copyImageToBuffer(*hdrColor.ImageHandle(),
-			                      vk::ImageLayout::eTransferSrcOptimal,
-			                      stagingBuf.buffer(),
-			                      {copyRegion});
-
-			EndSubmitWait(cmd);
-		}
-
-		// Map, convert half-float → float
-		const uint32_t pixelCount = kRenderWidth * kRenderHeight;
-		std::vector<float> result(pixelCount * 4);
-		void* mapped = stagingBuf.Map();
-		const auto* src = static_cast<const uint16_t*>(mapped);
-		for (size_t i = 0; i < pixelCount * 4; ++i)
-		{
-			result[i] = HalfToFloat(src[i]);
-		}
-		stagingBuf.Unmap();
-
-		return result;
-	}
-
-	/** Transition G-Buffer attachments to color attachment optimal. */
-	void TransitionGbufferToColorAttachment()
-	{
-		auto& cmd = BeginCmd();
-
-		const std::array<AttachmentName, 4> colorAtts = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		for (const auto& att : colorAtts)
-		{
-			m_attachmentManager->GetAttachment(att).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		m_attachmentManager->GetAttachment(AttachmentName::Depth).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-		EndSubmitWait(cmd);
-	}
-
 	// --- Constants ---
 	static constexpr uint32_t kRenderWidth  = 128;
 	static constexpr uint32_t kRenderHeight = 128;
@@ -463,7 +287,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	// --- Step 3: Record lighting pass ---
 	{
 		auto& cmd = BeginCmd();
-		const auto testCam = MakeTestCamera();
+		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 		m_lightingPass->Record(*cmd, PassContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
@@ -477,7 +301,9 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	}
 
 	// --- Step 4: Read back HDR output ---
-	std::vector<float> hdrPixels = ReadbackHdrOutput();
+	std::vector<float> hdrPixels = VulkanTestShared::ReadbackHdrOutput(
+		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
+		*m_attachmentManager, kRenderWidth, kRenderHeight);
 
 	// --- Step 5: Verify at least one pixel has non-zero colour ---
 	// The triangle covers roughly the center of the framebuffer.
@@ -536,7 +362,7 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 	// --- Record lighting pass with 0 lights ---
 	{
 		auto& cmd = BeginCmd();
-		const auto testCam = MakeTestCamera();
+		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 		m_lightingPass->Record(*cmd, PassContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
@@ -550,7 +376,9 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 	}
 
 	// --- Read back ---
-	std::vector<float> hdrPixels = ReadbackHdrOutput();
+	std::vector<float> hdrPixels = VulkanTestShared::ReadbackHdrOutput(
+		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
+		*m_attachmentManager, kRenderWidth, kRenderHeight);
 
 	// --- Verify: at least some covered pixels have the ambient term ---
 	// Ambient = 0.03 * albedo = 0.03 for white albedo

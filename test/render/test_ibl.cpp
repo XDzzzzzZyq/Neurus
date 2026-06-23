@@ -232,7 +232,7 @@ protected:
 		vk::raii::Buffer stagingBuf(dev, stagingCI);
 
 		auto memReqs = stagingBuf.getMemoryRequirements();
-		const uint32_t memType = findMemoryType(pd, memReqs.memoryTypeBits,
+		const uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
 			vk::MemoryPropertyFlagBits::eHostVisible |
 			vk::MemoryPropertyFlagBits::eHostCoherent);
 		vk::raii::DeviceMemory stagingMem(dev, vk::MemoryAllocateInfo(memReqs.size, memType));
@@ -404,7 +404,7 @@ protected:
 		vk::raii::Buffer stagingBuf(dev, stagingCI);
 
 		auto memReqs = stagingBuf.getMemoryRequirements();
-		const uint32_t memType = findMemoryType(pd, memReqs.memoryTypeBits,
+		const uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
 			vk::MemoryPropertyFlagBits::eHostVisible |
 			vk::MemoryPropertyFlagBits::eHostCoherent);
 		vk::raii::DeviceMemory stagingMem(dev, vk::MemoryAllocateInfo(memReqs.size, memType));
@@ -460,7 +460,7 @@ protected:
 		vk::raii::Buffer stagingBuf(dev, stagingCI);
 
 		auto memReqs = stagingBuf.getMemoryRequirements();
-		const uint32_t memType = findMemoryType(pd, memReqs.memoryTypeBits,
+		const uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
 			vk::MemoryPropertyFlagBits::eHostVisible |
 			vk::MemoryPropertyFlagBits::eHostCoherent);
 		vk::raii::DeviceMemory stagingMem(dev, vk::MemoryAllocateInfo(memReqs.size, memType));
@@ -506,22 +506,6 @@ protected:
 	// -------------------------------------------------------------------
 	// Utility
 	// -------------------------------------------------------------------
-
-	static uint32_t findMemoryType(const vk::raii::PhysicalDevice& pd,
-	                                uint32_t typeFilter,
-	                                vk::MemoryPropertyFlags props)
-	{
-		auto memProps = pd.getMemoryProperties();
-		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-		{
-			if ((typeFilter & (1u << i)) &&
-			    (memProps.memoryTypes[i].propertyFlags & props) == props)
-			{
-				return i;
-			}
-		}
-		return 0;
-	}
 
 	static void ensureDir(const std::string& filePath)
 	{

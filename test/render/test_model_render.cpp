@@ -52,23 +52,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
-#include <cstring>
 #include <fstream>
 #include <memory>
 #include <vector>
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-
-struct TestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
 
 // ---------------------------------------------------------------------------
 // Test fixture
@@ -120,160 +108,6 @@ protected:
 			2u,                          // numSets = kMaxFramesInFlight
 			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
-	}
-
-	/**
-	 * @brief Converts an IEEE 754 half-float (16-bit) to a 32-bit float.
-	 */
-	static float HalfToFloat(uint16_t half)
-	{
-		const uint32_t h = half;
-		const uint32_t sign     = (h >> 15) & 0x0001;
-		const uint32_t exp      = (h >> 10) & 0x001F;
-		const uint32_t mantissa =  h        & 0x03FF;
-
-		uint32_t f32;
-
-		if (exp == 0)
-		{
-			if (mantissa == 0)
-			{
-				f32 = sign << 31;
-			}
-			else
-			{
-				int e = -14;
-				uint32_t m = mantissa;
-				while ((m & 0x0400) == 0)
-				{
-					m <<= 1;
-					--e;
-				}
-				m &= 0x03FF;
-				f32 = (sign << 31) | ((uint32_t)(e + 127) << 23) | (m << 13);
-			}
-		}
-		else if (exp == 0x1F)
-		{
-			f32 = (sign << 31) | (0xFFu << 23) | (mantissa << 13);
-		}
-		else
-		{
-			f32 = (sign << 31) | ((uint32_t)(exp + 112) << 23) | (mantissa << 13);
-		}
-
-		float result;
-		std::memcpy(&result, &f32, sizeof(float));
-		return result;
-	}
-
-	/**
-	 * @brief Creates a CameraUBOData from a neurus::Camera object.
-	 */
-	static CameraUBOData MakeCameraUBO(Camera& cam)
-	{
-		CameraUBOData ubo;
-		ubo.view = cam.GetViewMatrix();
-		ubo.viewProj = cam.GetProjectionMatrix() * ubo.view;
-		return ubo;
-	}
-
-	/**
-	 * @brief Reads back HDR colour output into a float array.
-	 *
-	 * Assumes RGBA16F format (8 bytes per pixel). Converts half-floats to
-	 * single-precision floats.
-	 */
-	std::vector<float> ReadbackHdrOutput()
-	{
-		auto& pd = PhysicalDevice();
-		const vk::DeviceSize imageByteSize = kRenderWidth * kRenderHeight * 8; // RGBA16F
-
-		// Staging buffer: host-visible, TRANSFER_DST
-		VulkanBuffer stagingBuf(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		                        imageByteSize,
-		                        vk::BufferUsageFlagBits::eTransferDst,
-		                        vk::MemoryPropertyFlagBits::eHostVisible |
-		                            vk::MemoryPropertyFlagBits::eHostCoherent);
-
-		// Transition HDR output: GENERAL → TRANSFER_SRC_OPTIMAL
-		{
-			auto& cmd = BeginCmd();
-			auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
-
-			vk::ImageMemoryBarrier barrier(
-				vk::AccessFlagBits::eShaderWrite,
-				vk::AccessFlagBits::eTransferRead,
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eTransferSrcOptimal,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*hdrColor.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-
-			cmd.pipelineBarrier(
-				vk::PipelineStageFlagBits::eComputeShader,
-				vk::PipelineStageFlagBits::eTransfer,
-				{},
-				{},
-				{},
-				{barrier});
-
-			// Copy image → buffer
-			vk::BufferImageCopy copyRegion(
-				0, 0, 0,
-				vk::ImageSubresourceLayers(
-					vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-				vk::Offset3D(0, 0, 0),
-				vk::Extent3D(kRenderWidth, kRenderHeight, 1));
-
-			cmd.copyImageToBuffer(*hdrColor.ImageHandle(),
-			                      vk::ImageLayout::eTransferSrcOptimal,
-			                      stagingBuf.buffer(),
-			                      {copyRegion});
-
-			EndSubmitWait(cmd);
-		}
-
-		// Map, convert half-float → float
-		const uint32_t pixelCount = kRenderWidth * kRenderHeight;
-		std::vector<float> result(pixelCount * 4);
-		void* mapped = stagingBuf.Map();
-		const auto* src = static_cast<const uint16_t*>(mapped);
-		for (size_t i = 0; i < pixelCount * 4; ++i)
-		{
-			result[i] = HalfToFloat(src[i]);
-		}
-		stagingBuf.Unmap();
-
-		return result;
-	}
-
-	/** Transition G-Buffer attachments to color attachment optimal. */
-	void TransitionGbufferToColorAttachment()
-	{
-		auto& cmd = BeginCmd();
-
-		const std::array<AttachmentName, 4> colorAtts = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		for (const auto& att : colorAtts)
-		{
-			m_attachmentManager->GetAttachment(att).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		m_attachmentManager->GetAttachment(AttachmentName::Depth).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-		EndSubmitWait(cmd);
 	}
 
 	// --- Constants ---
@@ -332,15 +166,8 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	ASSERT_TRUE(loaded) << "Failed to load OBJ: " << objPath;
 
 	const auto& rawMesh = meshData->GetMeshData();
-	const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
-	const size_t indexCount = rawMesh.indexArray.size();
-
-	ASSERT_GT(srcVertexCount, 0u) << "OBJ has no vertices";
-	ASSERT_GT(indexCount, 0u) << "OBJ has no indices";
-
-	// Pre-extract vertex and index data (before meshData is shared into the Mesh)
-	std::vector<float> srcVertexData = rawMesh.dataArray;       // copy (14 floats/vert)
-	std::vector<uint32_t> srcIndexData = rawMesh.indexArray;    // copy
+	ASSERT_GT(rawMesh.dataArray.size() / 14, 0u) << "OBJ has no vertices";
+	ASSERT_GT(rawMesh.indexArray.size(), 0u) << "OBJ has no indices";
 
 	// -----------------------------------------------------------------------
 	// Step 2: Load BAKED.png texture (albedo)
@@ -419,56 +246,28 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	// Step 8: Build CameraUBOData from the Camera
 	// -----------------------------------------------------------------------
-	const CameraUBOData camUBO = MakeCameraUBO(*camera);
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -----------------------------------------------------------------------
-	// Step 9: Extract vertex data and upload to GPU
-	//
-	// MeshData stores 14 floats per vertex:
-	//   pos(3) + normal(3) + uv(2) + tangent(3) + bitangent(3)
-	// GeometryPass expects 8 floats per vertex (pos + normal + uv) at stride 32.
-	// We extract the first 8 floats from each vertex.
+	// Step 9: Upload mesh data to GPU
 	// -----------------------------------------------------------------------
-	std::vector<TestVertex> vertices(srcVertexCount);
-	for (size_t i = 0; i < srcVertexCount; ++i)
-	{
-		const float* src = &srcVertexData[i * 14];
-		TestVertex& v = vertices[i];
-		v.posX = src[0]; v.posY = src[1]; v.posZ = src[2];
-		v.nrmX = src[3]; v.nrmY = src[4]; v.nrmZ = src[5];
-		v.uvX  = src[6]; v.uvY  = src[7];
-	}
-
-	// Copy index data
-	std::vector<uint32_t> indices = srcIndexData;
-
-	// --- Upload to GPU ---
-	VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                 vertices.data(),
-	                 vertices.size() * sizeof(TestVertex),
-	                 sizeof(TestVertex),
-	                 static_cast<uint32_t>(vertices.size()));
-
-	IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(),
-	                indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
+	mesh->UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	// -----------------------------------------------------------------------
 	// Step 10: Build GeometryRenderItem with identity model matrix
 	// -----------------------------------------------------------------------
 	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = vbo.buffer();
-	renderItem.indexBuffer  = ibo.buffer();
-	renderItem.indexCount   = ibo.GetIndexCount();
-	renderItem.indexType    = ibo.GetIndexType();
+	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
+	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
+	renderItem.indexCount   = mesh->GetGPUIndexCount();
+	renderItem.indexType    = mesh->GetIndexBuffer()->GetIndexType();
 	renderItem.pushConstants.model = glm::mat4(1.0f);
 	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// -----------------------------------------------------------------------
 	// Step 11: Transition G-Buffer attachments to renderable layouts
 	// -----------------------------------------------------------------------
-	TransitionGbufferToColorAttachment();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
 	// -----------------------------------------------------------------------
 	// Step 12: Record geometry pass (G-Buffer write)
@@ -508,7 +307,9 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	// Step 14: Read back HDR colour output
 	// -----------------------------------------------------------------------
-	std::vector<float> hdrPixels = ReadbackHdrOutput();
+	std::vector<float> hdrPixels = VulkanTestShared::ReadbackHdrOutput(
+		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
+		*m_attachmentManager, kRenderWidth, kRenderHeight);
 
 	// -----------------------------------------------------------------------
 	// Step 15: Verify at least one pixel has non-zero RGB value

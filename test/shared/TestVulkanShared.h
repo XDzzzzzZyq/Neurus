@@ -15,10 +15,38 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "render/passes/AttachmentManager.h"
+
+#include <array>
+#include <cstdint>
+#include <cstring>
 #include <fstream>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include <glm/gtc/matrix_transform.hpp>
+
+#include "render/passes/GeometryPass.h"
+#include "scene/Camera.h"
+#include "render/VulkanBuffer.h"
+
+// ---------------------------------------------------------------------------
+// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Simple vertex with position, normal, and UV coordinates.
+ *
+ * Layout: posX/Y/Z (3 float), nrmX/Y/Z (3 float), uvX/uvY (2 float) = 32 bytes.
+ */
+struct TestVertex
+{
+	float posX, posY, posZ;
+	float nrmX, nrmY, nrmZ;
+	float uvX,  uvY;
+};
 
 // ---------------------------------------------------------------------------
 // Shared GPU test fixture — override SetUp/TearDown for non-standard setups
@@ -67,6 +95,117 @@ protected:
 	 * This tries multiple relative paths, falling back to the first candidate.
 	 */
 	static std::string ResolveAssetPath(const char* assetRelative);
+
+	// --- Shared test helpers ---
+
+	/**
+	 * @brief Computes CameraUBOData from a Camera object.
+	 */
+	static neurus::CameraUBOData ComputeCameraUBO(neurus::Camera& cam);
+
+	/**
+	 * @brief Creates a default camera UBO (60° FOV, looking at origin from (0,0,2)).
+	 * @param width  Render target width (for aspect ratio).
+	 * @param height Render target height (for aspect ratio).
+	 */
+	static neurus::CameraUBOData MakeTestCamera(uint32_t width, uint32_t height);
+
+	/**
+	 * @brief Creates a test triangle in the XY plane facing +Z.
+	 * @return Pair of (vertices, indices).
+	 */
+	static std::pair<std::vector<TestVertex>, std::vector<uint32_t>> TestTriangle();
+
+	/**
+	 * @brief Reads back HDRColor RGBA16F attachment into float array.
+	 *
+	 * Transitions HDRColor from GENERAL to TRANSFER_SRC_OPTIMAL, copies to
+	 * a staging buffer, converts half-floats to floats.
+	 *
+	 * @param device       Logical device.
+	 * @param pd           Physical device (for memory queries).
+	 * @param queue        Graphics queue.
+	 * @param qfi          Queue family index.
+	 * @param am           Attachment manager containing HDRColor attachment.
+	 * @param renderWidth  Render target width.
+	 * @param renderHeight Render target height.
+	 * @return Vector of RGBA float values (pixelCount * 4).
+	 */
+	static std::vector<float> ReadbackHdrOutput(
+		const vk::raii::Device& device,
+		const vk::raii::PhysicalDevice& pd,
+		vk::Queue queue,
+		uint32_t qfi,
+		neurus::AttachmentManager& am,
+		uint32_t renderWidth,
+		uint32_t renderHeight);
+
+	// --- Shared utility helpers ---
+
+	/**
+	 * @brief Converts an IEEE 754 half-float (16-bit) to a 32-bit float.
+	 */
+	static float HalfToFloat(uint16_t half);
+
+	/**
+	 * @brief Find a memory type matching the given type bits and property flags.
+	 * @param pd Physical device to query.
+	 * @param typeBits Bitmask of allowed memory types.
+	 * @param required Required memory property flags.
+	 * @return Index of the first matching memory type.
+	 * @throws std::runtime_error if no suitable memory type is found.
+	 */
+	static uint32_t FindMemoryType(const vk::raii::PhysicalDevice& pd,
+	                               uint32_t typeBits,
+	                               vk::MemoryPropertyFlags required)
+	{
+		auto memProps = pd.getMemoryProperties();
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+		{
+			if ((typeBits & (1u << i)) &&
+			    (memProps.memoryTypes[i].propertyFlags & required) == required)
+			{
+				return i;
+			}
+		}
+		throw std::runtime_error("No suitable memory type found");
+	}
+
+	/**
+	 * @brief Transition G-Buffer attachments to renderable layouts.
+	 *
+	 * Transitions Position, Normal, Albedo, MetallicRoughness to
+	 * eColorAttachmentOptimal and Depth to eDepthStencilAttachmentOptimal.
+	 *
+	 * @param am      AttachmentManager owning the G-Buffer attachments.
+	 * @param fixture Test fixture providing BeginCmd/EndSubmitWait.
+	 */
+	static void TransitionGbufferToColorAttachment(
+		neurus::AttachmentManager& am,
+		VulkanTestShared& fixture)
+	{
+		auto& cmd = fixture.BeginCmd();
+
+		const std::array<neurus::AttachmentName, 4> colorAtts = {
+			neurus::AttachmentName::Position,
+			neurus::AttachmentName::Normal,
+			neurus::AttachmentName::Albedo,
+			neurus::AttachmentName::MetallicRoughness,
+		};
+
+		for (const auto& att : colorAtts)
+		{
+			am.GetAttachment(att).TransitionLayout(
+				cmd, vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eColorAttachmentOptimal);
+		}
+
+		am.GetAttachment(neurus::AttachmentName::Depth).TransitionLayout(
+			cmd, vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal);
+
+		fixture.EndSubmitWait(cmd);
+	}
 
 	// --- Vulkan state (destructor order: reverse declaration) ---
 	bool m_hasVulkan = false;

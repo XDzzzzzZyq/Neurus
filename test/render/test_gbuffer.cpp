@@ -23,6 +23,9 @@
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
+#include "asset/MeshData.h"
+#include "scene/Mesh.h"
+
 #include <gbuffer.vert.h>
 #include <gbuffer.frag.h>
 
@@ -30,19 +33,9 @@
 
 #include <array>
 #include <memory>
+#include <string>
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-
-struct TestVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
 
 // ---------------------------------------------------------------------------
 // Test fixture
@@ -116,70 +109,6 @@ protected:
 		VulkanTestShared::TearDown();
 	}
 
-	// --- Helpers (BeginCmd/EndSubmitWait inherited from VulkanTestShared) ---
-
-	/**
-	 * @brief Creates a default camera looking at a triangle at the origin.
-	 */
-	CameraUBOData MakeTestCamera() const
-	{
-		CameraUBOData cam;
-		const glm::mat4 proj = glm::perspective(
-			glm::radians(60.0f),
-			static_cast<float>(kRenderWidth) / static_cast<float>(kRenderHeight),
-			0.1f, 100.0f);
-		const glm::mat4 view = glm::lookAt(
-			glm::vec3(0.0f, 0.0f, 2.0f),   // eye
-			glm::vec3(0.0f, 0.0f, 0.0f),   // target
-			glm::vec3(0.0f, 1.0f, 0.0f));   // up
-		cam.viewProj = proj * view;
-		cam.view = view;
-		return cam;
-	}
-
-	/**
-	 * @brief Creates a single test triangle in the XY plane facing +Z.
-	 *
-	 * Vertex layout: pos(3f) + normal(3f) + uv(2f) = 32 bytes.
-	 */
-	static std::pair<std::vector<TestVertex>, std::vector<uint32_t>> TestTriangle()
-	{
-		std::vector<TestVertex> verts = {
-			//  posX  posY posZ    nrmX nrmY nrmZ    uvX  uvY
-			{   0.0f,-0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.5f, 1.0f },
-			{   0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 1.0f, 0.0f },
-			{  -0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f },
-		};
-		std::vector<uint32_t> indices = { 0, 1, 2 };
-		return { verts, indices };
-	}
-
-	/** Transition G-Buffer attachments to the correct layouts. */
-	void TransitionGbufferAttachments()
-	{
-		auto& cmd = BeginCmd();
-
-		const std::array<AttachmentName, 4> colorAtts = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		for (const auto& att : colorAtts)
-		{
-			m_attachmentManager->GetAttachment(att).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		m_attachmentManager->GetAttachment(AttachmentName::Depth).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
-
-		EndSubmitWait(cmd);
-	}
-
 	// --- Constants ---
 	static constexpr uint32_t kRenderWidth  = 128;
 	static constexpr uint32_t kRenderHeight = 128;
@@ -226,31 +155,33 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 	auto& pd = PhysicalDevice();
 
 	// --- Transition attachments to renderable layouts ---
-	TransitionGbufferAttachments();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
-	// --- Create test geometry ---
-	auto [verts, indices] = TestTriangle();
-	const uint32_t vStride = sizeof(TestVertex);    // 32 bytes
+	// --- Create mesh from OBJ string ---
+	auto meshData = std::make_shared<MeshData>();
+	const std::string objStr =
+		"v 0.0 -0.5 0.0\n"
+		"v 0.5 0.5 0.0\n"
+		"v -0.5 0.5 0.0\n"
+		"vn 0.0 0.0 1.0\n"
+		"f 1//1 2//1 3//1\n";
+	ASSERT_TRUE(meshData->LoadObjFromString(objStr));
 
-	VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                 verts.data(), verts.size() * vStride,
-	                 vStride, static_cast<uint32_t>(verts.size()));
-
-	IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(), indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
+	Mesh mesh;
+	mesh.o_mesh = meshData;
+	mesh.UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 	// --- Build render item ---
 	GeometryRenderItem item;
-	item.vertexBuffer = vbo.buffer();
-	item.indexBuffer  = ibo.buffer();
-	item.indexCount   = ibo.GetIndexCount();
-	item.indexType    = ibo.GetIndexType();
+	item.vertexBuffer = mesh.GetVertexBuffer()->buffer();
+	item.indexBuffer  = mesh.GetIndexBuffer()->buffer();
+	item.indexCount   = mesh.GetGPUIndexCount();
+	item.indexType    = mesh.GetIndexBuffer()->GetIndexType();
 	item.pushConstants.model = glm::mat4(1.0f);         // identity
 	item.pushConstants.normalMatrix = glm::mat4(1.0f);   // identity
 
 	// --- Camera ---
-	const auto camera = MakeTestCamera();
+	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 	// --- Record ---
 	{
@@ -270,10 +201,6 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 	SUCCEED();
 }
 
-// ---------------------------------------------------------------------------
-// 3. Record - multiple render items
-// ---------------------------------------------------------------------------
-
 TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 {
 	if (!HasVulkan())
@@ -283,26 +210,28 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 
 	auto& pd = PhysicalDevice();
 
-	TransitionGbufferAttachments();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
-	// --- Create test geometry ---
-	auto [verts, indices] = TestTriangle();
-	const uint32_t vStride = sizeof(TestVertex);
+	// --- Create mesh from OBJ string ---
+	auto meshData = std::make_shared<MeshData>();
+	const std::string objStr =
+		"v 0.0 -0.5 0.0\n"
+		"v 0.5 0.5 0.0\n"
+		"v -0.5 0.5 0.0\n"
+		"vn 0.0 0.0 1.0\n"
+		"f 1//1 2//1 3//1\n";
+	ASSERT_TRUE(meshData->LoadObjFromString(objStr));
 
-	VertexBuffer vbo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                 verts.data(), verts.size() * vStride,
-	                 vStride, static_cast<uint32_t>(verts.size()));
-
-	IndexBuffer ibo(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                indices.data(), indices.size() * sizeof(uint32_t),
-	                static_cast<uint32_t>(indices.size()));
+	Mesh mesh;
+	mesh.o_mesh = meshData;
+	mesh.UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 	// --- Two render items with different transforms ---
 	GeometryRenderItem item0;
-	item0.vertexBuffer = vbo.buffer();
-	item0.indexBuffer  = ibo.buffer();
-	item0.indexCount   = ibo.GetIndexCount();
-	item0.indexType    = ibo.GetIndexType();
+	item0.vertexBuffer = mesh.GetVertexBuffer()->buffer();
+	item0.indexBuffer  = mesh.GetIndexBuffer()->buffer();
+	item0.indexCount   = mesh.GetGPUIndexCount();
+	item0.indexType    = mesh.GetIndexBuffer()->GetIndexType();
 	item0.pushConstants.model = glm::mat4(1.0f);
 	item0.pushConstants.normalMatrix = glm::mat4(1.0f);
 
@@ -311,7 +240,7 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 	                                           glm::vec3(1.0f, 0.0f, 0.0f));
 	// Normal matrix stays identity since we're only translating
 
-	const auto camera = MakeTestCamera();
+	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 	{
 		auto& cmd = BeginCmd();
@@ -339,9 +268,9 @@ TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	TransitionGbufferAttachments();
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
 
-	const auto camera = MakeTestCamera();
+	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 	{
 		auto& cmd = BeginCmd();

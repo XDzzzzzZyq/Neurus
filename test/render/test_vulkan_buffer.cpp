@@ -7,7 +7,7 @@
 #include <cstring>
 
 #include "render/VulkanBuffer.h"
-#include "render/VulkanContext.h"
+#include "shared/TestVulkanShared.h"
 
 using namespace neurus;
 
@@ -20,77 +20,18 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class VulkanBufferTest : public ::testing::Test
+class VulkanBufferTest : public VulkanTestShared
 {
 protected:
 	void SetUp() override
 	{
-		try
-		{
-			// --- Create instance ---
-			m_instance = std::make_unique<vk::raii::Instance>(VulkanContext::CreateInstance());
-
-			// --- Enumerate physical devices ---
-			m_physicalDevices = std::make_unique<vk::raii::PhysicalDevices>(*m_instance);
-			if (m_physicalDevices->empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Find a queue family with graphics bit (no surface needed) ---
-			auto qfProps = (*m_physicalDevices)[0].getQueueFamilyProperties();
-			m_queueFamilyIndex = UINT32_MAX;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_queueFamilyIndex = i;
-					break;
-				}
-			}
-
-			if (m_queueFamilyIndex == UINT32_MAX)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Create logical device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_queueFamilyIndex, 1, &prio);
-			vk::DeviceCreateInfo devCI({}, qCI);
-
-			m_device = std::make_unique<vk::raii::Device>(
-				(*m_physicalDevices)[0], devCI);
-
-			m_queue = m_device->getQueue(m_queueFamilyIndex, 0);
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
+		VulkanTestShared::SetUp();
 	}
 
 	void TearDown() override
 	{
-		if (m_device)
-		{
-			m_device->waitIdle();
-		}
-		// vk::raii handles cleanup in reverse order
-		m_device.reset();
-		m_physicalDevices.reset();
-		m_instance.reset();
+		VulkanTestShared::TearDown();
 	}
-
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	std::unique_ptr<vk::raii::PhysicalDevices> m_physicalDevices;
-	std::unique_ptr<vk::raii::Device> m_device;
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
-	bool m_hasVulkan = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -108,9 +49,9 @@ TEST_F(VulkanBufferTest, CreateHostVisibleBuffer_Succeeds)
 
 	ASSERT_NO_THROW({
 		VulkanBuffer buf(*m_device,
-		                 (*m_physicalDevices)[0],
+		                 PhysicalDevice(),
 		                 m_queue,
-		                 m_queueFamilyIndex,
+		                 m_graphicsQueueFamily,
 		                 kSize,
 		                 vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
 		                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -129,9 +70,9 @@ TEST_F(VulkanBufferTest, CreateDeviceLocalBuffer_Succeeds)
 
 	ASSERT_NO_THROW({
 		VulkanBuffer buf(*m_device,
-		                 (*m_physicalDevices)[0],
+		                 PhysicalDevice(),
 		                 m_queue,
-		                 m_queueFamilyIndex,
+		                 m_graphicsQueueFamily,
 		                 kSize,
 		                 vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
 		                 vk::MemoryPropertyFlagBits::eDeviceLocal);
@@ -158,9 +99,9 @@ TEST_F(VulkanBufferTest, UploadThenMap_DataRoundtrips)
 	}
 
 	VulkanBuffer buf(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 kSize,
 	                 vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -197,9 +138,9 @@ TEST_F(VulkanBufferTest, MapWriteThenRead_DataRoundtrips)
 	}
 
 	VulkanBuffer buf(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 kSize,
 	                 vk::BufferUsageFlagBits::eUniformBuffer,
 	                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -235,9 +176,9 @@ TEST_F(VulkanBufferTest, GetDescriptorInfo_ReturnsValidInfo)
 	constexpr vk::DeviceSize kSize = 128;
 
 	VulkanBuffer buf(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 kSize,
 	                 vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -269,9 +210,9 @@ TEST_F(VulkanBufferTest, MoveConstructor_TransfersOwnership)
 	constexpr vk::DeviceSize kSize = 64;
 
 	VulkanBuffer bufA(*m_device,
-	                  (*m_physicalDevices)[0],
+	                  PhysicalDevice(),
 	                  m_queue,
-	                  m_queueFamilyIndex,
+	                  m_graphicsQueueFamily,
 	                  kSize,
 	                  vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -296,9 +237,9 @@ TEST_F(VulkanBufferTest, MoveAssignment_TransfersOwnership)
 	constexpr vk::DeviceSize kSize = 64;
 
 	VulkanBuffer bufA(*m_device,
-	                  (*m_physicalDevices)[0],
+	                  PhysicalDevice(),
 	                  m_queue,
-	                  m_queueFamilyIndex,
+	                  m_graphicsQueueFamily,
 	                  kSize,
 	                  vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	                  vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
@@ -307,9 +248,9 @@ TEST_F(VulkanBufferTest, MoveAssignment_TransfersOwnership)
 
 	// Move-assign
 	VulkanBuffer bufB(*m_device,
-	                  (*m_physicalDevices)[0],
+	                  PhysicalDevice(),
 	                  m_queue,
-	                  m_queueFamilyIndex,
+	                  m_graphicsQueueFamily,
 	                  32,  // different size
 	                  vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	                  vk::MemoryPropertyFlagBits::eDeviceLocal);
@@ -334,9 +275,9 @@ TEST_F(VulkanBufferTest, BufferAccessor_ReturnsValidHandle)
 	constexpr vk::DeviceSize kSize = 16;
 
 	VulkanBuffer buf(*m_device,
-	                 (*m_physicalDevices)[0],
+	                 PhysicalDevice(),
 	                 m_queue,
-	                 m_queueFamilyIndex,
+	                 m_graphicsQueueFamily,
 	                 kSize,
 	                 vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
 	                 vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);

@@ -255,7 +255,7 @@ TEST(Light, SetRatio)
 }
 
 // -----------------------------------------------------------------------
-// Dirty flag - all setters mark is_light_changed
+// Dirty flag - initial state (setter dirty checks are in each setter test)
 // -----------------------------------------------------------------------
 
 /**
@@ -265,76 +265,6 @@ TEST(Light, DirtyFlag_StartsFalse)
 {
 	Light light(LightType::POINTLIGHT);
 	EXPECT_FALSE(light.is_light_changed);
-}
-
-/**
- * @brief SetColor sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetColor)
-{
-	Light light(LightType::POINTLIGHT);
-	light.SetColor(glm::vec3(0.5f));
-	EXPECT_TRUE(light.is_light_changed);
-}
-
-/**
- * @brief SetPower sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetPower)
-{
-	Light light(LightType::POINTLIGHT);
-	light.SetPower(5.0f);
-	EXPECT_TRUE(light.is_light_changed);
-}
-
-/**
- * @brief SetShadow sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetShadow)
-{
-	Light light(LightType::POINTLIGHT);
-	light.SetShadow(false);
-	EXPECT_TRUE(light.is_light_changed);
-}
-
-/**
- * @brief SetRadius sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetRadius)
-{
-	Light light(LightType::POINTLIGHT);
-	light.SetRadius(0.2f);
-	EXPECT_TRUE(light.is_light_changed);
-}
-
-/**
- * @brief SetCutoff sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetCutoff)
-{
-	Light light(LightType::SPOTLIGHT);
-	light.SetCutoff(0.5f);
-	EXPECT_TRUE(light.is_light_changed);
-}
-
-/**
- * @brief SetOuterCutoff sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetOuterCutoff)
-{
-	Light light(LightType::SPOTLIGHT);
-	light.SetOuterCutoff(0.4f);
-	EXPECT_TRUE(light.is_light_changed);
-}
-
-/**
- * @brief SetRatio sets dirty flag.
- */
-TEST(Light, DirtyFlag_SetRatio)
-{
-	Light light(LightType::AREALIGHT);
-	light.SetRatio(0.5f);
-	EXPECT_TRUE(light.is_light_changed);
 }
 
 // -----------------------------------------------------------------------

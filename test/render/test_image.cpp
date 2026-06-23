@@ -1,6 +1,8 @@
 // Must define platform before including Vulkan headers
 #define VK_USE_PLATFORM_WIN32_KHR
 
+#include "shared/TestVulkanShared.h"
+
 #include <gtest/gtest.h>
 
 #include "render/Image.h"
@@ -15,128 +17,8 @@ using namespace neurus;
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class ImageTest : public ::testing::Test
+class ImageTest : public VulkanTestShared
 {
-protected:
-	void SetUp() override
-	{
-		try
-		{
-			// --- Instance ---
-			vk::ApplicationInfo appInfo("NeurusTest", VK_MAKE_VERSION(0, 1, 0),
-			                            "NeurusTest", VK_MAKE_VERSION(0, 1, 0),
-			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
-			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
-
-			// --- Physical device ---
-			m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-			if (m_physicalDevices.empty())
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// Pick discrete GPU if available, otherwise first
-			m_selectedPdIndex = 0;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(m_physicalDevices.size()); ++i)
-			{
-				if (m_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
-				{
-					m_selectedPdIndex = i;
-					break;
-				}
-			}
-			auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-			// --- Queue family ---
-			auto qfProps = pd.getQueueFamilyProperties();
-			bool foundGraphics = false;
-			for (uint32_t i = 0; i < static_cast<uint32_t>(qfProps.size()); ++i)
-			{
-				if (qfProps[i].queueFlags & vk::QueueFlagBits::eGraphics)
-				{
-					m_graphicsQueueFamily = i;
-					foundGraphics = true;
-					break;
-				}
-			}
-			if (!foundGraphics)
-			{
-				m_hasVulkan = false;
-				return;
-			}
-
-			// --- Device ---
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-
-			// --- Command pool ---
-			vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-			                                 m_graphicsQueueFamily);
-			m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
-
-			// --- Command buffers ---
-			vk::CommandBufferAllocateInfo allocInfo(*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
-			m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
-
-			m_hasVulkan = true;
-		}
-		catch (...)
-		{
-			m_hasVulkan = false;
-		}
-	}
-
-	void TearDown() override
-	{
-		// RAII handles cleanup in reverse declaration order
-	}
-
-	/** Helper: begin one-shot command buffer. */
-	vk::raii::CommandBuffer& BeginCmd()
-	{
-		auto& cmd = m_commandBuffers[0];
-		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-		return cmd;
-	}
-
-	/** Helper: end and submit one-shot command buffer, then wait. */
-	void EndCmd(vk::raii::CommandBuffer& cmd)
-	{
-		cmd.end();
-		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		auto queue = m_device->getQueue(m_graphicsQueueFamily, 0);
-		queue.submit(submitInfo, nullptr);
-		queue.waitIdle();
-	}
-
-	/** Shortcut: record commands inside a one-shot buffer. */
-	template <typename F>
-	void OneShotSubmit(F&& recordFn)
-	{
-		auto& cmd = BeginCmd();
-		recordFn(cmd);
-		EndCmd(cmd);
-	}
-
-	bool m_hasVulkan = false;
-
-	vk::raii::Context m_context;
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedPdIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
-	uint32_t m_graphicsQueueFamily = 0;
-	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
-	vk::raii::CommandBuffers m_commandBuffers = nullptr;
 };
 
 // ---------------------------------------------------------------------------
@@ -151,7 +33,7 @@ TEST_F(ImageTest, Create2D_ValidHandles)
 	}
 
 	const vk::Extent2D extent(256, 256);
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
@@ -175,7 +57,7 @@ TEST_F(ImageTest, Create2D_WithMipLevels)
 
 	const vk::Extent2D extent(512, 512);
 	const uint32_t mipLevels = 4;
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
 	                  vk::ImageUsageFlagBits::eSampled |
@@ -194,7 +76,7 @@ TEST_F(ImageTest, CreateCube_ValidHandles)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 	const vk::Extent2D extent(128, 128);
 
 	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
@@ -212,7 +94,7 @@ TEST_F(ImageTest, CreateDepthStencil_ValidHandles)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 	const vk::Extent2D extent(1024, 768);
 
 	// Check if depth format is supported
@@ -245,7 +127,7 @@ TEST_F(ImageTest, TransitionLayout_Basic)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 	const vk::Extent2D extent(64, 64);
 
 	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
@@ -254,7 +136,8 @@ TEST_F(ImageTest, TransitionLayout_Basic)
 	                      vk::ImageUsageFlagBits::eTransferDst,
 	                  1);
 
-	OneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
+	{
+		auto& cmd = BeginCmd();
 		// UNDEFINED → COLOR_ATTACHMENT_OPTIMAL
 		image.TransitionLayout(cmd, vk::ImageLayout::eUndefined,
 		                       vk::ImageLayout::eColorAttachmentOptimal);
@@ -262,7 +145,8 @@ TEST_F(ImageTest, TransitionLayout_Basic)
 		// COLOR_ATTACHMENT_OPTIMAL → SHADER_READ_ONLY_OPTIMAL
 		image.TransitionLayout(cmd, vk::ImageLayout::eColorAttachmentOptimal,
 		                       vk::ImageLayout::eShaderReadOnlyOptimal);
-	});
+		EndSubmitWait(cmd);
+	}
 
 	SUCCEED();
 }
@@ -274,7 +158,7 @@ TEST_F(ImageTest, TransitionLayout_MipLevels)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 	const vk::Extent2D extent(256, 256);
 
 	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
@@ -283,13 +167,15 @@ TEST_F(ImageTest, TransitionLayout_MipLevels)
 	                      vk::ImageUsageFlagBits::eTransferDst,
 	                  4);
 
-	OneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
+	{
+		auto& cmd = BeginCmd();
 		// Transition all 4 mip levels
 		image.TransitionLayout(cmd,
 		                       vk::ImageLayout::eUndefined,
 		                       vk::ImageLayout::eTransferDstOptimal,
 		                       0, 4);  // baseMip=0, levelCount=4
-	});
+		EndSubmitWait(cmd);
+	}
 
 	SUCCEED();
 }
@@ -301,7 +187,7 @@ TEST_F(ImageTest, TransitionLayout_SingleMipLevel)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 	const vk::Extent2D extent(128, 128);
 
 	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
@@ -310,13 +196,15 @@ TEST_F(ImageTest, TransitionLayout_SingleMipLevel)
 	                      vk::ImageUsageFlagBits::eTransferDst,
 	                  4);
 
-	OneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
+	{
+		auto& cmd = BeginCmd();
 		// Transition only mip level 1
 		image.TransitionLayout(cmd,
 		                       vk::ImageLayout::eUndefined,
 		                       vk::ImageLayout::eTransferSrcOptimal,
 		                       1, 1);  // baseMip=1, levelCount=1
-	});
+		EndSubmitWait(cmd);
+	}
 
 	SUCCEED();
 }
@@ -332,7 +220,7 @@ TEST_F(ImageTest, GenerateMipmaps_Completes)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto& pd = m_physicalDevices[m_selectedPdIndex];
+	auto& pd = PhysicalDevice();
 
 	// Check that blitting from a linear-tiled format is supported
 	auto fmtProps = pd.getFormatProperties(vk::Format::eR8G8B8A8Unorm);
@@ -350,7 +238,8 @@ TEST_F(ImageTest, GenerateMipmaps_Completes)
 	                      vk::ImageUsageFlagBits::eTransferDst,
 	                  4);
 
-	OneShotSubmit([&](vk::raii::CommandBuffer& cmd) {
+	{
+		auto& cmd = BeginCmd();
 		// First transition to TRANSFER_DST so GenerateMipmaps can blit into lower levels
 		image.TransitionLayout(cmd,
 		                       vk::ImageLayout::eUndefined,
@@ -358,7 +247,8 @@ TEST_F(ImageTest, GenerateMipmaps_Completes)
 		                       0, image.MipLevels());
 
 		image.GenerateMipmaps(cmd);
-	});
+		EndSubmitWait(cmd);
+	}
 
 	SUCCEED();
 }
