@@ -181,7 +181,6 @@ void ShadowDepthPass::updateUBO()
 	ubo.faceVP[4] = proj * glm::lookAt(p, p + glm::vec3( 0, 0, 1), glm::vec3( 0,-1, 0));
 	ubo.faceVP[5] = proj * glm::lookAt(p, p + glm::vec3( 0, 0,-1), glm::vec3( 0,-1, 0));
 	ubo.lpx = p.x; ubo.lpy = p.y; ubo.lpz = p.z;
-	ubo._pad0 = 0.0f;
 	ubo.farPlane = m_farPlane;
 
 	NEURUS_LOG("[ShadowDepthPass] UBO: farPlane=" << m_farPlane

@@ -428,50 +428,31 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	// -------------------------------------------------------------------
 	// Step 4: Create LightUBO populated with face 3 (-Y) VP matrix
 	// -------------------------------------------------------------------
-	// std140 GLSL layout: mat4[6] @ 0 (384 bytes), vec3 @ 384 (12 bytes).
-	// On this GPU the GLSL compiler places farPlane directly at 396 (vec3=12
-	// bytes, no rounding to 16). Matches ShadowDepthPass::LightUBO which also
-	// uses _pad0... actually it adds _pad0 making farPlane @ 400 there.
-	// BUT that works via the ShadowDepthPass pipeline which reads farPlane at
-	// offset 400. The depth_to_color.frag uses identical layout.
-	// Empirical testing: WITHOUT _pad0 → values correct; WITH _pad0 → INF.
-	struct FaceUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float farPlane; };
-
-	VulkanBuffer faceUBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		sizeof(FaceUBO),
-		vk::BufferUsageFlagBits::eUniformBuffer,
-		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-		"Face3UBO");
-
+	// -------------------------------------------------------------------
+	// Step 4: Reuse ShadowDepthPass's UBO — update face 3 VP matrix
+	// -------------------------------------------------------------------
 	{
 		const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
 		const float kNearPlane = 0.1f;
 		const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, kNearPlane, kFarPlane);
 
-		FaceUBO ubo{};
-		ubo.faceVP[3] = proj * glm::lookAt(lightPos,
+		auto& ubo = m_shadowDepthPass->GetUBO();
+		ShadowDepthPass::LightUBO data{};
+		data.faceVP[3] = proj * glm::lookAt(lightPos,
 			lightPos + glm::vec3(0, -1, 0), glm::vec3(0, 0, -1));
-		ubo.lpx = lightPos.x; ubo.lpy = lightPos.y; ubo.lpz = lightPos.z;
-		ubo.farPlane = kFarPlane;
+		data.lpx = lightPos.x; data.lpy = lightPos.y; data.lpz = lightPos.z;
+		data.farPlane = kFarPlane;
 
-		void* ptr = faceUBO.Map();
-		std::memcpy(ptr, &ubo, sizeof(FaceUBO));
-		faceUBO.Unmap();
+		void* ptr = ubo.Map();
+		std::memcpy(ptr, &data, sizeof(data));
+		ubo.Unmap();
 	}
 
 	// -------------------------------------------------------------------
-	// Step 5: Create descriptor set (binding 0: UBO)
+	// Step 5: Reuse pass's descriptor layout + set
 	// -------------------------------------------------------------------
-	auto lightBindings = BuildLayout()
-		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
-		            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
-		.Build();
-	DescriptorSetLayout lightLayout(*m_device, lightBindings);
-
-	DescriptorPool lightPool(*m_device, 1,
-		DescriptorPool::CalculatePoolSizes({&lightLayout}, 1));
-	auto lightSet = std::move(lightPool.Allocate(lightLayout, 1).front());
-	lightSet.WriteBuffer(0, faceUBO.GetDescriptorInfo(), vk::DescriptorType::eUniformBuffer);
+	const auto& lightLayout = m_shadowDepthPass->GetLightLayout();
+	vk::DescriptorSet lightSetHandle = m_shadowDepthPass->GetLightSetHandle();
 
 	// -------------------------------------------------------------------
 	// Step 6: Create graphics pipeline (depth_to_color.frag outputs depth to color)
@@ -561,7 +542,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *face3Pipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			face3Layout, 0, {lightSet.handle()}, {});
+			face3Layout, 0, {lightSetHandle}, {});
 
 		// Push faceIndex = 3 at offset sizeof(mat4) = 64
 		const int32_t faceIdx = 3;
@@ -847,41 +828,13 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 3: Create shared pipeline resources
+	// Step 3: Reuse pass's UBO + descriptor set
 	// -------------------------------------------------------------------
 	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
-	const float kNearPlane = 0.1f;
-	const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, kNearPlane, kFarPlane);
 
-	// Face lookAt params matching ShadowDepthPass::updateUBO
-	static const glm::vec3 kTargets[6] = {
-		{ 1, 0, 0}, {-1, 0, 0}, { 0, 1, 0}, { 0,-1, 0}, { 0, 0, 1}, { 0, 0,-1}
-	};
-	static const glm::vec3 kUps[6] = {
-		{ 0,-1, 0}, { 0,-1, 0}, { 0, 0, 1}, { 0, 0,-1}, { 0,-1, 0}, { 0,-1, 0}
-	};
-
-	struct FaceUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float farPlane; };
-
-	// Descriptor layout + pool + set
-	auto lightBindings = BuildLayout()
-		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
-		            vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment)
-		.Build();
-	DescriptorSetLayout lightLayout(*m_device, lightBindings);
-
-	DescriptorPool lightPool(*m_device, 1,
-		DescriptorPool::CalculatePoolSizes({&lightLayout}, 1));
-	auto lightSet = std::move(lightPool.Allocate(lightLayout, 1).front());
-
-	// UBO (filled with all 6 VP matrices before the single rendering pass)
-	VulkanBuffer faceUBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
-		sizeof(FaceUBO),
-		vk::BufferUsageFlagBits::eUniformBuffer,
-		vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-		"AllFacesUBO");
-
-	lightSet.WriteBuffer(0, faceUBO.GetDescriptorInfo(), vk::DescriptorType::eUniformBuffer);
+	// Reuse pass's UBO (already filled with all 6 faces from SetUp's SetLightPosition)
+	const auto& lightLayout = m_shadowDepthPass->GetLightLayout();
+	vk::DescriptorSet lightSetHandle = m_shadowDepthPass->GetLightSetHandle();
 
 	// Shader modules — use multiview vertex shader
 	auto vertModule = ShaderModule::FromEmbedded(*m_device,
@@ -971,22 +924,9 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 6: Update UBO with all 6 face VP matrices
+	// Step 6: Ensure pass UBO reflects the scene's light position
 	// -------------------------------------------------------------------
-	{
-		FaceUBO ubo{};
-		for (uint32_t face = 0; face < 6; ++face)
-		{
-			ubo.faceVP[face] = proj * glm::lookAt(lightPos,
-				lightPos + kTargets[face], kUps[face]);
-		}
-		ubo.lpx = lightPos.x; ubo.lpy = lightPos.y; ubo.lpz = lightPos.z;
-		ubo.farPlane = kFarPlane;
-
-		void* ptr = faceUBO.Map();
-		std::memcpy(ptr, &ubo, sizeof(FaceUBO));
-		faceUBO.Unmap();
-	}
+	m_shadowDepthPass->SetLightPosition(lightPos);
 
 	// -------------------------------------------------------------------
 	// Step 7: Render all 6 faces in ONE pass via multiview (viewMask = 0x3F)
@@ -1036,7 +976,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			pipelineLayout, 0, {lightSet.handle()}, {});
+			pipelineLayout, 0, {lightSetHandle}, {});
 
 		// No faceIndex push constant — gl_ViewIndex handles it per-view
 		for (const auto& item : renderItems)

@@ -54,18 +54,21 @@ public:
 	uint32_t Resolution() const { return m_resolution; }
 	const BufferLayout& VertexLayout() const { return m_vtxLayout; }
 	const DescriptorSetLayout& LightDescriptorLayout() const { return m_layout; }
-
-private:
-	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
+	const DescriptorSetLayout& GetLightLayout() const { return m_layout; }
+	vk::DescriptorSet GetLightSetHandle() const { return m_set->handle(); }
+	VulkanBuffer& GetUBO() { return *m_ubo; }
 
 	// Must match std140 layout in shadow shaders:
 	//   mat4 faceViewProj[6];  // 384 bytes (offset 0)
-	//   vec3 lightWorldPos;    //  16 bytes (offset 384) — std140 pads vec3
-	//   float farPlane;        //   4 bytes (offset 400)
-	// Total: 404 bytes
-	struct LightUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float _pad0; float farPlane; };
-	static_assert(sizeof(LightUBO) == 404,
-	              "LightUBO size must match std140 layout (vec3 padding)");
+	//   vec3 lightWorldPos;    //  12 bytes (offset 384)
+	//   float farPlane;        //   4 bytes (offset 396)
+	// Total: 400 bytes
+	struct LightUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float farPlane; };
+	static_assert(sizeof(LightUBO) == 400,
+	              "LightUBO size must match std140 layout");
+
+private:
+	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
 
 	void createDepthCubemap(const vk::raii::Device& device,
 	                        const vk::raii::PhysicalDevice& physicalDevice);
