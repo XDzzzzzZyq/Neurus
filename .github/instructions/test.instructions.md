@@ -10,34 +10,84 @@ non-GPU tests (editor layer, events) run on every CI push.
 
 ```
 test/
-├── CMakeLists.txt          # Test build configuration
-├── shared/                 # Shared test infrastructure
-│   ├── TestVulkanShared.h      # GPU test fixture base class
-│   ├── TestVulkanShared.cpp    # Bootstrap: Instance → Device → Queue → CommandPool
-│   └── test_main.cpp           # Google Test main() entry point
-├── editor/                 # Non-GPU tests (run in CI)
-│   ├── test_uievents.cpp
-│   ├── test_eventbus.cpp
-│   ├── test_editor_context.cpp
-│   └── test_camera_controller.cpp   # Event-driven MMB camera controls
-├── render/                 # GPU tests (excluded from CI)
+├── CMakeLists.txt              # Test build configuration
+├── shared/                     # Shared test infrastructure
+│   ├── test_main.cpp               # Google Test main() entry point
+│   ├── TestVulkanShared.h          # GPU test fixture base class + static helpers
+│   ├── TestVulkanShared.cpp        # Bootstrap: Instance → Device → Queue → CommandPool
+│   ├── TestReferenceImage.h        # Reference-image comparison utilities
+│   ├── TestCornellBox.h            # Cornell box scene builder
+│   └── TestSimpleShadow.h          # Shadow test scene builder
+├── editor/                     # Non-GPU tests (run in CI)
+│   ├── test_event_bus.cpp          # Qt UIEvents singleton tests
+│   ├── test_event_bus_typed.cpp    # Typed EventQueue tests (+ expanded event tests)
+│   ├── test_context.cpp            # EditorContext tests (consolidated)
+│   ├── test_input.cpp              # Input state tests
+│   ├── test_camera_controller.cpp  # Event-driven MMB camera controls
+│   ├── test_selection.cpp          # Selection manager tests
+│   └── test_scene_status.cpp       # Scene status tracking tests
+├── asset/                      # Asset layer tests
+│   ├── test_imagedata.cpp          # ImageData loading and decoding
+│   └── test_meshdata.cpp           # MeshData OBJ parsing
+├── scene/                      # Scene layer tests
+│   ├── test_camera.cpp             # Camera transforms and projection
+│   ├── test_debug.cpp              # Debug visualization helpers
+│   ├── test_light.cpp              # Light data structures
+│   ├── test_mesh.cpp               # Mesh data and GPU upload
+│   ├── test_scene.cpp              # Scene graph (consolidated)
+│   ├── test_scene_integration.cpp  # Scene + renderer integration
+│   ├── test_sprite.cpp             # Sprite/overlay tests
+│   ├── test_transform.cpp          # Transform hierarchy tests
+│   └── test_uid.cpp                # Unique ID generation tests
+├── project/                    # Project serialization tests
+│   ├── test_default_project.cpp    # Default project creation
+│   └── test_project_roundtrip.cpp  # Project save/load round-trip
+├── render/                     # GPU tests (excluded from CI)
 │   ├── test_attachments.cpp
+│   ├── test_buffers.cpp
+│   ├── test_commandbuffer.cpp
+│   ├── test_compute_pipeline.cpp
+│   ├── test_deferred_shading.cpp   # Reference-image regression test
+│   ├── test_descriptor.cpp
 │   ├── test_gbuffer.cpp
-│   ├── test_deferred_shading.cpp    # Reference-image regression test
+│   ├── test_ibl.cpp
+│   ├── test_ibl_render.cpp
+│   ├── test_image.cpp
 │   ├── test_lighting.cpp
+│   ├── test_material.cpp
+│   ├── test_mesh.cpp
 │   ├── test_model_render.cpp
+│   ├── test_pipeline.cpp
+│   ├── test_renderpass.cpp
+│   ├── test_scene_wiring.cpp       # Overrides SetUp for swapchain
 │   ├── test_screenshot.cpp
-│   ├── test_gpu_resource_cache.cpp
-│   ├── test_scene_wiring.cpp        # Overrides SetUp for swapchain
+│   ├── test_shader_module.cpp
+│   ├── test_shadow_cubemap.cpp
+│   ├── test_ssao.cpp
+│   ├── test_syncobjects.cpp
 │   ├── test_texture.cpp
-│   └── reference/                  # Reference images for regression tests
-│       └── deferred/               # Deferred-pass reference PNGs
-│           ├── Position.png
-│           ├── Normal.png
-│           ├── Albedo.png
-│           ├── MetallicRoughness.png
-│           └── HDRColor.png
-└── render/                          # (CMake-source-directory for render tests)
+│   ├── test_vulkan_buffer.cpp
+│   ├── test_vulkan_context.cpp
+│   ├── reference/                  # Reference images for regression tests
+│   │   ├── deferred/               # Deferred-pass reference PNGs
+│   │   │   ├── Position.png
+│   │   │   ├── Normal.png
+│   │   │   ├── Albedo.png
+│   │   │   ├── MetallicRoughness.png
+│   │   │   └── HDRColor.png
+│   │   ├── ibl/                    # IBL reference images
+│   │   │   ├── ibl_render.png
+│   │   │   └── test_gradient.hdr
+│   │   ├── shadow/                 # Shadow cubemap reference images
+│   │   │   ├── CubemapDepth_Face0.png
+│   │   │   ├── CubemapDepth_Face1.png
+│   │   │   ├── CubemapDepth_Face2.png
+│   │   │   ├── CubemapDepth_Face3.png
+│   │   │   ├── CubemapDepth_Face4.png
+│   │   │   └── CubemapDepth_Face5.png
+│   │   └── ssao/                   # SSAO reference image
+│   │       └── SSAO.png
+│   └── render/                     # (CMake-source-directory for render tests)
 ```
 
 ## Test Fixture Hierarchy
@@ -93,6 +143,34 @@ void SetUp() override
 ```
 
 See `test_scene_wiring.cpp` for an example that enables `VK_KHR_swapchain`.
+
+### Shared Static Helpers
+
+In addition to the protected member methods above, `VulkanTestShared` provides
+8 static helper functions/structs for common test operations. These eliminate
+duplicated code across test files:
+
+| Helper | Signature | What it does |
+|--------|-----------|-------------|
+| `TestVertex` struct | `posX/Y/Z, nrmX/Y/Z, uvX/uvY` | 32-byte vertex matching `GeometryPass::BufferLayout` (3 pos + 3 normal + 2 UV floats) |
+| `HalfToFloat(uint16_t)` | `static float` | IEEE 754 half-precision (16-bit) to single-precision (32-bit) float conversion |
+| `FindMemoryType(pd, typeBits, required)` | `static uint32_t` | Memory type index lookup matching type bits and property flags for staging/buffer allocation |
+| `TransitionGbufferToColorAttachment(am, fixture)` | `static void` | Transitions all 4 color attachments (Position/Normal/Albedo/MetallicRoughness) to `eColorAttachmentOptimal` and Depth to `eDepthStencilAttachmentOptimal` |
+| `ComputeCameraUBO(Camera&)` | `static CameraUBOData` | Computes view and view-projection matrices from a `Camera` object |
+| `MakeTestCamera(w, h)` | `static CameraUBOData` | Creates a default 60° FOV camera at `(0,0,2)` looking at origin with given aspect ratio |
+| `TestTriangle()` | `static pair<vector<TestVertex>, vector<uint32_t>>` | Returns a 3-vertex triangle (XY plane, facing +Z) + 3 indices, suitable for quick geometry tests |
+| `ReadbackHdrOutput(device, pd, queue, qfi, am, w, h)` | `static vector<float>` | Reads back HDRColor RGBA16F attachment to CPU; handles layout transition, staging copy, and half→float conversion |
+
+Usage example — replace 15+ lines of manual G-Buffer transitions with one call:
+
+```cpp
+// Instead of manually transitioning each attachment:
+VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+```
+
+All helpers are defined in `test/shared/TestVulkanShared.h`. Tests that need a
+helper not yet available should add it to the shared header rather than
+duplicating it in the local test file.
 
 ## Writing a GPU Test
 
@@ -433,6 +511,30 @@ These patterns were established during deferred PBR development and apply to all
 - **Light placement**: Inverse-square attenuation `1/d²` is aggressive. Keep test lights within 2-4 units of geometry for visible lighting. A light at distance 5 produces only ~4% radiance vs distance 2.
 - **Debugging black HDRColor**: First check that Position.w > 0 (the early-out in the compute shader), then check attenuation distance, light power, and descriptor bindings. Don't assume "zero lighting" means the compute shader is broken.
 - **Verify references with Python** before committing: use `PIL.Image` to check uniform values, unique pixel counts, and histogram analysis.
+- **Use `Mesh::UploadToGPU()` instead of raw VBO/IBO** in rendering tests. Instead of creating `VertexBuffer`/`IndexBuffer` directly (which duplicates GPU upload logic and bypasses the Mesh abstraction), load geometry through `MeshData` and `Mesh`:
+  ```cpp
+  // BEFORE (direct buffer creation — only for buffer-specific tests):
+  VertexBuffer vbo(device, pd, queue, qfi, vertexData, size, stride, count);
+  IndexBuffer  ibo(device, pd, queue, qfi, indexData, isize, icount);
+
+  // AFTER (required for rendering/feature tests):
+  auto meshData = std::make_shared<MeshData>();
+  meshData->LoadObjFromString(kObjString);  // or LoadObj(path)
+  auto mesh = std::make_shared<Mesh>();
+  mesh->o_mesh = meshData;
+  mesh->UploadToGPU(device, pd, queue, qfi);
+  // Access GPU resources via:
+  //   mesh->GetVertexBuffer(), mesh->GetIndexBuffer(), mesh->GetGPUIndexCount()
+  ```
+  **Exemption**: `test_buffers.cpp` and `test_vulkan_buffer.cpp` are the unit
+  tests for `VertexBuffer`/`IndexBuffer`/`VulkanBuffer` — they use raw buffers
+  by design and are exempt from this rule.
+- **"Extract, Don't Duplicate"**: Before writing a helper function in a test
+  file, check if `VulkanTestShared` already provides it (see Shared Static
+  Helpers above). If a helper is needed across 2+ test files, extract it to
+  `TestVulkanShared.h` as a static method. Do **not** duplicate vertex structs,
+  half-float converters, G-Buffer transition logic, or camera UBO computation
+  — they are already centralized.
 
 ## Common Pitfalls Summary
 
@@ -447,6 +549,11 @@ These patterns were established during deferred PBR development and apply to all
 | Wrong normal space | Lighting doesn't match geometry | VS stores view-space, compute transforms back |
 | First-run reference stale | Test passed against old reference | Delete PNGs, regenerate, verify |
 | No `VK_EXT_DEBUG_UTILS` | Deferred validation errors | Include in Debug builds |
+| Manual Vulkan bootstrap | Test file has its own Instance/Device/Queue/CommandPool setup (~70 lines) | Inherit `VulkanTestShared` base class |
+| Raw VBO/IBO in rendering test | Test creates `VertexBuffer`/`IndexBuffer` directly | Use `Mesh::UploadToGPU()` |
+| Duplicated `TestVertex` struct | `struct TestVertex { ... }` defined locally in test file | Use `TestVertex` from `TestVulkanShared.h` |
+| Duplicated helper functions | `HalfToFloat`, `TransitionGbufferToColorAttachment`, `FindMemoryType` repeated across files | Use static helpers from `VulkanTestShared` |
+| Placeholder/stub test file | File with single `GTEST_SKIP` test | Delete from CMakeLists.txt; do NOT write new test logic unless planned |
 
 ## Complete Development Cycle Checklist
 
