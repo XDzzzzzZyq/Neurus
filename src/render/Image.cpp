@@ -33,6 +33,12 @@ Image::Image(const vk::raii::Device& device,
 	allocateAndBindMemory(device, physicalDevice);
 	createImageView(device, debugName);
 
+	if (m_imageType == ImageType::eCube)
+	{
+		createFaceViews(device);
+		createMultiviewView(device);
+	}
+
 	// --- Set debug name in Debug builds ---
 #ifdef _DEBUG
 	if (debugName && *debugName)
@@ -85,7 +91,8 @@ void Image::createImage(const vk::raii::Device& device,
 	{
 	case ImageType::eCube:
 		m_arrayLayers = 6;
-		createFlags = vk::ImageCreateFlagBits::eCubeCompatible;
+		createFlags = vk::ImageCreateFlagBits::eCubeCompatible |
+		              vk::ImageCreateFlagBits::e2DArrayCompatible;
 		break;
 	case ImageType::eDepthStencil:
 		m_arrayLayers = 1;
@@ -652,6 +659,45 @@ uint32_t Image::FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
 	}
 
 	throw std::runtime_error("Image: failed to find suitable memory type.");
+}
+
+// ---------------------------------------------------------------------------
+// Cube-only views
+// ---------------------------------------------------------------------------
+
+const vk::raii::ImageView& Image::FaceView(uint32_t faceIdx) const
+{
+	return m_faceViews[faceIdx];
+}
+
+const vk::raii::ImageView& Image::ArrayView() const
+{
+	return m_multiviewView;
+}
+
+void Image::createFaceViews(const vk::raii::Device& device)
+{
+	const auto aspect = AspectFromFormat(m_format);
+	m_faceViews.clear();
+	m_faceViews.reserve(6);
+	for (uint32_t f = 0; f < 6; ++f)
+	{
+		vk::ImageViewCreateInfo ci({}, *m_image,
+			vk::ImageViewType::e2D, m_format,
+			vk::ComponentMapping(),
+			vk::ImageSubresourceRange(aspect, 0, 1, f, 1));
+		m_faceViews.emplace_back(device, ci);
+	}
+}
+
+void Image::createMultiviewView(const vk::raii::Device& device)
+{
+	const auto aspect = AspectFromFormat(m_format);
+	vk::ImageViewCreateInfo ci({}, *m_image,
+		vk::ImageViewType::e2DArray, m_format,
+		vk::ComponentMapping(),
+		vk::ImageSubresourceRange(aspect, 0, 1, 0, 6));
+	m_multiviewView = vk::raii::ImageView(device, ci);
 }
 
 } // namespace neurus

@@ -60,7 +60,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	m_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
 	createDepthCubemap(device, physicalDevice);
-	createFaceViews(device);
 	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 	createPipeline(device);
 	updateUBO();
@@ -101,22 +100,6 @@ void ShadowDepthPass::createDepthmap(const vk::raii::Device& device,
 			vk::ImageUsageFlagBits::eTransferSrc,
 		1u, Image::ImageType::e2D,
 		"ShadowDepthMap2D");
-}
-
-// ===========================================================================
-// createDepthViews — single 2D image view for the depth map
-// ===========================================================================
-
-void ShadowDepthPass::createDepthViews(const vk::raii::Device& device)
-{
-	if (!m_depthmap)
-		return;
-
-	vk::ImageViewCreateInfo ci({}, *m_depthmap->ImageHandle(),
-		vk::ImageViewType::e2D, kDepthFmt,
-		vk::ComponentMapping(),
-		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1));
-	m_depthView = vk::raii::ImageView(device, ci);
 }
 
 // ===========================================================================
@@ -178,25 +161,6 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 
 	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
 	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-}
-
-// ===========================================================================
-// Per-face views
-// ===========================================================================
-
-void ShadowDepthPass::createFaceViews(const vk::raii::Device& device)
-{
-	m_faceViews.clear();
-	m_faceViews.reserve(kShadowFaceCount);
-	for (uint32_t f = 0; f < kShadowFaceCount; ++f)
-	{
-		vk::ImageViewCreateInfo ci({}, *m_cubemap->ImageHandle(),
-		                           vk::ImageViewType::e2D, kDepthFmt,
-		                           vk::ComponentMapping(),
-		                           vk::ImageSubresourceRange(
-		                               vk::ImageAspectFlagBits::eDepth, 0, 1, f, 1));
-		m_faceViews.emplace_back(device, ci);
-	}
 }
 
 // ===========================================================================
@@ -280,7 +244,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 	for (uint32_t face = 0; face < kShadowFaceCount; ++face)
 	{
 		vk::RenderingAttachmentInfo depthAtt(
-			*m_faceViews[face],
+			*m_cubemap->FaceView(face),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,

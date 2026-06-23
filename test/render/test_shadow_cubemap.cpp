@@ -420,9 +420,8 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	//          correctly occludes the plane (depth ~0.12) at cube-covered pixels.
 	// -------------------------------------------------------------------
 	m_shadowDepthPass->createDepthmap(*m_device, pd);
-	m_shadowDepthPass->createDepthViews(*m_device);
 	auto& depthImage = m_shadowDepthPass->Depthmap();
-	auto& depthView  = m_shadowDepthPass->DepthView();
+	auto& depthView  = m_shadowDepthPass->Depthmap().ImageViewHandle();
 
 	// Transition to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	{

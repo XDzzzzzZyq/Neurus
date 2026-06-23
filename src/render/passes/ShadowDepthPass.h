@@ -47,12 +47,13 @@ public:
 
 	void createDepthmap(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice);
-	void createDepthViews(const vk::raii::Device& device);
 
+	// --- Accessors ---
 	Image& ShadowCubemap() { return *m_cubemap; }
 	Image& Depthmap() { return *m_depthmap; }
-	const vk::raii::ImageView& DepthView() const { return m_depthView; }
 	uint32_t Resolution() const { return m_resolution; }
+	const BufferLayout& VertexLayout() const { return m_vtxLayout; }
+	const DescriptorSetLayout& LightDescriptorLayout() const { return m_layout; }
 
 private:
 	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
@@ -68,7 +69,6 @@ private:
 
 	void createDepthCubemap(const vk::raii::Device& device,
 	                        const vk::raii::PhysicalDevice& physicalDevice);
-	void createFaceViews(const vk::raii::Device& device);
 	void createUniforms(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice,
 	                    vk::Queue queue, uint32_t qfi);
@@ -83,8 +83,6 @@ private:
 	// --- GPU resources ---
 	std::unique_ptr<Image> m_cubemap;
 	std::unique_ptr<Image> m_depthmap;
-	std::vector<vk::raii::ImageView> m_faceViews;
-	vk::raii::ImageView m_depthView = nullptr;
 	std::unique_ptr<VulkanBuffer> m_ubo;
 	DescriptorSetLayout m_layout;
 	DescriptorPool m_pool;

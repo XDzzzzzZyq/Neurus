@@ -183,8 +183,21 @@ public:
 	/** @brief Underlying vk::raii::Image handle. */
 	const vk::raii::Image& ImageHandle() const { return m_image; }
 
-	/** @brief Underlying vk::raii::ImageView handle. */
+	/** @brief Underlying vk::raii::ImageView handle (default view). */
 	const vk::raii::ImageView& ImageViewHandle() const { return m_imageView; }
+
+	/**
+	 * @brief Per-layer 2D view for rendering to a specific cubemap face.
+	 * @param faceIdx Face index in [0,5].
+	 * @note Valid only for ImageType::eCube.
+	 */
+	const vk::raii::ImageView& FaceView(uint32_t faceIdx) const;
+
+	/**
+	 * @brief 2D_ARRAY view covering all 6 layers for multiview rendering.
+	 * @note Valid only for ImageType::eCube.
+	 */
+	const vk::raii::ImageView& ArrayView() const;
 
 	/** @brief Underlying vk::raii::DeviceMemory handle. */
 	const vk::raii::DeviceMemory& DeviceMemoryHandle() const { return m_deviceMemory; }
@@ -241,6 +254,8 @@ private:
 	void allocateAndBindMemory(const vk::raii::Device& device,
 	                           const vk::raii::PhysicalDevice& physicalDevice);
 	void createImageView(const vk::raii::Device& device, const char* debugName);
+	void createFaceViews(const vk::raii::Device& device);
+	void createMultiviewView(const vk::raii::Device& device);
 
 	// --- Layout helpers ---
 	static vk::AccessFlags AccessFlagsForLayout(vk::ImageLayout layout);
@@ -253,6 +268,10 @@ private:
 	vk::raii::Image m_image = nullptr;
 	vk::raii::DeviceMemory m_deviceMemory = nullptr;
 	vk::raii::ImageView m_imageView = nullptr;
+
+	// --- Cube-only views ---
+	std::vector<vk::raii::ImageView> m_faceViews;
+	vk::raii::ImageView m_multiviewView = nullptr;
 
 	// --- Metadata ---
 	vk::Extent2D m_extent{};
