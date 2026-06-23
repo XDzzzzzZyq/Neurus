@@ -405,13 +405,6 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		EndSubmitWait(cmd);
 	}
 
-	// Create image view for the 2D color image
-	vk::ImageViewCreateInfo viewCI({}, *tempColor.ImageHandle(),
-		vk::ImageViewType::e2D, vk::Format::eR32G32B32A32Sfloat,
-		vk::ComponentMapping(),
-		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-	vk::raii::ImageView tempView(*m_device, viewCI);
-
 	// -------------------------------------------------------------------
 	// Step 3b: Use ShadowDepthPass's built-in 2D depth map for depth testing.
 	//          Without a real depth attachment, depth testing is disabled and
@@ -543,7 +536,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		const vk::ClearValue depthClear = vk::ClearDepthStencilValue(1.0f, 0);
 
 		vk::RenderingAttachmentInfo colorAtt(
-			*tempView,
+			tempColor.ImageViewHandle(),
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
@@ -588,17 +581,9 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		cmd.endRendering();
 
 		// Transition color image → TRANSFER_SRC for readback
-		vk::ImageMemoryBarrier copyBarrier(
-			vk::AccessFlagBits::eColorAttachmentWrite,
-			vk::AccessFlagBits::eTransferRead,
+		tempColor.TransitionLayout(cmd,
 			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ImageLayout::eTransferSrcOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*tempColor.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-		                   vk::PipelineStageFlagBits::eTransfer,
-		                   {}, {}, {}, copyBarrier);
+			vk::ImageLayout::eTransferSrcOptimal);
 
 		EndSubmitWait(cmd);
 	}
@@ -951,115 +936,37 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	// -------------------------------------------------------------------
 	// Must have VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT for multiview.
 
-	auto FindDeviceLocalMemType = [&](const vk::MemoryRequirements& memReqs)
-	{
-		auto memProps = pd.getMemoryProperties();
-		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-		{
-			if ((memReqs.memoryTypeBits & (1u << i)) &&
-			    (memProps.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal))
-				return i;
-		}
-		return UINT32_MAX;
-	};
-
 	// --- Color cubemap ---
-	vk::raii::Image colorCube(nullptr);
-	vk::raii::DeviceMemory colorCubeMem(nullptr);
-	{
-		vk::ImageCreateFlags cubeFlags =
-			vk::ImageCreateFlagBits::eCubeCompatible |
-			vk::ImageCreateFlagBits::e2DArrayCompatible;
-
-		vk::ImageCreateInfo ci(cubeFlags, vk::ImageType::e2D,
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::Extent3D(kRes, kRes, 1), 1, 6,
-			vk::SampleCountFlagBits::e1,
-			vk::ImageTiling::eOptimal,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-			vk::SharingMode::eExclusive, {}, vk::ImageLayout::eUndefined);
-
-		vk::raii::Image img(*m_device, ci);
-		auto memReqs = img.getMemoryRequirements();
-		uint32_t mt = FindDeviceLocalMemType(memReqs);
-		ASSERT_LT(mt, UINT32_MAX) << "No device-local memory for color cubemap";
-		vk::raii::DeviceMemory mem(*m_device, vk::MemoryAllocateInfo(memReqs.size, mt));
-		img.bindMemory(*mem, 0);
-		colorCube = std::move(img);
-		colorCubeMem = std::move(mem);
-	}
+	Image verifyCube(*m_device, pd,
+		vk::Extent2D(kRes, kRes),
+		vk::Format::eR32G32B32A32Sfloat,
+		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+		1u, Image::ImageType::eCube,
+		"VerificationCubemap");
 
 	// --- Depth cubemap ---
-	vk::raii::Image depthCube(nullptr);
-	vk::raii::DeviceMemory depthCubeMem(nullptr);
-	{
-		vk::ImageCreateFlags cubeFlags =
-			vk::ImageCreateFlagBits::eCubeCompatible |
-			vk::ImageCreateFlagBits::e2DArrayCompatible;
-
-		vk::ImageCreateInfo ci(cubeFlags, vk::ImageType::e2D,
-			vk::Format::eD32Sfloat,
-			vk::Extent3D(kRes, kRes, 1), 1, 6,
-			vk::SampleCountFlagBits::e1,
-			vk::ImageTiling::eOptimal,
-			vk::ImageUsageFlagBits::eDepthStencilAttachment,
-			vk::SharingMode::eExclusive, {}, vk::ImageLayout::eUndefined);
-
-		vk::raii::Image img(*m_device, ci);
-		auto memReqs = img.getMemoryRequirements();
-		uint32_t mt = FindDeviceLocalMemType(memReqs);
-		ASSERT_LT(mt, UINT32_MAX) << "No device-local memory for depth cubemap";
-		vk::raii::DeviceMemory mem(*m_device, vk::MemoryAllocateInfo(memReqs.size, mt));
-		img.bindMemory(*mem, 0);
-		depthCube = std::move(img);
-		depthCubeMem = std::move(mem);
-	}
-
-	// --- 2D_ARRAY image views for multiview rendering (cover all 6 layers) ---
-	vk::ImageViewCreateInfo colorArrViewCI({}, *colorCube,
-		vk::ImageViewType::e2DArray, vk::Format::eR32G32B32A32Sfloat,
-		vk::ComponentMapping(),
-		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
-	vk::raii::ImageView colorArrView(*m_device, colorArrViewCI);
-
-	vk::ImageViewCreateInfo depthArrViewCI({}, *depthCube,
-		vk::ImageViewType::e2DArray, vk::Format::eD32Sfloat,
-		vk::ComponentMapping(),
-		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 6));
-	vk::raii::ImageView depthArrView(*m_device, depthArrViewCI);
+	Image depthCube(*m_device, pd,
+		vk::Extent2D(kRes, kRes),
+		vk::Format::eD32Sfloat,
+		vk::ImageUsageFlagBits::eDepthStencilAttachment,
+		1u, Image::ImageType::eCube,
+		"DepthVerificationCubemap");
 
 	// -------------------------------------------------------------------
 	// Step 5: Transition cubemaps to attachment layouts
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
-
-		vk::ImageMemoryBarrier colorBarrier(
-			vk::AccessFlagBits::eNone,
-			vk::AccessFlagBits::eColorAttachmentWrite,
+		verifyCube.TransitionLayout(cmd,
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eColorAttachmentOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*colorCube,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
-		cmd.pipelineBarrier(
-			vk::PipelineStageFlagBits::eTopOfPipe,
-			vk::PipelineStageFlagBits::eColorAttachmentOutput,
-			{}, {}, {}, colorBarrier);
-
-		vk::ImageMemoryBarrier depthBarrier(
-			vk::AccessFlagBits::eNone,
-			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+			0, 1,  // mip 0, 1 level
+			0, 6); // all 6 array layers
+		depthCube.TransitionLayout(cmd,
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*depthCube,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 6));
-		cmd.pipelineBarrier(
-			vk::PipelineStageFlagBits::eTopOfPipe,
-			vk::PipelineStageFlagBits::eEarlyFragmentTests,
-			{}, {}, {}, depthBarrier);
-
+			0, 1,  // mip 0, 1 level
+			0, 6); // all 6 array layers
 		EndSubmitWait(cmd);
 	}
 
@@ -1099,7 +1006,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		const vk::ClearValue depthClear = vk::ClearDepthStencilValue(1.0f, 0);
 
 		vk::RenderingAttachmentInfo colorAtt(
-			*colorArrView,
+			verifyCube.ArrayView(),
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
@@ -1108,7 +1015,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			colorClear);
 
 		vk::RenderingAttachmentInfo depthAtt(
-			*depthArrView,
+			depthCube.ArrayView(),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
@@ -1144,17 +1051,11 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		cmd.endRendering();
 
 		// Transition color cubemap for readback (all layers)
-		vk::ImageMemoryBarrier copyBarrier(
-			vk::AccessFlagBits::eColorAttachmentWrite,
-			vk::AccessFlagBits::eTransferRead,
+		verifyCube.TransitionLayout(cmd,
 			vk::ImageLayout::eColorAttachmentOptimal,
 			vk::ImageLayout::eTransferSrcOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*colorCube,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-		                   vk::PipelineStageFlagBits::eTransfer,
-		                   {}, {}, {}, copyBarrier);
+			0, 1,  // mip 0, 1 level
+			0, 6); // all 6 array layers
 
 		EndSubmitWait(cmd);
 	}
@@ -1206,7 +1107,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 			copyRegion.imageExtent = vk::Extent3D(kRes, kRes, 1);
 			cmd.copyImageToBuffer(
-				*colorCube,
+				*verifyCube.ImageHandle(),
 				vk::ImageLayout::eTransferSrcOptimal,
 				*stagingBuf,
 				copyRegion);
