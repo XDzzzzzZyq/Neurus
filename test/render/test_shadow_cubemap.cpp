@@ -413,34 +413,25 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	vk::raii::ImageView tempView(*m_device, viewCI);
 
 	// -------------------------------------------------------------------
-	// Step 3b: Create a temporary D32_SFLOAT depth image for correct depth testing.
+	// Step 3b: Use ShadowDepthPass's built-in 2D depth map for depth testing.
 	//          Without a real depth attachment, depth testing is disabled and
 	//          the last rendered item (plane) always overwrites earlier items
 	//          (cube). With a real depth attachment, the cube (depth ~0.10)
 	//          correctly occludes the plane (depth ~0.12) at cube-covered pixels.
 	// -------------------------------------------------------------------
-	Image tempDepth(*m_device, pd,
-		vk::Extent2D(kRes, kRes),
-		vk::Format::eD32Sfloat,
-		vk::ImageUsageFlagBits::eDepthStencilAttachment,
-		1u, Image::ImageType::eDepthStencil,
-		"TempDepthForFace3");
+	m_shadowDepthPass->createDepthmap(*m_device, pd);
+	m_shadowDepthPass->createDepthViews(*m_device);
+	auto& depthImage = m_shadowDepthPass->Depthmap();
+	auto& depthView  = m_shadowDepthPass->DepthView();
 
 	// Transition to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	{
 		auto& cmd = BeginCmd();
-		tempDepth.TransitionLayout(cmd,
+		depthImage.TransitionLayout(cmd,
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eDepthStencilAttachmentOptimal);
 		EndSubmitWait(cmd);
 	}
-
-	// Create image view for depth
-	vk::ImageViewCreateInfo depthViewCI({}, *tempDepth.ImageHandle(),
-		vk::ImageViewType::e2D, vk::Format::eD32Sfloat,
-		vk::ComponentMapping(),
-		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1));
-	vk::raii::ImageView depthView(*m_device, depthViewCI);
 
 	// -------------------------------------------------------------------
 	// Step 4: Create LightUBO populated with face 3 (-Y) VP matrix

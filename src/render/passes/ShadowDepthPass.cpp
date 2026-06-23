@@ -50,77 +50,134 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	: Pass()
 	, m_resolution(resolution)
 	, m_farPlane(farPlane)
-	, m_cubemap(device, physicalDevice,
-	            vk::Extent2D{resolution, resolution},
-	            kDepthFmt,
-	            vk::ImageUsageFlagBits::eDepthStencilAttachment |
-	                vk::ImageUsageFlagBits::eSampled |
-	                vk::ImageUsageFlagBits::eTransferSrc,
-	            1u, Image::ImageType::eCube,
-	            "ShadowDepthCubemap")
-	, m_ubo(std::make_unique<VulkanBuffer>(device, physicalDevice,
-	           graphicsQueue, queueFamilyIndex,
-	           sizeof(LightUBO),
-	           vk::BufferUsageFlagBits::eUniformBuffer,
-	           vk::MemoryPropertyFlagBits::eHostVisible |
-	               vk::MemoryPropertyFlagBits::eHostCoherent,
-	           "ShadowDepthUBO"))
-	, m_layout(CreateLightLayout(device))
-	, m_pool(device, 1, DescriptorPool::CalculatePoolSizes({&m_layout}, 1))
-	, m_set(std::move(m_pool.Allocate(m_layout, 1).front()))
 	, m_pipelineLayout(nullptr)
 	, m_pipeline(nullptr)
 {
 	m_device = &device;
 
-	m_set.WriteBuffer(0, m_ubo->GetDescriptorInfo(), vk::DescriptorType::eUniformBuffer);
-#ifdef _DEBUG
-	m_set.SetDebugName("ShadowDepth_LightSet");
-#endif
-
 	m_vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
 	m_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
 	m_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
+	createDepthCubemap(device, physicalDevice);
 	createFaceViews(device);
-
-	// --- Create pipeline ---
-	{
-		auto vertModule = ShaderModule::FromEmbedded(device, shadow_depth_vert_spv, sizeof(shadow_depth_vert_spv));
-		auto fragModule = ShaderModule::FromEmbedded(device, shadow_depth_frag_spv, sizeof(shadow_depth_frag_spv));
-
-		std::vector<vk::PushConstantRange> pushRanges = {
-			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstants))
-		};
-
-		std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
-
-		PipelineBuilder builder;
-		m_pipeline = builder
-			.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-			.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-			.SetVertexInput(m_vtxLayout)
-			.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-			.SetRasterization(vk::PolygonMode::eFill,
-			                  vk::CullModeFlagBits::eNone,
-			                  vk::FrontFace::eClockwise)
-			.SetMultisampling()
-			.SetDepthStencil(true, true, vk::CompareOp::eLess)
-			.SetColorFormats({})
-			.SetDepthFormat(kDepthFmt)
-			.SetDescriptorSetLayouts(dslayouts)
-			.SetPushConstantRanges(pushRanges)
-			.BuildGraphicsPipeline(device);
-
-		vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
-		m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-	}
-
+	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
+	createPipeline(device);
 	updateUBO();
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution << " farPlane=" << farPlane
 	           << " lightPos=(" << m_lightPosition.x << "," << m_lightPosition.y << "," << m_lightPosition.z << ")"
 	           << " UBOsize=" << sizeof(LightUBO));
+}
+
+// ===========================================================================
+// createDepthCubemap — point-light cubemap image
+// ===========================================================================
+
+void ShadowDepthPass::createDepthCubemap(const vk::raii::Device& device,
+                                          const vk::raii::PhysicalDevice& physicalDevice)
+{
+	m_cubemap = std::make_unique<Image>(device, physicalDevice,
+		vk::Extent2D{m_resolution, m_resolution},
+		kDepthFmt,
+		vk::ImageUsageFlagBits::eDepthStencilAttachment |
+			vk::ImageUsageFlagBits::eSampled |
+			vk::ImageUsageFlagBits::eTransferSrc,
+		1u, Image::ImageType::eCube,
+		"ShadowDepthCubemap");
+}
+
+// ===========================================================================
+// createDepthmap — 2D depth map for directional lights / single-face tests
+// ===========================================================================
+
+void ShadowDepthPass::createDepthmap(const vk::raii::Device& device,
+                                      const vk::raii::PhysicalDevice& physicalDevice)
+{
+	m_depthmap = std::make_unique<Image>(device, physicalDevice,
+		vk::Extent2D{m_resolution, m_resolution},
+		kDepthFmt,
+		vk::ImageUsageFlagBits::eDepthStencilAttachment |
+			vk::ImageUsageFlagBits::eTransferSrc,
+		1u, Image::ImageType::e2D,
+		"ShadowDepthMap2D");
+}
+
+// ===========================================================================
+// createDepthViews — single 2D image view for the depth map
+// ===========================================================================
+
+void ShadowDepthPass::createDepthViews(const vk::raii::Device& device)
+{
+	if (!m_depthmap)
+		return;
+
+	vk::ImageViewCreateInfo ci({}, *m_depthmap->ImageHandle(),
+		vk::ImageViewType::e2D, kDepthFmt,
+		vk::ComponentMapping(),
+		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1));
+	m_depthView = vk::raii::ImageView(device, ci);
+}
+
+// ===========================================================================
+// createUniforms — UBO, descriptor pool & set
+// ===========================================================================
+
+void ShadowDepthPass::createUniforms(const vk::raii::Device& device,
+                                      const vk::raii::PhysicalDevice& physicalDevice,
+                                      vk::Queue queue, uint32_t qfi)
+{
+	m_ubo = std::make_unique<VulkanBuffer>(device, physicalDevice,
+		queue, qfi,
+		sizeof(LightUBO),
+		vk::BufferUsageFlagBits::eUniformBuffer,
+		vk::MemoryPropertyFlagBits::eHostVisible |
+			vk::MemoryPropertyFlagBits::eHostCoherent,
+		"ShadowDepthUBO");
+
+	m_layout = CreateLightLayout(device);
+	m_pool = DescriptorPool(device, 1, DescriptorPool::CalculatePoolSizes({&m_layout}, 1));
+	m_set = std::make_unique<DescriptorSet>(std::move(m_pool.Allocate(m_layout, 1).front()));
+	m_set->WriteBuffer(0, m_ubo->GetDescriptorInfo(), vk::DescriptorType::eUniformBuffer);
+#ifdef _DEBUG
+	m_set->SetDebugName("ShadowDepth_LightSet");
+#endif
+}
+
+// ===========================================================================
+// createPipeline — graphics pipeline + layout
+// ===========================================================================
+
+void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
+{
+	auto vertModule = ShaderModule::FromEmbedded(device, shadow_depth_vert_spv, sizeof(shadow_depth_vert_spv));
+	auto fragModule = ShaderModule::FromEmbedded(device, shadow_depth_frag_spv, sizeof(shadow_depth_frag_spv));
+
+	std::vector<vk::PushConstantRange> pushRanges = {
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstants))
+	};
+
+	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
+
+	PipelineBuilder builder;
+	m_pipeline = builder
+		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.SetVertexInput(m_vtxLayout)
+		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+		.SetRasterization(vk::PolygonMode::eFill,
+		                  vk::CullModeFlagBits::eNone,
+		                  vk::FrontFace::eClockwise)
+		.SetMultisampling()
+		.SetDepthStencil(true, true, vk::CompareOp::eLess)
+		.SetColorFormats({})
+		.SetDepthFormat(kDepthFmt)
+		.SetDescriptorSetLayouts(dslayouts)
+		.SetPushConstantRanges(pushRanges)
+		.BuildGraphicsPipeline(device);
+
+	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
+	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
 }
 
 // ===========================================================================
@@ -133,7 +190,7 @@ void ShadowDepthPass::createFaceViews(const vk::raii::Device& device)
 	m_faceViews.reserve(kShadowFaceCount);
 	for (uint32_t f = 0; f < kShadowFaceCount; ++f)
 	{
-		vk::ImageViewCreateInfo ci({}, *m_cubemap.ImageHandle(),
+		vk::ImageViewCreateInfo ci({}, *m_cubemap->ImageHandle(),
 		                           vk::ImageViewType::e2D, kDepthFmt,
 		                           vk::ComponentMapping(),
 		                           vk::ImageSubresourceRange(
@@ -196,13 +253,13 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*m_cubemap.ImageHandle(),
+			*m_cubemap->ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
 			                          0, 1, 0, kShadowFaceCount));
 		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
 		                       vk::PipelineStageFlagBits::eLateFragmentTests,
 		                       {}, {}, {}, barrier);
-		m_cubemap.SetCurrentLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		m_cubemap->SetCurrentLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 	}
 
 	const vk::Viewport viewport(0.f, 0.f,
@@ -216,7 +273,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 	                          m_pipelineLayout, 0,
-	                          vk::ArrayProxy<const vk::DescriptorSet>(m_set.handle()), {});
+	                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
 
 	const vk::ClearValue clearValue = vk::ClearDepthStencilValue(1.0f, 0);
 
@@ -266,13 +323,13 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ImageLayout::eShaderReadOnlyOptimal,
 			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*m_cubemap.ImageHandle(),
+			*m_cubemap->ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
 			                          0, 1, 0, kShadowFaceCount));
 		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eLateFragmentTests,
 		                       vk::PipelineStageFlagBits::eComputeShader,
 		                       {}, {}, {}, barrier);
-		m_cubemap.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+		m_cubemap->SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 	}
 }
 

@@ -45,7 +45,13 @@ public:
 	void SetLightPosition(const glm::vec3& position);
 	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
 
-	Image& ShadowCubemap() { return m_cubemap; }
+	void createDepthmap(const vk::raii::Device& device,
+	                    const vk::raii::PhysicalDevice& physicalDevice);
+	void createDepthViews(const vk::raii::Device& device);
+
+	Image& ShadowCubemap() { return *m_cubemap; }
+	Image& Depthmap() { return *m_depthmap; }
+	const vk::raii::ImageView& DepthView() const { return m_depthView; }
 	uint32_t Resolution() const { return m_resolution; }
 
 private:
@@ -60,15 +66,13 @@ private:
 	static_assert(sizeof(LightUBO) == 404,
 	              "LightUBO size must match std140 layout (vec3 padding)");
 
-	void createCubemap(const vk::raii::Device& device,
-	                   const vk::raii::PhysicalDevice& physicalDevice);
+	void createDepthCubemap(const vk::raii::Device& device,
+	                        const vk::raii::PhysicalDevice& physicalDevice);
 	void createFaceViews(const vk::raii::Device& device);
 	void createUniforms(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice,
 	                    vk::Queue queue, uint32_t qfi);
-	void createPipeline(const vk::raii::Device& device,
-	                    const uint32_t* vertSpv, size_t vertSize,
-	                    const uint32_t* fragSpv, size_t fragSize);
+	void createPipeline(const vk::raii::Device& device);
 	void updateUBO();
 
 	// --- Parameters ---
@@ -77,12 +81,14 @@ private:
 	glm::vec3 m_lightPosition{0.0f};
 
 	// --- GPU resources ---
-	Image m_cubemap;
+	std::unique_ptr<Image> m_cubemap;
+	std::unique_ptr<Image> m_depthmap;
 	std::vector<vk::raii::ImageView> m_faceViews;
+	vk::raii::ImageView m_depthView = nullptr;
 	std::unique_ptr<VulkanBuffer> m_ubo;
 	DescriptorSetLayout m_layout;
 	DescriptorPool m_pool;
-	DescriptorSet m_set;
+	std::unique_ptr<DescriptorSet> m_set;
 	BufferLayout m_vtxLayout;
 	vk::raii::PipelineLayout m_pipelineLayout = nullptr;
 	vk::raii::Pipeline m_pipeline = nullptr;
