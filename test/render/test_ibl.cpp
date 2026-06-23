@@ -124,14 +124,13 @@ protected:
 
 	void createE2CPipeline(const vk::raii::Device& dev)
 	{
-		auto bindings = BuildLayout()
-			.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
-			            vk::ShaderStageFlagBits::eCompute)
-			.AddBinding(1, vk::DescriptorType::eStorageImage,
-			            vk::ShaderStageFlagBits::eCompute)
-			.Build();
-
-		m_e2cSetLayout = std::make_unique<DescriptorSetLayout>(dev, bindings);
+		m_e2cSetLayout = std::make_unique<DescriptorSetLayout>(
+			BuildLayout()
+				.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
+				            vk::ShaderStageFlagBits::eCompute)
+				.AddBinding(1, vk::DescriptorType::eStorageImage,
+				            vk::ShaderStageFlagBits::eCompute)
+				.Build(dev));
 
 		auto poolSizes = DescriptorPool::CalculatePoolSizes({m_e2cSetLayout.get()}, 1);
 		m_e2cPool = std::make_unique<DescriptorPool>(dev, 1, poolSizes);
@@ -146,14 +145,13 @@ protected:
 
 	void createC2EPipeline(const vk::raii::Device& dev)
 	{
-		auto bindings = BuildLayout()
-			.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
-			            vk::ShaderStageFlagBits::eCompute)
-			.AddBinding(1, vk::DescriptorType::eStorageImage,
-			            vk::ShaderStageFlagBits::eCompute)
-			.Build();
-
-		m_c2eSetLayout = std::make_unique<DescriptorSetLayout>(dev, bindings);
+		m_c2eSetLayout = std::make_unique<DescriptorSetLayout>(
+			BuildLayout()
+				.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
+				            vk::ShaderStageFlagBits::eCompute)
+				.AddBinding(1, vk::DescriptorType::eStorageImage,
+				            vk::ShaderStageFlagBits::eCompute)
+				.Build(dev));
 
 		auto poolSizes = DescriptorPool::CalculatePoolSizes({m_c2eSetLayout.get()}, 1);
 		m_c2ePool = std::make_unique<DescriptorPool>(dev, 1, poolSizes);

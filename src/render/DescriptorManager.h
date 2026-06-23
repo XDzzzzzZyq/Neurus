@@ -23,13 +23,12 @@ class DescriptorSet;
  * with a readable chained syntax.
  *
  * @code
- *   auto bindings = BuildLayout()
+ *   return BuildLayout()
  *       .AddBinding(0, vk::DescriptorType::eUniformBuffer,
  *                   vk::ShaderStageFlagBits::eVertex)
  *       .AddBinding(1, vk::DescriptorType::eCombinedImageSampler,
  *                   vk::ShaderStageFlagBits::eFragment)
- *       .Build();
- *   DescriptorSetLayout layout(device, bindings);
+ *       .Build(device);
  * @endcode
  */
 class DescriptorSetLayoutBuilder
@@ -57,6 +56,13 @@ public:
 	 *         DescriptorSetLayout construction.
 	 */
 	std::vector<vk::DescriptorSetLayoutBinding> Build();
+
+	/**
+	 * @brief Finalizes and returns a DescriptorSetLayout directly.
+	 * @param device Logical device for layout creation.
+	 * @return DescriptorSetLayout wrapping the accumulated bindings.
+	 */
+	DescriptorSetLayout Build(const vk::raii::Device& device);
 
 private:
 	std::vector<vk::DescriptorSetLayoutBinding> m_bindings;

@@ -241,7 +241,7 @@ void SSAOPass::UpdateParams(const glm::mat4& viewProj,
 
 DescriptorSetLayout SSAOPass::CreateDescriptorSetLayout(const vk::raii::Device& device)
 {
-	auto bindings = BuildLayout()
+	return BuildLayout()
 		// G-Buffer inputs (combined image samplers)
 		.AddBinding(0,
 		            vk::DescriptorType::eCombinedImageSampler,
@@ -264,9 +264,7 @@ DescriptorSetLayout SSAOPass::CreateDescriptorSetLayout(const vk::raii::Device& 
 		.AddBinding(5,
 		            vk::DescriptorType::eUniformBuffer,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-
-	return DescriptorSetLayout(device, bindings);
+		.Build(device);
 }
 
 // ---------------------------------------------------------------------------

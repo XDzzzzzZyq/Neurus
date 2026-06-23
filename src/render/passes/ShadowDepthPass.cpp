@@ -31,12 +31,11 @@ namespace {
 
 DescriptorSetLayout ShadowDepthPass::CreateLightLayout(const vk::raii::Device& device)
 {
-	auto bindings = BuildLayout()
+	return BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
 		            vk::ShaderStageFlagBits::eVertex |
 		                vk::ShaderStageFlagBits::eFragment)
-		.Build();
-	return DescriptorSetLayout(device, bindings);
+		.Build(device);
 }
 
 // ===========================================================================

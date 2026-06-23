@@ -22,15 +22,14 @@ namespace neurus {
 
 DescriptorSetLayout ShadowEvalPass::CreateDescriptorLayout(const vk::raii::Device& device)
 {
-	auto bindings = BuildLayout()
+	return BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
 		.AddBinding(1, vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
 		.AddBinding(2, vk::DescriptorType::eStorageImage,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-	return DescriptorSetLayout(device, bindings);
+		.Build(device);
 }
 
 // ===========================================================================

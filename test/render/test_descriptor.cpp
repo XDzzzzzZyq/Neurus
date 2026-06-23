@@ -124,13 +124,11 @@ TEST_F(DescriptorManagerTest, CreateDescriptorSetLayout_WithSingleBinding)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .Build();
-
 	ASSERT_NO_THROW({
-		DescriptorSetLayout layout(*m_device, bindings);
+		auto layout = BuildLayout()
+		                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+		                                vk::ShaderStageFlagBits::eVertex)
+		                    .Build(*m_device);
 		EXPECT_EQ(layout.bindings().size(), 1u);
 	});
 }
@@ -142,15 +140,13 @@ TEST_F(DescriptorManagerTest, CreateDescriptorSetLayout_WithMultipleBindings)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .AddBinding(1, vk::DescriptorType::eCombinedImageSampler,
-	                                vk::ShaderStageFlagBits::eFragment)
-	                    .Build();
-
 	ASSERT_NO_THROW({
-		DescriptorSetLayout layout(*m_device, bindings);
+		auto layout = BuildLayout()
+		                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+		                                vk::ShaderStageFlagBits::eVertex)
+		                    .AddBinding(1, vk::DescriptorType::eCombinedImageSampler,
+		                                vk::ShaderStageFlagBits::eFragment)
+		                    .Build(*m_device);
 		EXPECT_EQ(layout.bindings().size(), 2u);
 	});
 }
@@ -162,12 +158,10 @@ TEST_F(DescriptorManagerTest, DescriptorSetLayout_ReturnsValidVkLayout)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                  .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+	                              vk::ShaderStageFlagBits::eVertex)
+	                  .Build(*m_device);
 
 	// The underlying vk::raii::DescriptorSetLayout must be non-null
 	const auto& vkLayout = layout.layout();
@@ -223,14 +217,12 @@ TEST_F(DescriptorManagerTest, CalculatePoolSizes_SingleLayout)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .AddBinding(1, vk::DescriptorType::eCombinedImageSampler,
-	                                vk::ShaderStageFlagBits::eFragment)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                 .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+	                             vk::ShaderStageFlagBits::eVertex)
+	                 .AddBinding(1, vk::DescriptorType::eCombinedImageSampler,
+	                             vk::ShaderStageFlagBits::eFragment)
+	                 .Build(*m_device);
 	std::vector<const DescriptorSetLayout*> layouts = {&layout};
 
 	auto sizes = DescriptorPool::CalculatePoolSizes(layouts, 2);
@@ -262,23 +254,20 @@ TEST_F(DescriptorManagerTest, CalculatePoolSizes_MultipleLayouts)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindingsA = BuildLayout()
-	                     .AddBinding(0,
-	                                 vk::DescriptorType::eUniformBuffer,
-	                                 vk::ShaderStageFlagBits::eVertex)
-	                     .Build();
+	auto layoutA = BuildLayout()
+	                  .AddBinding(0,
+	                              vk::DescriptorType::eUniformBuffer,
+	                              vk::ShaderStageFlagBits::eVertex)
+	                  .Build(*m_device);
 
-	auto bindingsB = BuildLayout()
-	                     .AddBinding(0,
-	                                 vk::DescriptorType::eUniformBuffer,
-	                                 vk::ShaderStageFlagBits::eFragment)
-	                     .AddBinding(1,
-	                                 vk::DescriptorType::eStorageBuffer,
-	                                 vk::ShaderStageFlagBits::eFragment)
-	                     .Build();
-
-	DescriptorSetLayout layoutA(*m_device, bindingsA);
-	DescriptorSetLayout layoutB(*m_device, bindingsB);
+	auto layoutB = BuildLayout()
+	                  .AddBinding(0,
+	                              vk::DescriptorType::eUniformBuffer,
+	                              vk::ShaderStageFlagBits::eFragment)
+	                  .AddBinding(1,
+	                              vk::DescriptorType::eStorageBuffer,
+	                              vk::ShaderStageFlagBits::eFragment)
+	                  .Build(*m_device);
 	std::vector<const DescriptorSetLayout*> layouts = {&layoutA, &layoutB};
 
 	auto sizes = DescriptorPool::CalculatePoolSizes(layouts, 3);
@@ -307,12 +296,10 @@ TEST_F(DescriptorManagerTest, Allocate_SingleDescriptorSet_Succeeds)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                 .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+	                             vk::ShaderStageFlagBits::eVertex)
+	                 .Build(*m_device);
 
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{vk::DescriptorType::eUniformBuffer, 1},
@@ -333,12 +320,10 @@ TEST_F(DescriptorManagerTest, Allocate_MultipleDescriptorSets_Succeeds)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                 .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+	                             vk::ShaderStageFlagBits::eVertex)
+	                 .Build(*m_device);
 
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{vk::DescriptorType::eUniformBuffer, 3},
@@ -364,12 +349,10 @@ TEST_F(DescriptorManagerTest, Allocate_ZeroCount_ReturnsEmpty)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                 .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+	                             vk::ShaderStageFlagBits::eVertex)
+	                 .Build(*m_device);
 
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{vk::DescriptorType::eUniformBuffer, 1},
@@ -405,12 +388,10 @@ TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 	vk::DescriptorBufferInfo bufInfo = buf.GetDescriptorInfo();
 
 	// Create layout, pool, allocate set
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eUniformBuffer,
-	                                vk::ShaderStageFlagBits::eVertex)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                 .AddBinding(0, vk::DescriptorType::eUniformBuffer,
+	                             vk::ShaderStageFlagBits::eVertex)
+	                 .Build(*m_device);
 
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{vk::DescriptorType::eUniformBuffer, 1},
@@ -446,12 +427,10 @@ TEST_F(DescriptorManagerTest, WriteBuffer_DefaultType_UniformBuffer)
 
 	vk::DescriptorBufferInfo bufInfo = buf.GetDescriptorInfo();
 
-	auto bindings = BuildLayout()
-	                    .AddBinding(0, vk::DescriptorType::eStorageBuffer,
-	                                vk::ShaderStageFlagBits::eCompute)
-	                    .Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+	auto layout = BuildLayout()
+	                 .AddBinding(0, vk::DescriptorType::eStorageBuffer,
+	                             vk::ShaderStageFlagBits::eCompute)
+	                 .Build(*m_device);
 
 	std::vector<vk::DescriptorPoolSize> poolSizes = {
 		{vk::DescriptorType::eStorageBuffer, 1},

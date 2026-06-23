@@ -118,12 +118,10 @@ TEST_F(ComputePipelineTest, WithDescriptorSetLayout_BuildsSuccessfully)
 			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
 
 	// Create a descriptor set layout with a storage buffer binding
-	auto bindings = BuildLayout()
+	auto layout = BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eStorageBuffer,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+		.Build(*m_device);
 
 	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
 		.SetShaderStage(shader)
@@ -176,12 +174,10 @@ TEST_F(ComputePipelineTest, WithLayoutAndPushConstants_BuildsSuccessfully)
 			dummy_comp_spv,
 			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
 
-	auto bindings = BuildLayout()
+	auto layout = BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-
-	DescriptorSetLayout layout(*m_device, bindings);
+		.Build(*m_device);
 
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute, 0, 32);

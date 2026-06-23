@@ -89,13 +89,11 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 
 DescriptorSetLayout GeometryPass::CreateCameraLayout(const vk::raii::Device& device)
 {
-	auto bindings = BuildLayout()
+	return BuildLayout()
 		.AddBinding(0,
 		            vk::DescriptorType::eUniformBuffer,
 		            vk::ShaderStageFlagBits::eVertex)
-		.Build();
-
-	return DescriptorSetLayout(device, bindings);
+		.Build(device);
 }
 
 // ---------------------------------------------------------------------------

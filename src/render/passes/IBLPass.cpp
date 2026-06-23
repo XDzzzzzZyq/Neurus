@@ -323,7 +323,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 
 DescriptorSetLayout IBLPass::CreateDescriptorSetLayout(const vk::raii::Device& device)
 {
-	auto bindings = BuildLayout()
+	return BuildLayout()
 		// Equirect input (combined image sampler)
 		.AddBinding(0,
 		            vk::DescriptorType::eCombinedImageSampler,
@@ -332,9 +332,7 @@ DescriptorSetLayout IBLPass::CreateDescriptorSetLayout(const vk::raii::Device& d
 		.AddBinding(1,
 		            vk::DescriptorType::eStorageImage,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-
-	return DescriptorSetLayout(device, bindings);
+		.Build(device);
 }
 
 // ---------------------------------------------------------------------------

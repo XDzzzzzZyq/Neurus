@@ -906,13 +906,12 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 	vk::raii::Sampler cubeSampler(m_device, samplerCI);
 
 	// --- 3. Descriptor set layout (2 bindings) ---
-	auto bindings = BuildLayout()
+	DescriptorSetLayout c2eLayout = BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
 		.AddBinding(1, vk::DescriptorType::eStorageImage,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-	DescriptorSetLayout c2eLayout(m_device, bindings);
+		.Build(m_device);
 
 	DescriptorPool c2ePool(m_device, 1,
 		DescriptorPool::CalculatePoolSizes({&c2eLayout}, 1));

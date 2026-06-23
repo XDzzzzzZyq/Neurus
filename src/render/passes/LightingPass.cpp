@@ -229,7 +229,7 @@ uint32_t LightingPass::GetLightCount() const
 
 DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Device& device)
 {
-	auto bindings = BuildLayout()
+	return BuildLayout()
 		// G-Buffer inputs (combined image samplers)
 		.AddBinding(0,
 		            vk::DescriptorType::eCombinedImageSampler,
@@ -267,9 +267,7 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.AddBinding(9,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build();
-
-	return DescriptorSetLayout(device, bindings);
+		.Build(device);
 }
 
 // ---------------------------------------------------------------------------

@@ -24,6 +24,11 @@ std::vector<vk::DescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::Build()
 	return std::move(m_bindings);
 }
 
+DescriptorSetLayout DescriptorSetLayoutBuilder::Build(const vk::raii::Device& device)
+{
+	return DescriptorSetLayout(device, std::move(m_bindings));
+}
+
 DescriptorSetLayoutBuilder BuildLayout()
 {
 	return DescriptorSetLayoutBuilder{};
