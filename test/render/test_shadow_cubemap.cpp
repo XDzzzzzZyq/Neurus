@@ -34,6 +34,7 @@
 #include "shared/TestReferenceImage.h"
 
 #include "shadow_depth.vert.h"
+#include "shadow_depth_multiview.vert.h"
 #include "depth_to_color.frag.h"
 
 #include <glm/glm.hpp>
@@ -67,6 +68,62 @@ protected:
 		if (!m_hasVulkan) return;
 
 		auto& pd = PhysicalDevice();
+
+		// --- Enable multiview for AllFacesDepth single-pass cubemap rendering ---
+		//
+		// VK_KHR_multiview is core since Vulkan 1.1. We must explicitly enable it
+		// in the VkPhysicalDeviceVulkan11Features pNext chain, otherwise viewMask
+		// must be 0 (validation: VUID-VkRenderingInfo-viewMask-06099).
+		//
+		// Strategy: create a new Device with multiview enabled BEFORE destroying
+		// the old one. If creation fails (unlikely on any Vulkan 1.1+ GPU) the
+		// original device is still intact.
+		{
+			vk::PhysicalDeviceVulkan11Features vk11Features{};
+			vk11Features.multiview = VK_TRUE;
+
+			float prio = 1.0f;
+			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
+			vk::PhysicalDeviceFeatures features;
+			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
+			devCI.pNext = &vk11Features;
+
+			std::unique_ptr<vk::raii::Device> newDevice;
+			try
+			{
+				newDevice = std::make_unique<vk::raii::Device>(pd, devCI);
+			}
+			catch (const std::exception& e)
+			{
+				std::cerr << "[ShadowCubemapTest] Multiview not supported: "
+				          << e.what() << std::endl;
+				m_multiviewAvailable = false;
+			}
+
+			if (newDevice)
+			{
+				m_multiviewAvailable = true;
+
+				// Swap: destroy old, use new
+				m_device->waitIdle();
+				m_commandBuffers = vk::raii::CommandBuffers(nullptr);
+				m_commandPool.reset();
+				m_device.reset();
+
+				m_device = std::move(newDevice);
+				m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
+
+				// Re-create command pool + buffers with the new device
+				vk::CommandPoolCreateInfo poolCI(
+					vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+					m_graphicsQueueFamily);
+				m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
+
+				vk::CommandBufferAllocateInfo allocInfo(
+					*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
+				m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
+			}
+		}
 
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes, kFarPlane);
@@ -287,6 +344,7 @@ protected:
 
 	// --- Render data ---
 	std::unique_ptr<ShadowDepthPass> m_shadowDepthPass;
+	bool m_multiviewAvailable = false;
 };
 
 // ===========================================================================
@@ -785,6 +843,10 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
+	if (!m_multiviewAvailable)
+	{
+		GTEST_SKIP() << "Multiview not available on this device.";
+	}
 
 	auto& pd = PhysicalDevice();
 
@@ -810,7 +872,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 3: Create shared pipeline resources (once for all faces)
+	// Step 3: Create shared pipeline resources
 	// -------------------------------------------------------------------
 	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
 	const float kNearPlane = 0.1f;
@@ -837,7 +899,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		DescriptorPool::CalculatePoolSizes({&lightLayout}, 1));
 	auto lightSet = std::move(lightPool.Allocate(lightLayout, 1).front());
 
-	// UBO (reused across faces, data updated per face)
+	// UBO (filled with all 6 VP matrices before the single rendering pass)
 	VulkanBuffer faceUBO(*m_device, pd, m_queue, m_graphicsQueueFamily,
 		sizeof(FaceUBO),
 		vk::BufferUsageFlagBits::eUniformBuffer,
@@ -846,9 +908,9 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 
 	lightSet.WriteBuffer(0, faceUBO.GetDescriptorInfo(), vk::DescriptorType::eUniformBuffer);
 
-	// Shader modules
+	// Shader modules — use multiview vertex shader
 	auto vertModule = ShaderModule::FromEmbedded(*m_device,
-		shadow_depth_vert_spv, sizeof(shadow_depth_vert_spv));
+		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
 	auto fragModule = ShaderModule::FromEmbedded(*m_device,
 		depth_to_color_frag_spv, sizeof(depth_to_color_frag_spv));
 
@@ -858,13 +920,14 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // inNormal (unused)
 	vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // inUV (unused)
 
+	// Push constant range: mat4 model only (64 bytes), no faceIndex needed
 	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstants))
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4))
 	};
 
 	std::vector<vk::DescriptorSetLayout> dslayouts = { *lightLayout.layout() };
 
-	// Pipeline (shared across all faces)
+	// Pipeline (multiview vertex shader — gl_ViewIndex selects VP matrix)
 	PipelineBuilder builder;
 	auto pipeline = builder
 		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
@@ -893,164 +956,250 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	vk::PipelineLayoutCreateInfo plCI({}, dslayouts, pushRanges);
 	vk::raii::PipelineLayout pipelineLayout(*m_device, plCI);
 
+	// -------------------------------------------------------------------
+	// Step 4: Create single color cubemap (RGBA32F) + depth cubemap (D32)
+	// -------------------------------------------------------------------
+	// Must have VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT for multiview.
+
+	auto FindDeviceLocalMemType = [&](const vk::MemoryRequirements& memReqs)
+	{
+		auto memProps = pd.getMemoryProperties();
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+		{
+			if ((memReqs.memoryTypeBits & (1u << i)) &&
+			    (memProps.memoryTypes[i].propertyFlags & vk::MemoryPropertyFlagBits::eDeviceLocal))
+				return i;
+		}
+		return UINT32_MAX;
+	};
+
+	// --- Color cubemap ---
+	vk::raii::Image colorCube(nullptr);
+	vk::raii::DeviceMemory colorCubeMem(nullptr);
+	{
+		vk::ImageCreateFlags cubeFlags =
+			vk::ImageCreateFlagBits::eCubeCompatible |
+			vk::ImageCreateFlagBits::e2DArrayCompatible;
+
+		vk::ImageCreateInfo ci(cubeFlags, vk::ImageType::e2D,
+			vk::Format::eR32G32B32A32Sfloat,
+			vk::Extent3D(kRes, kRes, 1), 1, 6,
+			vk::SampleCountFlagBits::e1,
+			vk::ImageTiling::eOptimal,
+			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
+			vk::SharingMode::eExclusive, {}, vk::ImageLayout::eUndefined);
+
+		vk::raii::Image img(*m_device, ci);
+		auto memReqs = img.getMemoryRequirements();
+		uint32_t mt = FindDeviceLocalMemType(memReqs);
+		ASSERT_LT(mt, UINT32_MAX) << "No device-local memory for color cubemap";
+		vk::raii::DeviceMemory mem(*m_device, vk::MemoryAllocateInfo(memReqs.size, mt));
+		img.bindMemory(*mem, 0);
+		colorCube = std::move(img);
+		colorCubeMem = std::move(mem);
+	}
+
+	// --- Depth cubemap ---
+	vk::raii::Image depthCube(nullptr);
+	vk::raii::DeviceMemory depthCubeMem(nullptr);
+	{
+		vk::ImageCreateFlags cubeFlags =
+			vk::ImageCreateFlagBits::eCubeCompatible |
+			vk::ImageCreateFlagBits::e2DArrayCompatible;
+
+		vk::ImageCreateInfo ci(cubeFlags, vk::ImageType::e2D,
+			vk::Format::eD32Sfloat,
+			vk::Extent3D(kRes, kRes, 1), 1, 6,
+			vk::SampleCountFlagBits::e1,
+			vk::ImageTiling::eOptimal,
+			vk::ImageUsageFlagBits::eDepthStencilAttachment,
+			vk::SharingMode::eExclusive, {}, vk::ImageLayout::eUndefined);
+
+		vk::raii::Image img(*m_device, ci);
+		auto memReqs = img.getMemoryRequirements();
+		uint32_t mt = FindDeviceLocalMemType(memReqs);
+		ASSERT_LT(mt, UINT32_MAX) << "No device-local memory for depth cubemap";
+		vk::raii::DeviceMemory mem(*m_device, vk::MemoryAllocateInfo(memReqs.size, mt));
+		img.bindMemory(*mem, 0);
+		depthCube = std::move(img);
+		depthCubeMem = std::move(mem);
+	}
+
+	// --- 2D_ARRAY image views for multiview rendering (cover all 6 layers) ---
+	vk::ImageViewCreateInfo colorArrViewCI({}, *colorCube,
+		vk::ImageViewType::e2DArray, vk::Format::eR32G32B32A32Sfloat,
+		vk::ComponentMapping(),
+		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
+	vk::raii::ImageView colorArrView(*m_device, colorArrViewCI);
+
+	vk::ImageViewCreateInfo depthArrViewCI({}, *depthCube,
+		vk::ImageViewType::e2DArray, vk::Format::eD32Sfloat,
+		vk::ComponentMapping(),
+		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 6));
+	vk::raii::ImageView depthArrView(*m_device, depthArrViewCI);
+
+	// -------------------------------------------------------------------
+	// Step 5: Transition cubemaps to attachment layouts
+	// -------------------------------------------------------------------
+	{
+		auto& cmd = BeginCmd();
+
+		vk::ImageMemoryBarrier colorBarrier(
+			vk::AccessFlagBits::eNone,
+			vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+			*colorCube,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
+		cmd.pipelineBarrier(
+			vk::PipelineStageFlagBits::eTopOfPipe,
+			vk::PipelineStageFlagBits::eColorAttachmentOutput,
+			{}, {}, {}, colorBarrier);
+
+		vk::ImageMemoryBarrier depthBarrier(
+			vk::AccessFlagBits::eNone,
+			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+			*depthCube,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 6));
+		cmd.pipelineBarrier(
+			vk::PipelineStageFlagBits::eTopOfPipe,
+			vk::PipelineStageFlagBits::eEarlyFragmentTests,
+			{}, {}, {}, depthBarrier);
+
+		EndSubmitWait(cmd);
+	}
+
+	// -------------------------------------------------------------------
+	// Step 6: Update UBO with all 6 face VP matrices
+	// -------------------------------------------------------------------
+	{
+		FaceUBO ubo{};
+		for (uint32_t face = 0; face < 6; ++face)
+		{
+			ubo.faceVP[face] = proj * glm::lookAt(lightPos,
+				lightPos + kTargets[face], kUps[face]);
+		}
+		ubo.lpx = lightPos.x; ubo.lpy = lightPos.y; ubo.lpz = lightPos.z;
+		ubo.farPlane = kFarPlane;
+
+		void* ptr = faceUBO.Map();
+		std::memcpy(ptr, &ubo, sizeof(FaceUBO));
+		faceUBO.Unmap();
+	}
+
+	// -------------------------------------------------------------------
+	// Step 7: Render all 6 faces in ONE pass via multiview (viewMask = 0x3F)
+	// -------------------------------------------------------------------
+	{
+		auto& cmd = BeginCmd();
+
+		const vk::Viewport viewport(0.f, 0.f,
+			static_cast<float>(kRes), static_cast<float>(kRes), 0.f, 1.f);
+		const vk::Rect2D scissor({0, 0}, {kRes, kRes});
+		cmd.setViewport(0, viewport);
+		cmd.setScissor(0, scissor);
+
+		// Clear color = (1,1,1,1) so background pixels match expected depth of 1.0
+		const vk::ClearValue colorClear =
+			vk::ClearColorValue(std::array<float, 4>{1.f, 1.f, 1.f, 1.f});
+		const vk::ClearValue depthClear = vk::ClearDepthStencilValue(1.0f, 0);
+
+		vk::RenderingAttachmentInfo colorAtt(
+			*colorArrView,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ResolveModeFlagBits::eNone, nullptr,
+			vk::ImageLayout::eUndefined,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			colorClear);
+
+		vk::RenderingAttachmentInfo depthAtt(
+			*depthArrView,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			vk::ResolveModeFlagBits::eNone, nullptr,
+			vk::ImageLayout::eUndefined,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			depthClear);
+
+		// viewMask = 0x3F: all 6 faces rendered simultaneously
+		// layerCount = 1:  the multiview extension maps views → layers
+		vk::RenderingInfo renderInfo(
+			vk::RenderingFlags{},
+			{{0, 0}, {kRes, kRes}},
+			1u,                 // layerCount
+			0x3Fu,              // viewMask: bits 0-5 = faces 0-5
+			colorAtt, &depthAtt, nullptr);
+
+		cmd.beginRendering(renderInfo);
+
+		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+			pipelineLayout, 0, {lightSet.handle()}, {});
+
+		// No faceIndex push constant — gl_ViewIndex handles it per-view
+		for (const auto& item : renderItems)
+		{
+			cmd.pushConstants<glm::mat4>(pipelineLayout,
+				vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
+			cmd.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
+			cmd.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
+			cmd.drawIndexed(item.indexCount, 1, 0, 0, 0);
+		}
+
+		cmd.endRendering();
+
+		// Transition color cubemap for readback (all layers)
+		vk::ImageMemoryBarrier copyBarrier(
+			vk::AccessFlagBits::eColorAttachmentWrite,
+			vk::AccessFlagBits::eTransferRead,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ImageLayout::eTransferSrcOptimal,
+			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+			*colorCube,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
+		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
+		                   vk::PipelineStageFlagBits::eTransfer,
+		                   {}, {}, {}, copyBarrier);
+
+		EndSubmitWait(cmd);
+	}
+
+	// -------------------------------------------------------------------
+	// Step 8: Read back each face layer and verify against expected depth
+	// -------------------------------------------------------------------
 	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRes) * kRes * 4 * sizeof(float);
 	bool anyReferenceGenerated = false;
 
-	// -------------------------------------------------------------------
-	// Step 4: Loop over all 6 faces
-	// -------------------------------------------------------------------
+	auto FindHostVisibleMemType = [&](const vk::MemoryRequirements& memReqs)
+	{
+		auto memProps = pd.getMemoryProperties();
+		for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
+		{
+			if ((memReqs.memoryTypeBits & (1u << i)) &&
+			    (memProps.memoryTypes[i].propertyFlags &
+			     (vk::MemoryPropertyFlagBits::eHostVisible |
+			      vk::MemoryPropertyFlagBits::eHostCoherent)))
+				return i;
+		}
+		return UINT32_MAX;
+	};
+
 	for (uint32_t face = 0; face < 6; ++face)
 	{
-		NEURUS_LOG("[AllFacesDepth] Processing face " << face);
+		NEURUS_LOG("[AllFacesDepth] Reading back face " << face);
 
-		// 4a. Create temporary color + depth images (per face)
-		Image tempColor(*m_device, pd,
-			vk::Extent2D(kRes, kRes),
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-			1u, Image::ImageType::e2D,
-			("TempColor_Face" + std::to_string(face)).c_str());
-
-		Image tempDepth(*m_device, pd,
-			vk::Extent2D(kRes, kRes),
-			vk::Format::eD32Sfloat,
-			vk::ImageUsageFlagBits::eDepthStencilAttachment,
-			1u, Image::ImageType::eDepthStencil,
-			("TempDepth_Face" + std::to_string(face)).c_str());
-
-		// Transition to attachment layouts
-		{
-			auto& cmd = BeginCmd();
-			tempColor.TransitionLayout(cmd,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
-			tempDepth.TransitionLayout(cmd,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eDepthStencilAttachmentOptimal);
-			EndSubmitWait(cmd);
-		}
-
-		// Image views
-		vk::ImageViewCreateInfo viewCI({}, *tempColor.ImageHandle(),
-			vk::ImageViewType::e2D, vk::Format::eR32G32B32A32Sfloat,
-			vk::ComponentMapping(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		vk::raii::ImageView tempView(*m_device, viewCI);
-
-		vk::ImageViewCreateInfo depthViewCI({}, *tempDepth.ImageHandle(),
-			vk::ImageViewType::e2D, vk::Format::eD32Sfloat,
-			vk::ComponentMapping(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 1));
-		vk::raii::ImageView depthView(*m_device, depthViewCI);
-
-		// 4b. Update UBO for this face
-		{
-			FaceUBO ubo{};
-			ubo.faceVP[face] = proj * glm::lookAt(lightPos,
-				lightPos + kTargets[face], kUps[face]);
-			ubo.lpx = lightPos.x; ubo.lpy = lightPos.y; ubo.lpz = lightPos.z;
-			ubo.farPlane = kFarPlane;
-
-			void* ptr = faceUBO.Map();
-			std::memcpy(ptr, &ubo, sizeof(FaceUBO));
-			faceUBO.Unmap();
-		}
-
-		// 4c. Render face geometry into 2D color image
-		{
-			auto& cmd = BeginCmd();
-
-			const vk::Viewport viewport(0.f, 0.f,
-				static_cast<float>(kRes), static_cast<float>(kRes), 0.f, 1.f);
-			const vk::Rect2D scissor({0, 0}, {kRes, kRes});
-			cmd.setViewport(0, viewport);
-			cmd.setScissor(0, scissor);
-
-			// Clear color = (1,1,1,1) so background pixels (no geometry hit)
-			// match expected background depth of 1.0
-			const vk::ClearValue colorClear =
-				vk::ClearColorValue(std::array<float, 4>{1.f, 1.f, 1.f, 1.f});
-			const vk::ClearValue depthClear = vk::ClearDepthStencilValue(1.0f, 0);
-
-			vk::RenderingAttachmentInfo colorAtt(
-				*tempView,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eClear,
-				vk::AttachmentStoreOp::eStore,
-				colorClear);
-
-			vk::RenderingAttachmentInfo depthAtt(
-				*depthView,
-				vk::ImageLayout::eDepthStencilAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eClear,
-				vk::AttachmentStoreOp::eStore,
-				depthClear);
-
-			vk::RenderingInfo renderInfo(
-				{}, {{0, 0}, {kRes, kRes}},
-				1, 0, colorAtt, &depthAtt, nullptr);
-
-			cmd.beginRendering(renderInfo);
-
-			cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-			cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-				pipelineLayout, 0, {lightSet.handle()}, {});
-
-			const int32_t faceIdx = static_cast<int32_t>(face);
-			cmd.pushConstants<int32_t>(pipelineLayout,
-				vk::ShaderStageFlagBits::eVertex,
-				sizeof(glm::mat4), faceIdx);
-
-			for (const auto& item : renderItems)
-			{
-				cmd.pushConstants<glm::mat4>(pipelineLayout,
-					vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
-				cmd.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-				cmd.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-				cmd.drawIndexed(item.indexCount, 1, 0, 0, 0);
-			}
-
-			cmd.endRendering();
-
-			// Transition color image for readback
-			vk::ImageMemoryBarrier copyBarrier(
-				vk::AccessFlagBits::eColorAttachmentWrite,
-				vk::AccessFlagBits::eTransferRead,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ImageLayout::eTransferSrcOptimal,
-				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-				*tempColor.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eColorAttachmentOutput,
-			                   vk::PipelineStageFlagBits::eTransfer,
-			                   {}, {}, {}, copyBarrier);
-
-			EndSubmitWait(cmd);
-		}
-
-		// 4d. Copy color image → staging buffer
+		// 8a. Copy face layer → staging buffer
 		vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
 		vk::raii::Buffer stagingBuf(*m_device, stagingCI);
 
 		auto memReqs = stagingBuf.getMemoryRequirements();
-		auto memProps = pd.getMemoryProperties();
-		uint32_t memType = 0;
-		for (; memType < memProps.memoryTypeCount; ++memType)
-		{
-			if ((memReqs.memoryTypeBits & (1u << memType)) &&
-			    (memProps.memoryTypes[memType].propertyFlags &
-			     (vk::MemoryPropertyFlagBits::eHostVisible |
-			      vk::MemoryPropertyFlagBits::eHostCoherent)))
-			{
-				break;
-			}
-		}
-		ASSERT_LT(memType, memProps.memoryTypeCount)
-			<< "No host-visible+coherent memory type";
+		uint32_t memType = FindHostVisibleMemType(memReqs);
+		ASSERT_LT(memType, UINT32_MAX) << "No host-visible+coherent memory type";
 
 		vk::MemoryAllocateInfo allocInfo(memReqs.size, memType);
 		vk::raii::DeviceMemory stagingMem(*m_device, allocInfo);
@@ -1063,18 +1212,18 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			copyRegion.bufferRowLength   = 0;
 			copyRegion.bufferImageHeight = 0;
 			copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-				vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+				vk::ImageAspectFlagBits::eColor, 0, face, 1);
 			copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 			copyRegion.imageExtent = vk::Extent3D(kRes, kRes, 1);
 			cmd.copyImageToBuffer(
-				*tempColor.ImageHandle(),
+				*colorCube,
 				vk::ImageLayout::eTransferSrcOptimal,
 				*stagingBuf,
 				copyRegion);
 			EndSubmitWait(cmd);
 		}
 
-		// 4e. Map and extract depth data (R channel of float RGBA)
+		// 8b. Map and extract depth data (R channel of float RGBA)
 		void* mapped = stagingMem.mapMemory(0, bufSize);
 		std::vector<float> depthData(kRes * kRes);
 		{
@@ -1102,7 +1251,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 
 		stagingMem.unmapMemory();
 
-		// 4f. Pixel-by-pixel mathematical verification
+		// 8c. Pixel-by-pixel mathematical verification
 		int cubePixels  = 0;
 		int planePixels = 0;
 		int bgPixels    = 0;
@@ -1204,7 +1353,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			EXPECT_GT(bgPixels, 0)     << "Face +Y: all pixels should be background";
 		}
 
-		// 4g. Reference image regression
+		// 8d. Reference image regression
 		{
 			const std::string refPath =
 				std::string(neurus::test::kReferenceDir)
