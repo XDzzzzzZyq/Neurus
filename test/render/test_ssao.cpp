@@ -17,9 +17,9 @@
 #include "shared/TestCornellBox.h"
 
 // --- Render layer ---
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
-#include "render/passes/PassContext.h"
+#include "render/passes/RenderContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/passes/SSAOPass.h"
 #include "render/Screenshot.h"
@@ -58,15 +58,13 @@ protected:
 
 		auto& pd = PhysicalDevice();
 
-		// --- Render pass infrastructure ---
-		m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
-		m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+		// --- Render pass infrastructure (attachments created lazily) ---
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 		m_renderPassManager = std::make_unique<RenderPassManager>();
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			*m_attachmentManager,
 			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
@@ -74,7 +72,6 @@ protected:
 		// --- SSAO pass ---
 		m_ssaoPass = std::make_unique<SSAOPass>(
 			*m_device, pd,
-			*m_attachmentManager,
 			1u,   // one descriptor set for single-frame test
 			m_queue, m_graphicsQueueFamily,
 			ssao_comp_spv, sizeof(ssao_comp_spv));
@@ -86,7 +83,7 @@ protected:
 	}
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<AttachmentManager>  m_attachmentManager;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<SSAOPass>           m_ssaoPass;
@@ -122,11 +119,11 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	// Step 2: Transition G-Buffer & record geometry pass
 	// -------------------------------------------------------------------
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
@@ -145,8 +142,12 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 		const glm::mat4 view     = camUBO.view;
 		const glm::vec3 camPos   = cb.camera->GetPosition();
 
-		m_ssaoPass->UpdateParams(viewProj, view, camPos);
-		m_ssaoPass->Record(*cmd, PassContext{{kRenderWidth, kRenderHeight}, 0});
+		m_ssaoPass->Record(*cmd, *m_renderCache, RenderContext{
+			.renderExtent = {kRenderWidth, kRenderHeight},
+			.viewProj = viewProj,
+			.view = view,
+			.cameraPos = camPos,
+		});
 
 		EndSubmitWait(cmd);
 	}
@@ -157,7 +158,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	const std::string refPath = std::string(neurus::test::kReferenceDir) + "ssao/SSAO.png";
 	const std::string tmpPath = refPath + ".tmp";
 
-	Image& ssaoAttachment = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+	Image& ssaoAttachment = m_renderCache->GetAttachment(AttachmentName::SSAO, {kRenderWidth, kRenderHeight});
 	const bool captured = Screenshot::CaptureAttachment(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
 		ssaoAttachment, tmpPath, false);  // not signed, so no remap

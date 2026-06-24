@@ -5,18 +5,17 @@
 
 #include "DeferredRenderer.h"
 
-#include "passes/AttachmentManager.h"
+#include "passes/RenderCache.h"
 #include "passes/GeometryPass.h"
 #include "passes/IBLPass.h"
 #include "passes/LightingPass.h"
-#include "passes/PassContext.h"
+#include "passes/RenderContext.h"
 #include "passes/RenderPassManager.h"
 #include "Image.h"
 #include "Texture.h"
 #include "Screenshot.h"
 #include "passes/SSAOPass.h"
 #include "passes/ShadowDepthPass.h"
-#include "passes/ShadowEvalPass.h"
 #include "Swapchain.h"
 #include "passes/SyncObjects.h"
 #include "VulkanBuffer.h"
@@ -36,7 +35,6 @@
 #include "importance_samp.comp.h"
 #include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
-#include "shadow_eval.comp.h"
 #include "c2e.comp.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -73,16 +71,14 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	, m_physicalDevice(physicalDevice)
 	, m_graphicsQueue(graphicsQueue)
 	, m_queueFamilyIndex(queueFamilyIndex)
-	, m_surface(surface)
 	, m_commandPool(createCommandPool(device, queueFamilyIndex))
 {
 	// --- 1. Create swapchain ---
 	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
 	const auto extent = m_swapchain->extent();
 
-	// --- 2. Create G-Buffer attachments ---
-	m_attachmentManager = std::make_unique<AttachmentManager>(device, physicalDevice);
-	m_attachmentManager->Create(extent);
+	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
+	m_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
 
 	// --- 3. Create render pass manager ---
 	m_renderPassManager = std::make_unique<RenderPassManager>();
@@ -106,7 +102,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto geoPass = std::make_unique<GeometryPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			*m_attachmentManager, *m_renderPassManager,
+			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 		m_geometryPass = geoPass.get();
@@ -117,7 +113,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto lightPass = std::make_unique<LightingPass>(
 			device, physicalDevice,
-			*m_attachmentManager,
 			kMaxFramesInFlight,
 			m_graphicsQueue, m_queueFamilyIndex,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
@@ -129,7 +124,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto ssaoPass = std::make_unique<SSAOPass>(
 			device, physicalDevice,
-			*m_attachmentManager,
 			kMaxFramesInFlight,
 			m_graphicsQueue, m_queueFamilyIndex,
 			ssao_comp_spv, sizeof(ssao_comp_spv));
@@ -160,16 +154,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
 	}
 
-	// --- 7e. Create shadow eval pass (compute: samples cubemap → shadow intensity) ---
-	{
-		auto shadowEval = std::make_unique<ShadowEvalPass>(
-			device, physicalDevice,
-			m_attachmentManager.get(),
-			kMaxFramesInFlight);
-		m_shadowEvalPass = shadowEval.get();
-		m_passes.push_back(std::move(shadowEval));
-		NEURUS_LOG("[DeferredRenderer] ShadowEvalPass created");
-	}
+	// --- 7e. Shadow evaluation removed (broken, to be re-implemented) ---
 
 	// --- 8. Create command pool ---
 	// (initialized in member initializer list via createCommandPool)
@@ -229,7 +214,7 @@ DeferredRenderer::~DeferredRenderer()
 	WaitIdle();
 	// vk::raii destructors clean up automatically in reverse declaration order.
 	// m_passes vector destroys all passes in construction order (GeometryPass → LightingPass →
-	//   SSAOPass → IBLPass), before RenderPassManager and AttachmentManager.
+	//   SSAOPass → IBLPass), before RenderPassManager and RenderCache.
 }
 
 // ---------------------------------------------------------------------------
@@ -243,8 +228,9 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 		m_lightingPass->UploadLights(scene);
 	}
 
-	// --- Configure shadow passes from the first point light with use_shadow ---
-	if (m_shadowDepthPass && m_shadowEvalPass)
+	// --- Configure shadow depth pass from the first point light with use_shadow ---
+	m_activeShadowLightUID = -1;
+	if (m_shadowDepthPass)
 	{
 		for (const auto& [id, light] : scene.light_list)
 		{
@@ -252,13 +238,8 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 			if (light->light_type == LightType::POINTLIGHT && light->use_shadow)
 			{
 				const glm::vec3 lightPos = light->GetPosition();
-				const float farPlane = ShadowDepthPass::kDefaultFarPlane;
-				const float bias = 0.005f;
-
 				m_shadowDepthPass->SetLightPosition(lightPos);
-				m_shadowEvalPass->SetLight(
-					m_shadowDepthPass->ShadowCubemap(),
-					lightPos, farPlane, bias);
+				m_activeShadowLightUID = id;
 				break;  // Only first shadow-casting point light for MVP
 			}
 		}
@@ -334,14 +315,6 @@ void DeferredRenderer::GenerateIBL(const Image& equirectImage,
 	m_iblPass->Generate(equirectImage, diffuseOut, specularOut);
 }
 
-void DeferredRenderer::ResetIBLResources()
-{
-	if (m_lightingPass)
-	{
-		m_lightingPass->ResetIBLResources();
-	}
-}
-
 // ---------------------------------------------------------------------------
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
@@ -403,7 +376,7 @@ void DeferredRenderer::DrawFrame()
 	// No-args DrawFrame is deprecated and used only as camera-fallback.
 	// Pass empty render items (no geometry drawn) - the fallback exists only
 	// to prevent a crash when no camera is configured.
-	recordFrame(cmdBuf, imageIndex, fallbackCam, {});
+	recordFrame(cmdBuf, imageIndex, fallbackCam, {}, nullptr);
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -508,29 +481,10 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 		renderItems.push_back(buildRenderItem(*mesh));
 	}
 
-	// --- Pull Environment textures from Scene and wire into lighting pass (per-frame) ---
-	//     Cubemaps are generated on EnvironmentChanged and owned by Environment
-	//     as std::unique_ptr<Texture>. Access via GetDiffuseTexture()/GetSpecularTexture().
-	//     When absent, the lighting pass falls back to its internal black 1x1 cubemap placeholders.
-	if (!scene.env_list.empty())
-	{
-		auto& env = scene.env_list.begin()->second;
-		auto* diffuseTex = env->GetDiffuseTexture();
-		auto* specularTex = env->GetSpecularTexture();
-		if (diffuseTex && specularTex)
-		{
-			m_lightingPass->SetIBLResources(
-				*diffuseTex->GetImage()->ImageViewHandle(),
-				*diffuseTex->GetSampler(),
-				*specularTex->GetImage()->ImageViewHandle(),
-				*specularTex->GetSampler());
-		}
-	}
-
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
 
-	recordFrame(cmdBuf, imageIndex, *activeCam, renderItems);
+	recordFrame(cmdBuf, imageIndex, *activeCam, renderItems, &scene);
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -590,8 +544,10 @@ void DeferredRenderer::recreateSwapchain()
 
 	uint32_t newImageCount = m_swapchain->imageCount();
 	vk::Extent2D newExtent = m_swapchain->extent();
-	// Recreate attachments at new extent
-	m_attachmentManager->Resize(newExtent);
+	// Clear screen-space attachments (G-Buffer + shadow intensities).
+	// Shadow cubemaps survive resize.  Attachments are re-created lazily
+	// on first GetAttachment() call in the next frame.
+	m_renderCache->CleanScreenSpace();
 
 	// Rebuild render-finished semaphores (one per swapchain image)
 	m_renderFinishedSemaphores.clear();
@@ -636,7 +592,8 @@ void DeferredRenderer::recreateSwapchain()
 
 void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex,
                                    const Camera& camera,
-                                   const std::vector<GeometryRenderItem>& renderItems)
+                                   const std::vector<GeometryRenderItem>& renderItems,
+                                   const Scene* scene)
 {
 	const vk::Extent2D extent = m_swapchain->extent();
 
@@ -644,110 +601,53 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBuf.begin(beginInfo);
 
-	// --- Transition G-Buffer images to attachment layouts for this frame ---
-	//     Uses eUndefined as oldLayout to discard previous contents (beginRendering
-	//     will clear them anyway). This explicit barrier ensures the validation
-	//     layer's layout tracking is synchronised before dynamic rendering.
-	{
-		const std::array<AttachmentName, 4> gBufferColors = {
-			AttachmentName::Position,
-			AttachmentName::Normal,
-			AttachmentName::Albedo,
-			AttachmentName::MetallicRoughness,
-		};
-
-		std::array<vk::ImageMemoryBarrier2, 5> preBarriers;
-
-		for (size_t i = 0; i < 4; ++i)
-		{
-			auto& att = m_attachmentManager->GetAttachment(gBufferColors[i]);
-			preBarriers[i] = ImageBarrier(
-				*att.ImageHandle(),
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::PipelineStageFlagBits2::eTopOfPipe,
-				vk::AccessFlagBits2::eNone,
-				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-				vk::AccessFlagBits2::eColorAttachmentWrite);
-			att.SetCurrentLayout(vk::ImageLayout::eColorAttachmentOptimal);
-		}
-
-		const auto& depthAtt = m_attachmentManager->GetAttachment(AttachmentName::Depth);
-		preBarriers[4] = ImageBarrier(
-			*depthAtt.ImageHandle(),
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::PipelineStageFlagBits2::eTopOfPipe,
-			vk::AccessFlagBits2::eNone,
-			vk::PipelineStageFlagBits2::eEarlyFragmentTests,
-			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-			vk::ImageAspectFlagBits::eDepth);
-
-		const vk::DependencyInfo depInfo({}, {}, {}, preBarriers);
-		cmdBuf.pipelineBarrier2(depInfo);
-	}
-
 	// --- Compute camera matrices for this frame ---
 	const CameraUBOData cameraData = computeCameraData(extent, camera);
 	const glm::mat4 viewMatrix = cameraData.view;
 	const glm::vec3 cameraPos = camera.GetPosition();
-	const glm::mat4 viewProj = cameraData.viewProj;
+	const glm::mat4 invProjView = glm::inverse(cameraData.viewProj);
+
+	// --- Build per-frame render context (constructed once, passed to all passes) ---
+	RenderContext ctx{};
+	ctx.renderExtent = extent;
+	ctx.frameIndex = m_currentFrame;
+	ctx.viewProj = cameraData.viewProj;
+	ctx.view = viewMatrix;
+	ctx.cameraPos = cameraPos;
+	ctx.invProjView = invProjView;
+	ctx.renderItems = &renderItems;
+	ctx.scene = scene;
+	ctx.lightUID = m_activeShadowLightUID;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
-	m_geometryPass->Record(cmdBuf, PassContext{
-		.renderExtent = extent,
-		.frameIndex = m_currentFrame,
-		.viewProj = cameraData.viewProj,
-		.view = viewMatrix,
-		.cameraPos = cameraPos,
-		.renderItems = &renderItems,
-	});
+	m_geometryPass->Record(cmdBuf, *m_renderCache, ctx);
 
 	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---
 	//     Uses the same render items as the geometry pass (all scene geometry).
 	//     The light position has been set via SetShadowLight() or UpdateFromScene().
 	if (m_shadowDepthPass)
 	{
-		PassContext shadowCtx{};
-		shadowCtx.renderExtent = vk::Extent2D{
-			m_shadowDepthPass->Resolution(),
-			m_shadowDepthPass->Resolution()};
-		shadowCtx.renderItems = &renderItems;
-		shadowCtx.frameIndex = m_currentFrame;
-		m_shadowDepthPass->Record(cmdBuf, shadowCtx);
+		m_shadowDepthPass->Record(cmdBuf, *m_renderCache, ctx);
 	}
 
 	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
 	if (m_ssaoPass)
 	{
-		m_ssaoPass->UpdateParams(viewProj, viewMatrix, cameraPos);
-		m_ssaoPass->Record(cmdBuf, PassContext{extent, m_currentFrame});
+		m_ssaoPass->Record(cmdBuf, *m_renderCache, ctx);
 	}
 
-	// --- Phase 2b: ShadowEvalPass → compute shadow intensity from cubemap ---
-	if (m_shadowEvalPass)
-	{
-		m_shadowEvalPass->Record(cmdBuf, PassContext{extent, m_currentFrame});
-	}
+	// Shadow evaluation — to be re-implemented
 
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
 	//     Light SSBO is owned and managed by LightingPass internally.
 	//     UploadLights() should be called before the first DrawFrame()
 	//     to populate the SSBO from the scene (handled by T9).
-	// Compute inverse projection*view for skybox background ray in lighting pass
-	const glm::mat4 invProjView = glm::inverse(cameraData.viewProj);
-	m_lightingPass->Record(cmdBuf, PassContext{
-		.renderExtent = extent,
-		.frameIndex = m_currentFrame,
-		.view = viewMatrix,
-		.cameraPos = cameraPos,
-		.invProjView = invProjView,
-	});
+	m_lightingPass->Record(cmdBuf, *m_renderCache, ctx);
 
 	// --- Phase 4: Blit HDRColor → swapchain image ---
 	// LightingPass leaves HDRColor in GENERAL layout.
 	// Transition to TRANSFER_SRC_OPTIMAL for the blit.
-	auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+	auto& hdrColor = m_renderCache->GetAttachment(AttachmentName::HDRColor, extent);
 	const vk::Image hdrImage = *hdrColor.ImageHandle();
 	const vk::Image swapchainImage = m_swapchain->images()[imageIndex];
 
@@ -851,11 +751,12 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 {
 	int count = 0;
 
-	if (m_attachmentManager)
+	if (m_renderCache)
 	{
 		count = Screenshot::CaptureAllAttachments(m_device, m_physicalDevice,
 		                                          m_graphicsQueue, m_queueFamilyIndex,
-		                                          *m_attachmentManager,
+		                                          *m_renderCache,
+		                                          m_swapchain->extent(),
 		                                          "screenshots/gbuffer");
 	}
 
@@ -874,12 +775,12 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 
 std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filenamePrefix)
 {
-	if (!m_shadowDepthPass)
+	if (!m_shadowDepthPass || m_activeShadowLightUID < 0)
 	{
 		return {};
 	}
 
-	auto& cubemap = m_shadowDepthPass->ShadowCubemap();
+	auto& cubemap = m_renderCache->GetShadowMap(m_activeShadowLightUID);
 	const uint32_t cubeRes = m_shadowDepthPass->Resolution();
 	const uint32_t equiWidth = cubeRes * 2;
 	const uint32_t equiHeight = cubeRes;

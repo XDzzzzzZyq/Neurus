@@ -8,7 +8,7 @@ namespace neurus {
 
 // --- Forward declarations ---
 class Image;
-class AttachmentManager;
+class RenderCache;
 
 /**
  * @brief Static utility for capturing Vulkan images to PNG files.
@@ -96,7 +96,8 @@ public:
 	                                 const vk::raii::PhysicalDevice& physicalDevice,
 	                                 vk::Queue queue,
 	                                 uint32_t queueFamilyIndex,
-	                                 AttachmentManager& attachmentManager,
+	                                 RenderCache& renderCache,
+	                                 vk::Extent2D extent,
 	                                 const std::string& prefix);
 };
 

@@ -13,7 +13,6 @@
  * - Subclasses own their compute pipeline, push constants, and any pass-
  *   specific UBOs / SSBOs.
  *
- * @note m_attachmentManager is nullable (IBLPass passes nullptr).
  * @note m_descriptorSetLayout is moved in via the constructor — subclasses
  *       create their own layout via their static CreateDescriptorSetLayout()
  *       factory before calling this constructor.
@@ -24,16 +23,16 @@
 #include "Pass.h"
 #include "../ComputePipelineBuilder.h"
 #include "../DescriptorManager.h"
-#include "AttachmentManager.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
 #include <memory>
-#include <span>
 #include <string>
 #include <vector>
 
 namespace neurus {
+
+class RenderCache;
 
 /**
  * @brief Abstract base class for compute shader passes.
@@ -41,7 +40,6 @@ namespace neurus {
  * Provides:
  * - Nearest-neighbour sampler for G-Buffer reads
  * - Descriptor pool / set lifecycle (pool creation, allocation, debug names)
- * - Image layout transition helpers (G-Buffer→SHADER_READ_ONLY, output→GENERAL)
  * - Compute dispatch helper (bind pipeline → push constants → dispatch)
  *
  * Subclasses must:
@@ -58,13 +56,11 @@ public:
 	 *
 	 * @param device              Logical device (retained reference).
 	 * @param physicalDevice      Physical device (for sampler creation).
-	 * @param attachmentManager   Attachment provider (nullable — IBLPass passes nullptr).
 	 * @param descriptorSetLayout Descriptor set layout created by the subclass (moved in).
 	 * @param numSets             Number of descriptor sets (one per in-flight frame).
 	 */
 	ComputePass(const vk::raii::Device& device,
 	            const vk::raii::PhysicalDevice& physicalDevice,
-	            AttachmentManager* attachmentManager,
 	            DescriptorSetLayout&& descriptorSetLayout,
 	            uint32_t numSets);
 
@@ -82,7 +78,7 @@ public:
 	 *
 	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
 	 */
-	virtual void WriteDescriptors(uint32_t setIndex) = 0;
+	virtual void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) = 0;
 
 protected:
 	// -------------------------------------------------------------------
@@ -115,40 +111,6 @@ protected:
 	 * @param numSets Number of descriptor sets to allocate.
 	 */
 	void CreateDescriptorSets(uint32_t numSets);
-
-	// -------------------------------------------------------------------
-	// Barrier helpers
-	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Transitions a set of G-Buffer attachments to SHADER_READ_ONLY_OPTIMAL.
-	 *
-	 * Inserts a pipelineBarrier2 that transitions each attachment from its
-	 * current layout (typically eColorAttachmentOptimal) to eShaderReadOnlyOptimal.
-	 * Updates CPU-side layout tracking on each attachment.
-	 *
-	 * @param cmdBuf            Command buffer in recording state.
-	 * @param attachmentNames   Span of attachment identifiers to transition.
-	 * @param attachmentManager Attachment provider for layout queries.
-	 */
-	void TransitionGbufferToRead(vk::CommandBuffer cmdBuf,
-	                             std::span<const AttachmentName> attachmentNames,
-	                             AttachmentManager& attachmentManager);
-
-	/**
-	 * @brief Transitions a single output attachment to GENERAL for compute write.
-	 *
-	 * Inserts a pipelineBarrier2 that transitions the attachment from its
-	 * current layout (or from UNDEFINED) to eGeneral.  Updates CPU-side
-	 * layout tracking.
-	 *
-	 * @param cmdBuf            Command buffer in recording state.
-	 * @param name              Attachment to transition.
-	 * @param attachmentManager Attachment provider.
-	 */
-	void TransitionOutputToGeneral(vk::CommandBuffer cmdBuf,
-	                               AttachmentName name,
-	                               AttachmentManager& attachmentManager);
 
 	// -------------------------------------------------------------------
 	// Dispatch helper
@@ -189,9 +151,6 @@ protected:
 	/// Physical device (non-owning reference, for format / memory queries).
 	const vk::raii::PhysicalDevice* m_physicalDevice = nullptr;
 
-	/// Attachment manager (nullable — IBLPass passes nullptr).
-	AttachmentManager* m_attachmentManager = nullptr;
-
 	/// Nearest-neighbour sampler for G-Buffer reads.
 	vk::raii::Sampler m_sampler = nullptr;
 
@@ -214,12 +173,10 @@ protected:
 
 inline ComputePass::ComputePass(const vk::raii::Device& device,
                                 const vk::raii::PhysicalDevice& physicalDevice,
-                                AttachmentManager* attachmentManager,
                                 DescriptorSetLayout&& descriptorSetLayout,
                                 uint32_t numSets)
 	: Pass()
 	, m_physicalDevice(&physicalDevice)
-	, m_attachmentManager(attachmentManager)
 	, m_sampler(CreateSampler(device, physicalDevice))
 	, m_descriptorSetLayout(std::move(descriptorSetLayout))
 	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
@@ -268,74 +225,6 @@ inline void ComputePass::CreateDescriptorSets(uint32_t numSets)
 		m_descriptorSets[i].SetDebugName(dsName.c_str());
 	}
 #endif
-}
-
-inline void ComputePass::TransitionGbufferToRead(
-	vk::CommandBuffer cmdBuf,
-	std::span<const AttachmentName> attachmentNames,
-	AttachmentManager& attachmentManager)
-{
-	std::vector<vk::ImageMemoryBarrier2> barriers;
-	barriers.reserve(attachmentNames.size());
-
-	for (const auto& name : attachmentNames)
-	{
-		auto& attachment = attachmentManager.GetAttachment(name);
-		const vk::ImageLayout oldLayout = attachment.CurrentLayout();
-
-		barriers.push_back(vk::ImageMemoryBarrier2(
-			(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
-				? vk::PipelineStageFlagBits2::eColorAttachmentOutput
-				: vk::PipelineStageFlagBits2::eComputeShader,         // srcStage
-			(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
-				? vk::AccessFlagBits2::eColorAttachmentWrite
-				: vk::AccessFlagBits2::eShaderWrite,                  // srcAccess
-			vk::PipelineStageFlagBits2::eComputeShader,               // dstStage
-			vk::AccessFlagBits2::eShaderRead,                         // dstAccess
-			oldLayout,                                                 // oldLayout
-			vk::ImageLayout::eShaderReadOnlyOptimal,                  // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*attachment.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1)));
-
-		attachment.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-	}
-
-	const vk::DependencyInfo depInfo({}, {}, {}, barriers);
-	cmdBuf.pipelineBarrier2(depInfo);
-}
-
-inline void ComputePass::TransitionOutputToGeneral(
-	vk::CommandBuffer cmdBuf,
-	AttachmentName name,
-	AttachmentManager& attachmentManager)
-{
-	auto& attachment = attachmentManager.GetAttachment(name);
-	const vk::ImageLayout oldLayout = attachment.CurrentLayout();
-
-	const vk::ImageMemoryBarrier2 barrier(
-		(oldLayout == vk::ImageLayout::eUndefined)
-			? vk::PipelineStageFlagBits2::eTopOfPipe
-			: vk::PipelineStageFlagBits2::eAllCommands,            // srcStage
-		(oldLayout == vk::ImageLayout::eUndefined)
-			? vk::AccessFlagBits2::eNone
-			: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
-		vk::PipelineStageFlagBits2::eComputeShader,             // dstStage
-		vk::AccessFlagBits2::eShaderWrite,                      // dstAccess
-		oldLayout,                                               // oldLayout
-		vk::ImageLayout::eGeneral,                               // newLayout
-		VK_QUEUE_FAMILY_IGNORED,
-		VK_QUEUE_FAMILY_IGNORED,
-		*attachment.ImageHandle(),
-		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-		                          0, 1, 0, 1));
-
-	attachment.SetCurrentLayout(vk::ImageLayout::eGeneral);
-
-	const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-	cmdBuf.pipelineBarrier2(depInfo);
 }
 
 inline void ComputePass::DispatchCompute(

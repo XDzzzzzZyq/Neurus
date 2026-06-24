@@ -16,10 +16,10 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/PassContext.h"
+#include "render/passes/RenderContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/VulkanBuffer.h"
 #include "render/buffers/IndexBuffer.h"
@@ -71,9 +71,8 @@ protected:
 			return;
 		}
 
-		// --- Attachment manager (G-Buffer + HDR color + depth) ---
-		m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
-		m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 
 		// --- Render pass manager ---
 		m_renderPassManager = std::make_unique<RenderPassManager>();
@@ -81,7 +80,6 @@ protected:
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			*m_attachmentManager,
 			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
@@ -89,7 +87,6 @@ protected:
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
-			*m_attachmentManager,
 			2u,                          // numSets = kMaxFramesInFlight
 			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
@@ -106,7 +103,7 @@ protected:
 		auto& pd = PhysicalDevice();
 
 		// Transition GBuffer → renderable
-		VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 		// Build test triangle mesh from inline OBJ data → Mesh → UploadToGPU
 		const std::string triObj =
@@ -141,7 +138,7 @@ protected:
 		{
 			auto& cmd = BeginCmd();
 			std::vector<GeometryRenderItem> items = {item};
-			m_geometryPass->Record(*cmd, PassContext{
+			m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 				.renderExtent = {kRenderWidth, kRenderHeight},
 				.viewProj = camera.viewProj,
 				.view = camera.view,
@@ -194,7 +191,7 @@ protected:
 	static constexpr uint32_t kRenderHeight = 128;
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<AttachmentManager>  m_attachmentManager;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 
 	// --- Systems under test ---
@@ -289,7 +286,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 		auto& cmd = BeginCmd();
 		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
@@ -303,7 +300,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	// --- Step 4: Read back HDR output ---
 	std::vector<float> hdrPixels = VulkanTestShared::ReadbackHdrOutput(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
-		*m_attachmentManager, kRenderWidth, kRenderHeight);
+		*m_renderCache, kRenderWidth, kRenderHeight);
 
 	// --- Step 5: Verify at least one pixel has non-zero colour ---
 	// The triangle covers roughly the center of the framebuffer.
@@ -364,7 +361,7 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 		auto& cmd = BeginCmd();
 		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
@@ -378,7 +375,7 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 	// --- Read back ---
 	std::vector<float> hdrPixels = VulkanTestShared::ReadbackHdrOutput(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
-		*m_attachmentManager, kRenderWidth, kRenderHeight);
+		*m_renderCache, kRenderWidth, kRenderHeight);
 
 	// --- Verify: at least some covered pixels have the ambient term ---
 	// Ambient = 0.03 * albedo = 0.03 for white albedo

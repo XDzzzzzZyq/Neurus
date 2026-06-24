@@ -262,7 +262,7 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 	const vk::raii::PhysicalDevice& pd,
 	vk::Queue queue,
 	uint32_t qfi,
-	AttachmentManager& am,
+	RenderCache& am,
 	uint32_t renderWidth,
 	uint32_t renderHeight)
 {
@@ -288,7 +288,7 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 		cmd.begin(vk::CommandBufferBeginInfo(
 			vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		auto& hdrColor = am.GetAttachment(AttachmentName::HDRColor);
+		auto& hdrColor = am.GetAttachment(AttachmentName::HDRColor, vk::Extent2D{renderWidth, renderHeight});
 
 		vk::ImageMemoryBarrier barrier(
 			vk::AccessFlagBits::eShaderWrite,

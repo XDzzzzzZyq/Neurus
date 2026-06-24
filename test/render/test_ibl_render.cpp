@@ -19,11 +19,11 @@
 #include "shared/TestVulkanShared.h"
 
 // --- Render layer ---
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/IBLPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/PassContext.h"
+#include "render/passes/RenderContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Image.h"
 #include "render/Material.h"
@@ -37,6 +37,7 @@
 
 // --- Scene layer ---
 #include "scene/Camera.h"
+#include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -65,7 +66,7 @@ using namespace neurus;
 // ---------------------------------------------------------------------------
 // Procedural colourful gradient equirectangular image
 //
-// Horizontal: red (left) → blue (right)
+// Horizontal: red (left) — blue (right)
 // Vertical:   green mid-band, white equator
 // Poles fade to dark
 // Alpha = 1.0 everywhere
@@ -82,7 +83,7 @@ static std::vector<float> GenerateColorfulGradient(uint32_t width, uint32_t heig
 			const float u = static_cast<float>(x) / static_cast<float>(width);
 			const float v = static_cast<float>(y) / static_cast<float>(height);
 
-			// Horizontal: red → blue
+			// Horizontal: red — blue
 			float r = 1.0f - u;
 			float g = 0.0f;
 			float b = u;
@@ -136,14 +137,12 @@ protected:
 		auto& pd  = PhysicalDevice();
 
 		// --- Render pass infrastructure ---
-		m_attachmentManager = std::make_unique<AttachmentManager>(dev, pd);
-		m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+		m_renderCache = std::make_unique<RenderCache>(dev, pd);
 		m_renderPassManager = std::make_unique<RenderPassManager>();
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			dev, pd, m_queue, m_graphicsQueueFamily,
-			*m_attachmentManager,
 			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
@@ -151,7 +150,6 @@ protected:
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			dev, pd,
-			*m_attachmentManager,
 			1u,  // single frame
 			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
@@ -163,71 +161,9 @@ protected:
 			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
 			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
 
-		// --- Create IBL cubemap Images (owned by test fixture) ---
-		{
-			const vk::ImageUsageFlags cubeUsage =
-				vk::ImageUsageFlagBits::eStorage      // compute write
-				| vk::ImageUsageFlagBits::eSampled    // shader read
-				| vk::ImageUsageFlagBits::eTransferSrc; // readback
-
-			m_diffuseCubemap = std::make_unique<Image>(
-				dev, pd,
-				vk::Extent2D{IBLPass::kDiffuseFaceRes, IBLPass::kDiffuseFaceRes},
-				vk::Format::eR32G32B32A32Sfloat,
-				cubeUsage,
-				/*mipLevels=*/1,
-				Image::ImageType::eCube,
-				"IBLRenderTest_DiffuseCube");
-
-			m_specularCubemap = std::make_unique<Image>(
-				dev, pd,
-				vk::Extent2D{IBLPass::kSpecularFaceRes, IBLPass::kSpecularFaceRes},
-				vk::Format::eR32G32B32A32Sfloat,
-				cubeUsage,
-				/*mipLevels=*/IBLPass::kSpecularMipLevels,
-				Image::ImageType::eCube,
-				"IBLRenderTest_SpecularCube");
-
-			// Create diffuse sampler (1 mip)
-			vk::SamplerCreateInfo diffuseSamplerCI(
-				{},
-				vk::Filter::eLinear,
-				vk::Filter::eLinear,
-				vk::SamplerMipmapMode::eLinear,
-				vk::SamplerAddressMode::eClampToEdge,
-				vk::SamplerAddressMode::eClampToEdge,
-				vk::SamplerAddressMode::eClampToEdge,
-				0.0f,
-				VK_FALSE,
-				0.0f,
-				VK_FALSE,
-				vk::CompareOp::eAlways,
-				0.0f,
-				1.0f,
-				vk::BorderColor::eFloatTransparentBlack,
-				VK_FALSE);
-			m_diffuseSampler = vk::raii::Sampler(dev, diffuseSamplerCI);
-
-			// Create specular sampler (kSpecularMipLevels mips)
-			vk::SamplerCreateInfo specularSamplerCI(
-				{},
-				vk::Filter::eLinear,
-				vk::Filter::eLinear,
-				vk::SamplerMipmapMode::eLinear,
-				vk::SamplerAddressMode::eClampToEdge,
-				vk::SamplerAddressMode::eClampToEdge,
-				vk::SamplerAddressMode::eClampToEdge,
-				0.0f,
-				VK_FALSE,
-				0.0f,
-				VK_FALSE,
-				vk::CompareOp::eAlways,
-				0.0f,
-				static_cast<float>(IBLPass::kSpecularMipLevels),
-				vk::BorderColor::eFloatTransparentBlack,
-				VK_FALSE);
-			m_specularSampler = vk::raii::Sampler(dev, specularSamplerCI);
-		}
+		// --- Create Environment + Build IBL textures (cubemap Images + samplers) ---
+		m_env = std::make_shared<Environment>();
+		m_env->BuildIBLTextures(dev, pd);
 
 		// --- Generate equirect gradient & upload to GPU ---
 		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
@@ -246,15 +182,10 @@ protected:
 		                                  gradientPixels.data(),
 		                                  gradientPixels.size() * sizeof(float));
 
-		// --- Generate IBL cubemaps ---
-		m_iblPass->Generate(*m_equirectImage, *m_diffuseCubemap, *m_specularCubemap);
-
-		// --- Wire IBL resources into lighting pass ---
-		m_lightingPass->SetIBLResources(
-			*m_diffuseCubemap->ImageViewHandle(),
-			*m_diffuseSampler,
-			*m_specularCubemap->ImageViewHandle(),
-			*m_specularSampler);
+		// --- Generate IBL cubemaps into Environment ---
+		m_iblPass->Generate(*m_equirectImage,
+		                   *m_env->GetCubemapDiffuse(),
+		                   *m_env->GetCubemapSpecular());
 	}
 
 	void TearDown() override
@@ -263,18 +194,14 @@ protected:
 	}
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<AttachmentManager>  m_attachmentManager;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<LightingPass>       m_lightingPass;
 	std::unique_ptr<IBLPass>            m_iblPass;
 	std::unique_ptr<Image>              m_equirectImage;
-	// --- IBL cubemaps (owned by test fixture, passed to IBLPass::Generate) ---
-	std::unique_ptr<Image>              m_diffuseCubemap;
-	std::unique_ptr<Image>              m_specularCubemap;
-	// --- Cubemap samplers ---
-	vk::raii::Sampler                   m_diffuseSampler = nullptr;
-	vk::raii::Sampler                   m_specularSampler = nullptr;
+	// --- IBL environment (owns cubemap Images + samplers via Texture objects) ---
+	std::shared_ptr<Environment>        m_env;
 };
 
 // ===========================================================================
@@ -356,12 +283,12 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer & record geometry pass
 	// -------------------------------------------------------------------
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	{
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
@@ -371,22 +298,22 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 8: Upload light SSBO & record lighting pass (with IBL)
+	// Step 8: Upload light SSBO & record lighting pass (with IBL from scene Environment)
 	// -------------------------------------------------------------------
 	{
 		Scene scene;
 		scene.UseLight(light);
+		scene.env_list[m_env->GetObjectID()] = m_env;
 		m_lightingPass->UploadLights(scene);
-	}
 
-	{
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = camUBO.view,
 			.cameraPos = camera->GetPosition(),
 			.invProjView = glm::inverse(camUBO.viewProj),
+			.scene = &scene,
 		});
 		EndSubmitWait(cmd);
 	}
@@ -397,7 +324,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	const std::string refPath = std::string(neurus::test::kReferenceDir) + "ibl/ibl_render.png";
 	const std::string tmpPath = refPath + ".tmp";
 
-	Image& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+	Image& hdrColor = m_renderCache->GetAttachment(AttachmentName::HDRColor, {kRenderWidth, kRenderHeight});
 	const bool captured = Screenshot::CaptureAttachment(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
 		hdrColor, tmpPath, false);
@@ -483,11 +410,11 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 	// --- Render Frame 1 (IBL active) ---
 	{
-		VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
@@ -498,16 +425,17 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	{
 		Scene scene;
 		scene.UseLight(light);
+		scene.env_list[m_env->GetObjectID()] = m_env;
 		m_lightingPass->UploadLights(scene);
-	}
-	{
+
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = camUBO.view,
 			.cameraPos = camera->GetPosition(),
 			.invProjView = glm::inverse(camUBO.viewProj),
+			.scene = &scene,
 		});
 		EndSubmitWait(cmd);
 	}
@@ -519,10 +447,9 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	// 2a. Wait for all GPU work to finish
 	m_device->waitIdle();
 
-	// 2b. Reset IBL references in LightingPass so descriptor sets no
-	//     longer reference the soon-to-be-destroyed cubemap ImageViews.
-	SCOPED_TRACE("ResetIBLResources");
-	m_lightingPass->ResetIBLResources();
+	// 2b. Destroy Environment (LightingPass reads IBL from scene per-frame,
+	//     so no ResetIBLResources call needed – the old Environment will be
+	//     replaced with a fresh one after recreation).
 
 	// 2c. Destroy render pass objects (reverse order of creation).
 	//     Unique_ptr destructors handle Vulkan resource teardown.
@@ -532,30 +459,27 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	m_lightingPass.reset();
 	m_geometryPass.reset();
 	m_renderPassManager.reset();
-	m_attachmentManager.reset();
+	m_renderCache.reset();
 
-	// 2d. Destroy IBL GPU resources (cubemap images + samplers + equirect).
+	// 2d. Destroy IBL GPU resources (Environment + equirect).
+	//     The Environment owns cubemap Images + samplers via its Texture objects.
 	SCOPED_TRACE("Destroy IBL resources");
+	m_env.reset();
 	m_equirectImage.reset();
-	m_diffuseCubemap.reset();
-	m_specularCubemap.reset();
-	m_diffuseSampler  = vk::raii::Sampler(nullptr);
-	m_specularSampler = vk::raii::Sampler(nullptr);
 
-	// 2e. Recreate AttachmentManager + passes (simulating renderer init).
+	// 2e. Recreate RenderCache + passes (simulating renderer init).
 	SCOPED_TRACE("Recreate passes");
-	m_attachmentManager = std::make_unique<AttachmentManager>(dev, pd);
-	m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+	m_renderCache = std::make_unique<RenderCache>(dev, pd);
 	m_renderPassManager = std::make_unique<RenderPassManager>();
 
 	m_geometryPass = std::make_unique<GeometryPass>(
 		dev, pd, m_queue, m_graphicsQueueFamily,
-		*m_attachmentManager, *m_renderPassManager,
+		*m_renderPassManager,
 		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
 	m_lightingPass = std::make_unique<LightingPass>(
-		dev, pd, *m_attachmentManager, 1u,
+		dev, pd, 1u,
 		m_queue, m_graphicsQueueFamily,
 		pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
 
@@ -564,58 +488,10 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
 		importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
 
-	// 2f. Re-create IBL cubemap Images + samplers.
+	// 2f. Re-create Environment + build IBL textures (cubemap Images + samplers).
 	SCOPED_TRACE("Recreate IBL resources");
-	{
-		const vk::ImageUsageFlags cubeUsage =
-			vk::ImageUsageFlagBits::eStorage
-			| vk::ImageUsageFlagBits::eSampled
-			| vk::ImageUsageFlagBits::eTransferSrc;
-
-		m_diffuseCubemap = std::make_unique<Image>(
-			dev, pd,
-			vk::Extent2D{IBLPass::kDiffuseFaceRes, IBLPass::kDiffuseFaceRes},
-			vk::Format::eR32G32B32A32Sfloat,
-			cubeUsage,
-			/*mipLevels=*/1,
-			Image::ImageType::eCube,
-			"IBLRenderTest_DiffuseCube_Reload");
-
-		m_specularCubemap = std::make_unique<Image>(
-			dev, pd,
-			vk::Extent2D{IBLPass::kSpecularFaceRes, IBLPass::kSpecularFaceRes},
-			vk::Format::eR32G32B32A32Sfloat,
-			cubeUsage,
-			IBLPass::kSpecularMipLevels,
-			Image::ImageType::eCube,
-			"IBLRenderTest_SpecularCube_Reload");
-	}
-
-	// Samplers (reuse same creation params as SetUp)
-	{
-		vk::SamplerCreateInfo diffuseSamplerCI(
-			{}, vk::Filter::eLinear, vk::Filter::eLinear,
-			vk::SamplerMipmapMode::eLinear,
-			vk::SamplerAddressMode::eClampToEdge,
-			vk::SamplerAddressMode::eClampToEdge,
-			vk::SamplerAddressMode::eClampToEdge,
-			0.0f, VK_FALSE, 0.0f, VK_FALSE,
-			vk::CompareOp::eAlways, 0.0f, 1.0f,
-			vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
-		m_diffuseSampler = vk::raii::Sampler(dev, diffuseSamplerCI);
-
-		vk::SamplerCreateInfo specularSamplerCI(
-			{}, vk::Filter::eLinear, vk::Filter::eLinear,
-			vk::SamplerMipmapMode::eLinear,
-			vk::SamplerAddressMode::eClampToEdge,
-			vk::SamplerAddressMode::eClampToEdge,
-			vk::SamplerAddressMode::eClampToEdge,
-			0.0f, VK_FALSE, 0.0f, VK_FALSE,
-			vk::CompareOp::eAlways, 0.0f,
-			static_cast<float>(IBLPass::kSpecularMipLevels),
-			vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
-		m_specularSampler = vk::raii::Sampler(dev, specularSamplerCI);
-	}
+	m_env = std::make_shared<Environment>();
+	m_env->BuildIBLTextures(dev, pd);
 
 	// 2g. Re-create equirect gradient + upload to GPU.
 	{
@@ -634,16 +510,12 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		                                 gradientPixels.size() * sizeof(float));
 	}
 
-	// 2h. Generate IBL cubemaps and wire into lighting pass.
+	// 2h. Generate IBL cubemaps into the new Environment.
+	//     (No SetIBLResources needed – LightingPass reads from scene per-frame.)
 	SCOPED_TRACE("Generate IBL cubemaps");
-	m_iblPass->Generate(*m_equirectImage, *m_diffuseCubemap, *m_specularCubemap);
-
-	SCOPED_TRACE("Wire IBL into LightingPass");
-	m_lightingPass->SetIBLResources(
-		*m_diffuseCubemap->ImageViewHandle(),
-		*m_diffuseSampler,
-		*m_specularCubemap->ImageViewHandle(),
-		*m_specularSampler);
+	m_iblPass->Generate(*m_equirectImage,
+	                   *m_env->GetCubemapDiffuse(),
+	                   *m_env->GetCubemapSpecular());
 
 	// ================================================================
 	// Phase 3 — Render Frame 2 (after reload, IBL active again)
@@ -651,11 +523,11 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 	SCOPED_TRACE("Render Frame 2");
 	{
-		VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
@@ -666,16 +538,17 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	{
 		Scene scene;
 		scene.UseLight(light);
+		scene.env_list[m_env->GetObjectID()] = m_env;
 		m_lightingPass->UploadLights(scene);
-	}
-	{
+
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = camUBO.view,
 			.cameraPos = camera->GetPosition(),
 			.invProjView = glm::inverse(camUBO.viewProj),
+			.scene = &scene,
 		});
 		EndSubmitWait(cmd);
 	}

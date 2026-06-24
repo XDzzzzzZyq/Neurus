@@ -5,6 +5,7 @@
 
 #include "passes/ShadowDepthPass.h"
 #include "passes/GeometryPass.h"       // for GeometryRenderItem
+#include "passes/RenderCache.h"         // for GetShadowMap
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
 
@@ -66,7 +67,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	m_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
 	m_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
-	createDepthCubemap(device, physicalDevice);
 	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 
 	if (m_mode == ShadowMode::Multiview)
@@ -82,23 +82,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution << " farPlane=" << farPlane
 	           << " lightPos=(" << m_lightPosition.x << "," << m_lightPosition.y << "," << m_lightPosition.z << ")"
 	           << " UBOsize=" << sizeof(LightUBO));
-}
-
-// ===========================================================================
-// createDepthCubemap — point-light cubemap image
-// ===========================================================================
-
-void ShadowDepthPass::createDepthCubemap(const vk::raii::Device& device,
-                                          const vk::raii::PhysicalDevice& physicalDevice)
-{
-	m_cubemap = std::make_unique<Image>(device, physicalDevice,
-		vk::Extent2D{m_resolution, m_resolution},
-		kDepthFmt,
-		vk::ImageUsageFlagBits::eDepthStencilAttachment |
-			vk::ImageUsageFlagBits::eSampled |
-			vk::ImageUsageFlagBits::eTransferSrc,
-		1u, Image::ImageType::eCube,
-		"ShadowDepthCubemap");
 }
 
 // ===========================================================================
@@ -307,7 +290,7 @@ void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
 // Record
 // ===========================================================================
 
-void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
+void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	const size_t itemCount = ctx.renderItems ? ctx.renderItems->size() : 0;
 	NEURUS_LOG("[ShadowDepthPass] Record: " << itemCount << " render items, "
@@ -316,18 +299,19 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 	// Transition cubemap to depth attachment layout (all faces/layers)
 	{
+		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
 		vk::ImageMemoryBarrier barrier(
 			{}, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
 			vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*m_cubemap->ImageHandle(),
+			*cubemap.ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
 			                          0, 1, 0, kShadowFaceCount));
 		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
 		                       vk::PipelineStageFlagBits::eLateFragmentTests,
 		                       {}, {}, {}, barrier);
-		m_cubemap->SetCurrentLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		cubemap.SetCurrentLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
 	}
 
 	const vk::Viewport viewport(0.f, 0.f,
@@ -356,7 +340,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
 
 		vk::RenderingAttachmentInfo depthAtt(
-			m_cubemap->ArrayView(),
+			cache.GetShadowMap(ctx.lightUID).ArrayView(),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
@@ -416,7 +400,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		for (uint32_t face = 0; face < kShadowFaceCount; ++face)
 		{
 			vk::RenderingAttachmentInfo depthAtt(
-				*m_cubemap->FaceView(face),
+				*(cache.GetShadowMap(ctx.lightUID).FaceView(face)),
 				vk::ImageLayout::eDepthStencilAttachmentOptimal,
 				vk::ResolveModeFlagBits::eNone, nullptr,
 				vk::ImageLayout::eUndefined,
@@ -454,19 +438,20 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 	// Transition cubemap to SHADER_READ_ONLY for sampling
 	{
+		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
 		vk::ImageMemoryBarrier barrier(
 			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
 			vk::AccessFlagBits::eShaderRead,
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ImageLayout::eShaderReadOnlyOptimal,
 			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*m_cubemap->ImageHandle(),
+			*cubemap.ImageHandle(),
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
 			                          0, 1, 0, kShadowFaceCount));
 		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eLateFragmentTests,
 		                       vk::PipelineStageFlagBits::eComputeShader,
 		                       {}, {}, {}, barrier);
-		m_cubemap->SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+		cubemap.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 	}
 }
 

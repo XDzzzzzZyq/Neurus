@@ -23,7 +23,7 @@
 
 #include "render/passes/ShadowDepthPass.h"
 #include "render/passes/GeometryPass.h"    // for GeometryRenderItem definition
-#include "render/passes/PassContext.h"
+#include "render/passes/RenderContext.h"
 #include "render/Image.h"
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
@@ -153,6 +153,8 @@ protected:
 			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes, kFarPlane);
 
 		m_shadowDepthPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
+
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 
 		if (m_multiviewAvailable)
 		{
@@ -364,6 +366,7 @@ protected:
 	std::unique_ptr<ShadowDepthPass> m_shadowDepthPass;
 	std::unique_ptr<ShadowDepthPass> m_multiviewDepthPass;
 	bool m_multiviewAvailable = false;
+	std::unique_ptr<RenderCache> m_renderCache;
 };
 
 // ===========================================================================
@@ -395,10 +398,11 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
-		PassContext ctx{};
+		RenderContext ctx{};
 		ctx.renderExtent = vk::Extent2D(kRes, kRes);
 		ctx.renderItems  = &renderItems;
-		m_shadowDepthPass->Record(*cmd, ctx);
+		ctx.lightUID     = shadowRes.scene->light_list.begin()->first;
+		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
@@ -808,12 +812,13 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	{
 		auto& cmd = BeginCmd();
 
-		PassContext ctx{};
+		RenderContext ctx{};
 		ctx.renderExtent = vk::Extent2D(kRes, kRes);
 		ctx.renderItems  = &renderItems;
+		ctx.lightUID     = shadowRes.scene->light_list.begin()->first;
 		ctx.optionalColorView   = verifyCube.ArrayView();  // implicit VkImageView
 		ctx.optionalColorFormat = vk::Format::eR32G32B32A32Sfloat;
-		m_multiviewDepthPass->Record(*cmd, ctx);
+		m_multiviewDepthPass->Record(*cmd, *m_renderCache, ctx);
 
 		// Transition colour cubemap for readback (must happen after rendering)
 		verifyCube.TransitionLayout(cmd,

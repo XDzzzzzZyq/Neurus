@@ -21,10 +21,10 @@
 #include "shared/TestVulkanShared.h"
 
 // Render layer
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/PassContext.h"
+#include "render/passes/RenderContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Material.h"
 #include "render/Texture.h"
@@ -86,9 +86,8 @@ protected:
 			return;
 		}
 
-		// --- Attachment manager (G-Buffer + HDR color + depth) ---
-		m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
-		m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 
 		// --- Render pass manager ---
 		m_renderPassManager = std::make_unique<RenderPassManager>();
@@ -96,7 +95,6 @@ protected:
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			*m_attachmentManager,
 			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
@@ -104,7 +102,6 @@ protected:
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
-			*m_attachmentManager,
 			2u,                          // numSets = kMaxFramesInFlight
 			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
@@ -115,7 +112,7 @@ protected:
 	static constexpr uint32_t kRenderHeight = 256;
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<AttachmentManager>  m_attachmentManager;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 
 	// --- Systems under test ---
@@ -267,7 +264,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	// Step 11: Transition G-Buffer attachments to renderable layouts
 	// -----------------------------------------------------------------------
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	// -----------------------------------------------------------------------
 	// Step 12: Record geometry pass (G-Buffer write)
@@ -275,7 +272,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	{
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
@@ -293,7 +290,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	{
 		auto& cmd = BeginCmd();
 
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = camUBO.view,
@@ -309,7 +306,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	std::vector<float> hdrPixels = VulkanTestShared::ReadbackHdrOutput(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
-		*m_attachmentManager, kRenderWidth, kRenderHeight);
+		*m_renderCache, kRenderWidth, kRenderHeight);
 
 	// -----------------------------------------------------------------------
 	// Step 15: Verify at least one pixel has non-zero RGB value

@@ -15,7 +15,7 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/VulkanBuffer.h"
@@ -70,20 +70,18 @@ protected:
 				return;
 			}
 
-			// --- Attachment manager (G-Buffer + depth) ---
-			m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
-			m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+			// --- Attachment manager (G-Buffer + depth) - attachments created lazily ---
+			m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 
 			// --- Render pass manager ---
 			m_renderPassManager = std::make_unique<RenderPassManager>();
 
 			// --- Geometry pass ---
-			m_geometryPass = std::make_unique<GeometryPass>(
-				*m_device, pd, m_queue, m_graphicsQueueFamily,
-				*m_attachmentManager,
-				*m_renderPassManager,
-				gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-				gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+		m_geometryPass = std::make_unique<GeometryPass>(
+			*m_device, pd, m_queue, m_graphicsQueueFamily,
+			*m_renderPassManager,
+			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
+			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
 			m_hasVulkan = true;
 		}
@@ -105,7 +103,7 @@ protected:
 			m_device->waitIdle();
 		}
 		m_geometryPass.reset();
-		m_attachmentManager.reset();
+		m_renderCache.reset();
 		VulkanTestShared::TearDown();
 	}
 
@@ -114,7 +112,7 @@ protected:
 	static constexpr uint32_t kRenderHeight = 128;
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<AttachmentManager>  m_attachmentManager;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 
 	// --- System under test ---
@@ -155,7 +153,7 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 	auto& pd = PhysicalDevice();
 
 	// --- Transition attachments to renderable layouts ---
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	// --- Create mesh from OBJ string ---
 	auto meshData = std::make_shared<MeshData>();
@@ -188,7 +186,7 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { item };
 
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camera.viewProj,
 			.view = camera.view,
@@ -210,7 +208,7 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 
 	auto& pd = PhysicalDevice();
 
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	// --- Create mesh from OBJ string ---
 	auto meshData = std::make_shared<MeshData>();
@@ -245,7 +243,7 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 	{
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { item0, item1 };
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camera.viewProj,
 			.view = camera.view,
@@ -268,14 +266,14 @@ TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 	{
 		auto& cmd = BeginCmd();
 		const std::vector<GeometryRenderItem> emptyItems;
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camera.viewProj,
 			.view = camera.view,

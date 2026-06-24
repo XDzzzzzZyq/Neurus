@@ -11,7 +11,7 @@
  * - Inherits from ComputePass for shared infrastructure (sampler, descriptor
  *   pool/sets, barrier transitions, dispatch logic).
  * - Owns the compute pipeline, camera/kernel UBO, and noise UBO.
- * - Borrows AttachmentManager for G-Buffer and SSAO image views.
+ * - Borrows RenderCache for G-Buffer and SSAO image views.
  *
  * @note Hemisphere sampling with 16 kernel samples, world-space depth
  *       comparison, and lightweight 2-pixel neighbour blur.
@@ -32,7 +32,7 @@
 namespace neurus {
 
 // --- Forward declarations ---
-class AttachmentManager;
+class RenderCache;
 
 // ---------------------------------------------------------------------------
 // GPU-side data structures (std140-compatible)
@@ -111,7 +111,6 @@ public:
 	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for sampler creation).
-	 * @param attachmentManager G-Buffer and SSAO attachment provider (borrowed).
 	 * @param numSets           Number of descriptor sets (one per in-flight frame).
 	 * @param graphicsQueue     Graphics queue for noise UBO staging upload.
 	 * @param queueFamilyIndex  Queue family index for staging command pool.
@@ -122,27 +121,11 @@ public:
 	 */
 	SSAOPass(const vk::raii::Device& device,
 	         const vk::raii::PhysicalDevice& physicalDevice,
-	         AttachmentManager& attachmentManager,
 	         uint32_t numSets,
 	         vk::Queue graphicsQueue,
 	         uint32_t queueFamilyIndex,
 	         const uint32_t* compSpv,
 	         size_t compSize);
-
-	// -------------------------------------------------------------------
-	// Parameter updates
-	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Updates the per-frame SSAO parameters UBO (camera + kernel).
-	 *
-	 * @param viewProj   Combined view-projection matrix (projection * view).
-	 * @param view       View matrix (for normal VS→WS transform).
-	 * @param cameraPos  Camera world-space position.
-	 */
-	void UpdateParams(const glm::mat4& viewProj,
-	                  const glm::mat4& view,
-	                  const glm::vec3& cameraPos);
 
 	// -------------------------------------------------------------------
 	// Recording
@@ -161,13 +144,13 @@ public:
 	 * @param cmdBuf  Command buffer in recording state.
 	 * @param ctx     Per-frame context (render extent, frame index).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
+	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/**
 	 * @brief Writes all descriptors (image + buffer) into the specified set.
 	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
 	 */
-	void WriteDescriptors(uint32_t setIndex) override;
+	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 
 private:
 	/**

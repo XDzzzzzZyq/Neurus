@@ -10,7 +10,7 @@
  * Architecture:
  * - Owns the graphics pipeline, descriptor set layout, descriptor pool,
  *   camera UBO, and camera descriptor set (set 0).
- * - Borrows AttachmentManager and RenderPassManager (non-owning references).
+ * - Borrows RenderCache and RenderPassManager (non-owning references).
  * - Receives pre-assembled GeometryRenderItem batches from the caller.
  * - Each GeometryRenderItem bundles GPU buffers + model matrices.
  *
@@ -24,7 +24,7 @@
 #include "../VulkanBuffer.h"
 #include "../buffers/BufferLayout.h"
 #include "Pass.h"
-#include "PassContext.h"
+#include "RenderContext.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -34,7 +34,7 @@
 namespace neurus {
 
 // --- Forward declarations ---
-class AttachmentManager;
+class RenderCache;
 class RenderPassManager;
 
 /**
@@ -108,7 +108,6 @@ public:
 	             const vk::raii::PhysicalDevice& physicalDevice,
 	             vk::Queue queue,
 	             uint32_t queueFamilyIndex,
-	             AttachmentManager& attachmentManager,
 	             RenderPassManager& renderPassManager,
 	             const uint32_t* vertSpv,
 	             size_t vertSize,
@@ -131,7 +130,7 @@ public:
 	 * @param renderItems     Vector of draw batches to render.
 	 * @param renderExtent    Render area dimensions.
 	 */
-	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
+	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/**
 	 * @brief Returns the camera descriptor set layout (set 0).
@@ -156,7 +155,6 @@ private:
 
 	// --- References (non-owning) ---
 	const vk::raii::PhysicalDevice* m_physicalDevice;
-	AttachmentManager* m_attachmentManager;
 	RenderPassManager* m_renderPassManager;
 
 	// --- Descriptor resources ---

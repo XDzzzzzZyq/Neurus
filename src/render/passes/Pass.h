@@ -7,8 +7,8 @@
  * via Record() and ensures non-copyable RAII semantics for all GPU-
  * owning passes.
  *
- * @note PassContext is forward-declared here; its definition lives in
- *       PassContext.h (Task 3).
+ * @note RenderContext is forward-declared here; its definition lives in
+ *       RenderContext.h.
  */
 
 #pragma once
@@ -18,7 +18,8 @@
 namespace neurus {
 
 // --- Forward declarations ---
-struct PassContext;
+struct RenderContext;
+class RenderCache;
 
 /**
  * @brief Base class for a single render pass in the pipeline.
@@ -43,10 +44,15 @@ public:
 	/**
 	 * @brief Records the pass's commands into a command buffer.
 	 *
+	 * Each derived pass receives the per-frame context (immutable) and a
+	 * mutable cache reference so it can lazily create or retrieve GPU
+	 * resources (pipelines, descriptor sets, buffers) during recording.
+	 *
 	 * @param cmdBuf   Command buffer in the recording state.
+	 * @param cache    Mutable render cache for lazy GPU resource creation.
 	 * @param ctx      Per-frame context (attachments, viewport, frame index, etc.).
 	 */
-	virtual void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) = 0;
+	virtual void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) = 0;
 
 protected:
 	Pass() = default;

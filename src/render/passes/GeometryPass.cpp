@@ -5,7 +5,8 @@
 
 #include "passes/GeometryPass.h"
 
-#include "passes/AttachmentManager.h"
+#include "passes/RenderCache.h"
+#include "passes/SyncObjects.h"
 #include "PipelineBuilder.h"
 #include "passes/RenderPassManager.h"
 #include "shaders/ShaderModule.h"
@@ -26,14 +27,12 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            vk::Queue queue,
                            uint32_t queueFamilyIndex,
-                           AttachmentManager& attachmentManager,
                            RenderPassManager& renderPassManager,
                            const uint32_t* vertSpv,
                            size_t vertSize,
                            const uint32_t* fragSpv,
                            size_t fragSize)
 	: m_physicalDevice(&physicalDevice)
-	, m_attachmentManager(&attachmentManager)
 	, m_renderPassManager(&renderPassManager)
 	// --- Descriptor set layout ---
 	, m_cameraLayout(CreateCameraLayout(device))
@@ -174,7 +173,7 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
 // Record
 // ---------------------------------------------------------------------------
 
-void GeometryPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
+void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	// --- Extract per-frame context ---
 	const CameraUBOData cameraData{ctx.viewProj, ctx.view};
@@ -188,7 +187,12 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		m_cameraUBO.Unmap();
 	}
 
-	// --- 2. Collect G-Buffer attachment image views ---
+	// --- 2. Collect G-Buffer attachment image views and set CPU-tracked layout ---
+	//     GetAttachment(name, extent, targetLayout) ensures the CPU-side layout
+	//     tracking is correct for subsequent passes (SSAO, Lighting) that check
+	//     CurrentLayout().  The actual GPU transition from eUndefined (first frame)
+	//     or eShaderReadOnlyOptimal (subsequent frames) is handled implicitly by
+	//     vkCmdBeginRendering / vkCmdEndRendering in BeginPass/EndPass.
 	const std::array<AttachmentName, 4> gBufferColorAttachments = {
 		AttachmentName::Position,
 		AttachmentName::Normal,
@@ -201,10 +205,50 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 	for (const auto& attName : gBufferColorAttachments)
 	{
 		colorViews.push_back(
-			*m_attachmentManager->GetAttachment(attName).ImageViewHandle());
+			*cache.GetAttachment(attName, renderExtent,
+			                     vk::ImageLayout::eColorAttachmentOptimal)
+			       .ImageViewHandle());
 	}
 	vk::ImageView depthView =
-		*m_attachmentManager->GetAttachment(AttachmentName::Depth).ImageViewHandle();
+		*cache.GetAttachment(AttachmentName::Depth, renderExtent,
+		                     vk::ImageLayout::eDepthStencilAttachmentOptimal)
+		       .ImageViewHandle();
+
+	// --- 2b. Transition G-Buffer images to attachment layouts for this pass ---
+	//     Uses eUndefined as oldLayout to discard previous contents (beginRendering
+	//     will clear them anyway).  On first frame the GPU layout really is
+	//     eUndefined; on subsequent frames this is a "don't care" discard.
+	//     CPU-side tracking was already set by GetAttachment above.
+	{
+		std::array<vk::ImageMemoryBarrier2, 5> barriers;
+
+		for (size_t i = 0; i < 4; ++i)
+		{
+			const auto& att = cache.GetAttachment(gBufferColorAttachments[i], renderExtent);
+			barriers[i] = ImageBarrier(
+				*att.ImageHandle(),
+				vk::ImageLayout::eUndefined,
+				vk::ImageLayout::eColorAttachmentOptimal,
+				vk::PipelineStageFlagBits2::eTopOfPipe,
+				vk::AccessFlagBits2::eNone,
+				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+				vk::AccessFlagBits2::eColorAttachmentWrite);
+		}
+
+		const auto& depthAtt = cache.GetAttachment(AttachmentName::Depth, renderExtent);
+		barriers[4] = ImageBarrier(
+			*depthAtt.ImageHandle(),
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			vk::PipelineStageFlagBits2::eTopOfPipe,
+			vk::AccessFlagBits2::eNone,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests,
+			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+			vk::ImageAspectFlagBits::eDepth);
+
+		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
+		cmdBuf.pipelineBarrier2(depInfo);
+	}
 
 	// --- 3. Begin G-Buffer dynamic rendering pass ---
 	const auto clearValues = RenderPassManager::PresetClearValues(

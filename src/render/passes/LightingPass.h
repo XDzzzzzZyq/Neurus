@@ -10,12 +10,12 @@
  * Architecture:
  * - Owns the compute pipeline, descriptor sets, sampler, descriptor pool,
  *   and light SSBO (VulkanBuffer).
- * - Borrows AttachmentManager for G-Buffer and HDR colour image views.
- * - Optionally accepts IBL cubemap resources via SetIBLResources().
+ * - Borrows RenderCache for G-Buffer and HDR colour image views.
+ * - Reads IBL cubemap resources per-frame from the Scene's Environment list.
  * - Uses ComputePipelineBuilder for pipeline construction.
  *
  * @note Direct lighting + IBL (diffuse + specular).
- * @note Descriptor set layout: 9 bindings (5 sampled images, 1 storage image, 1 SSBO, 2 cube samplers).
+ * @note Descriptor set layout: 10 bindings (5 sampled images, 1 storage image, 1 SSBO, 2 cube samplers, 1 shadow).
  */
 
 #pragma once
@@ -32,7 +32,7 @@
 namespace neurus {
 
 // --- Forward declarations ---
-class AttachmentManager;
+class RenderCache;
 class ComputePipelineBuilder;
 class Image;
 class Scene;
@@ -110,7 +110,6 @@ public:
 	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for sampler creation).
-	 * @param attachmentManager G-Buffer and HDR colour attachment provider (borrowed).
 	 * @param numSets           Number of descriptor sets to allocate (one per
 	 *                          in-flight frame). Must match kMaxFramesInFlight
 	 *                          in the renderer.
@@ -123,7 +122,6 @@ public:
 	 */
 	LightingPass(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
-	             AttachmentManager& attachmentManager,
 	             uint32_t numSets,
 	             vk::Queue graphicsQueue,
 	             uint32_t queueFamilyIndex,
@@ -167,37 +165,6 @@ public:
 	uint32_t GetLightCount() const;
 
 	// -------------------------------------------------------------------
-	// IBL resource injection
-	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Sets the IBL cubemap resources for bindings 7-8.
-	 *
-	 * Call before the first Record() to enable IBL (diffuse + specular).
-	 * If not called, fallback black cubemaps are used (valid but zero contribution).
-	 *
-	 * @param irradianceView    ImageView for diffuse irradiance cubemap.
-	 * @param irradianceSampler Sampler for diffuse cubemap.
-	 * @param prefilteredView   ImageView for specular prefiltered cubemap.
-	 * @param prefilteredSampler Sampler for specular cubemap.
-	 */
-	void SetIBLResources(vk::ImageView irradianceView,
-	                     vk::Sampler irradianceSampler,
-	                     vk::ImageView prefilteredView,
-	                     vk::Sampler prefilteredSampler);
-
-	/**
-	 * @brief Resets IBL cubemap references to null and writes fallback
-	 *        cubemap descriptors into all descriptor sets.
-	 *
-	 * Must be called before the Environment that owns the current IBL
-	 * cubemaps is destroyed, to prevent descriptor sets from referencing
-	 * stale (soon-to-be-destroyed) VkImageView/VkSampler handles.
-	 * Typically paired with a preceding DeviceWaitIdle().
-	 */
-	void ResetIBLResources();
-
-	// -------------------------------------------------------------------
 	// Recording
 	// -------------------------------------------------------------------
 
@@ -215,7 +182,7 @@ public:
 	 * @param ctx             Per-frame context (camera position, view matrix,
 	 *                        invProjView, render extent, frame index).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
+	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 private:
 	/**
@@ -249,7 +216,7 @@ private:
 	 *
 	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
 	 */
-	void WriteDescriptors(uint32_t setIndex) override;
+	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 
 	// --- Queue handles for SSBO creation ---
 	vk::Queue m_graphicsQueue;
@@ -267,10 +234,5 @@ private:
 	std::unique_ptr<Image> m_fallbackIrradianceCube;
 	std::unique_ptr<Image> m_fallbackPrefilteredCube;
 	vk::raii::Sampler m_fallbackCubeSampler = nullptr;
-	// IBL resources injected by SetIBLResources() (non-owning handles)
-	vk::ImageView m_iblIrradianceView = nullptr;
-	vk::Sampler    m_iblIrradianceSampler = nullptr;
-	vk::ImageView m_iblPrefilteredView = nullptr;
-	vk::Sampler    m_iblPrefilteredSampler = nullptr;
 };
 } // namespace neurus

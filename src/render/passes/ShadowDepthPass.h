@@ -6,7 +6,7 @@
 #pragma once
 
 #include "passes/Pass.h"
-#include "passes/PassContext.h"
+#include "passes/RenderContext.h"
 #include "../Image.h"
 #include "../VulkanBuffer.h"
 #include "../DescriptorManager.h"
@@ -51,14 +51,13 @@ public:
 	ShadowDepthPass& operator=(ShadowDepthPass&&) noexcept = default;
 
 	void SetLightPosition(const glm::vec3& position);
-	void Record(vk::CommandBuffer cmdBuf, const PassContext& ctx) override;
+	void Record(vk::CommandBuffer cmdBuf, RenderCache& /*cache*/, const RenderContext& ctx) override;
 
 	void createDepthmap(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice);
 
 	// --- Accessors ---
 	ShadowMode Mode() const { return m_mode; }
-	Image& ShadowCubemap() { return *m_cubemap; }
 	Image& Depthmap() { return *m_depthmap; }
 	uint32_t Resolution() const { return m_resolution; }
 	const BufferLayout& VertexLayout() const { return m_vtxLayout; }
@@ -87,8 +86,6 @@ public:
 private:
 	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
 
-	void createDepthCubemap(const vk::raii::Device& device,
-	                        const vk::raii::PhysicalDevice& physicalDevice);
 	void createUniforms(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice,
 	                    vk::Queue queue, uint32_t qfi);
@@ -104,7 +101,6 @@ private:
 	ShadowMode m_mode = ShadowMode::SingleFace;
 
 	// --- GPU resources ---
-	std::unique_ptr<Image> m_cubemap;
 	std::unique_ptr<Image> m_depthmap;
 	std::unique_ptr<VulkanBuffer> m_ubo;
 	DescriptorSetLayout m_layout;

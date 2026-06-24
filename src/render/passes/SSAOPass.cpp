@@ -3,12 +3,12 @@
  * @brief Screen-Space Ambient Occlusion compute pass implementation.
  */
 
-#include "passes/AttachmentManager.h"
+#include "passes/RenderCache.h"
 #include "passes/SSAOPass.h"
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
-#include "passes/PassContext.h"
+#include "passes/RenderContext.h"
 #include "passes/SyncObjects.h"
 #include "shaders/ShaderModule.h"
 
@@ -78,13 +78,12 @@ private:
 
 SSAOPass::SSAOPass(const vk::raii::Device& device,
                    const vk::raii::PhysicalDevice& physicalDevice,
-                   AttachmentManager& attachmentManager,
                    uint32_t numSets,
                    vk::Queue graphicsQueue,
                    uint32_t queueFamilyIndex,
                    const uint32_t* compSpv,
                    size_t compSize)
-	: ComputePass(device, physicalDevice, &attachmentManager,
+	: ComputePass(device, physicalDevice,
 	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
@@ -199,43 +198,6 @@ std::array<NoiseEntryGpu, SSAOPass::kNoiseEntryCount> SSAOPass::GenerateNoise()
 }
 
 // ---------------------------------------------------------------------------
-// Parameter update
-// ---------------------------------------------------------------------------
-
-void SSAOPass::UpdateParams(const glm::mat4& viewProj,
-                            const glm::mat4& view,
-                            const glm::vec3& cameraPos)
-{
-	if (!m_paramsUBO)
-	{
-		return;
-	}
-
-	// Map the host-visible UBO and update camera matrices in-place.
-	// Kernel samples are static — only the first 128 bytes (viewProj + view + cameraPos) change.
-	void* mapped = m_paramsUBO->Map();
-	auto* params = static_cast<SSAOParamsGpu*>(mapped);
-
-	// View-projection matrix (column-major)
-	const float* vp = &viewProj[0][0];
-	for (int i = 0; i < 16; ++i) params->viewProj[i] = vp[i];
-
-	// View matrix
-	const float* vm = &view[0][0];
-	for (int i = 0; i < 16; ++i) params->view[i] = vm[i];
-
-	// Camera position
-	params->camX = cameraPos.x;
-	params->camY = cameraPos.y;
-	params->camZ = cameraPos.z;
-	params->camW = 0.0f;
-
-	// Kernel samples are NOT touched — they remain from construction
-
-	m_paramsUBO->Unmap();
-}
-
-// ---------------------------------------------------------------------------
 // Descriptor set layout
 // ---------------------------------------------------------------------------
 
@@ -295,7 +257,7 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
 // Descriptor writes
 // ---------------------------------------------------------------------------
 
-void SSAOPass::WriteDescriptors(uint32_t setIndex)
+void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
 	DescriptorSet& dstSet = m_descriptorSets[setIndex];
 
@@ -309,7 +271,7 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex)
 
 		for (uint32_t i = 0; i < 3; ++i)
 		{
-			const auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+			const auto& attachment = cache.GetAttachment(gBufferInputs[i], extent);
 
 			vk::DescriptorImageInfo imageInfo(
 				*m_sampler,                              // sampler
@@ -324,7 +286,7 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex)
 
 	// --- Write SSAO output (storage image) ---
 	{
-		const auto& ssaoAtt = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		const auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, extent);
 
 		vk::DescriptorImageInfo imageInfo(
 			nullptr,                              // sampler (not used for storage images)
@@ -353,13 +315,41 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex)
 // Record
 // ---------------------------------------------------------------------------
 
-void SSAOPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
+void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	const vk::Extent2D renderExtent = ctx.renderExtent;
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
+	// --- 0. Update per-frame SSAO params UBO (camera matrices) ---
+	//     Maps the host-visible UBO and overwrites only the first 128 bytes
+	//     (viewProj + view + cameraPos).  Kernel samples (offset 144) are
+	//     written once in the constructor and left intact.
+	if (m_paramsUBO)
+	{
+		void* mapped = m_paramsUBO->Map();
+		auto* params = static_cast<SSAOParamsGpu*>(mapped);
+
+		// View-projection matrix (column-major)
+		const float* vp = &ctx.viewProj[0][0];
+		for (int i = 0; i < 16; ++i) params->viewProj[i] = vp[i];
+
+		// View matrix
+		const float* vm = &ctx.view[0][0];
+		for (int i = 0; i < 16; ++i) params->view[i] = vm[i];
+
+		// Camera position
+		params->camX = ctx.cameraPos.x;
+		params->camY = ctx.cameraPos.y;
+		params->camZ = ctx.cameraPos.z;
+		params->camW = 0.0f;
+
+		// Kernel samples are NOT touched — they remain from construction
+
+		m_paramsUBO->Unmap();
+	}
+
 	// --- 1. Write descriptor set for this frame slot ---
-	WriteDescriptors(frameIndex);
+	WriteDescriptors(frameIndex, renderExtent, cache);
 
 	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
 	//     and SSAO attachment to GENERAL for compute write.
@@ -374,7 +364,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 		for (size_t i = 0; i < 3; ++i)
 		{
-			auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+			auto& attachment = cache.GetAttachment(gBufferInputs[i], renderExtent);
 			const vk::ImageLayout oldLayout = attachment.CurrentLayout();
 
 			barriers[i] = vk::ImageMemoryBarrier2(
@@ -398,7 +388,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		}
 
 		// SSAO attachment: current layout → GENERAL
-		auto& ssaoAtt = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
 		const vk::ImageLayout ssaoOldLayout = ssaoAtt.CurrentLayout();
 		barriers[3] = vk::ImageMemoryBarrier2(
 			(ssaoOldLayout == vk::ImageLayout::eUndefined)
@@ -463,7 +453,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 	// --- 7. Memory barrier: make SSAO output visible for lighting pass ---
 	{
-		const auto& ssaoAtt = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		const auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
 		const vk::ImageMemoryBarrier2 barrier(
 			vk::PipelineStageFlagBits2::eComputeShader,          // srcStage
 			vk::AccessFlagBits2::eShaderWrite,                    // srcAccess

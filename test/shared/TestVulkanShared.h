@@ -15,7 +15,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 
 #include <array>
 #include <cstdint>
@@ -136,7 +136,7 @@ protected:
 		const vk::raii::PhysicalDevice& pd,
 		vk::Queue queue,
 		uint32_t qfi,
-		neurus::AttachmentManager& am,
+		neurus::RenderCache& am,
 		uint32_t renderWidth,
 		uint32_t renderHeight);
 
@@ -177,11 +177,12 @@ protected:
 	 * Transitions Position, Normal, Albedo, MetallicRoughness to
 	 * eColorAttachmentOptimal and Depth to eDepthStencilAttachmentOptimal.
 	 *
-	 * @param am      AttachmentManager owning the G-Buffer attachments.
+	 * @param am      RenderCache owning the G-Buffer attachments.
 	 * @param fixture Test fixture providing BeginCmd/EndSubmitWait.
 	 */
 	static void TransitionGbufferToColorAttachment(
-		neurus::AttachmentManager& am,
+		neurus::RenderCache& am,
+		vk::Extent2D extent,
 		VulkanTestShared& fixture)
 	{
 		auto& cmd = fixture.BeginCmd();
@@ -195,12 +196,12 @@ protected:
 
 		for (const auto& att : colorAtts)
 		{
-			am.GetAttachment(att).TransitionLayout(
+			am.GetAttachment(att, extent).TransitionLayout(
 				cmd, vk::ImageLayout::eUndefined,
 				vk::ImageLayout::eColorAttachmentOptimal);
 		}
 
-		am.GetAttachment(neurus::AttachmentName::Depth).TransitionLayout(
+		am.GetAttachment(neurus::AttachmentName::Depth, extent).TransitionLayout(
 			cmd, vk::ImageLayout::eUndefined,
 			vk::ImageLayout::eDepthStencilAttachmentOptimal);
 

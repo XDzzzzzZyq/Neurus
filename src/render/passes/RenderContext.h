@@ -1,8 +1,8 @@
 /**
- * @file PassContext.h
+ * @file RenderContext.h
  * @brief Per-frame context data passed to all render passes.
  *
- * PassContext aggregates the per-frame state that multiple passes (Geometry,
+ * RenderContext aggregates the per-frame state that multiple passes (Geometry,
  * Lighting, SSAO, IBL) need to record their commands: render extent for
  * viewport/scissor, frame index for descriptor ring-buffer slots, camera
  * matrices for shading, and optional scene pointers for draw batches and
@@ -42,7 +42,7 @@ class Scene;
  * Populated once per frame by the renderer and passed (typically as const&)
  * to each pass's RecordCommandBuffer / Draw / Dispatch call.
  */
-struct PassContext
+struct RenderContext
 {
 	/// @brief Render area dimensions (used for viewport, scissor, dispatch groups).
 	vk::Extent2D renderExtent{};
@@ -73,6 +73,9 @@ struct PassContext
 	///        instead of depth-only (used for verification readback in tests).
 	vk::ImageView optionalColorView = nullptr;
 	vk::Format optionalColorFormat = vk::Format::eUndefined;
+
+	/// @brief Active shadow-casting light UID (-1 = no shadow-casting light).
+	int32_t lightUID = -1;
 };
 
 } // namespace neurus

@@ -1,4 +1,4 @@
-#include "passes/AttachmentManager.h"
+#include "passes/RenderCache.h"
 
 #include "Log.h"
 
@@ -10,60 +10,24 @@ namespace neurus {
 // Construction
 // ---------------------------------------------------------------------------
 
-AttachmentManager::AttachmentManager(const vk::raii::Device& device,
-                                     const vk::raii::PhysicalDevice& physicalDevice)
+RenderCache::RenderCache(const vk::raii::Device& device,
+                       const vk::raii::PhysicalDevice& physicalDevice)
 	: m_device(&device)
 	, m_physicalDevice(&physicalDevice)
 {
 }
 
 // ---------------------------------------------------------------------------
-// Create / Resize
+// Lazy attachment creation
 // ---------------------------------------------------------------------------
 
-void AttachmentManager::Create(const vk::Extent2D extent)
-{
-	m_extent = extent;
-	m_attachments.clear();
-
-	// --- G-Buffer ---
-	createAttachment(AttachmentName::Position);
-	createAttachment(AttachmentName::Normal);
-	createAttachment(AttachmentName::Albedo);
-	createAttachment(AttachmentName::MetallicRoughness);
-	createAttachment(AttachmentName::Depth);
-
-	// --- Post-FX ---
-	createAttachment(AttachmentName::HDRColor);
-	createAttachment(AttachmentName::SSAO);
-	createAttachment(AttachmentName::SSR);
-
-	// --- Shadow ---
-	// ShadowDepth cubemap is owned by ShadowDepthPass (fixed 1024x1024 resolution).
-	// ShadowIntensity is a screen-space R8 attachment written by ShadowEvalPass.
-	createAttachment(AttachmentName::ShadowIntensity);
-
-	NEURUS_LOG("[AttachmentManager] extent=" << m_extent.width << "x" << m_extent.height
-	          << " attachments=9"
-	          << " (position, normal, albedo, metallicRoughness, depth, hdrColor, ssao, ssr, shadowIntensity)");
-}
-
-void AttachmentManager::Resize(const vk::Extent2D extent)
-{
-	Create(extent);
-}
-
-// ---------------------------------------------------------------------------
-// Single attachment creation
-// ---------------------------------------------------------------------------
-
-void AttachmentManager::createAttachment(const AttachmentName name)
+void RenderCache::createAttachment(const AttachmentName name, const vk::Extent2D extent)
 {
 	const auto config = ConfigFor(name);
 
 	Image image(*m_device,
 	                  *m_physicalDevice,
-	                  m_extent,
+	                  extent,
 	                  config.format,
 	                  config.usage,
 	                  1,                // mipLevels
@@ -77,36 +41,129 @@ void AttachmentManager::createAttachment(const AttachmentName name)
 // Accessors
 // ---------------------------------------------------------------------------
 
-Image& AttachmentManager::GetAttachment(const AttachmentName name)
+Image& RenderCache::GetAttachment(const AttachmentName name, const vk::Extent2D extent)
 {
-	const auto it = m_attachments.find(name);
+	auto it = m_attachments.find(name);
 	if (it == m_attachments.end())
 	{
-		throw std::out_of_range("AttachmentManager::GetAttachment: attachment not found");
+		NEURUS_LOG("[RenderCache] Lazily creating attachment \""
+		          << AttachmentNameToString(name) << "\" at "
+		          << extent.width << "x" << extent.height);
+		createAttachment(name, extent);
+		it = m_attachments.find(name);
 	}
 	return it->second;
 }
 
-const Image& AttachmentManager::GetAttachment(const AttachmentName name) const
+Image& RenderCache::GetAttachment(const AttachmentName name, const vk::Extent2D extent,
+                                  const vk::ImageLayout targetLayout)
+{
+	Image& attachment = GetAttachment(name, extent);
+
+	if (targetLayout != vk::ImageLayout::eUndefined &&
+	    attachment.CurrentLayout() != targetLayout)
+	{
+		attachment.SetCurrentLayout(targetLayout);
+	}
+
+	return attachment;
+}
+
+const Image& RenderCache::GetAttachment(const AttachmentName name) const
 {
 	const auto it = m_attachments.find(name);
 	if (it == m_attachments.end())
 	{
-		throw std::out_of_range("AttachmentManager::GetAttachment: attachment not found");
+		throw std::out_of_range("RenderCache::GetAttachment: attachment not found");
 	}
 	return it->second;
 }
 
-bool AttachmentManager::HasAttachment(const AttachmentName name) const
+// ---------------------------------------------------------------------------
+// Per-light shadow resources (lazy creation)
+// ---------------------------------------------------------------------------
+
+Image& RenderCache::GetShadowMap(const int lightUID)
+{
+	auto it = m_shadowMaps.find(lightUID);
+	if (it != m_shadowMaps.end())
+	{
+		return it->second;
+	}
+
+	constexpr vk::Extent2D kShadowRes{1024, 1024};
+
+	Image cubemap(*m_device,
+	              *m_physicalDevice,
+	              kShadowRes,
+	              vk::Format::eD32Sfloat,
+	              vk::ImageUsageFlagBits::eDepthStencilAttachment |
+	                  vk::ImageUsageFlagBits::eSampled,
+	              1,                           // mipLevels
+	              Image::ImageType::eCube,
+	              "ShadowDepthCubemap_Light"); // debug name
+
+	const auto [insertedIt, _] = m_shadowMaps.emplace(lightUID, std::move(cubemap));
+	return insertedIt->second;
+}
+
+Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D extent)
+{
+	auto it = m_shadowIntensities.find(lightUID);
+	if (it != m_shadowIntensities.end())
+	{
+		return it->second;
+	}
+
+	Image intensity(*m_device,
+	                *m_physicalDevice,
+	                extent,
+	                vk::Format::eR8Unorm,
+	                vk::ImageUsageFlagBits::eStorage |
+	                    vk::ImageUsageFlagBits::eSampled |
+	                    vk::ImageUsageFlagBits::eTransferSrc,
+	                1,                         // mipLevels
+	                Image::ImageType::e2D,
+	                "ShadowIntensity_Light");  // debug name
+
+	const auto [insertedIt, _] = m_shadowIntensities.emplace(lightUID, std::move(intensity));
+	return insertedIt->second;
+}
+
+void RenderCache::RemoveLight(const int lightUID)
+{
+	m_shadowMaps.erase(lightUID);
+	m_shadowIntensities.erase(lightUID);
+}
+
+bool RenderCache::HasAttachment(const AttachmentName name) const
 {
 	return m_attachments.find(name) != m_attachments.end();
+}
+
+// ---------------------------------------------------------------------------
+// Clean / CleanScreenSpace
+// ---------------------------------------------------------------------------
+
+void RenderCache::Clean()
+{
+	m_attachments.clear();
+	m_shadowMaps.clear();
+	m_shadowIntensities.clear();
+}
+
+void RenderCache::CleanScreenSpace()
+{
+	m_attachments.clear();
+	m_shadowIntensities.clear();
+	// m_shadowMaps preserved — shadow cubemaps survive resize
 }
 
 // ---------------------------------------------------------------------------
 // Attachment configuration
 // ---------------------------------------------------------------------------
 
-AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const AttachmentName name)
+RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 {
 	// Common usage for color attachments:
 	//   COLOR_ATTACHMENT - written by fragment shader
@@ -156,18 +213,18 @@ AttachmentManager::AttachmentConfig AttachmentManager::ConfigFor(const Attachmen
 
 	// --- Shadow ---
 	case AttachmentName::ShadowDepth:
-		// Cubemap depth attachment: written by ShadowDepthPass, sampled by ShadowEvalPass
+		// Cubemap depth attachment: written by ShadowDepthPass, sampled by shadow evaluation
 		return { vk::Format::eD32Sfloat,
 		         vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 		         eCube };
 	case AttachmentName::ShadowIntensity:
-		// R8 shadow intensity: written by ShadowEvalPass compute shader
+		// R8 shadow intensity: written by shadow evaluation compute shader
 		return { vk::Format::eR8Unorm,
 		         vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc,
 		         e2D };
 	}
 
-	throw std::invalid_argument("AttachmentManager::ConfigFor: unknown attachment name");
+	throw std::invalid_argument("RenderCache::ConfigFor: unknown attachment name");
 }
 
 // ---------------------------------------------------------------------------

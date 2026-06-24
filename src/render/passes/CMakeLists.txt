@@ -1,8 +1,8 @@
 # src/render/passes/CMakeLists.txt - Render Pass Library
 
 add_library(neurus_render_passes STATIC
-	AttachmentManager.h
-	AttachmentManager.cpp
+	RenderCache.h
+	RenderCache.cpp
 	ComputePass.h
 	GeometryPass.h
 	GeometryPass.cpp
@@ -11,13 +11,11 @@ add_library(neurus_render_passes STATIC
 	LightingPass.h
 	LightingPass.cpp
 	Pass.h
-	PassContext.h
+	RenderContext.h
 	RenderPassManager.h
 	RenderPassManager.cpp
 	ShadowDepthPass.h
 	ShadowDepthPass.cpp
-	ShadowEvalPass.h
-	ShadowEvalPass.cpp
 	SSAOPass.h
 	SSAOPass.cpp
 	SyncObjects.h

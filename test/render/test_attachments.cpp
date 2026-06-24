@@ -2,18 +2,18 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/Image.h"
 
 using namespace neurus;
 
 /**
- * @brief Tests for AttachmentManager - G-Buffer and post-FX attachment creation, resize, and named access.
+ * @brief Tests for RenderCache - G-Buffer and post-FX attachment creation, resize, and named access.
  *
  * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
  *       in CI environments without GPU access.
  */
-class AttachmentManagerTest : public VulkanTestShared
+class RenderCacheTest : public VulkanTestShared
 {
 protected:
 	// SetUp/TearDown inherited from VulkanTestShared
@@ -23,7 +23,7 @@ protected:
 // Creation - G-Buffer attachments
 // ---------------------------------------------------------------------------
 
-TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndExtent)
+TEST_F(RenderCacheTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndExtent)
 {
 	if (!HasVulkan())
 	{
@@ -40,12 +40,14 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 		GTEST_SKIP() << "D32_SFLOAT depth attachment not supported.";
 	}
 
-	AttachmentManager manager(*m_device, pd);
-	manager.Create(extent);
+	RenderCache manager(*m_device, pd);
+
+	// Lazy creation via first GetAttachment call
+	manager.GetAttachment(AttachmentName::Position, extent);
 
 	// --- Position (RGBA16_SFLOAT) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::Position);
+		const auto& attachment = manager.GetAttachment(AttachmentName::Position, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR16G16B16A16Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -55,7 +57,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 
 	// --- Normal (RGBA16_SFLOAT) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::Normal);
+		const auto& attachment = manager.GetAttachment(AttachmentName::Normal, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR16G16B16A16Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -63,7 +65,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 
 	// --- Albedo (RGBA8_SRGB) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::Albedo);
+		const auto& attachment = manager.GetAttachment(AttachmentName::Albedo, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR8G8B8A8Srgb);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -71,7 +73,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 
 	// --- MetallicRoughness (RGBA8_UNORM) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::MetallicRoughness);
+		const auto& attachment = manager.GetAttachment(AttachmentName::MetallicRoughness, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR8G8B8A8Unorm);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -79,7 +81,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 
 	// --- Depth (D32_SFLOAT) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::Depth);
+		const auto& attachment = manager.GetAttachment(AttachmentName::Depth, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eD32Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -91,7 +93,7 @@ TEST_F(AttachmentManagerTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndEx
 // Creation - Post-FX attachments
 // ---------------------------------------------------------------------------
 
-TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExtent)
+TEST_F(RenderCacheTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExtent)
 {
 	if (!HasVulkan())
 	{
@@ -101,12 +103,14 @@ TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExt
 	const vk::Extent2D extent(1920, 1080);
 	auto& pd = PhysicalDevice();
 
-	AttachmentManager manager(*m_device, pd);
-	manager.Create(extent);
+	RenderCache manager(*m_device, pd);
+
+	// Lazy creation via first GetAttachment call
+	manager.GetAttachment(AttachmentName::Position, extent);
 
 	// --- HDRColor (RGBA16F) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::HDRColor);
+		const auto& attachment = manager.GetAttachment(AttachmentName::HDRColor, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR16G16B16A16Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -114,7 +118,7 @@ TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExt
 
 	// --- SSAO (R8) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::SSAO);
+		const auto& attachment = manager.GetAttachment(AttachmentName::SSAO, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR8Unorm);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -122,7 +126,7 @@ TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExt
 
 	// --- SSR (RGBA16F) ---
 	{
-		const auto& attachment = manager.GetAttachment(AttachmentName::SSR);
+		const auto& attachment = manager.GetAttachment(AttachmentName::SSR, extent);
 		EXPECT_EQ(attachment.Extent(), extent);
 		EXPECT_EQ(attachment.Format(), vk::Format::eR16G16B16A16Sfloat);
 		EXPECT_EQ(attachment.MipLevels(), 1u);
@@ -133,7 +137,7 @@ TEST_F(AttachmentManagerTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExt
 // Resize
 // ---------------------------------------------------------------------------
 
-TEST_F(AttachmentManagerTest, Resize_AllAttachmentsHaveNewExtent)
+TEST_F(RenderCacheTest, Resize_AllAttachmentsHaveNewExtent)
 {
 	if (!HasVulkan())
 	{
@@ -151,32 +155,47 @@ TEST_F(AttachmentManagerTest, Resize_AllAttachmentsHaveNewExtent)
 	const vk::Extent2D initialExtent(1920, 1080);
 	const vk::Extent2D newExtent(3840, 2160);
 
-	AttachmentManager manager(*m_device, pd);
-	manager.Create(initialExtent);
+	RenderCache manager(*m_device, pd);
+
+	// Lazy creation at initial extent via first GetAttachment
+	manager.GetAttachment(AttachmentName::Position, initialExtent);
+	manager.GetAttachment(AttachmentName::Depth, initialExtent);
+	manager.GetAttachment(AttachmentName::HDRColor, initialExtent);
 
 	// All attachments have initial extent
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::Position).Extent(), initialExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::Depth).Extent(), initialExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::HDRColor).Extent(), initialExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::Position, initialExtent).Extent(), initialExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::Depth, initialExtent).Extent(), initialExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::HDRColor, initialExtent).Extent(), initialExtent);
 
-	manager.Resize(newExtent);
+	// Simulate resize: clear screen-space, then lazy re-create at new extent
+	manager.CleanScreenSpace();
+
+	// Trigger lazy re-creation at new extent
+	manager.GetAttachment(AttachmentName::Position, newExtent);
+	manager.GetAttachment(AttachmentName::Normal, newExtent);
+	manager.GetAttachment(AttachmentName::Albedo, newExtent);
+	manager.GetAttachment(AttachmentName::MetallicRoughness, newExtent);
+	manager.GetAttachment(AttachmentName::Depth, newExtent);
+	manager.GetAttachment(AttachmentName::HDRColor, newExtent);
+	manager.GetAttachment(AttachmentName::SSAO, newExtent);
+	manager.GetAttachment(AttachmentName::SSR, newExtent);
 
 	// All attachments have new extent
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::Position).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::Normal).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::Albedo).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::MetallicRoughness).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::Depth).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::HDRColor).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::SSAO).Extent(), newExtent);
-	EXPECT_EQ(manager.GetAttachment(AttachmentName::SSR).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::Position, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::Normal, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::Albedo, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::MetallicRoughness, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::Depth, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::HDRColor, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::SSAO, newExtent).Extent(), newExtent);
+	EXPECT_EQ(manager.GetAttachment(AttachmentName::SSR, newExtent).Extent(), newExtent);
 }
 
 // ---------------------------------------------------------------------------
 // Named access - all attachment names reachable
 // ---------------------------------------------------------------------------
 
-TEST_F(AttachmentManagerTest, GetAllAttachments_ByEnumAndString)
+TEST_F(RenderCacheTest, GetAllAttachments_ByEnumAndString)
 {
 	if (!HasVulkan())
 	{
@@ -192,41 +211,43 @@ TEST_F(AttachmentManagerTest, GetAllAttachments_ByEnumAndString)
 	}
 
 	const vk::Extent2D extent(1280, 720);
-	AttachmentManager manager(*m_device, pd);
-	manager.Create(extent);
+	RenderCache manager(*m_device, pd);
+
+	// Lazy creation via first GetAttachment call
+	manager.GetAttachment(AttachmentName::Position, extent);
 
 	// G-Buffer
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Position).ImageHandle());
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Normal).ImageHandle());
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Albedo).ImageHandle());
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::MetallicRoughness).ImageHandle());
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Depth).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Position, extent).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Normal, extent).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Albedo, extent).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::MetallicRoughness, extent).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::Depth, extent).ImageHandle());
 
 	// Post-FX
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::HDRColor).ImageHandle());
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::SSAO).ImageHandle());
-	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::SSR).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::HDRColor, extent).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::SSAO, extent).ImageHandle());
+	EXPECT_TRUE(*manager.GetAttachment(AttachmentName::SSR, extent).ImageHandle());
 }
 
 // ---------------------------------------------------------------------------
 // Non-copyable, movable
 // ---------------------------------------------------------------------------
 
-TEST_F(AttachmentManagerTest, NonCopyable)
+TEST_F(RenderCacheTest, NonCopyable)
 {
-	static_assert(!std::is_copy_constructible_v<AttachmentManager>,
-	              "AttachmentManager must not be copy-constructible");
-	static_assert(!std::is_copy_assignable_v<AttachmentManager>,
-	              "AttachmentManager must not be copy-assignable");
+	static_assert(!std::is_copy_constructible_v<RenderCache>,
+	              "RenderCache must not be copy-constructible");
+	static_assert(!std::is_copy_assignable_v<RenderCache>,
+	              "RenderCache must not be copy-assignable");
 	SUCCEED();
 }
 
-TEST_F(AttachmentManagerTest, Movable)
+TEST_F(RenderCacheTest, Movable)
 {
-	static_assert(std::is_move_constructible_v<AttachmentManager>,
-	              "AttachmentManager must be move-constructible");
-	static_assert(std::is_move_assignable_v<AttachmentManager>,
-	              "AttachmentManager must be move-assignable");
+	static_assert(std::is_move_constructible_v<RenderCache>,
+	              "RenderCache must be move-constructible");
+	static_assert(std::is_move_assignable_v<RenderCache>,
+	              "RenderCache must be move-assignable");
 	SUCCEED();
 }
 
@@ -234,7 +255,7 @@ TEST_F(AttachmentManagerTest, Movable)
 // HasAttachment check
 // ---------------------------------------------------------------------------
 
-TEST_F(AttachmentManagerTest, HasAttachment_TrueForCreatedAttachments)
+TEST_F(RenderCacheTest, HasAttachment_TrueForCreatedAttachments)
 {
 	if (!HasVulkan())
 	{
@@ -250,8 +271,13 @@ TEST_F(AttachmentManagerTest, HasAttachment_TrueForCreatedAttachments)
 	}
 
 	const vk::Extent2D extent(800, 600);
-	AttachmentManager manager(*m_device, pd);
-	manager.Create(extent);
+	RenderCache manager(*m_device, pd);
+
+	// Lazy creation via GetAttachment calls
+	manager.GetAttachment(AttachmentName::Position, extent);
+	manager.GetAttachment(AttachmentName::Depth, extent);
+	manager.GetAttachment(AttachmentName::HDRColor, extent);
+	manager.GetAttachment(AttachmentName::SSAO, extent);
 
 	EXPECT_TRUE(manager.HasAttachment(AttachmentName::Position));
 	EXPECT_TRUE(manager.HasAttachment(AttachmentName::Depth));

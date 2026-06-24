@@ -5,14 +5,16 @@
 
 #include "passes/LightingPass.h"
 
-#include "passes/AttachmentManager.h"
-#include "passes/PassContext.h"
+#include "passes/RenderCache.h"
+#include "passes/RenderContext.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "shaders/ShaderModule.h"
+#include "Texture.h"
 
 #include "Log.h"
 
+#include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
@@ -31,13 +33,12 @@ namespace neurus {
 
 LightingPass::LightingPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
-                           AttachmentManager& attachmentManager,
                            uint32_t numSets,
                            vk::Queue graphicsQueue,
                            uint32_t queueFamilyIndex,
                            const uint32_t* compSpv,
                            size_t compSize)
-	: ComputePass(device, physicalDevice, &attachmentManager,
+	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
 	, m_graphicsQueue(graphicsQueue)
 	, m_queueFamilyIndex(queueFamilyIndex)
@@ -64,7 +65,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 
 	// --- Create fallback IBL cubemaps (4×4 black) for bindings 7-8 ---
 	//     These ensure the descriptor bindings are always valid even when
-	//     SetIBLResources() has not been called (no HDR loaded).
+	//     no Environment is present in the scene (no IBL to sample).
 	//     Using 4×4 faces to satisfy minimum cubemap dimension requirements.
 	{
 		const vk::ImageUsageFlags cubeUsage =
@@ -295,69 +296,10 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 }
 
 // ---------------------------------------------------------------------------
-// IBL resource injection
-// ---------------------------------------------------------------------------
-
-void LightingPass::SetIBLResources(vk::ImageView irradianceView,
-                                    vk::Sampler irradianceSampler,
-                                    vk::ImageView prefilteredView,
-                                    vk::Sampler prefilteredSampler)
-{
-	m_iblIrradianceView    = irradianceView;
-	m_iblIrradianceSampler  = irradianceSampler;
-	m_iblPrefilteredView    = prefilteredView;
-	m_iblPrefilteredSampler = prefilteredSampler;
-}
-
-// ---------------------------------------------------------------------------
-// IBL resource reset (project reload safety)
-// ---------------------------------------------------------------------------
-
-void LightingPass::ResetIBLResources()
-{
-	// Clear stored IBL handles so WriteDescriptors() uses fallback cubemaps
-	m_iblIrradianceView    = vk::ImageView{};
-	m_iblIrradianceSampler  = vk::Sampler{};
-	m_iblPrefilteredView    = vk::ImageView{};
-	m_iblPrefilteredSampler = vk::Sampler{};
-
-	// Overwrite bindings 7-8 in all descriptor sets with fallback cubemaps.
-	// This removes any GPU-side reference to the soon-to-be-destroyed old
-	// cubemaps, preventing vkDestroyImageView/vkDestroySampler validation errors.
-	const uint32_t numSets = static_cast<uint32_t>(m_descriptorSets.size());
-	for (uint32_t i = 0; i < numSets; ++i)
-	{
-		DescriptorSet& dstSet = m_descriptorSets[i];
-
-		// Binding 7: fallback diffuse cubemap
-		{
-			vk::DescriptorImageInfo imageInfo(
-				*m_fallbackCubeSampler,
-				*m_fallbackIrradianceCube->ImageViewHandle(),
-				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(7, imageInfo,
-			                  vk::DescriptorType::eCombinedImageSampler);
-		}
-
-		// Binding 8: fallback specular cubemap
-		{
-			vk::DescriptorImageInfo imageInfo(
-				*m_fallbackCubeSampler,
-				*m_fallbackPrefilteredCube->ImageViewHandle(),
-				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(8, imageInfo,
-			                  vk::DescriptorType::eCombinedImageSampler);
-		}
-	}
-
-	NEURUS_LOG("[LightingPass] IBL resources reset to fallback cubemaps");
-}
-
-// ---------------------------------------------------------------------------
 // Descriptor writes
 // ---------------------------------------------------------------------------
 
-void LightingPass::WriteDescriptors(uint32_t setIndex)
+void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
 	DescriptorSet& dstSet = m_descriptorSets[setIndex];
 
@@ -371,7 +313,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 	// --- Write G-Buffer input descriptors (combined image samplers) ---
 	for (uint32_t i = 0; i < 4; ++i)
 	{
-		const auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+		const auto& attachment = cache.GetAttachment(gBufferInputs[i], extent);
 
 		vk::DescriptorImageInfo imageInfo(
 			*m_sampler,                              // sampler
@@ -385,7 +327,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 
 	// --- Write HDR colour output (storage image) ---
 	{
-		const auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+		const auto& hdrColor = cache.GetAttachment(AttachmentName::HDRColor, extent);
 
 		vk::DescriptorImageInfo imageInfo(
 			nullptr,                              // sampler (not used for storage images)
@@ -405,7 +347,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 
 	// --- Write SSAO attachment (combined image sampler) ---
 	{
-		const auto& ssao = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		const auto& ssao = cache.GetAttachment(AttachmentName::SSAO, extent);
 
 		vk::DescriptorImageInfo imageInfo(
 			*m_sampler,                              // sampler
@@ -417,41 +359,9 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 
-	// --- Write IBL irradiance cubemap (binding 7) ---
-	{
-		const bool hasIBL = (m_iblIrradianceView != vk::ImageView{});
-		const vk::Sampler sampler = hasIBL ? m_iblIrradianceSampler : *m_fallbackCubeSampler;
-
-		Image& fbIrrad = *m_fallbackIrradianceCube;
-		const vk::ImageView fallbackView = *fbIrrad.ImageViewHandle();
-		const vk::ImageView view = hasIBL ? m_iblIrradianceView : fallbackView;
-
-		vk::DescriptorImageInfo imageInfo(sampler, view,
-		                                  vk::ImageLayout::eShaderReadOnlyOptimal);
-
-		dstSet.WriteImage(7, imageInfo,
-		                  vk::DescriptorType::eCombinedImageSampler);
-	}
-
-	// --- Write IBL specular cubemap (binding 8) ---
-	{
-		const bool hasIBL = (m_iblPrefilteredView != vk::ImageView{});
-		const vk::Sampler sampler = hasIBL ? m_iblPrefilteredSampler : *m_fallbackCubeSampler;
-
-		Image& fbSpec = *m_fallbackPrefilteredCube;
-		const vk::ImageView fallbackView = *fbSpec.ImageViewHandle();
-		const vk::ImageView view = hasIBL ? m_iblPrefilteredView : fallbackView;
-
-		vk::DescriptorImageInfo imageInfo(sampler, view,
-		                                  vk::ImageLayout::eShaderReadOnlyOptimal);
-
-		dstSet.WriteImage(8, imageInfo,
-		                  vk::DescriptorType::eCombinedImageSampler);
-	}
-
 	// --- Write shadow intensity (binding 9) ---
 	{
-		const auto& shadowAtt = m_attachmentManager->GetAttachment(AttachmentName::ShadowIntensity);
+		const auto& shadowAtt = cache.GetAttachment(AttachmentName::ShadowIntensity, extent);
 
 		vk::DescriptorImageInfo imageInfo(
 			*m_sampler,                              // sampler
@@ -468,7 +378,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex)
 // Record
 // ---------------------------------------------------------------------------
 
-void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
+void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	const glm::vec3& cameraPos = ctx.cameraPos;
 	const glm::mat4& viewMatrix = ctx.view;
@@ -477,7 +387,77 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 	const uint32_t frameIndex = ctx.frameIndex;
 
 	// --- 1. Write descriptor set for this frame slot ---
-	WriteDescriptors(frameIndex);
+	WriteDescriptors(frameIndex, renderExtent, cache);
+
+	// --- 1b. Write IBL cubemap descriptors (bindings 7-8) from scene Environment or fallback ---
+	{
+		DescriptorSet& dstSet = m_descriptorSets[frameIndex];
+		const bool hasEnv = (ctx.scene != nullptr && !ctx.scene->env_list.empty());
+
+		if (hasEnv)
+		{
+			auto& env = ctx.scene->env_list.begin()->second;
+			Texture* diffuseTex = env->GetDiffuseTexture();
+			Texture* specularTex = env->GetSpecularTexture();
+
+			if (diffuseTex && diffuseTex->GetImage())
+			{
+				vk::DescriptorImageInfo irrInfo(
+					*diffuseTex->GetSampler(),
+					*diffuseTex->GetImage()->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+				dstSet.WriteImage(7, irrInfo,
+				                  vk::DescriptorType::eCombinedImageSampler);
+			}
+			else
+			{
+				// Diffuse not ready - use fallback
+				vk::DescriptorImageInfo fbInfo(
+					*m_fallbackCubeSampler,
+					*m_fallbackIrradianceCube->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+				dstSet.WriteImage(7, fbInfo,
+				                  vk::DescriptorType::eCombinedImageSampler);
+			}
+
+			if (specularTex && specularTex->GetImage())
+			{
+				vk::DescriptorImageInfo specInfo(
+					*specularTex->GetSampler(),
+					*specularTex->GetImage()->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+				dstSet.WriteImage(8, specInfo,
+				                  vk::DescriptorType::eCombinedImageSampler);
+			}
+			else
+			{
+				// Specular not ready - use fallback
+				vk::DescriptorImageInfo fbInfo(
+					*m_fallbackCubeSampler,
+					*m_fallbackPrefilteredCube->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+				dstSet.WriteImage(8, fbInfo,
+				                  vk::DescriptorType::eCombinedImageSampler);
+			}
+		}
+		else
+		{
+			// No scene or no environment — bind fallback cubemaps
+			vk::DescriptorImageInfo fbIrradInfo(
+				*m_fallbackCubeSampler,
+				*m_fallbackIrradianceCube->ImageViewHandle(),
+				vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(7, fbIrradInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
+
+			vk::DescriptorImageInfo fbSpecInfo(
+				*m_fallbackCubeSampler,
+				*m_fallbackPrefilteredCube->ImageViewHandle(),
+				vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(8, fbSpecInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
+		}
+	}
 
 	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
 	//     and HDRColor to GENERAL for compute write.
@@ -496,7 +476,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 		for (size_t i = 0; i < 4; ++i)
 		{
-			auto& attachment = m_attachmentManager->GetAttachment(gBufferInputs[i]);
+			auto& attachment = cache.GetAttachment(gBufferInputs[i], renderExtent);
 			const vk::ImageLayout oldLayout = attachment.CurrentLayout();
 
 			barriers[i] = vk::ImageMemoryBarrier2(
@@ -521,7 +501,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		}
 
 		// HDRColor: current layout → GENERAL
-		auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+		auto& hdrColor = cache.GetAttachment(AttachmentName::HDRColor, renderExtent);
 		const vk::ImageLayout hdrOldLayout = hdrColor.CurrentLayout();
 		barriers[4] = vk::ImageMemoryBarrier2(
 			(hdrOldLayout == vk::ImageLayout::eUndefined)
@@ -544,7 +524,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 		hdrColor.SetCurrentLayout(vk::ImageLayout::eGeneral);
 
 		// SSAO: GENERAL → SHADER_READ_ONLY (was written by SSAOPass, now read by lighting)
-		auto& ssao = m_attachmentManager->GetAttachment(AttachmentName::SSAO);
+		auto& ssao = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
 		vk::ImageLayout ssaoOldLayout = ssao.CurrentLayout();
 
 		// If SSAO attachment hasn't been written (layout = UNDEFINED), clear to 1.0 (no occlusion)
@@ -601,8 +581,8 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 
 		ssao.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 
-		// ShadowIntensity: GENERAL → SHADER_READ_ONLY (was written by ShadowEvalPass, now read by lighting)
-		auto& shadowAtt = m_attachmentManager->GetAttachment(AttachmentName::ShadowIntensity);
+		// ShadowIntensity: GENERAL → SHADER_READ_ONLY (read by lighting)
+		auto& shadowAtt = cache.GetAttachment(AttachmentName::ShadowIntensity, renderExtent);
 		vk::ImageLayout shadowOldLayout = shadowAtt.CurrentLayout();
 
 		// If shadow hasn't been computed (layout = UNDEFINED), clear to 0.0 (no shadow)
@@ -687,8 +667,8 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 			pc.view[i] = vm[i];
 		}
 
-		// Enable IBL when cubemap resources are available
-		pc.iblEnabled = (m_iblIrradianceView != vk::ImageView{}) ? 1 : 0;
+		// Enable IBL when scene has an environment
+		pc.iblEnabled = (ctx.scene && !ctx.scene->env_list.empty()) ? 1 : 0;
 
 		// Copy inverse(proj * view) matrix for skybox background ray
 		const float* ipv = &invProjView[0][0];
@@ -712,7 +692,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, const PassContext& ctx)
 	// --- 7. Memory barrier: make HDR output visible for subsequent passes ---
 	//     Uses pipelineBarrier2 for consistent layout tracking.
 	{
-		const auto& hdrColor = m_attachmentManager->GetAttachment(AttachmentName::HDRColor);
+		const auto& hdrColor = cache.GetAttachment(AttachmentName::HDRColor, renderExtent);
 		const vk::ImageMemoryBarrier2 barrier(
 			vk::PipelineStageFlagBits2::eComputeShader,          // srcStage
 			vk::AccessFlagBits2::eShaderWrite,                    // srcAccess

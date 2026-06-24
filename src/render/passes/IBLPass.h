@@ -33,6 +33,7 @@ namespace neurus {
 
 // --- Forward declarations ---
 class Image;
+class RenderCache;
 
 /**
  * @brief IBL generation pass - equirect → diffuse + specular cubemaps.
@@ -81,10 +82,15 @@ public:
 	~IBLPass();
 
 	/** @brief No-op — IBL generation is one-shot via Generate(), not per-frame. */
-	void Record(vk::CommandBuffer, const PassContext&) override {}
+	void Record(vk::CommandBuffer cmd, RenderCache& cache, const RenderContext& ctx) override
+	{
+		(void)cmd;
+		(void)cache;
+		(void)ctx;
+	}
 
 	/** @brief No-op — IBLPass manages its own descriptor writes via Generate(). */
-	void WriteDescriptors(uint32_t) override {}
+	void WriteDescriptors(uint32_t, vk::Extent2D, RenderCache&) override {}
 
 	// -------------------------------------------------------------------
 	// Generation

@@ -4,7 +4,7 @@
  *
  * DeferredRenderer owns the full deferred pipeline and all scene GPU resources:
  *   - Swapchain management (reuses neurus::Swapchain)
- *   - AttachmentManager (G-Buffer, HDRColor)
+ *   - RenderCache (G-Buffer, HDRColor)
  *   - GeometryPass (writes mesh geometry to G-Buffer MRT)
  *   - LightingPass (compute PBR lighting from G-Buffer into HDRColor)
  *   - Camera UBO data, mesh vertex/index buffers, light SSBO
@@ -31,7 +31,7 @@
 namespace neurus {
 
 // --- Forward declarations ---
-class AttachmentManager;
+class RenderCache;
 class RenderPassManager;
 class VertexBuffer;
 class IndexBuffer;
@@ -45,7 +45,6 @@ class LightingPass;
 class SSAOPass;
 class IBLPass;
 class ShadowDepthPass;
-class ShadowEvalPass;
 struct GeometryRenderItem;
 struct CameraUBOData;
 
@@ -65,7 +64,7 @@ public:
 	/**
 	 * @brief Creates the full deferred pipeline.
 	 *
-	 * Construction order: Swapchain → AttachmentManager → RenderPassManager →
+	 * Construction order: Swapchain → RenderCache → RenderPassManager →
 	 * GeometryPass → LightingPass → sync objects. Mesh buffers are uploaded
 	 * directly to GPU by Mesh objects. LightingPass owns its own light SSBO.
 	 * SPIR-V shaders are embedded at compile time (no constructor parameters needed).
@@ -124,7 +123,7 @@ public:
 	 * first DrawFrame() and after any scene light changes.
 	 *
 	 * If a point light with use_shadow enabled is found, configures
-	 * ShadowDepthPass and ShadowEvalPass accordingly.
+	 * ShadowDepthPass accordingly.
 	 *
 	 * @param scene Scene containing the light list.
 	 */
@@ -186,16 +185,6 @@ public:
 	void GenerateIBL(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
 
 	/**
-	 * @brief Resets the LightingPass IBL cubemap references to fallback,
-	 *        overwriting descriptor set bindings 7-8 with fallback cubemaps.
-	 *
-	 * Call before destroying the Environment that owns the current IBL
-	 * cubemaps (e.g., on project reload) to prevent stale handle validation
-	 * errors.  Typically preceded by WaitIdle().
-	 */
-	void ResetIBLResources();
-
-	/**
 	 * @brief Converts the shadow depth cubemap to an equirectangular grayscale PNG.
 	 *
 	 * Creates a temporary rgba32f equirect image, dispatches c2e.comp,
@@ -220,7 +209,8 @@ private:
 	 */
 	void recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex,
 	                 const Camera& camera,
-	                 const std::vector<GeometryRenderItem>& renderItems);
+	                 const std::vector<GeometryRenderItem>& renderItems,
+	                 const Scene* scene = nullptr);
 
 	/** @brief Destroys and re-creates sync objects after swapchain resize. */
 	void recreateSwapchain();
@@ -246,13 +236,12 @@ private:
 	const vk::raii::PhysicalDevice& m_physicalDevice;
 	vk::Queue m_graphicsQueue;
 	uint32_t m_queueFamilyIndex;
-	const vk::raii::SurfaceKHR& m_surface;
 
 	// --- Swapchain ---
 	std::unique_ptr<Swapchain> m_swapchain;
 
 	// --- Deferred pipeline ---
-	std::unique_ptr<AttachmentManager> m_attachmentManager;
+	std::unique_ptr<RenderCache> m_renderCache;
 	std::unique_ptr<RenderPassManager> m_renderPassManager;
 	// --- Polymorphic pass container (owning) ---
 	std::vector<std::unique_ptr<Pass>> m_passes;
@@ -263,7 +252,6 @@ private:
 	SSAOPass*   m_ssaoPass     = nullptr;
 	IBLPass*    m_iblPass      = nullptr;
 	ShadowDepthPass* m_shadowDepthPass = nullptr;
-	ShadowEvalPass*  m_shadowEvalPass  = nullptr;
 
 	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
 	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
@@ -286,6 +274,9 @@ private:
 
 	// --- Last acquired swapchain image index (for screenshot) ---
 	uint32_t m_lastImageIndex = 0;
+
+	// --- Active shadow-casting light UID (-1 = none) ---
+	int m_activeShadowLightUID = -1;
 };
 
 } // namespace neurus

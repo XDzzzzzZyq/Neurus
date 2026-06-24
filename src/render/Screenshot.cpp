@@ -1,6 +1,6 @@
 #include "Screenshot.h"
 #include "Image.h"
-#include "passes/AttachmentManager.h"
+#include "passes/RenderCache.h"
 #include "asset/ImageData.h"
 #include "Texture.h"
 #include "Log.h"
@@ -155,7 +155,8 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
                                        const vk::raii::PhysicalDevice& physicalDevice,
                                        vk::Queue queue,
                                        uint32_t queueFamilyIndex,
-                                       AttachmentManager& attachmentManager,
+                                       RenderCache& renderCache,
+                                       vk::Extent2D extent,
                                        const std::string& prefix)
 {
 	static constexpr AttachmentName kAttachmentNames[] = {
@@ -173,12 +174,12 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 
 	for (const auto name : kAttachmentNames)
 	{
-		if (!attachmentManager.HasAttachment(name))
+		if (!renderCache.HasAttachment(name))
 		{
 			continue;
 		}
 
-		Image& image = attachmentManager.GetAttachment(name);
+		Image& image = renderCache.GetAttachment(name, extent);
 
 		// Skip attachments that have never been written (current layout UNDEFINED).
 		// Capturing them would leave them in TRANSFER_SRC_OPTIMAL, causing

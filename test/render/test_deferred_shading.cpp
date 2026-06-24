@@ -19,10 +19,10 @@
 #include "shared/TestVulkanShared.h"
 
 // --- Render layer ---
-#include "render/passes/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/PassContext.h"
+#include "render/passes/RenderContext.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Material.h"
 #include "render/Screenshot.h"
@@ -93,15 +93,13 @@ protected:
 			return;
 		}
 
-		// --- Render pass infrastructure ---
-		m_attachmentManager = std::make_unique<AttachmentManager>(*m_device, pd);
-		m_attachmentManager->Create({kRenderWidth, kRenderHeight});
+		// --- Render pass infrastructure (attachments created lazily) ---
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 		m_renderPassManager = std::make_unique<RenderPassManager>();
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			*m_attachmentManager,
 			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
@@ -109,7 +107,6 @@ protected:
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
-			*m_attachmentManager,
 			2u,
 			m_queue, m_graphicsQueueFamily,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
@@ -121,7 +118,7 @@ protected:
 	}
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<AttachmentManager>  m_attachmentManager;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<LightingPass>       m_lightingPass;
@@ -202,12 +199,12 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer attachments & record geometry pass
 	// -------------------------------------------------------------------
-	VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	{
 		auto& cmd = BeginCmd();
 		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, PassContext{
+		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
@@ -227,7 +224,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 
 	{
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, PassContext{
+		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = camUBO.view,
@@ -252,7 +249,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 			+ "deferred/" + AttachmentNameToString(name) + ".png";
 		const std::string tmpPath = refPath + ".tmp";
 
-		Image& attachment = m_attachmentManager->GetAttachment(name);
+		Image& attachment = m_renderCache->GetAttachment(name, {kRenderWidth, kRenderHeight});
 		const bool captured = Screenshot::CaptureAttachment(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			attachment, tmpPath, isNormal);

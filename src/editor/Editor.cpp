@@ -140,12 +140,10 @@ void Editor::OnProjectNew()
 {
 	try
 	{
-		// Drain GPU work and reset IBL descriptor references before
-		// destroying the old project's GPU resources.
+		// Drain GPU work before destroying the old project's GPU resources.
 		if (m_renderer)
 		{
 			m_renderer->WaitIdle();
-			m_renderer->ResetIBLResources();
 		}
 
 		m_project = std::make_unique<neurus::project::Project>(
@@ -185,16 +183,10 @@ void Editor::OnProjectOpen(const QString& path)
 {
 	try
 	{
-		// Drain any GPU work referencing the old project's resources and
-		// reset IBL cubemap descriptor references to fallback before the
-		// old Environment (and its cubemap Image/Sampler resources) are
-		// destroyed. This prevents:
-		//   - vkDestroySampler while still in use by descriptor set
-		//   - VUID-VkWriteDescriptorSet-descriptorType-02996 (stale VkImageView)
+		// Drain any GPU work referencing the old project's resources.
 		if (m_renderer)
 		{
 			m_renderer->WaitIdle();
-			m_renderer->ResetIBLResources();
 		}
 
 		m_project = std::make_unique<neurus::project::Project>(
