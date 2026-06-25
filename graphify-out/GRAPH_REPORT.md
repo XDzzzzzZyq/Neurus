@@ -1,15 +1,16 @@
-# Graph Report - D:\Projects\Neurus  (2026-06-19)
+# Graph Report - Neurus  (2026-06-25)
 
 ## Corpus Check
-- cluster-only mode — file stats not available
+- 117 files · ~68,624 words
+- Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 742 nodes · 1070 edges · 81 communities (51 shown, 30 thin omitted)
-- Extraction: 95% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.8)
+- 959 nodes · 1426 edges · 92 communities (60 shown, 32 thin omitted)
+- Extraction: 98% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 9 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bfb77aff`
+- Built from commit: `9882b62a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -43,6 +44,7 @@
 - [[_COMMUNITY_Scene Mesh GPU Upload|Scene Mesh GPU Upload]]
 - [[_COMMUNITY_Camera Controller (OrbitPanZoom)|Camera Controller (Orbit/Pan/Zoom)]]
 - [[_COMMUNITY_Buffer Layout Attributes|Buffer Layout Attributes]]
+- [[_COMMUNITY_Project SaveLoad|Project Save/Load]]
 - [[_COMMUNITY_Command Buffer Wrapper|Command Buffer Wrapper]]
 - [[_COMMUNITY_Debug Line Rendering|Debug Line Rendering]]
 - [[_COMMUNITY_Debug Points Rendering|Debug Points Rendering]]
@@ -90,71 +92,83 @@
 - [[_COMMUNITY_Main Window Header|Main Window Header]]
 - [[_COMMUNITY_Vulkan Widget Header|Vulkan Widget Header]]
 - [[_COMMUNITY_Light Spot Cutoff|Light Spot Cutoff]]
+- [[_COMMUNITY_Editor Context Cpp|Editor Context Cpp]]
+- [[_COMMUNITY_Editor Context Header|Editor Context Header]]
+- [[_COMMUNITY_Community 81|Community 81]]
+- [[_COMMUNITY_Community 82|Community 82]]
+- [[_COMMUNITY_Community 83|Community 83]]
+- [[_COMMUNITY_Community 84|Community 84]]
+- [[_COMMUNITY_Community 85|Community 85]]
+- [[_COMMUNITY_Community 86|Community 86]]
+- [[_COMMUNITY_Community 87|Community 87]]
+- [[_COMMUNITY_Community 88|Community 88]]
+- [[_COMMUNITY_Community 89|Community 89]]
+- [[_COMMUNITY_Community 90|Community 90]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `BeginPass()` - 13 edges
-2. `Update()` - 12 edges
-3. `Image()` - 12 edges
-4. `createFromPixelData()` - 12 edges
-5. `LoadObjFromString()` - 11 edges
-6. `SavePixelData()` - 10 edges
-7. `ReadImageToBuffer()` - 10 edges
-8. `FromFile()` - 10 edges
-9. `VulkanImage()` - 10 edges
-10. `ReadImageToBuffer()` - 10 edges
+1. `Image()` - 15 edges
+2. `BeginPass()` - 13 edges
+3. `createFromPixelData()` - 12 edges
+4. `LoadObjFromString()` - 11 edges
+5. `Initialize()` - 11 edges
+6. `ReadImageToBuffer()` - 11 edges
+7. `SavePixelData()` - 10 edges
+8. `CaptureAllAttachments()` - 10 edges
+9. `FromFile()` - 10 edges
+10. `VulkanImage()` - 10 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `NeurusMainWindow()` --calls--> `Resize()`  [INFERRED]
-  src/ui/NeurusMainWindow.cpp → src/render/AttachmentManager.cpp
-- `CaptureAllAttachments()` --calls--> `AttachmentNameToString()`  [INFERRED]
-  src/render/Screenshot.cpp → src/render/AttachmentManager.cpp
-- `CreateDescriptorSetLayout()` --calls--> `BuildLayout()`  [INFERRED]
-  src/render/LightingPass.cpp → src/render/DescriptorManager.cpp
+- `ExportShadowDepthEquirect()` --calls--> `BuildLayout()`  [INFERRED]
+  src/render/DeferredRenderer.cpp → src/render/DescriptorManager.cpp
 - `CreateCameraLayout()` --calls--> `BuildLayout()`  [INFERRED]
-  src/render/GeometryPass.cpp → src/render/DescriptorManager.cpp
-- `Camera()` --has_uid--> `UID()`  [0.95]
-  src/scene/Camera.cpp → src/scene/UID.cpp
+  src/render/passes/GeometryPass.cpp → src/render/DescriptorManager.cpp
+- `CreateDescriptorSetLayout()` --calls--> `BuildLayout()`  [INFERRED]
+  src/render/passes/IBLPass.cpp → src/render/DescriptorManager.cpp
+- `CreateLightLayout()` --calls--> `BuildLayout()`  [INFERRED]
+  src/render/passes/ShadowDepthPass.cpp → src/render/DescriptorManager.cpp
+- `CreateDescriptorSetLayout()` --calls--> `BuildLayout()`  [INFERRED]
+  src/render/passes/SSAOPass.cpp → src/render/DescriptorManager.cpp
 
 ## Import Cycles
 - None detected.
 
-## Communities (81 total, 30 thin omitted)
+## Communities (92 total, 32 thin omitted)
 
 ### Community 0 - "Deferred Renderer Core"
-Cohesion: 0.06
-Nodes (38): CommandPool, neurus(), neurus(), Fence, Mesh, buildRenderItem(), computeCameraData(), createCommandPool() (+30 more)
+Cohesion: 0.16
+Nodes (19): CameraUBOData, GeometryRenderItem, buildRenderItem(), computeCameraData(), DrawFrame(), ExportShadowDepthEquirect(), GenerateIBL(), HandleResize() (+11 more)
 
 ### Community 1 - "Application & Window Events"
-Cohesion: 0.11
-Nodes (21): GetSpeedMultiplier(), Orbit(), Pan(), Update(), Zoom(), GetDeltaMouseX(), GetDeltaMouseY(), GetInputState() (+13 more)
+Cohesion: 0.10
+Nodes (11): GetInputState(), IsAltHeld(), IsCtrlHeld(), IsMouseButtonClicked(), IsMouseButtonPressed(), IsMouseButtonReleased(), IsShiftHeld(), RecordMousePress() (+3 more)
 
 ### Community 2 - "Scene Debug Visualization"
-Cohesion: 0.07
-Nodes (20): mutable, PointType, SetColor(), SetColor(), SetPointType(), cereal(), neurus(), GetTransformPtr() (+12 more)
+Cohesion: 0.06
+Nodes (22): mutable, PointType, SetColor(), SetColor(), SetPointType(), neurus(), cereal(), neurus() (+14 more)
 
 ### Community 3 - "Lighting Pass & Index/Vertex Buffers"
-Cohesion: 0.09
-Nodes (25): neurus(), neurus(), CreateDescriptorSetLayout(), CreatePipeline(), CreateSampler(), GetLightSSBO(), LightingPass(), Record() (+17 more)
+Cohesion: 0.29
+Nodes (5): neurus(), neurus(), namespace, namespace, VulkanBuffer
 
 ### Community 4 - "Texture & Material Cache"
-Cohesion: 0.18
-Nodes (24): computeMipLevels(), createFromPixelData(), createSampler(), ForAttachment(), FromData(), FromFile(), LoadTexture(), pixelByteSize() (+16 more)
+Cohesion: 0.19
+Nodes (26): computeMipLevels(), createFromPixelData(), createSampler(), ForAttachment(), FromData(), FromFile(), FromImage(), LoadTexture() (+18 more)
 
 ### Community 5 - "Vulkan Image GPU Resource"
 Cohesion: 0.15
 Nodes (26): AccessFlagsForLayout(), allocateAndBindMemory(), AspectFromFormat(), createImage(), createImageView(), FindMemoryType(), GenerateMipmaps(), PipelineStageForLayout() (+18 more)
 
 ### Community 6 - "Render Image Abstraction"
-Cohesion: 0.16
-Nodes (25): AccessFlagsForLayout(), allocateAndBindMemory(), AspectFromFormat(), createImage(), createImageView(), FindMemoryType(), GenerateMipmaps(), Image() (+17 more)
+Cohesion: 0.15
+Nodes (31): AccessFlagsForLayout(), allocateAndBindMemory(), AspectFromFormat(), createFaceViews(), createImage(), createImageView(), createMultiviewView(), FindMemoryType() (+23 more)
 
 ### Community 7 - "Editor Input System"
-Cohesion: 0.13
-Nodes (15): BoxSelect(), RaycastSelect(), RayIntersectsSphere(), ScreenToRay(), neurus(), EventBus(), neurus(), Ray (+7 more)
+Cohesion: 0.12
+Nodes (16): BoxSelect(), RaycastSelect(), RayIntersectsSphere(), ScreenToRay(), EventQueue, neurus(), EventQueue(), GetEventQueue() (+8 more)
 
 ### Community 8 - "Selection Controller"
-Cohesion: 0.18
-Nodes (20): AttachmentLoadOp, AttachmentStoreOp, ClearValue, PassType, BeginPass(), ColorAttachmentCount(), colorLoadOpFor(), colorStoreOpFor() (+12 more)
+Cohesion: 0.17
+Nodes (20): AttachmentLoadOp, AttachmentStoreOp, ClearValue, BeginPass(), ColorAttachmentCount(), colorLoadOpFor(), colorStoreOpFor(), depthLoadOpFor() (+12 more)
 
 ### Community 9 - "Render Pass & Attachment Config"
 Cohesion: 0.18
@@ -166,23 +180,23 @@ Nodes (17): AddFace(), ComputeCenter(), ComputeFaceNormals(), ComputeTangents(),
 
 ### Community 11 - "Geometry Pass & Descriptor Layout"
 Cohesion: 0.21
-Nodes (15): DescriptorImageInfo, DescriptorPoolSize, DescriptorSetLayoutBinding, DescriptorType, Allocate(), Build(), CalculatePoolSizes(), DescriptorPool() (+7 more)
+Nodes (16): DescriptorImageInfo, DescriptorPoolSize, DescriptorSetLayoutBinding, DescriptorType, Allocate(), Build(), CalculatePoolSizes(), DescriptorPool() (+8 more)
 
 ### Community 12 - "Mesh Data Loading (OBJ)"
-Cohesion: 0.22
-Nodes (15): ImageData, neurus(), CaptureAllAttachments(), CaptureAttachment(), CaptureSwapchain(), timestampedFilename(), namespace, AttachmentManager (+7 more)
+Cohesion: 0.11
+Nodes (25): AttachmentConfig, AttachmentName, ImageData, AttachmentNameToString(), ConfigFor(), createAttachment(), HasAttachment(), RenderCache() (+17 more)
 
 ### Community 13 - "Descriptor Pool Management"
-Cohesion: 0.20
-Nodes (14): Instance, QObject, QString, QString, QWidget, MainWindow(), CreateDocks(), CreateMenus() (+6 more)
+Cohesion: 0.09
+Nodes (30): InitEditor(), InitRenderer(), InitVulkan(), LoadProject(), resolveResourcePath(), Run(), StartRenderLoop(), WireSignals() (+22 more)
 
 ### Community 14 - "Screenshot Capture & Image Data"
 Cohesion: 0.20
 Nodes (15): QKeyEvent, QMouseEvent, QPaintEvent, QResizeEvent, QWheelEvent, QWidget, keyPressEvent(), keyReleaseEvent() (+7 more)
 
 ### Community 15 - "Editor Context & Scene State"
-Cohesion: 0.17
-Nodes (13): activeScene(), GetActiveCamera(), GetObjectID(), GetObjectIDs(), SetScene(), Camera, Context(), EditorContext() (+5 more)
+Cohesion: 0.19
+Nodes (11): activeScene(), GetActiveCamera(), GetObjectID(), GetObjectIDs(), SetScene(), Camera, EditorContext(), ObjectID (+3 more)
 
 ### Community 16 - "Light Component System"
 Cohesion: 0.15
@@ -197,28 +211,28 @@ Cohesion: 0.22
 Nodes (11): BufferUsageFlags, findMemoryType(), GetDescriptorInfo(), Upload(), VulkanBuffer(), DescriptorBufferInfo, Device, DeviceSize (+3 more)
 
 ### Community 19 - "Image Data Asset Loading"
-Cohesion: 0.31
-Nodes (12): ChannelCount(), ConvertHalfToU8(), EnsureDirectory(), HalfToFloat(), IsBGRFormat(), PixelByteSize(), SavePixelData(), SwizzleBGRtoRGB() (+4 more)
+Cohesion: 0.25
+Nodes (15): ChannelCount(), ConvertHalfToU8(), EnsureDirectory(), HalfToFloat(), IsBGRFormat(), LoadFromPath(), PixelByteSize(), SavePixelData() (+7 more)
 
 ### Community 20 - "Attachment Manager"
-Cohesion: 0.27
-Nodes (12): AttachmentConfig, AttachmentName, AttachmentManager(), AttachmentNameToString(), ConfigFor(), Create(), createAttachment(), HasAttachment() (+4 more)
+Cohesion: 0.09
+Nodes (26): array, KernelSampleGpu, kMaxKernelSamples, kNoiseEntryCount, NoiseEntryGpu, CreateDescriptorSetLayout(), CreatePipeline(), DeterministicRNG (+18 more)
 
 ### Community 21 - "Material Shader Parameters"
-Cohesion: 0.21
-Nodes (12): DescriptorSetLayoutBuilder, BuildLayout(), CreateCameraLayout(), CreatePipeline(), GeometryPass(), RenderPassManager, AttachmentManager, DescriptorSetLayout (+4 more)
+Cohesion: 0.20
+Nodes (10): DescriptorSetLayoutBuilder, CreateDescriptorSetLayout(), CreatePipeline(), LightingPass(), BuildLayout(), DescriptorSetLayout, Device, PhysicalDevice (+2 more)
 
 ### Community 22 - "Camera System"
 Cohesion: 0.21
 Nodes (11): MatDataType, MaterialRes, MatParaType, InitParamData(), LoadMaterial(), Material(), ParseConfig(), SetMatParam() (+3 more)
 
 ### Community 23 - "Scene Graph Management"
-Cohesion: 0.17
-Nodes (10): Camera(), DebugLine(), DebugPoints(), Mesh(), ReloadMeshData(), Sprite(), neurus(), UID() (+2 more)
+Cohesion: 0.14
+Nodes (12): Camera(), DebugLine(), DebugPoints(), Mesh(), ReleaseGPUBuffers(), ReloadMeshData(), Scene(), Sprite() (+4 more)
 
 ### Community 24 - "Editor Core State"
-Cohesion: 0.24
-Nodes (6): GetProjectionMatrix(), GetViewMatrix(), SetCamPos(), SetTarPos(), mat4, vec3
+Cohesion: 0.08
+Nodes (24): mat4, GenFloatData(), GetProjectionMatrix(), GetViewMatrix(), SetCamPos(), SetTarPos(), BuildIBLTextures(), CreateCubemapSampler() (+16 more)
 
 ### Community 25 - "Shader Module & Pipeline Stages"
 Cohesion: 0.20
@@ -237,8 +251,8 @@ Cohesion: 0.48
 Nodes (6): AddAttribute(), GetBindingDescription(), GetFormatSize(), GetStride(), Format, VertexInputBindingDescription
 
 ### Community 30 - "Command Buffer Wrapper"
-Cohesion: 0.57
-Nodes (6): CreateDefault(), New(), Open(), Save(), Project(), string
+Cohesion: 0.12
+Nodes (29): DeferredRenderer, Edit(), Editor(), GenerateIBL(), Initialize(), OnCameraAdd(), OnIBLLoad(), OnLightAdd() (+21 more)
 
 ### Community 31 - "Debug Line Rendering"
 Cohesion: 0.33
@@ -249,8 +263,8 @@ Cohesion: 0.33
 Nodes (5): ShaderModule, LoadShader(), Device, shared_ptr, string
 
 ### Community 33 - "Shader Library Cache"
-Cohesion: 0.33
-Nodes (6): Record(), CameraUBOData, CommandBuffer, Extent2D, GeometryRenderItem, vector
+Cohesion: 0.11
+Nodes (27): Light, QDoubleSpinBox, QModelIndex, QWidget, Scene, Camera, ObjectID, QString (+19 more)
 
 ### Community 34 - "Index Buffer GPU Resource"
 Cohesion: 0.47
@@ -261,8 +275,8 @@ Cohesion: 0.47
 Nodes (4): PushDebugPoint(), PushDebugPoints(), vec3, vector
 
 ### Community 36 - "Compute Pipeline Builder"
-Cohesion: 0.50
-Nodes (3): resolveResourcePath(), Run(), QString
+Cohesion: 0.19
+Nodes (19): createDepthmap(), CreateLightLayout(), createMultiviewColorPipeline(), createMultiviewPipeline(), createSingleFacePipeline(), createUniforms(), Record(), SetLightPosition() (+11 more)
 
 ### Community 37 - "Application Class Header"
 Cohesion: 0.40
@@ -278,7 +292,7 @@ Nodes (4): BuildComputePipeline(), ComputePipelineBuilder(), Device, Pipeline
 
 ### Community 40 - "Sprite Component"
 Cohesion: 0.67
-Nodes (3): neurus(), project(), namespace
+Nodes (3): neurus(), raii(), namespace
 
 ### Community 41 - "Shader Program Pipeline"
 Cohesion: 0.83
@@ -304,25 +318,69 @@ Nodes (3): ShaderProgram(), Device, Extent2D
 Cohesion: 0.67
 Nodes (3): namespace, ads(), neurus()
 
+### Community 50 - "Selection Controller Header"
+Cohesion: 0.14
+Nodes (12): CommandPool, neurus(), neurus(), createCommandPool(), DeferredRenderer(), WaitIdle(), namespace, namespace (+4 more)
+
+### Community 54 - "Deferred Renderer Header"
+Cohesion: 0.23
+Nodes (13): ComputePipelineBuilder, CreateEquirectSampler(), CreatePipeline(), dispatchCompute(), Generate(), WriteDescriptors(), PipelineLayout, CommandBuffer (+5 more)
+
+### Community 56 - "Geometry Pass Header"
+Cohesion: 0.11
+Nodes (13): CreateDescriptorSets(), DispatchCompute(), neurus(), neurus(), neurus(), neurus(), neurus(), namespace (+5 more)
+
+### Community 58 - "Pipeline Builder Header"
+Cohesion: 0.20
+Nodes (13): CreateCameraLayout(), CreatePipeline(), GeometryPass(), Record(), RenderPassManager, CommandBuffer, DescriptorSetLayout, Device (+5 more)
+
+### Community 59 - "Screenshot Header"
+Cohesion: 0.30
+Nodes (11): CameraPushEvent, CameraRotateEvent, CameraSlideEvent, CameraZoomEvent, Init(), NotifyCameraChanged(), OnCameraPush(), OnCameraRotate() (+3 more)
+
+### Community 79 - "Editor Context Cpp"
+Cohesion: 0.29
+Nodes (9): GetLightSSBO(), Record(), UploadLights(), WriteDescriptors(), CommandBuffer, Extent2D, RenderCache, RenderContext (+1 more)
+
+### Community 80 - "Editor Context Header"
+Cohesion: 0.25
+Nodes (7): Fence, m_fence(), m_semaphore(), neurus(), device, namespace, Semaphore
+
+### Community 81 - "Community 81"
+Cohesion: 0.33
+Nodes (5): neurus(), neurus(), project(), namespace, namespace
+
+### Community 82 - "Community 82"
+Cohesion: 0.33
+Nodes (6): CreateDescriptorSetLayout(), IBLPass(), DescriptorSetLayout, Device, PhysicalDevice, Queue
+
+### Community 83 - "Community 83"
+Cohesion: 0.40
+Nodes (5): IBLPushConstants, maxStep, mipLevel, _pad, roughnessSq
+
+### Community 84 - "Community 84"
+Cohesion: 0.40
+Nodes (4): SetMatColor(), SetTex(), string, vec3
+
 ## Knowledge Gaps
-- **184 isolated node(s):** `QString`, `vector`, `Extent2D`, `namespace`, `namespace` (+179 more)
+- **230 isolated node(s):** `QString`, `vector`, `Extent2D`, `ImageLoadResult`, `namespace` (+225 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **30 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **32 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `UID()` connect `Scene Graph Management` to `Light Component System`, `Application & Window Events`?**
-  _High betweenness centrality (0.135) - this node is a cross-community bridge._
-- **Why does `Mesh()` connect `Scene Graph Management` to `Project Save/Load`?**
-  _High betweenness centrality (0.124) - this node is a cross-community bridge._
-- **Why does `Scene()` connect `Application & Window Events` to `Shader Module & Pipeline Stages`, `Scene Graph Management`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
+- **Why does `array` connect `Attachment Manager` to `Deferred Renderer Core`, `Pipeline Builder Header`, `Editor Context Cpp`?**
+  _High betweenness centrality (0.085) - this node is a cross-community bridge._
+- **Why does `Environment` connect `Command Buffer Wrapper` to `Editor Core State`, `Shader Library Cache`, `Editor Context Cpp`?**
+  _High betweenness centrality (0.070) - this node is a cross-community bridge._
+- **Why does `Light` connect `Shader Library Cache` to `Light Component System`, `Project Save/Load`, `Editor Context Cpp`?**
+  _High betweenness centrality (0.068) - this node is a cross-community bridge._
 - **What connects `QString`, `vector`, `Extent2D` to the rest of the system?**
-  _184 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Deferred Renderer Core` be split into smaller, more focused modules?**
-  _Cohesion score 0.056429232192414434 - nodes in this community are weakly interconnected._
+  _230 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Application & Window Events` be split into smaller, more focused modules?**
-  _Cohesion score 0.11260504201680673 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.10333333333333333 - nodes in this community are weakly interconnected._
 - **Should `Scene Debug Visualization` be split into smaller, more focused modules?**
-  _Cohesion score 0.06554621848739496 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.059743954480796585 - nodes in this community are weakly interconnected._
+- **Should `Vulkan Image GPU Resource` be split into smaller, more focused modules?**
+  _Cohesion score 0.14814814814814814 - nodes in this community are weakly interconnected._
