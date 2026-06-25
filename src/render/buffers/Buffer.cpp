@@ -58,7 +58,6 @@ void Buffer::createBuffer(const vk::raii::Device& device,
 	// --- Create buffer ---
 	vk::BufferCreateInfo bufferCI({}, m_size, m_usageFlags);
 	m_buffer = std::make_unique<vk::raii::Buffer>(*m_device, bufferCI);
-	m_bufferRaw = **m_buffer;
 
 	// --- Query memory requirements ---
 	auto memReqs = m_buffer->getMemoryRequirements();
@@ -117,14 +116,12 @@ Buffer::Buffer(Buffer&& other) noexcept
 	, m_physicalDevice(other.m_physicalDevice)
 	, m_buffer(std::move(other.m_buffer))
 	, m_memory(std::move(other.m_memory))
-	, m_bufferRaw(other.m_bufferRaw)
 	, m_size(other.m_size)
 	, m_usageFlags(other.m_usageFlags)
 	, m_memoryProperties(other.m_memoryProperties)
 	, m_debugName(std::move(other.m_debugName))
 {
 	// Invalidate the moved-from object
-	other.m_bufferRaw = vk::Buffer{};
 	other.m_size = 0;
 }
 
@@ -136,14 +133,12 @@ Buffer& Buffer::operator=(Buffer&& other) noexcept
 		m_physicalDevice = other.m_physicalDevice;
 		m_buffer = std::move(other.m_buffer);
 		m_memory = std::move(other.m_memory);
-		m_bufferRaw = other.m_bufferRaw;
 		m_size = other.m_size;
 		m_usageFlags = other.m_usageFlags;
 		m_memoryProperties = other.m_memoryProperties;
 		m_debugName = std::move(other.m_debugName);
 
 		// Invalidate the moved-from object
-		other.m_bufferRaw = vk::Buffer{};
 		other.m_size = 0;
 	}
 
@@ -158,7 +153,7 @@ vk::DescriptorBufferInfo Buffer::GetDescriptorInfo(vk::DeviceSize offset,
                                                     vk::DeviceSize range) const
 {
 	vk::DeviceSize actualRange = (range == VK_WHOLE_SIZE) ? m_size : range;
-	return vk::DescriptorBufferInfo(m_bufferRaw, offset, actualRange);
+	return vk::DescriptorBufferInfo(this->buffer(), offset, actualRange);
 }
 
 } // namespace neurus

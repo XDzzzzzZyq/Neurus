@@ -26,6 +26,15 @@ GPUBuffer::GPUBuffer(const vk::raii::Device& device,
 	             usageFlags | vk::BufferUsageFlagBits::eTransferDst,
 	             vk::MemoryPropertyFlagBits::eDeviceLocal,
 	             debugName);
+	m_staging = std::make_unique<StagingBuffer>(*m_device,
+		                                        *m_physicalDevice,
+		                                        m_queue,
+		                                        m_queueFamilyIndex,
+		                                        m_size,
+		                                        m_debugName.empty() ? nullptr
+		                                                            : (m_debugName + "_Staging").c_str());
+
+	NEURUS_LOG("[GPUBuffer::Map] created staging buffer, size=" << m_size);
 }
 
 // ---------------------------------------------------------------------------
@@ -50,19 +59,6 @@ void GPUBuffer::Upload(const void* data, vk::DeviceSize size)
 
 void* GPUBuffer::Map()
 {
-	if (!m_staging)
-	{
-		m_staging = std::make_unique<StagingBuffer>(*m_device,
-		                                            *m_physicalDevice,
-		                                            m_queue,
-		                                            m_queueFamilyIndex,
-		                                            m_size,
-		                                            m_debugName.empty() ? nullptr
-		                                                                : (m_debugName + "_Staging").c_str());
-
-		NEURUS_LOG("[GPUBuffer::Map] created staging buffer, size=" << m_size);
-	}
-
 	return m_staging->Map();
 }
 
@@ -72,11 +68,6 @@ void* GPUBuffer::Map()
 
 void GPUBuffer::Unmap()
 {
-	if (!m_staging)
-	{
-		throw std::runtime_error("GPUBuffer::Unmap: Map() was never called.");
-	}
-
 	m_staging->Unmap();
 
 	// --- Create transient command pool and one-shot command buffer ---
@@ -93,7 +84,7 @@ void GPUBuffer::Unmap()
 	cmdBufs[0].begin(beginInfo);
 
 	vk::BufferCopy copyRegion(0, 0, m_size);
-	cmdBufs[0].copyBuffer(m_staging->buffer(), m_bufferRaw, copyRegion);
+	cmdBufs[0].copyBuffer(m_staging->buffer(), this->buffer(), copyRegion);
 
 	// Memory barrier to ensure transfer writes are visible to all
 	// subsequent GPU operations on this buffer.

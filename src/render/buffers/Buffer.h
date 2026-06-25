@@ -89,7 +89,7 @@ public:
 		vk::DeviceSize range = VK_WHOLE_SIZE) const;
 
 	/** @brief Returns the underlying vk::Buffer handle. */
-	vk::Buffer buffer() const { return m_bufferRaw; }
+	vk::Buffer buffer() const { return *m_buffer; }
 
 	/** @brief Returns the buffer size in bytes. */
 	vk::DeviceSize size() const { return m_size; }
@@ -128,7 +128,6 @@ protected:
 
 	std::unique_ptr<vk::raii::Buffer> m_buffer;
 	std::unique_ptr<vk::raii::DeviceMemory> m_memory;
-	vk::Buffer m_bufferRaw = VK_NULL_HANDLE;
 	vk::DeviceSize m_size = 0;
 	vk::BufferUsageFlags m_usageFlags;
 	vk::MemoryPropertyFlags m_memoryProperties;
