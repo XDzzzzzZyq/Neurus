@@ -186,11 +186,10 @@ void LightingPass::UploadLights(const Scene& scene)
 	// Create or re-create the SSBO
 	const vk::DeviceSize bufferSize = newCount * sizeof(PointLightGpu);
 
-	m_lightSSBO = std::make_unique<VulkanBuffer>(
+	m_lightSSBO = std::make_unique<GPUBuffer>(
 		*m_device, *m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
 		bufferSize,
-		vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-		vk::MemoryPropertyFlagBits::eDeviceLocal,
+		vk::BufferUsageFlagBits::eStorageBuffer,
 		"LightSSBO");
 	m_lightSSBO->Upload(gpuLights.data(), bufferSize);
 
@@ -198,7 +197,7 @@ void LightingPass::UploadLights(const Scene& scene)
 	           << " (" << bufferSize << " bytes)");
 }
 
-const VulkanBuffer* LightingPass::GetLightSSBO() const
+const GPUBuffer* LightingPass::GetLightSSBO() const
 {
 	return m_lightSSBO ? m_lightSSBO.get() : nullptr;
 }

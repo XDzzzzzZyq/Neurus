@@ -11,7 +11,7 @@
 #include "shared/TestVulkanShared.h"
 
 #include "render/DescriptorManager.h"
-#include "render/VulkanBuffer.h"
+#include "render/buffers/StagingBuffer.h"
 #include "render/VulkanContext.h"
 
 using namespace neurus;
@@ -374,16 +374,13 @@ TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// Create a host-visible uniform buffer
+	// Create a host-visible staging buffer
 	constexpr vk::DeviceSize kBufSize = 256;
-	VulkanBuffer buf(*m_device,
-	                 PhysicalDevice(),
-	                 m_queue,
-	                 m_graphicsQueueFamily,
-	                 kBufSize,
-	                 vk::BufferUsageFlagBits::eUniformBuffer,
-	                 vk::MemoryPropertyFlagBits::eHostVisible |
-	                     vk::MemoryPropertyFlagBits::eHostCoherent);
+	StagingBuffer buf(*m_device,
+	                  PhysicalDevice(),
+	                  m_queue,
+	                  m_graphicsQueueFamily,
+	                  kBufSize);
 
 	vk::DescriptorBufferInfo bufInfo = buf.GetDescriptorInfo();
 
@@ -416,14 +413,11 @@ TEST_F(DescriptorManagerTest, WriteBuffer_DefaultType_UniformBuffer)
 	}
 
 	constexpr vk::DeviceSize kBufSize = 128;
-	VulkanBuffer buf(*m_device,
-	                 PhysicalDevice(),
-	                 m_queue,
-	                 m_graphicsQueueFamily,
-	                 kBufSize,
-	                 vk::BufferUsageFlagBits::eStorageBuffer,
-	                 vk::MemoryPropertyFlagBits::eHostVisible |
-	                     vk::MemoryPropertyFlagBits::eHostCoherent);
+	StagingBuffer buf(*m_device,
+	                  PhysicalDevice(),
+	                  m_queue,
+	                  m_graphicsQueueFamily,
+	                  kBufSize);
 
 	vk::DescriptorBufferInfo bufInfo = buf.GetDescriptorInfo();
 

@@ -18,7 +18,7 @@
 #include "passes/ShadowDepthPass.h"
 #include "Swapchain.h"
 #include "passes/SyncObjects.h"
-#include "VulkanBuffer.h"
+#include "buffers/GPUBuffer.h"
 #include "buffers/VertexBuffer.h"
 #include "buffers/IndexBuffer.h"
 #include "shaders/ShaderModule.h"
@@ -84,16 +84,15 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	m_renderPassManager = std::make_unique<RenderPassManager>();
 
 	// --- 4. Create fallback SSBO for zero-light scenes ---
-	//     LightingPass::Record needs a valid VulkanBuffer reference even when
+	//     LightingPass::Record needs a valid GPUBuffer reference even when
 	//     no lights are present (the SSBO descriptor must be bound, even
 	//     though the shader won't read it when lightCount=0).
 	{
 		uint8_t zero[sizeof(PointLightGpu)] = {};
-		m_fallbackSSBO = std::make_unique<VulkanBuffer>(
+		m_fallbackSSBO = std::make_unique<GPUBuffer>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
 			sizeof(PointLightGpu),
-			vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-			vk::MemoryPropertyFlagBits::eDeviceLocal);
+			vk::BufferUsageFlagBits::eStorageBuffer);
 		m_fallbackSSBO->Upload(zero, sizeof(PointLightGpu));
 		NEURUS_LOG("[DeferredRenderer] Created fallback SSBO (zero-light)");
 	}

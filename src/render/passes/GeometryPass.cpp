@@ -37,16 +37,7 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	// --- Descriptor set layout ---
 	, m_cameraLayout(CreateCameraLayout(device))
 	// --- Camera UBO (host-visible for per-frame memcpy update) ---
-	, m_cameraUBO(device,
-	              physicalDevice,
-	              queue,
-	              queueFamilyIndex,
-	              sizeof(CameraUBOData),
-	              vk::BufferUsageFlagBits::eUniformBuffer |
-	                  vk::BufferUsageFlagBits::eTransferDst,
-	              vk::MemoryPropertyFlagBits::eHostVisible |
-	                  vk::MemoryPropertyFlagBits::eHostCoherent,
-	              "CameraUBO")
+	, m_cameraUBO(device, physicalDevice, "CameraUBO")
 	// --- Descriptor pool (1 set, 1 UBO) ---
 	, m_descriptorPool(device,
 	                   1,

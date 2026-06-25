@@ -1,5 +1,5 @@
 #include "Texture.h"
-#include "VulkanBuffer.h"
+#include "buffers/StagingBuffer.h"
 #include "asset/ImageData.h"
 
 #include "Log.h"
@@ -260,12 +260,9 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 			Image::ImageType::e2D);
 
 		// --- 2. Create staging buffer (host-visible) ---
-		const vk::BufferUsageFlags stagingUsage = vk::BufferUsageFlagBits::eTransferSrc;
-		const vk::MemoryPropertyFlags stagingProps = vk::MemoryPropertyFlagBits::eHostVisible
-		                                             | vk::MemoryPropertyFlagBits::eHostCoherent;
 
-		VulkanBuffer stagingBuffer(device, physicalDevice, queue, queueFamilyIndex,
-		                           dataSize, stagingUsage, stagingProps);
+		StagingBuffer stagingBuffer(device, physicalDevice, queue, queueFamilyIndex,
+		                            dataSize);
 
 		// Copy pixel data into staging buffer
 		void* mapped = stagingBuffer.Map();

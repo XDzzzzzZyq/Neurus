@@ -30,7 +30,7 @@
 
 #include "render/passes/GeometryPass.h"
 #include "scene/Camera.h"
-#include "render/VulkanBuffer.h"
+#include "render/buffers/GPUBuffer.h"
 
 // ---------------------------------------------------------------------------
 // Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))

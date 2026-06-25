@@ -205,7 +205,7 @@ public:
 	 *
 	 * @param binding    Shader binding number.
 	 * @param bufferInfo Pre-filled VkDescriptorBufferInfo (use
-	 *                   VulkanBuffer::GetDescriptorInfo()).
+	 *                   Buffer::GetDescriptorInfo()).
 	 * @param type       Descriptor type (default: eUniformBuffer).
 	 */
 	void WriteBuffer(uint32_t binding,

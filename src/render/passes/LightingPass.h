@@ -9,7 +9,7 @@
  *
  * Architecture:
  * - Owns the compute pipeline, descriptor sets, sampler, descriptor pool,
- *   and light SSBO (VulkanBuffer).
+ *   and light SSBO (GPUBuffer).
  * - Borrows RenderCache for G-Buffer and HDR colour image views.
  * - Reads IBL cubemap resources per-frame from the Scene's Environment list.
  * - Uses ComputePipelineBuilder for pipeline construction.
@@ -22,7 +22,7 @@
 
 #include "passes/ComputePass.h"
 #include "../DescriptorManager.h"
-#include "../VulkanBuffer.h"
+#include "../buffers/GPUBuffer.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -158,9 +158,9 @@ public:
 	 * When nullptr, descriptor binding 5 uses PARTIALLY_BOUND and is
 	 * not updated — the shader never reads it because lightCount=0.
 	 *
-	 * @return Non-owning pointer to VulkanBuffer, or nullptr.
+	 * @return Non-owning pointer to GPUBuffer, or nullptr.
 	 */
-	const VulkanBuffer* GetLightSSBO() const;
+	const GPUBuffer* GetLightSSBO() const;
 
 	/**
 	 * @brief Returns the number of point lights in the SSBO.
@@ -230,7 +230,7 @@ private:
 	vk::raii::Pipeline m_pipeline;
 
 	// --- Owned light SSBO ---
-	std::unique_ptr<VulkanBuffer> m_lightSSBO;
+	std::unique_ptr<GPUBuffer> m_lightSSBO;
 	uint32_t m_lightCount = 0;
 
 	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---

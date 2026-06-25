@@ -29,7 +29,6 @@
 #include "render/DescriptorManager.h"
 #include "render/shaders/ShaderModule.h"
 #include "render/buffers/BufferLayout.h"
-#include "render/VulkanBuffer.h"
 
 #include "shared/TestReferenceImage.h"
 

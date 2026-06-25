@@ -100,18 +100,9 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 			initialParams.kernelSamples[i] = kernel[i];
 		}
 
-		m_paramsUBO = std::make_unique<VulkanBuffer>(
-			device, physicalDevice,
-			graphicsQueue, queueFamilyIndex,
-			sizeof(SSAOParamsGpu),
-			vk::BufferUsageFlagBits::eUniformBuffer,
-			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent,
-			"SSAOParamsUBO");
-
-		// Map and write initial data
-		void* mapped = m_paramsUBO->Map();
-		std::memcpy(mapped, &initialParams, sizeof(SSAOParamsGpu));
-		m_paramsUBO->Unmap();
+		m_paramsUBO = std::make_unique<UniformBuffer<SSAOParamsGpu>>(
+			device, physicalDevice, "SSAOParamsUBO");
+		m_paramsUBO->Upload(initialParams);
 
 		NEURUS_LOG("[SSAOPass] Created params UBO (" << sizeof(SSAOParamsGpu) << " bytes, "
 		           << kMaxKernelSamples << " kernel samples)");
@@ -121,15 +112,12 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	{
 		const auto noise = GenerateNoise();
 
-		m_noiseUBO = std::make_unique<VulkanBuffer>(
+		m_noiseUBO = std::make_unique<GPUBuffer>(
 			device, physicalDevice,
 			graphicsQueue, queueFamilyIndex,
 			sizeof(noise),
-			vk::BufferUsageFlagBits::eUniformBuffer | vk::BufferUsageFlagBits::eTransferDst,
-			vk::MemoryPropertyFlagBits::eDeviceLocal,
+			vk::BufferUsageFlagBits::eUniformBuffer,
 			"SSAONoiseUBO");
-
-		// Upload noise data via staging
 		m_noiseUBO->Upload(noise.data(), sizeof(noise));
 
 		NEURUS_LOG("[SSAOPass] Created noise UBO (" << sizeof(noise) << " bytes, "

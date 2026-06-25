@@ -28,7 +28,6 @@
 #include "render/Image.h"
 #include "render/Material.h"
 #include "render/Screenshot.h"
-#include "render/VulkanBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 

@@ -1,17 +1,17 @@
 #pragma once
 
-#include "VulkanBuffer.h"
+#include "GPUBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
 namespace neurus {
 
 /**
- * @brief RAII wrapper around VulkanBuffer specialized for index data.
+ * @brief Device-local index buffer with staging-backed upload.
  *
- * Creates a device-local index buffer with INDEX_BUFFER + TRANSFER_DST usage.
- * Uploads host index data immediately upon construction via the staging pattern.
- * Stores metadata: index count and index type (always UINT32).
+ * Inherits from GPUBuffer for GPU buffer lifecycle (device-local allocation,
+ * staging-backed Map/Unmap/Upload). Specializes the buffer usage to INDEX_BUFFER.
+ * GPUBuffer automatically adds TRANSFER_DST for staging support.
  *
  * @note Indices are always uint32_t (VK_INDEX_TYPE_UINT32). This avoids
  *       template complexity while supporting large meshes (up to 4B indices).
@@ -23,13 +23,13 @@ namespace neurus {
  *   uint32_t count = ibo.GetIndexCount();
  *   vk::IndexType type = ibo.GetIndexType();
  */
-class IndexBuffer
+class IndexBuffer : public GPUBuffer
 {
 public:
 	/**
 	 * @brief Creates a device-local index buffer and uploads index data.
 	 *
-	 * Internally creates a VulkanBuffer with INDEX_BUFFER | TRANSFER_DST usage
+	 * Internally creates a GPUBuffer with INDEX_BUFFER | TRANSFER_DST usage
 	 * and DEVICE_LOCAL memory, then calls Upload() with the provided data.
 	 *
 	 * @param device           Borrowed logical device (outlives this buffer).
@@ -64,11 +64,7 @@ public:
 	/** @brief Index type - always VK_INDEX_TYPE_UINT32. */
 	vk::IndexType GetIndexType() const { return vk::IndexType::eUint32; }
 
-	/** @brief Underlying Vulkan buffer handle for binding. */
-	vk::Buffer buffer() const { return m_buffer.buffer(); }
-
 private:
-	VulkanBuffer m_buffer;
 	uint32_t m_indexCount;
 };
 

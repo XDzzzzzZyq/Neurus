@@ -21,7 +21,7 @@
 #include "render/passes/LightingPass.h"
 #include "render/passes/RenderContext.h"
 #include "render/passes/RenderPassManager.h"
-#include "render/VulkanBuffer.h"
+#include "render/buffers/GPUBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
@@ -153,7 +153,7 @@ protected:
 	/**
 	 * @brief Creates a point light SSBO with a single light.
 	 */
-	std::unique_ptr<VulkanBuffer> CreateLightSSBO(const glm::vec3& pos,
+	std::unique_ptr<GPUBuffer> CreateLightSSBO(const glm::vec3& pos,
 	                                              float power = 50.0f,
 	                                              const glm::vec3& color = glm::vec3(1.0f))
 	{
@@ -169,12 +169,10 @@ protected:
 		light.power  = power;
 		light.radius = 0.05f;
 
-		auto ssbo = std::make_unique<VulkanBuffer>(
+		auto ssbo = std::make_unique<GPUBuffer>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			sizeof(PointLightGpu),
-			vk::BufferUsageFlagBits::eStorageBuffer |
-			    vk::BufferUsageFlagBits::eTransferDst,
-			vk::MemoryPropertyFlagBits::eDeviceLocal);
+			vk::BufferUsageFlagBits::eStorageBuffer);
 
 		ssbo->Upload(&light, sizeof(PointLightGpu));
 		return ssbo;

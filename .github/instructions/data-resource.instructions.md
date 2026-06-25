@@ -5,7 +5,7 @@
 The Asset layer (`src/asset/`) manages **loading, storing, and providing access**
 to external asset data (meshes, images). GPU resource abstractions (buffers,
 images, descriptors) are owned by the **Renderer layer** (`src/render/`) — see
-`renderer.instructions.md` for VulkanBuffer, VulkanImage, Texture, and
+`renderer.instructions.md` for the Buffer class hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer), VulkanImage, Texture, and
 DescriptorManager.
 
 The original "Data & Resource" layer concept has been absorbed: asset loading
@@ -15,7 +15,12 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 
 - `src/asset/MeshData.h/cpp` - Mesh geometry data (vertices, indices)
 - `src/asset/ImageData.h/cpp` - Image pixel data (CPU-side, raw or decoded)
-- `src/render/VulkanBuffer.h/cpp` - GPU buffer abstraction (vertex, index, uniform, storage)
+- `src/render/buffers/Buffer.h` - Virtual base class (Buffer) with m_buffer, m_memory
+- `src/render/buffers/StagingBuffer.h/cpp` - Host-visible staging buffer (StagingBuffer) for CPU↔GPU transfers
+- `src/render/buffers/GPUBuffer.h/cpp` - Device-local GPU buffer (GPUBuffer) with staging Map/Unmap
+- `src/render/buffers/UniformBuffer.h` - Template uniform buffer (UniformBuffer<T>) for host-visible struct upload
+- `src/render/buffers/VertexBuffer.h/cpp` - Vertex buffer (VertexBuffer, inherits GPUBuffer)
+- `src/render/buffers/IndexBuffer.h/cpp` - Index buffer (IndexBuffer, inherits GPUBuffer)
 - `src/render/VulkanImage.h/cpp` - GPU image abstraction (allocation, views, transitions)
 - `src/render/Image.h/cpp` - Higher-level image wrapper (loading, mipmaps)
 - `src/render/Texture.h/cpp` - Texture resource (combines Image + sampler + descriptor)
@@ -33,10 +38,12 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
    - Provide ImageData struct with format, dimensions, pixel data
    - CPU-side representation; GPU upload handled by renderer
 
-3. **GPU Buffer Abstraction** (`src/render/VulkanBuffer.h/cpp`)
-   - Allocate device-local or host-visible `vk::raii::Buffer` + `vk::DeviceMemory`
-   - Staging uploads from CPU to device-local memory
-   - Vertex, index, uniform, and storage buffer types
+3. **Buffer Class Hierarchy** (`src/render/buffers/Buffer.h`)
+   - Virtual base class `Buffer` with `m_buffer`, `m_memory`
+   - `StagingBuffer` — host-visible transfers (owns m_queue)
+   - `GPUBuffer` — device-local with staging-backed Map/Unmap
+   - `UniformBuffer<T>` — host-visible template for uniform structs
+   - Vertex/index buffers inherit from GPUBuffer
 
 4. **GPU Image Abstraction** (`src/render/VulkanImage.h/cpp`)
    - Create `vk::raii::Image` with appropriate tiling, usage, memory
@@ -61,7 +68,7 @@ File System (OBJ, PNG)
 src/asset/: MeshData / ImageData (CPU-side loading)
     │
     ▼
-src/render/: VulkanBuffer / VulkanImage / Texture (GPU upload + resource)
+src/render/buffers/: Buffer / StagingBuffer / GPUBuffer / UniformBuffer (GPU buffers)
     │
     ▼
 Renderer passes (GeometryPass, LightingPass): consume GPU resources
@@ -72,7 +79,7 @@ Renderer passes (GeometryPass, LightingPass): consume GPU resources
 ### ✅ Asset & Resource Code MAY:
 - Load and parse asset files (OBJ, PNG, HDR)
 - Provide CPU-side data structs (MeshData, ImageData)
-- Own GPU memory allocations (VkDeviceMemory via VulkanBuffer, VulkanImage)
+- Own GPU memory allocations (VkDeviceMemory via Buffer, VulkanImage)
 - Provide allocation utilities to Renderer passes
 
 ### ❌ Asset & Resource Code MUST NOT:
@@ -86,7 +93,7 @@ Renderer passes (GeometryPass, LightingPass): consume GPU resources
 
 - OBJ mesh loading via MeshData (icosphere, cube, etc.)
 - PNG/HDR image decoding via ImageData
-- VulkanBuffer for vertex, index, uniform, and storage buffers
+- Buffer hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer<T>) for vertex, index, uniform, and storage buffers
 - VulkanImage for GPU image allocation and layout transitions
 - Texture class combining image + sampler + descriptor
 - DescriptorManager with per-frame descriptor pool rotation

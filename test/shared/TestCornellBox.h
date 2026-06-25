@@ -21,7 +21,6 @@
 #include "Log.h"
 #include "render/passes/GeometryPass.h"
 #include "render/Material.h"
-#include "render/VulkanBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
@@ -95,7 +94,7 @@ struct CornellBoxResources
  * @param device           Logical device.
  * @param physicalDevice   Physical device (for memory properties).
  * @param graphicsQueue    Graphics queue for staging uploads.
- * @param queueFamilyIndex Queue family index for VulkanBuffer creation.
+ * @param queueFamilyIndex Queue family index for GPUBuffer creation.
  * @param basePath         Base path for OBJ files (default: "res/obj/cornellbox/").
  * @return Fully populated CornellBoxResources (move-only due to unique_ptr members).
  */

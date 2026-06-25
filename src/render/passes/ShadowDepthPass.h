@@ -8,9 +8,9 @@
 #include "passes/Pass.h"
 #include "passes/RenderContext.h"
 #include "../Image.h"
-#include "../VulkanBuffer.h"
 #include "../DescriptorManager.h"
 #include "../buffers/BufferLayout.h"
+#include "../buffers/UniformBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
@@ -64,15 +64,6 @@ public:
 	const DescriptorSetLayout& LightDescriptorLayout() const { return m_layout; }
 	const DescriptorSetLayout& GetLightLayout() const { return m_layout; }
 	vk::DescriptorSet GetLightSetHandle() const { return m_set->handle(); }
-	VulkanBuffer& GetUBO() { return *m_ubo; }
-	const vk::raii::Pipeline& GetPipeline() const
-	{
-		return m_mode == ShadowMode::Multiview ? m_multiviewPipeline : m_pipeline;
-	}
-	const vk::raii::PipelineLayout& GetPipelineLayout() const
-	{
-		return m_mode == ShadowMode::Multiview ? m_multiviewPipelineLayout : m_pipelineLayout;
-	}
 
 	// Must match std140 layout in shadow shaders:
 	//   mat4 faceViewProj[6];  // 384 bytes (offset 0)
@@ -82,6 +73,16 @@ public:
 	struct LightUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float farPlane; };
 	static_assert(sizeof(LightUBO) == 400,
 	              "LightUBO size must match std140 layout");
+
+	UniformBuffer<LightUBO>& GetUBO() { return *m_ubo; }
+	const vk::raii::Pipeline& GetPipeline() const
+	{
+		return m_mode == ShadowMode::Multiview ? m_multiviewPipeline : m_pipeline;
+	}
+	const vk::raii::PipelineLayout& GetPipelineLayout() const
+	{
+		return m_mode == ShadowMode::Multiview ? m_multiviewPipelineLayout : m_pipelineLayout;
+	}
 
 private:
 	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
@@ -102,7 +103,7 @@ private:
 
 	// --- GPU resources ---
 	std::unique_ptr<Image> m_depthmap;
-	std::unique_ptr<VulkanBuffer> m_ubo;
+	std::unique_ptr<UniformBuffer<LightUBO>> m_ubo;
 	DescriptorSetLayout m_layout;
 	DescriptorPool m_pool;
 	std::unique_ptr<DescriptorSet> m_set;

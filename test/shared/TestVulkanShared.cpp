@@ -279,11 +279,17 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 	const vk::DeviceSize imageByteSize = renderWidth * renderHeight * 8; // RGBA16F = 8 B/px
 
 	// Staging buffer: host-visible, TRANSFER_DST
-	VulkanBuffer stagingBuf(device, pd, queue, qfi,
-	                        imageByteSize,
-	                        vk::BufferUsageFlagBits::eTransferDst,
-	                        vk::MemoryPropertyFlagBits::eHostVisible |
-	                            vk::MemoryPropertyFlagBits::eHostCoherent);
+	vk::BufferCreateInfo stagingCI({}, imageByteSize, vk::BufferUsageFlagBits::eTransferDst);
+	vk::raii::Buffer stagingBuf(device, stagingCI);
+
+	auto stagingMemReqs = stagingBuf.getMemoryRequirements();
+	uint32_t stagingMemTypeIndex = FindMemoryType(pd,
+	                                              stagingMemReqs.memoryTypeBits,
+	                                              vk::MemoryPropertyFlagBits::eHostVisible |
+	                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
+	vk::MemoryAllocateInfo stagingAllocInfo(stagingMemReqs.size, stagingMemTypeIndex);
+	vk::raii::DeviceMemory stagingMem(device, stagingAllocInfo);
+	stagingBuf.bindMemory(*stagingMem, 0);
 
 	// Transition HDR output: GENERAL → TRANSFER_SRC_OPTIMAL
 	{
@@ -329,7 +335,7 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 
 		cmd.copyImageToBuffer(*hdrColor.ImageHandle(),
 		                      vk::ImageLayout::eTransferSrcOptimal,
-		                      stagingBuf.buffer(),
+		                      *stagingBuf,
 		                      {copyRegion});
 
 		cmd.end();
@@ -341,13 +347,13 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 	// Map, convert half-float → float
 	const uint32_t pixelCount = renderWidth * renderHeight;
 	std::vector<float> result(pixelCount * 4);
-	void* mapped = stagingBuf.Map();
+	void* mapped = stagingMem.mapMemory(0, imageByteSize);
 	const auto* src = static_cast<const uint16_t*>(mapped);
 	for (size_t i = 0; i < pixelCount * 4; ++i)
 	{
 		result[i] = HalfToFloat(src[i]);
 	}
-	stagingBuf.Unmap();
+	stagingMem.unmapMemory();
 
 	return result;
 }

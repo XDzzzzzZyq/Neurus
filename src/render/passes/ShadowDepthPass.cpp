@@ -108,13 +108,8 @@ void ShadowDepthPass::createUniforms(const vk::raii::Device& device,
                                       const vk::raii::PhysicalDevice& physicalDevice,
                                       vk::Queue queue, uint32_t qfi)
 {
-	m_ubo = std::make_unique<VulkanBuffer>(device, physicalDevice,
-		queue, qfi,
-		sizeof(LightUBO),
-		vk::BufferUsageFlagBits::eUniformBuffer,
-		vk::MemoryPropertyFlagBits::eHostVisible |
-			vk::MemoryPropertyFlagBits::eHostCoherent,
-		"ShadowDepthUBO");
+	m_ubo = std::make_unique<UniformBuffer<LightUBO>>(
+		device, physicalDevice, "ShadowDepthUBO");
 
 	m_layout = CreateLightLayout(device);
 	m_pool = DescriptorPool(device, 1, DescriptorPool::CalculatePoolSizes({&m_layout}, 1));

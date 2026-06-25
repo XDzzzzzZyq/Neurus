@@ -527,7 +527,7 @@ These patterns were established during deferred PBR development and apply to all
   //   mesh->GetVertexBuffer(), mesh->GetIndexBuffer(), mesh->GetGPUIndexCount()
   ```
   **Exemption**: `test_buffers.cpp` and `test_vulkan_buffer.cpp` are the unit
-  tests for `VertexBuffer`/`IndexBuffer`/`VulkanBuffer` — they use raw buffers
+  tests for `VertexBuffer`/`IndexBuffer`/`Buffer` hierarchy — they use raw buffers
   by design and are exempt from this rule.
 - **"Extract, Don't Duplicate"**: Before writing a helper function in a test
   file, check if `VulkanTestShared` already provides it (see Shared Static

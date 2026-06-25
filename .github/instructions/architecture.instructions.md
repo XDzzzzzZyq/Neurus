@@ -115,7 +115,7 @@ Renderer Layer owns:
   All framebuffer attachments (via RenderCache, dynamic rendering)
 
   Also through src/render/ abstractions:
-  VkBuffer + VkDeviceMemory pairs (VulkanBuffer)
+  VkBuffer + VkDeviceMemory pairs (Buffer hierarchy: GPUBuffer, StagingBuffer, UniformBuffer<T>)
   VkImage + VkDeviceMemory + VkImageView triples (VulkanImage, Texture)
   VkDescriptorPool + VkDescriptorSet (DescriptorManager)
 ```

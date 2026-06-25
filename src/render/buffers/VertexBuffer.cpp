@@ -19,14 +19,13 @@ VertexBuffer::VertexBuffer(const vk::raii::Device& device,
                            uint32_t stride,
                            uint32_t vertexCount,
                            const char* debugName)
-	: m_buffer(device,
-	           physicalDevice,
-	           queue,
-	           queueFamilyIndex,
-	           size,
-	           vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	           vk::MemoryPropertyFlagBits::eDeviceLocal,
-	           debugName)
+	: GPUBuffer(device,
+	            physicalDevice,
+	            queue,
+	            queueFamilyIndex,
+	            size,
+	            vk::BufferUsageFlagBits::eVertexBuffer,
+	            debugName)
 	, m_vertexCount(vertexCount)
 	, m_stride(stride)
 {
@@ -37,7 +36,7 @@ VertexBuffer::VertexBuffer(const vk::raii::Device& device,
 
 	if (data != nullptr && size > 0)
 	{
-		m_buffer.Upload(data, size);
+		Upload(data, size);
 	}
 
 	NEURUS_LOG("[VertexBuffer] " << vertexCount << " verts, stride=" << stride

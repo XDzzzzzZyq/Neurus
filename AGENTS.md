@@ -146,6 +146,14 @@ Neurus/
 │   │       ├── LightingPass.h/cpp
 │   │       ├── IBLPass.h/cpp
 │   │       └── ShadowDepthPass.h/cpp
+│   │   └── buffers/          # Buffer class hierarchy
+│   │       ├── Buffer.h/cpp         # Virtual base class (Buffer)
+│   │       ├── StagingBuffer.h/cpp  # Host-visible staging
+│   │       ├── GPUBuffer.h/cpp      # Device-local with staging
+│   │       ├── UniformBuffer.h      # Template uniform (UniformBuffer<T>)
+│   │       ├── VertexBuffer.h/cpp   # Vertex buffer (inherits GPUBuffer)
+│   │       ├── IndexBuffer.h/cpp    # Index buffer (inherits GPUBuffer)
+│   │       └── BufferLayout.h/cpp   # Vertex input layout description
 │   ├── editor/             # Editor layer (logic, controllers)
 │   │   ├── events/          # Event system (UIEvents + typed EventQueue)
 │   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor

@@ -18,7 +18,6 @@
 #include "render/passes/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/RenderPassManager.h"
-#include "render/VulkanBuffer.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"

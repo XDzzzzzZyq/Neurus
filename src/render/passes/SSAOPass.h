@@ -20,7 +20,8 @@
 #pragma once
 
 #include "passes/ComputePass.h"
-#include "../VulkanBuffer.h"
+#include "../buffers/GPUBuffer.h"
+#include "../buffers/UniformBuffer.h"
 
 #include <glm/glm.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -199,8 +200,8 @@ private:
 	vk::raii::Pipeline m_pipeline;
 
 	// --- Owned UBOs ---
-	std::unique_ptr<VulkanBuffer> m_paramsUBO;   ///< SSAO params (camera + kernel), host-visible
-	std::unique_ptr<VulkanBuffer> m_noiseUBO;    ///< Noise rotation vectors, device-local
+	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> m_paramsUBO;   ///< SSAO params (camera + kernel), host-visible
+	std::unique_ptr<GPUBuffer> m_noiseUBO;    ///< Noise rotation vectors, device-local
 
 	// --- Push constant data ---
 	int32_t m_kernelLength = kDefaultKernelLength;

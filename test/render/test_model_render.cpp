@@ -30,7 +30,6 @@
 #include "render/Texture.h"
 #include "asset/ImageData.h"
 #include "render/Texture.h"
-#include "render/VulkanBuffer.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"

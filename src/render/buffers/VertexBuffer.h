@@ -1,17 +1,17 @@
 #pragma once
 
-#include "VulkanBuffer.h"
+#include "GPUBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
 namespace neurus {
 
 /**
- * @brief RAII wrapper around VulkanBuffer specialized for vertex data.
+ * @brief Device-local vertex buffer with staging-backed upload.
  *
- * Creates a device-local vertex buffer with VERTEX_BUFFER + TRANSFER_DST usage.
- * Uploads host vertex data immediately upon construction via the staging pattern.
- * Stores metadata: vertex count and per-vertex stride in bytes.
+ * Inherits from GPUBuffer for GPU buffer lifecycle (device-local allocation,
+ * staging-backed Map/Unmap/Upload). Specializes the buffer usage to VERTEX_BUFFER.
+ * GPUBuffer automatically adds TRANSFER_DST for staging support.
  *
  * @note Template-free design - vertex data is passed as raw bytes + stride.
  *       Callers must ensure the data pointer remains valid during construction.
@@ -22,13 +22,13 @@ namespace neurus {
  *   vk::Buffer handle = vbo.buffer();
  *   uint32_t count = vbo.GetVertexCount();
  */
-class VertexBuffer
+class VertexBuffer : public GPUBuffer
 {
 public:
 	/**
 	 * @brief Creates a device-local vertex buffer and uploads vertex data.
 	 *
-	 * Internally creates a VulkanBuffer with VERTEX_BUFFER | TRANSFER_DST usage
+	 * Creates a GPUBuffer internally with VERTEX_BUFFER | TRANSFER_DST usage
 	 * and DEVICE_LOCAL memory, then calls Upload() with the provided data.
 	 *
 	 * @param device           Borrowed logical device (outlives this buffer).
@@ -65,11 +65,7 @@ public:
 	/** @brief Byte stride between consecutive vertices. */
 	uint32_t GetStride() const { return m_stride; }
 
-	/** @brief Underlying Vulkan buffer handle for binding. */
-	vk::Buffer buffer() const { return m_buffer.buffer(); }
-
 private:
-	VulkanBuffer m_buffer;
 	uint32_t m_vertexCount;
 	uint32_t m_stride;
 };

@@ -21,8 +21,8 @@
 #pragma once
 
 #include "../DescriptorManager.h"
-#include "../VulkanBuffer.h"
 #include "../buffers/BufferLayout.h"
+#include "../buffers/UniformBuffer.h"
 #include "Pass.h"
 #include "RenderContext.h"
 
@@ -161,7 +161,7 @@ private:
 	DescriptorSetLayout m_cameraLayout;             ///< Set 0 layout definition
 
 	// --- Camera UBO (host-visible for per-frame update) ---
-	VulkanBuffer m_cameraUBO;
+	UniformBuffer<CameraUBOData> m_cameraUBO;
 
 	// --- Descriptor pool + set for camera UBO ---
 	DescriptorPool m_descriptorPool;

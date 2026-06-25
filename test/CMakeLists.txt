@@ -5,7 +5,7 @@ add_executable(neurus_test
 	shared/TestVulkanShared.h
 	shared/test_main.cpp
 	render/test_buffers.cpp
-	render/test_vulkan_buffer.cpp
+	render/test_buffer.cpp
 	render/test_vulkan_context.cpp
 	asset/test_meshdata.cpp
 	asset/test_imagedata.cpp

@@ -71,7 +71,7 @@ struct SimpleShadowResources
  * @param device           Logical device.
  * @param physicalDevice   Physical device (for memory properties).
  * @param graphicsQueue    Graphics queue for staging uploads.
- * @param queueFamilyIndex Queue family index for VulkanBuffer creation.
+ * @param queueFamilyIndex Queue family index for GPUBuffer creation.
  * @return Fully populated SimpleShadowResources.
  */
 inline SimpleShadowResources LoadSimpleShadow(

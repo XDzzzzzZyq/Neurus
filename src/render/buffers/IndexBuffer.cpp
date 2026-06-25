@@ -18,14 +18,13 @@ IndexBuffer::IndexBuffer(const vk::raii::Device& device,
                          vk::DeviceSize size,
                          uint32_t indexCount,
                          const char* debugName)
-	: m_buffer(device,
-	           physicalDevice,
-	           queue,
-	           queueFamilyIndex,
-	           size,
-	           vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst,
-	           vk::MemoryPropertyFlagBits::eDeviceLocal,
-	           debugName)
+	: GPUBuffer(device,
+	            physicalDevice,
+	            queue,
+	            queueFamilyIndex,
+	            size,
+	            vk::BufferUsageFlagBits::eIndexBuffer,
+	            debugName)
 	, m_indexCount(indexCount)
 {
 	if (data == nullptr && size > 0)
@@ -35,7 +34,7 @@ IndexBuffer::IndexBuffer(const vk::raii::Device& device,
 
 	if (data != nullptr && size > 0)
 	{
-		m_buffer.Upload(data, size);
+		Upload(data, size);
 	}
 
 	NEURUS_LOG("[IndexBuffer] " << indexCount << " indices, size=" << size << " bytes"
