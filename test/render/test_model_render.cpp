@@ -267,17 +267,22 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	// -----------------------------------------------------------------------
-	// Step 12: Record geometry pass (G-Buffer write)
+	// Step 12: Build RenderContext & record geometry pass (G-Buffer write)
 	// -----------------------------------------------------------------------
+	std::vector<GeometryRenderItem> items = { renderItem };
+	RenderContext ctx{
+		.renderExtent = {kRenderWidth, kRenderHeight},
+		.frameIndex = 0,
+		.viewProj = camUBO.viewProj,
+		.view = camUBO.view,
+		.cameraPos = camera->GetPosition(),
+		.invProjView = glm::inverse(camUBO.viewProj),
+		.renderItems = &items,
+	};
+
 	{
 		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.renderItems = &items,
-		});
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
@@ -286,18 +291,9 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	// -----------------------------------------------------------------------
 	m_lightingPass->UploadLights(scene);
 
-	// Record lighting compute pass
 	{
 		auto& cmd = BeginCmd();
-
-		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.frameIndex = 0,
-			.view = camUBO.view,
-			.cameraPos = camera->GetPosition(),
-			.invProjView = glm::inverse(camUBO.viewProj),
-		});
-
+		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 

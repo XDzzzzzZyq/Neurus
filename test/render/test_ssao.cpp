@@ -117,18 +117,22 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*cb.camera);
 
 	// -------------------------------------------------------------------
-	// Step 2: Transition G-Buffer & record geometry pass
+	// Step 2: Transition G-Buffer & build RenderContext
 	// -------------------------------------------------------------------
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
+	RenderContext ctx{
+		.renderExtent = {kRenderWidth, kRenderHeight},
+		.viewProj = camUBO.viewProj,
+		.view = camUBO.view,
+		.cameraPos = cb.camera->GetPosition(),
+		.renderItems = &cb.renderItems,
+	};
+
+	// --- Record geometry pass ---
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.renderItems = &cb.renderItems,
-		});
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
@@ -137,18 +141,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
-
-		const glm::mat4 viewProj = camUBO.viewProj;
-		const glm::mat4 view     = camUBO.view;
-		const glm::vec3 camPos   = cb.camera->GetPosition();
-
-		m_ssaoPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = viewProj,
-			.view = view,
-			.cameraPos = camPos,
-		});
-
+		m_ssaoPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 

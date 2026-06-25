@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 
 #include "shared/TestVulkanShared.h"
+#include "shared/TestDeferredScene.h"
 
 // --- Render layer ---
 #include "render/passes/RenderCache.h"
@@ -137,79 +138,36 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 
 	auto& pd = PhysicalDevice();
 
+ 	// -------------------------------------------------------------------
+	// Step 1: Load sphere scene (shared helper)
 	// -------------------------------------------------------------------
-	// Step 1: Load sphere OBJ
-	// -------------------------------------------------------------------
-	std::string objPath = ResolveAssetPath("res/obj/sphere.obj");
+	auto scene = neurus::test::BuildDeferredScene(
+		*m_device, pd, m_queue, m_graphicsQueueFamily,
+		ResolveAssetPath("res/obj/sphere.obj"));
 
-	auto meshData = std::make_shared<MeshData>();
-	const bool loaded = meshData->LoadObj(objPath);
-	ASSERT_TRUE(loaded) << "Failed to load OBJ: " << objPath;
-
-	const auto& rawMesh = meshData->GetMeshData();
-	ASSERT_GT(rawMesh.dataArray.size() / 14, 0u);
-	ASSERT_GT(rawMesh.indexArray.size(), 0u);
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*scene.camera);
+	GeometryRenderItem renderItem = scene.renderItem;
+	std::vector<GeometryRenderItem> items = { renderItem };
 
 	// -------------------------------------------------------------------
-	// Step 2: Create camera (same as default scene: pos (0,2,5), target origin)
-	// -------------------------------------------------------------------
-	auto camera = std::make_shared<Camera>(
-		static_cast<float>(kRenderWidth),
-		static_cast<float>(kRenderHeight),
-		60.0f, 0.1f, 100.0f);
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
-	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
-
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
-
-	// -------------------------------------------------------------------
-	// Step 3: Create point light
-	// -------------------------------------------------------------------
-	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
-	light->SetPosition(glm::vec3(2.0f, 2.0f, 2.0f));
-	light->light_radius = 10.0f;
-
-	// -------------------------------------------------------------------
-	// Step 4: Build mesh + material
-	// -------------------------------------------------------------------
-	auto material = std::make_shared<Material>();
-	material->SetMatParam(Material::MAT_METAL, 0.0f);
-	material->SetMatParam(Material::MAT_ROUGH, 0.5f);
-	material->SetMatParam(Material::MAT_ALBEDO, glm::vec3(1.0f, 1.0f, 1.0f));
-
-	auto mesh = std::make_shared<Mesh>();
-	mesh->o_mesh = meshData;
-	mesh->o_material = material;
-
-	// -------------------------------------------------------------------
-	// Step 5: Upload mesh to GPU via Mesh::UploadToGPU()
-	// -------------------------------------------------------------------
-	mesh->UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
-
-	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
-	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
-	renderItem.indexCount   = mesh->GetGPUIndexCount();
-	renderItem.indexType    = mesh->GetIndexBuffer()->GetIndexType();
-	// Scale by 0.25 to match original vertex-scaling behaviour (positions
-	// were multiplied by 0.25 in the manual conversion that this replace).
-	renderItem.pushConstants.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.25f));
-	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-	// -------------------------------------------------------------------
-	// Step 7: Transition G-Buffer attachments & record geometry pass
+	// Step 7: Transition G-Buffer attachments & build RenderContext
 	// -------------------------------------------------------------------
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
+	RenderContext ctx{
+		.renderExtent = {kRenderWidth, kRenderHeight},
+		.frameIndex = 0,
+		.viewProj = camUBO.viewProj,
+		.view = camUBO.view,
+		.cameraPos = scene.camera->GetPosition(),
+		.invProjView = glm::inverse(camUBO.viewProj),
+		.renderItems = &items,
+	};
+
+	// --- Record geometry pass ---
 	{
 		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.renderItems = &items,
-		});
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
@@ -217,20 +175,14 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// Step 8: Upload light SSBO & record lighting pass
 	// -------------------------------------------------------------------
 	{
-		Scene scene;
-		scene.UseLight(light);
-		m_lightingPass->UploadLights(scene);
+		Scene testScene;
+		testScene.UseLight(scene.light);
+		m_lightingPass->UploadLights(testScene);
 	}
 
 	{
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.frameIndex = 0,
-			.view = camUBO.view,
-			.cameraPos = camera->GetPosition(),
-			.invProjView = glm::inverse(camUBO.viewProj),
-		});
+		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 

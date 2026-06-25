@@ -281,40 +281,40 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// -------------------------------------------------------------------
-	// Step 7: Transition G-Buffer & record geometry pass
+	// Step 7: Transition G-Buffer, build RenderContext, create scene
 	// -------------------------------------------------------------------
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
+	Scene scene;
+	scene.UseLight(light);
+	scene.env_list[m_env->GetObjectID()] = m_env;
+	m_lightingPass->UploadLights(scene);
+
+	std::vector<GeometryRenderItem> items = { renderItem };
+	RenderContext ctx{
+		.renderExtent = {kRenderWidth, kRenderHeight},
+		.frameIndex = 0,
+		.viewProj = camUBO.viewProj,
+		.view = camUBO.view,
+		.cameraPos = camera->GetPosition(),
+		.invProjView = glm::inverse(camUBO.viewProj),
+		.renderItems = &items,
+		.scene = &scene,
+	};
+
+	// --- Record geometry pass ---
 	{
 		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.renderItems = &items,
-		});
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
 	// -------------------------------------------------------------------
-	// Step 8: Upload light SSBO & record lighting pass (with IBL from scene Environment)
+	// Step 8: Record lighting pass (with IBL from scene Environment)
 	// -------------------------------------------------------------------
 	{
-		Scene scene;
-		scene.UseLight(light);
-		scene.env_list[m_env->GetObjectID()] = m_env;
-		m_lightingPass->UploadLights(scene);
-
 		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.frameIndex = 0,
-			.view = camUBO.view,
-			.cameraPos = camera->GetPosition(),
-			.invProjView = glm::inverse(camUBO.viewProj),
-			.scene = &scene,
-		});
+		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
@@ -412,32 +412,30 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	{
 		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
-		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.renderItems = &items,
-		});
-		EndSubmitWait(cmd);
-	}
-	{
 		Scene scene;
 		scene.UseLight(light);
 		scene.env_list[m_env->GetObjectID()] = m_env;
 		m_lightingPass->UploadLights(scene);
 
-		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
+		std::vector<GeometryRenderItem> items = { renderItem };
+		RenderContext ctx{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
+			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
 			.cameraPos = camera->GetPosition(),
 			.invProjView = glm::inverse(camUBO.viewProj),
+			.renderItems = &items,
 			.scene = &scene,
-		});
+		};
+
+		auto& cmd = BeginCmd();
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
+
+		auto& cmd2 = BeginCmd();
+		m_lightingPass->Record(*cmd2, *m_renderCache, ctx);
+		EndSubmitWait(cmd2);
 	}
 
 	// ================================================================
@@ -525,32 +523,30 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	{
 		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
-		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { renderItem };
-		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.renderItems = &items,
-		});
-		EndSubmitWait(cmd);
-	}
-	{
 		Scene scene;
 		scene.UseLight(light);
 		scene.env_list[m_env->GetObjectID()] = m_env;
 		m_lightingPass->UploadLights(scene);
 
-		auto& cmd = BeginCmd();
-		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
+		std::vector<GeometryRenderItem> items = { renderItem };
+		RenderContext ctx{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
+			.viewProj = camUBO.viewProj,
 			.view = camUBO.view,
 			.cameraPos = camera->GetPosition(),
 			.invProjView = glm::inverse(camUBO.viewProj),
+			.renderItems = &items,
 			.scene = &scene,
-		});
+		};
+
+		auto& cmd = BeginCmd();
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
+
+		auto& cmd2 = BeginCmd();
+		m_lightingPass->Record(*cmd2, *m_renderCache, ctx);
+		EndSubmitWait(cmd2);
 	}
 
 	// If we reached here without crashing or triggering Vulkan validation
