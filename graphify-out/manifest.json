@@ -145,18 +145,18 @@
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.cpp": {
-    "mtime": 1782228060.6964521,
-    "ast_hash": "5a8bfa7ba3e75c53a6f7498da207e71d",
+    "mtime": 1782351590.816159,
+    "ast_hash": "1fa54651ffd16f5f71d7d29576e02db0",
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.h": {
-    "mtime": 1782228059.6574366,
-    "ast_hash": "082f8325f31ad8bf238448eea8234ccc",
+    "mtime": 1782351566.3589156,
+    "ast_hash": "2e64f4f9973699917d471597923a31be",
     "semantic_hash": ""
   },
   "src/render/Image.cpp": {
-    "mtime": 1782182630.2768526,
-    "ast_hash": "6727f7c47c680aa4b43e5504b5e74707",
+    "mtime": 1782352359.1698349,
+    "ast_hash": "f51c0ca18ce06b137826a487506485d9",
     "semantic_hash": ""
   },
   "src/render/Image.h": {
@@ -230,9 +230,9 @@
     "semantic_hash": ""
   },
   "src/render/VulkanContext.cpp": {
-    "mtime": 1781871940.0117316,
-    "ast_hash": "d3c7b4f42d02b1b1a2846a5baf3cd7eb",
-    "semantic_hash": "d3c7b4f42d02b1b1a2846a5baf3cd7eb"
+    "mtime": 1782352174.1886327,
+    "ast_hash": "9d572fbfa645f485ec6e05bd96a8f2d9",
+    "semantic_hash": ""
   },
   "src/render/VulkanContext.h": {
     "mtime": 1781871940.0127313,
@@ -535,13 +535,13 @@
     "semantic_hash": ""
   },
   "src/render/passes/LightingPass.cpp": {
-    "mtime": 1782319431.8562293,
-    "ast_hash": "02fae0006e1a248f34b4860825b626a3",
+    "mtime": 1782351654.2300453,
+    "ast_hash": "eecced2819079a2695cfb3d1c9edd23f",
     "semantic_hash": ""
   },
   "src/render/passes/LightingPass.h": {
-    "mtime": 1782319431.857209,
-    "ast_hash": "76db2a820c8619d0ebb500a0c1b65e24",
+    "mtime": 1782351617.8167796,
+    "ast_hash": "14a3b425e67b20bbc9111608bdcd19d1",
     "semantic_hash": ""
   },
   "src/render/passes/Pass.h": {
@@ -550,8 +550,8 @@
     "semantic_hash": ""
   },
   "src/render/passes/RenderCache.cpp": {
-    "mtime": 1782319566.6324015,
-    "ast_hash": "f20e0038d51f1e8b59bdb16f28afe377",
+    "mtime": 1782352363.3357441,
+    "ast_hash": "f8688af8d023086de7c27ca69ccf4478",
     "semantic_hash": ""
   },
   "src/render/passes/RenderCache.h": {
