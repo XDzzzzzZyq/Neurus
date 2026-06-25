@@ -116,7 +116,7 @@ Renderer Layer owns:
 
   Also through src/render/ abstractions:
   VkBuffer + VkDeviceMemory pairs (Buffer hierarchy: GPUBuffer, StagingBuffer, UniformBuffer<T>)
-  VkImage + VkDeviceMemory + VkImageView triples (VulkanImage, Texture)
+  VkImage + VkDeviceMemory + VkImageView triples (Image, Texture)
   VkDescriptorPool + VkDescriptorSet (DescriptorManager)
 ```
 

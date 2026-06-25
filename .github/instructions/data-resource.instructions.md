@@ -5,7 +5,7 @@
 The Asset layer (`src/asset/`) manages **loading, storing, and providing access**
 to external asset data (meshes, images). GPU resource abstractions (buffers,
 images, descriptors) are owned by the **Renderer layer** (`src/render/`) — see
-`renderer.instructions.md` for the Buffer class hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer), VulkanImage, Texture, and
+`renderer.instructions.md` for the Buffer class hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer), Image, Texture, and
 DescriptorManager.
 
 The original "Data & Resource" layer concept has been absorbed: asset loading
@@ -21,8 +21,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 - `src/render/buffers/UniformBuffer.h` - Template uniform buffer (UniformBuffer<T>) for host-visible struct upload
 - `src/render/buffers/VertexBuffer.h/cpp` - Vertex buffer (VertexBuffer, inherits GPUBuffer)
 - `src/render/buffers/IndexBuffer.h/cpp` - Index buffer (IndexBuffer, inherits GPUBuffer)
-- `src/render/VulkanImage.h/cpp` - GPU image abstraction (allocation, views, transitions)
-- `src/render/Image.h/cpp` - Higher-level image wrapper (loading, mipmaps)
+- `src/render/Image.h/cpp` - GPU image abstraction (allocation, views, transitions, mipmaps)
 - `src/render/Texture.h/cpp` - Texture resource (combines Image + sampler + descriptor)
 - `src/render/DescriptorManager.h/cpp` - Descriptor pool/set lifecycle management
 
@@ -45,7 +44,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
    - `UniformBuffer<T>` — host-visible template for uniform structs
    - Vertex/index buffers inherit from GPUBuffer
 
-4. **GPU Image Abstraction** (`src/render/VulkanImage.h/cpp`)
+4. **GPU Image Abstraction** (`src/render/Image.h/cpp`)
    - Create `vk::raii::Image` with appropriate tiling, usage, memory
    - Create `vk::raii::ImageView` and `vk::raii::Sampler`
    - Image layout transitions and mipmap generation
@@ -79,7 +78,7 @@ Renderer passes (GeometryPass, LightingPass): consume GPU resources
 ### ✅ Asset & Resource Code MAY:
 - Load and parse asset files (OBJ, PNG, HDR)
 - Provide CPU-side data structs (MeshData, ImageData)
-- Own GPU memory allocations (VkDeviceMemory via Buffer, VulkanImage)
+- Own GPU memory allocations (VkDeviceMemory via Buffer, Image)
 - Provide allocation utilities to Renderer passes
 
 ### ❌ Asset & Resource Code MUST NOT:
@@ -94,7 +93,7 @@ Renderer passes (GeometryPass, LightingPass): consume GPU resources
 - OBJ mesh loading via MeshData (icosphere, cube, etc.)
 - PNG/HDR image decoding via ImageData
 - Buffer hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer<T>) for vertex, index, uniform, and storage buffers
-- VulkanImage for GPU image allocation and layout transitions
+- Image for GPU image allocation and layout transitions
 - Texture class combining image + sampler + descriptor
 - DescriptorManager with per-frame descriptor pool rotation
 - RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`) and per-light shadow cubemap management (`GetShadowMap(lightUID)`)
