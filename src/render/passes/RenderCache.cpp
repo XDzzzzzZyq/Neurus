@@ -121,7 +121,8 @@ Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D ex
 	                vk::Format::eR8Unorm,
 	                vk::ImageUsageFlagBits::eStorage |
 	                    vk::ImageUsageFlagBits::eSampled |
-	                    vk::ImageUsageFlagBits::eTransferSrc,
+	                    vk::ImageUsageFlagBits::eTransferSrc |
+	                    vk::ImageUsageFlagBits::eTransferDst,
 	                1,                         // mipLevels
 	                Image::ImageType::e2D,
 	                "ShadowIntensity_Light");  // debug name
@@ -220,7 +221,8 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 	case AttachmentName::ShadowIntensity:
 		// R8 shadow intensity: written by shadow evaluation compute shader
 		return { vk::Format::eR8Unorm,
-		         vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferSrc,
+		         vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
+		             vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst,
 		         e2D };
 	}
 

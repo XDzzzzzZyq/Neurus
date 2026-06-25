@@ -51,6 +51,24 @@ public:
 		uint32_t count = 1);
 
 	/**
+	 * @brief Adds a descriptor binding with binding flags.
+	 *
+	 * @param binding      Shader binding number.
+	 * @param type         Descriptor type (uniform buffer, sampler, etc.).
+	 * @param stageFlags   Shader stages that access this binding.
+	 * @param flags        Binding flags (e.g. PARTIALLY_BOUND).
+	 * @param count        Number of descriptors in the binding (for arrays,
+	 *                     default 1).
+	 * @return Reference to this builder for fluent chaining.
+	 */
+	DescriptorSetLayoutBuilder& AddBindingWithFlags(
+		uint32_t binding,
+		vk::DescriptorType type,
+		vk::ShaderStageFlags stageFlags,
+		vk::DescriptorBindingFlags flags,
+		uint32_t count = 1);
+
+	/**
 	 * @brief Finalizes and returns the accumulated binding vector.
 	 * @return Vector of descriptor set layout bindings ready for
 	 *         DescriptorSetLayout construction.
@@ -66,6 +84,7 @@ public:
 
 private:
 	std::vector<vk::DescriptorSetLayoutBinding> m_bindings;
+	std::vector<vk::DescriptorBindingFlags> m_bindingFlags;
 };
 
 /**
@@ -104,6 +123,22 @@ public:
 	DescriptorSetLayout(
 		const vk::raii::Device& device,
 		const std::vector<vk::DescriptorSetLayoutBinding>& bindings);
+
+	/**
+	 * @brief Creates the Vulkan descriptor set layout with per-binding flags.
+	 *
+	 * The bindingFlags vector must have the same size as bindings. Each
+	 * entry corresponds to the binding at the same index. Bindings with
+	 * flags=0 behave the same as the flags-less constructor.
+	 *
+	 * @param device        Logical device (must outlive this layout).
+	 * @param bindings      Vector of VkDescriptorSetLayoutBinding entries.
+	 * @param bindingFlags  Per-binding flags (e.g. PARTIALLY_BOUND).
+	 */
+	DescriptorSetLayout(
+		const vk::raii::Device& device,
+		const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
+		const std::vector<vk::DescriptorBindingFlags>& bindingFlags);
 
 	DescriptorSetLayout(const DescriptorSetLayout&) = delete;
 	DescriptorSetLayout& operator=(const DescriptorSetLayout&) = delete;

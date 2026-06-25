@@ -1,5 +1,6 @@
 #include "DescriptorManager.h"
 
+#include <cassert>
 #include <stdexcept>
 
 namespace neurus {
@@ -16,17 +17,51 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBinding(
 {
 	m_bindings.push_back(
 		vk::DescriptorSetLayoutBinding(binding, type, count, stageFlags));
+	// Push a zero-flag entry to keep m_bindingFlags aligned with m_bindings
+	m_bindingFlags.push_back(vk::DescriptorBindingFlags{});
+	return *this;
+}
+
+DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBindingWithFlags(
+	uint32_t binding,
+	vk::DescriptorType type,
+	vk::ShaderStageFlags stageFlags,
+	vk::DescriptorBindingFlags flags,
+	uint32_t count)
+{
+	m_bindings.push_back(
+		vk::DescriptorSetLayoutBinding(binding, type, count, stageFlags));
+	m_bindingFlags.push_back(flags);
 	return *this;
 }
 
 std::vector<vk::DescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::Build()
 {
+	m_bindingFlags.clear();
 	return std::move(m_bindings);
 }
 
 DescriptorSetLayout DescriptorSetLayoutBuilder::Build(const vk::raii::Device& device)
 {
-	return DescriptorSetLayout(device, std::move(m_bindings));
+	// Check if any binding has non-zero flags
+	bool hasFlags = false;
+	for (auto f : m_bindingFlags)
+	{
+		if (f != vk::DescriptorBindingFlags{})
+		{
+			hasFlags = true;
+			break;
+		}
+	}
+
+	if (hasFlags)
+	{
+		return DescriptorSetLayout(device, std::move(m_bindings), std::move(m_bindingFlags));
+	}
+	else
+	{
+		return DescriptorSetLayout(device, std::move(m_bindings));
+	}
 }
 
 DescriptorSetLayoutBuilder BuildLayout()
@@ -45,6 +80,26 @@ DescriptorSetLayout::DescriptorSetLayout(
 {
 	vk::DescriptorSetLayoutCreateInfo createInfo(
 		vk::DescriptorSetLayoutCreateFlags{}, bindings);
+	m_layout = vk::raii::DescriptorSetLayout(device, createInfo);
+}
+
+DescriptorSetLayout::DescriptorSetLayout(
+	const vk::raii::Device& device,
+	const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
+	const std::vector<vk::DescriptorBindingFlags>& bindingFlags)
+	: m_bindings(bindings)
+{
+	assert(bindings.size() == bindingFlags.size()
+	       && "Binding flags vector must match bindings vector size");
+
+	vk::DescriptorSetLayoutBindingFlagsCreateInfo flagsInfo;
+	flagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
+	flagsInfo.pBindingFlags = bindingFlags.data();
+
+	vk::DescriptorSetLayoutCreateInfo createInfo(
+		vk::DescriptorSetLayoutCreateFlags{}, bindings);
+	createInfo.pNext = &flagsInfo;
+
 	m_layout = vk::raii::DescriptorSetLayout(device, createInfo);
 }
 
@@ -121,7 +176,8 @@ DescriptorPool::DescriptorPool(
 	: m_device(&device)
 {
 	vk::DescriptorPoolCreateInfo createInfo(
-		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
+		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
+		vk::DescriptorPoolCreateFlagBits::eUpdateAfterBind,
 		maxSets,
 		poolSizes);
 

@@ -47,22 +47,6 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets
 	           << " qfi=" << queueFamilyIndex);
 
-	// --- Create fallback SSBO for zero-light scenes ---
-	//     The SSBO descriptor (binding 5) must always reference a valid buffer,
-	//     even when the scene has no point lights. This fallback is a single
-	//     zero-filled element that the shader never reads (lightCount=0).
-	{
-		uint8_t zero[sizeof(PointLightGpu)] = {};
-		m_fallbackSSBO = std::make_unique<VulkanBuffer>(
-			*m_device, *m_physicalDevice, graphicsQueue, queueFamilyIndex,
-			sizeof(PointLightGpu),
-			vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
-			vk::MemoryPropertyFlagBits::eDeviceLocal,
-			"FallbackLightSSBO");
-		m_fallbackSSBO->Upload(zero, sizeof(PointLightGpu));
-		NEURUS_LOG("[LightingPass] Created fallback SSBO (zero-light)");
-	}
-
 	// --- Create fallback IBL cubemaps (4×4 black) for bindings 7-8 ---
 	//     These ensure the descriptor bindings are always valid even when
 	//     no Environment is present in the scene (no IBL to sample).
@@ -195,7 +179,7 @@ void LightingPass::UploadLights(const Scene& scene)
 	if (newCount == 0)
 	{
 		m_lightSSBO.reset();
-		NEURUS_LOG("[LightingPass] No point lights in scene - SSBO released (fallback preserved)");
+		NEURUS_LOG("[LightingPass] No point lights in scene - SSBO released (PARTIALLY_BOUND)");
 		return;
 	}
 
@@ -216,7 +200,7 @@ void LightingPass::UploadLights(const Scene& scene)
 
 const VulkanBuffer* LightingPass::GetLightSSBO() const
 {
-	return m_lightSSBO ? m_lightSSBO.get() : m_fallbackSSBO.get();
+	return m_lightSSBO ? m_lightSSBO.get() : nullptr;
 }
 
 uint32_t LightingPass::GetLightCount() const
@@ -248,10 +232,11 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.AddBinding(4,
 		            vk::DescriptorType::eStorageImage,
 		            vk::ShaderStageFlagBits::eCompute)
-		// Light SSBO
-		.AddBinding(5,
-		            vk::DescriptorType::eStorageBuffer,
-		            vk::ShaderStageFlagBits::eCompute)
+		// Light SSBO (PARTIALLY_BOUND - valid to skip update when no lights)
+		.AddBindingWithFlags(5,
+		                     vk::DescriptorType::eStorageBuffer,
+		                     vk::ShaderStageFlagBits::eCompute,
+		                     vk::DescriptorBindingFlagBits::ePartiallyBound)
 		// SSAO occlusion input (combined image sampler)
 		.AddBinding(6,
 		            vk::DescriptorType::eCombinedImageSampler,
@@ -339,10 +324,16 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		                  vk::DescriptorType::eStorageImage);
 	}
 
-	// --- Write light SSBO (uses fallback when no lights present) ---
+	// --- Write light SSBO (skipped when no lights, PARTIALLY_BOUND) ---
 	{
-		dstSet.WriteBuffer(5, GetLightSSBO()->GetDescriptorInfo(),
-		                   vk::DescriptorType::eStorageBuffer);
+		if (m_lightSSBO)
+		{
+			dstSet.WriteBuffer(5, GetLightSSBO()->GetDescriptorInfo(),
+			                   vk::DescriptorType::eStorageBuffer);
+		}
+		// When m_lightSSBO is nullptr, binding 5 is left un-updated.
+		// PARTIALLY_BOUND flag makes this safe because lightCount=0
+		// guarantees the shader never accesses binding 5.
 	}
 
 	// --- Write SSAO attachment (combined image sampler) ---

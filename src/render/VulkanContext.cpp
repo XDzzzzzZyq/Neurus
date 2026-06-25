@@ -96,6 +96,10 @@ void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 	sync2.synchronization2 = VK_TRUE;
 	sync2.pNext = &dynRendering;
 
+	vk::PhysicalDeviceDescriptorIndexingFeatures descriptorIndexing;
+	descriptorIndexing.descriptorBindingPartiallyBound = VK_TRUE;
+	descriptorIndexing.pNext = &sync2;
+
 	vk::PhysicalDeviceFeatures features;
 	std::vector<const char*> devExts = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
 
@@ -111,7 +115,7 @@ void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 		}
 	}
 
-	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &sync2);
+	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &descriptorIndexing);
 
 	m_device = std::make_unique<vk::raii::Device>(pd, devCI);
 	m_graphicsQueue = m_device->getQueue(m_graphicsQueueFamily, 0);

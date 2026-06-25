@@ -337,10 +337,13 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 }
 
 // ---------------------------------------------------------------------------
-// 6. Zero lights - produces ambient-only output (non-black for covered pixels)
+// 6. Zero lights with PARTIALLY_BOUND descriptor — validates that the
+//    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT on the SSBO binding works
+//    correctly. When m_lightSSBO is null, the shader must not crash because
+//    lightCount=0 prevents any SSBO reads.
 // ---------------------------------------------------------------------------
 
-TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
+TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 {
 	if (!m_hasVulkan)
 	{
@@ -350,25 +353,25 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 	// --- Render triangle ---
 	const auto camera = RenderTestTriangle();
 
-	// --- Upload zero lights (empty scene) ---
+	// --- Upload zero lights (empty scene — m_lightSSBO becomes null) ---
 	{
 		Scene emptyScene;
 		m_lightingPass->UploadLights(emptyScene);
 	}
 
-	// --- Record lighting pass with 0 lights ---
+	// --- Record lighting pass with 0 lights (PARTIALLY_BOUND SSBO) ---
 	{
 		auto& cmd = BeginCmd();
 		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
-		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
+		RenderContext ctx{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
 			.cameraPos = glm::vec3(0.0f, 0.0f, 2.0f),
 			.invProjView = glm::inverse(testCam.viewProj),
-		});
-
+		};
+		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
 	}
 
@@ -377,20 +380,23 @@ TEST_F(LightingPassTest, ZeroLights_ProducesAmbientOnly)
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
 		*m_renderCache, kRenderWidth, kRenderHeight);
 
-	// --- Verify: at least some covered pixels have the ambient term ---
-	// Ambient = 0.03 * albedo = 0.03 for white albedo
+	// --- Verify: the GPU didn't crash, no VUID errors, HDR data is valid ---
+	// With zero lights the shader still produces ambient output (~0.03).
+	// This test primarily validates that the PARTIALLY_BOUND SSBO binding
+	// doesn't cause a crash or validation error when m_lightSSBO is null.
 	bool foundLit = false;
 	for (size_t i = 0; i < hdrPixels.size(); i += 4)
 	{
 		float r = hdrPixels[i + 0];
-		if (r > 0.001f && r < 0.05f)  // ambient is ~0.03
+		if (r > 0.001f && r < 0.05f)
 		{
 			foundLit = true;
 			break;
 		}
 	}
 
-	// Zero lights should still write ambient to covered pixels
 	EXPECT_TRUE(foundLit)
-		<< "Zero-light dispatch should produce ambient term (~0.03) on the test triangle.";
+		<< "Zero-light dispatch with PARTIALLY_BOUND SSBO should produce "
+		<< "valid output (ambient ~0.03) on the test triangle. "
+		<< "If the GPU crashed, the test harness would have caught it.";
 }

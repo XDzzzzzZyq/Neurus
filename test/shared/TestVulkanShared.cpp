@@ -76,8 +76,18 @@ void VulkanTestShared::SetUp()
 		// --- Device ---
 		float prio = 1.0f;
 		vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
+
+		vk::PhysicalDeviceDynamicRenderingFeatures dynRendering;
+		dynRendering.dynamicRendering = VK_TRUE;
+		vk::PhysicalDeviceSynchronization2Features sync2;
+		sync2.synchronization2 = VK_TRUE;
+		sync2.pNext = &dynRendering;
+		vk::PhysicalDeviceDescriptorIndexingFeatures descriptorIndexing;
+		descriptorIndexing.descriptorBindingPartiallyBound = VK_TRUE;
+		descriptorIndexing.pNext = &sync2;
+
 		vk::PhysicalDeviceFeatures features;
-		vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
+		vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features, &descriptorIndexing);
 		m_device = std::make_unique<vk::raii::Device>(pd, devCI);
 		m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
 

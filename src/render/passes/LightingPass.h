@@ -144,17 +144,21 @@ public:
 	 * each Light to a PointLightGpu struct (std140, 48 bytes), and
 	 * uploads the array as a device-local storage buffer.
 	 *
-	 * If the scene has no point lights, a fallback single-element SSBO
-	 * is kept so that the descriptor binding remains valid. GetLightCount()
-	 * returns 0 in that case.
+	 * If the scene has no point lights, the light SSBO is released,
+	 * the descriptor binding uses PARTIALLY_BOUND (no update when null),
+	 * and GetLightCount() returns 0.
 	 *
 	 * @param scene Scene containing the light list.
 	 */
 	void UploadLights(const Scene& scene);
 
 	/**
-	 * @brief Returns the light SSBO (always valid, never nullptr).
-	 * @return Non-owning pointer to VulkanBuffer.
+	 * @brief Returns the light SSBO or nullptr when no lights are present.
+	 *
+	 * When nullptr, descriptor binding 5 uses PARTIALLY_BOUND and is
+	 * not updated — the shader never reads it because lightCount=0.
+	 *
+	 * @return Non-owning pointer to VulkanBuffer, or nullptr.
 	 */
 	const VulkanBuffer* GetLightSSBO() const;
 
@@ -194,7 +198,7 @@ private:
 	 *   2: gAlbedo              (combined image sampler)
 	 *   3: gMetallicRoughness   (combined image sampler)
 	 *   4: outputImage          (storage image)
-	 *   5: LightBuffer          (storage buffer / SSBO)
+	 *   5: LightBuffer          (storage buffer / SSBO, PARTIALLY_BOUND)
 	 *   6: U_AO                 (combined image sampler, SSAO occlusion)
 	 *   7: U_Irradiance         (combined image sampler, diffuse IBL cubemap)
 	 *   8: U_Prefiltered        (combined image sampler, specular IBL cubemap)
@@ -228,7 +232,6 @@ private:
 	// --- Owned light SSBO ---
 	std::unique_ptr<VulkanBuffer> m_lightSSBO;
 	uint32_t m_lightCount = 0;
-	std::unique_ptr<VulkanBuffer> m_fallbackSSBO;
 
 	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---
 	std::unique_ptr<Image> m_fallbackIrradianceCube;

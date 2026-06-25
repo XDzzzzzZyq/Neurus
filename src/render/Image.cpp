@@ -91,8 +91,7 @@ void Image::createImage(const vk::raii::Device& device,
 	{
 	case ImageType::eCube:
 		m_arrayLayers = 6;
-		createFlags = vk::ImageCreateFlagBits::eCubeCompatible |
-		              vk::ImageCreateFlagBits::e2DArrayCompatible;
+		createFlags = vk::ImageCreateFlagBits::eCubeCompatible;
 		break;
 	case ImageType::eDepthStencil:
 		m_arrayLayers = 1;
