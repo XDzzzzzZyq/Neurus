@@ -602,19 +602,15 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	cmdBuf.begin(beginInfo);
 
 	// --- Compute camera matrices for this frame ---
-	const CameraUBOData cameraData = computeCameraData(extent, camera);
-	const glm::mat4 viewMatrix = cameraData.view;
-	const glm::vec3 cameraPos = camera.GetPosition();
-	const glm::mat4 invProjView = glm::inverse(cameraData.viewProj);
-
 	// --- Build per-frame render context (constructed once, passed to all passes) ---
+	const CameraUBOData cameraData = computeCameraData(extent, camera);
 	RenderContext ctx{};
 	ctx.renderExtent = extent;
 	ctx.frameIndex = m_currentFrame;
 	ctx.viewProj = cameraData.viewProj;
-	ctx.view = viewMatrix;
-	ctx.cameraPos = cameraPos;
-	ctx.invProjView = invProjView;
+	ctx.view = cameraData.view;
+	ctx.cameraPos = camera.GetPosition();
+	ctx.invProjView = glm::inverse(cameraData.viewProj);
 	ctx.renderItems = &renderItems;
 	ctx.scene = scene;
 	ctx.lightUID = m_activeShadowLightUID;
@@ -623,30 +619,17 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	m_geometryPass->Record(cmdBuf, *m_renderCache, ctx);
 
 	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---
-	//     Uses the same render items as the geometry pass (all scene geometry).
-	//     The light position has been set via SetShadowLight() or UpdateFromScene().
-	if (m_shadowDepthPass)
-	{
-		m_shadowDepthPass->Record(cmdBuf, *m_renderCache, ctx);
-	}
+	m_shadowDepthPass->Record(cmdBuf, *m_renderCache, ctx);
 
 	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
-	if (m_ssaoPass)
-	{
-		m_ssaoPass->Record(cmdBuf, *m_renderCache, ctx);
-	}
+	m_ssaoPass->Record(cmdBuf, *m_renderCache, ctx);
 
 	// Shadow evaluation — to be re-implemented
 
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
-	//     Light SSBO is owned and managed by LightingPass internally.
-	//     UploadLights() should be called before the first DrawFrame()
-	//     to populate the SSBO from the scene (handled by T9).
 	m_lightingPass->Record(cmdBuf, *m_renderCache, ctx);
 
 	// --- Phase 4: Blit HDRColor → swapchain image ---
-	// LightingPass leaves HDRColor in GENERAL layout.
-	// Transition to TRANSFER_SRC_OPTIMAL for the blit.
 	auto& hdrColor = m_renderCache->GetAttachment(AttachmentName::HDRColor, extent);
 	const vk::Image hdrImage = *hdrColor.ImageHandle();
 	const vk::Image swapchainImage = m_swapchain->images()[imageIndex];

@@ -293,9 +293,6 @@ void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	const size_t itemCount = ctx.renderItems ? ctx.renderItems->size() : 0;
-	NEURUS_LOG("[ShadowDepthPass] Record: " << itemCount << " render items, "
-	           << m_resolution << "x" << m_resolution
-	           << " mode=" << (m_mode == ShadowMode::Multiview ? "Multiview" : "SingleFace"));
 
 	// Transition cubemap to depth attachment layout (all faces/layers)
 	{
