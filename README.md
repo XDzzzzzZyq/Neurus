@@ -100,8 +100,8 @@ Neurus/
 
 ## Current Scope (Deferred PBR MVP)
 
-The current deliverable is a deferred PBR renderer with geometry pass,
-lighting compute pass, and full G-Buffer pipeline:
+The current deliverable is a deferred PBR renderer with shadow mapping,
+screen-space ambient occlusion, image-based lighting, and full G-Buffer pipeline:
 
 - Vulkan-HPP RAII instance, device, swapchain, pipeline
 - `VK_KHR_dynamic_rendering` for render passes
@@ -115,7 +115,7 @@ lighting compute pass, and full G-Buffer pipeline:
 - Non-GPU Google Test samples (UIEvents, EventQueue, EditorContext)
 - Event-driven CameraController (orbit/zoom/dolly/pan via EventQueue)
 - OBJ mesh loading with MeshData (icosphere, cube, etc.)
-- Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute)
+- Deferred PBR pipeline: ShadowDepthPass → GeometryPass → SSAOPass → LightingPass → IBLPass
 - Reference-image regression tests (capture → compare PNG)
 
 ## Code Style

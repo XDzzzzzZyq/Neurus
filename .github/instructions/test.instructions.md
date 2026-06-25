@@ -165,7 +165,7 @@ Usage example — replace 15+ lines of manual G-Buffer transitions with one call
 
 ```cpp
 // Instead of manually transitioning each attachment:
-VulkanTestShared::TransitionGbufferToColorAttachment(*m_attachmentManager, *this);
+VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, *this);
 ```
 
 All helpers are defined in `test/shared/TestVulkanShared.h`. Tests that need a
@@ -178,7 +178,7 @@ duplicating it in the local test file.
 
 1. **Include** the shared fixture header and renderer headers
 2. **Inherit** from `VulkanTestShared`
-3. **Construct** renderer components (AttachmentManager, passes, etc.) in `SetUp()`
+3. **Construct** renderer components (RenderCache, passes, etc.) in `SetUp()`
 4. **Test body**:
    a. Load assets (OBJ meshes via `ResolveAssetPath()`)
    b. Create scene objects (Camera, Light, Mesh)
@@ -191,7 +191,7 @@ duplicating it in the local test file.
 ```cpp
 #include <gtest/gtest.h>
 #include "shared/TestVulkanShared.h"
-#include "render/AttachmentManager.h"
+#include "render/passes/RenderCache.h"
 #include "render/GeometryPass.h"
 // ... other includes ...
 

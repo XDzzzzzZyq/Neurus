@@ -47,9 +47,10 @@ are shared across layers.
 
 **Renderer Layer** (`src/render/`)
 - Pure rendering service with no application logic
-- Owns ALL GPU resources (device, swapchain, pipeline, command buffers, buffers, images, descriptors)
+- Owns ALL GPU resources (device, swapchain, pipeline, command buffers, buffers, images, descriptors, RenderCache)
 - Owns VkDevice, VkSwapchainKHR, VkPipeline, VkCommandPool
 - Consumes read-only VkSurfaceKHR from UI layer
+- Consumes per-frame RenderContext (immutable scene snapshot) for pass dispatch
 - Must NOT mutate application state
 - Must NOT depend on Editor or UI layers
 
@@ -110,7 +111,8 @@ Renderer Layer owns:
   VkSwapchainKHR (consumes UI's VkSurfaceKHR)
   VkPipeline + VkPipelineLayout
   VkCommandPool + VkCommandBuffers
-  All framebuffer attachments (via dynamic rendering)
+  RenderCache (cross-frame mutable resource pool, lazy GetAttachment / GetShadowMap)
+  All framebuffer attachments (via RenderCache, dynamic rendering)
 
   Also through src/render/ abstractions:
   VkBuffer + VkDeviceMemory pairs (VulkanBuffer)
@@ -169,16 +171,16 @@ compute pass, and full G-Buffer pipeline through the four-layer architecture.
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
 - OBJ mesh loading with MeshData
-- Deferred PBR pipeline: GeometryPass (G-Buffer) + LightingPass (compute)
+- Deferred PBR pipeline: ShadowDepthPass → GeometryPass (G-Buffer) → SSAOPass → LightingPass (compute) → IBLPass
 - Screenshot capture + TextureData PNG readback
 - GPU tests with shared VulkanTestShared base class
 - Reference-image regression tests (capture → compare PNG)
-- Render caches: GpuResourceCache, DescriptorCache
+- Render caches: RenderCache, DescriptorCache
 - RenderPassManager for dynamic rendering pass control
 
 **Features out of scope:**
 - glTF/PNG file loading, asset pipeline (OBJ loading is in scope)
-- Multi-pass rendering (SSAO, SSR), IBL, shadows
+- SSR (Screen-Space Reflections)
 - Ray tracing, mesh shaders
 - Undo/redo, serialization, plugin system
 - Linux/macOS support

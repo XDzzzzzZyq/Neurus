@@ -90,6 +90,7 @@ Renderer passes (GeometryPass, LightingPass): consume GPU resources
 - VulkanImage for GPU image allocation and layout transitions
 - Texture class combining image + sampler + descriptor
 - DescriptorManager with per-frame descriptor pool rotation
+- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`) and per-light shadow cubemap management (`GetShadowMap(lightUID)`)
 
 ## Future Enhancements
 

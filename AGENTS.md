@@ -137,7 +137,15 @@ Neurus/
 │   │   ├── DeferredRenderer.h/cpp # Deferred PBR pipeline (active renderer)
 │   │   ├── ShaderProgram.h/cpp
 │   │   ├── Swapchain.h/cpp
-│   │   └── VulkanContext.h/cpp
+│   │   ├── VulkanContext.h/cpp
+│   │   └── passes/          # Render passes
+│   │       ├── RenderCache.h/cpp     # Cross-frame mutable resource pool
+│   │       ├── RenderContext.h       # Per-frame immutable scene snapshot
+│   │       ├── GeometryPass.h/cpp
+│   │       ├── SSAOPass.h/cpp
+│   │       ├── LightingPass.h/cpp
+│   │       ├── IBLPass.h/cpp
+│   │       └── ShadowDepthPass.h/cpp
 │   ├── editor/             # Editor layer (logic, controllers)
 │   │   ├── events/          # Event system (UIEvents + typed EventQueue)
 │   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor

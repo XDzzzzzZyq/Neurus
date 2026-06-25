@@ -104,7 +104,7 @@ vk::raii::Device device(physicalDevice, deviceCreateInfo);
 ### ✅ Renderer MAY:
 - Read scene data via const reference
 - Subscribe to UIEvents signals for configuration changes
-- Own GPU resources (device, swapchain, pipeline, command buffers)
+- Own GPU resources (device, swapchain, pipeline, command buffers, RenderCache, attachments)
 - Emit performance metrics or warnings via UIEvents
 
 ### ❌ Renderer MUST NOT:
@@ -128,13 +128,19 @@ The triangle MVP implements a minimal but correct rendering path:
 ## Current Render Pipeline
 
 ```
+ShadowDepthPass (per-light cubemap depth → RenderCache via GetShadowMap)
+    │
+    ▼
 GeometryPass (G-Buffer MRT: Position, Normal, Albedo, MetallicRoughness, Depth)
     │
     ▼
 SSAOPass (compute: reads G-Buffer, writes AO to R8 attachment)
     │
     ▼
-LightingPass (compute: reads G-Buffer + AO, writes HDRColor)
+LightingPass (compute: reads G-Buffer + AO + shadow map, writes HDRColor)
+    │
+    ▼
+IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
     │
     ▼
 Blit HDRColor → Swapchain (vkCmdBlitImage)
@@ -148,6 +154,11 @@ Blit HDRColor → Swapchain (vkCmdBlitImage)
 - **Radius**: Default 0.15 (appropriate for [-1, 1] scene scale)
 
 ### Attachment Formats
+
+All screen-space attachments (Position, Normal, Albedo, MetallicRoughness, Depth, HDRColor,
+SSAO) are created lazily via `RenderCache::GetAttachment(name, extent)` on first use.
+Per-light shadow cubemaps are managed via `RenderCache::GetShadowMap(lightUID)`.
+
 | Attachment | Format | Clear Value | Purpose |
 |---|---|---|---|
 | Position | R32G32B32A32_SFLOAT | (0,0,0,0) | World-space position, w=1 for rendered pixels |
@@ -158,11 +169,12 @@ Blit HDRColor → Swapchain (vkCmdBlitImage)
 | HDRColor | R16G16B16A16_SFLOAT | (0,0,0,0) | Lighting output |
 | SSAO | R8_UNORM | 0 (no occlusion) | Screen-space ambient occlusion |
 | SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
+| ShadowMap | D32_SFLOAT | 1.0 | Per-light cubemap depth (RenderCache-owned) |
 
 ## Future Evolution
 
-- IBL (Image-Based Lighting): diffuse + specular cubemaps, BRDF LUT
-- Shadow mapping: per-light depth maps, shadow evaluation
+- IBL enhancements (BRDF LUT, multi-scattering)
+- Shadow mapping improvements (multi-light, shadow evaluation pass)
 - SSR (Screen-Space Reflections): ray marching variants
 - Tonemapping: filmic (ACES) + gamma correction
 - FXAA: luma-based edge anti-aliasing
