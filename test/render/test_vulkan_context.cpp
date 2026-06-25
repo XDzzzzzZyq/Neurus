@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-#include "render/VulkanContext.h"
+#include "app/VulkanContext.h"
 
 using namespace neurus;
 

@@ -53,6 +53,7 @@ add_executable(neurus_test
 target_link_libraries(neurus_test PRIVATE
 	neurus_project
 	neurus_scene
+	neurus_app
 	neurus_render
 	neurus_editor
 	neurus_ui

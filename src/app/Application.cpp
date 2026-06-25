@@ -44,7 +44,7 @@
 #include "editor/events/EventBus.h"
 #include "ui/NeurusMainWindow.h"
 #include "ui/VulkanWidget.h"
-#include "render/VulkanContext.h"
+#include "VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Texture.h"
 #include "asset/MeshData.h"

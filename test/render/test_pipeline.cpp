@@ -2,7 +2,7 @@
 
 #include <gtest/gtest.h>
 
-#include "render/VulkanContext.h"
+#include "app/VulkanContext.h"
 #include "render/PipelineBuilder.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/shaders/ShaderModule.h"

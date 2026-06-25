@@ -21,8 +21,6 @@ add_library(neurus_render STATIC
 	ComputePipelineBuilder.h
 	ComputePipelineBuilder.cpp
 	CommandBuffer.h
-	VulkanContext.h
-	VulkanContext.cpp
 	Swapchain.h
 	Swapchain.cpp
 	shaders/ShaderProgram.h

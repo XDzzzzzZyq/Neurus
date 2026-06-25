@@ -3,6 +3,8 @@
 add_library(neurus_app STATIC
 	Application.h
 	Application.cpp
+	VulkanContext.h
+	VulkanContext.cpp
 )
 
 target_include_directories(neurus_app PRIVATE

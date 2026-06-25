@@ -12,7 +12,7 @@
 
 #include "render/DescriptorManager.h"
 #include "render/buffers/StagingBuffer.h"
-#include "render/VulkanContext.h"
+#include "app/VulkanContext.h"
 
 using namespace neurus;
 

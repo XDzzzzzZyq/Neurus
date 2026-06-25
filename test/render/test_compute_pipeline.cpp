@@ -3,7 +3,7 @@
 #include "render/ComputePipelineBuilder.h"
 #include "render/shaders/ShaderModule.h"
 #include "render/DescriptorManager.h"
-#include "render/VulkanContext.h"
+#include "app/VulkanContext.h"
 
 #include <dummy.comp.h>
 

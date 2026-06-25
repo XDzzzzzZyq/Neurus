@@ -17,7 +17,7 @@
 #include "scene/Camera.h"
 #include "scene/Environment.h"
 #include "scene/Scene.h"
-#include "render/VulkanContext.h"
+#include "app/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/Image.h"
 #include "core/Log.h"
