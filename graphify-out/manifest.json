@@ -135,13 +135,13 @@
     "semantic_hash": ""
   },
   "src/render/DeferredRenderer.cpp": {
-    "mtime": 1782348313.5095124,
-    "ast_hash": "2a2df09a32c5aebfac99409f64f5dcad",
+    "mtime": 1782377415.317348,
+    "ast_hash": "964230754ec05bdb53a07d704b3c76f9",
     "semantic_hash": ""
   },
   "src/render/DeferredRenderer.h": {
-    "mtime": 1782319431.80121,
-    "ast_hash": "dc5868f95436287b5ed3ea1aaf144f70",
+    "mtime": 1782376813.3767211,
+    "ast_hash": "32ab7f2f0f1228b3fe9eba6f88a50da2",
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.cpp": {
@@ -150,8 +150,8 @@
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.h": {
-    "mtime": 1782351566.3589156,
-    "ast_hash": "2e64f4f9973699917d471597923a31be",
+    "mtime": 1782377405.8611162,
+    "ast_hash": "c7d0241c75c3ef223912ae31296e38b2",
     "semantic_hash": ""
   },
   "src/render/Image.cpp": {
@@ -210,23 +210,13 @@
     "semantic_hash": "c1f72781f0c2b1b5868d514774b346a7"
   },
   "src/render/Texture.cpp": {
-    "mtime": 1782125533.1813855,
-    "ast_hash": "6062abc791b5b7494a1a196e1845cd3d",
+    "mtime": 1782376855.6855917,
+    "ast_hash": "3c660e5f5b4534f477d477c765823246",
     "semantic_hash": ""
   },
   "src/render/Texture.h": {
     "mtime": 1781970375.162464,
     "ast_hash": "95b340bba1341db7cc2c0842cd3fabdb",
-    "semantic_hash": ""
-  },
-  "src/render/VulkanBuffer.cpp": {
-    "mtime": 1781872147.657137,
-    "ast_hash": "349300c04e11661f738924700d2b9dfb",
-    "semantic_hash": ""
-  },
-  "src/render/VulkanBuffer.h": {
-    "mtime": 1781872147.658137,
-    "ast_hash": "389f90f338f49aab02f1c8da4ed6dbdf",
     "semantic_hash": ""
   },
   "src/render/VulkanContext.cpp": {
@@ -255,23 +245,23 @@
     "semantic_hash": ""
   },
   "src/render/buffers/IndexBuffer.cpp": {
-    "mtime": 1781872147.6681376,
-    "ast_hash": "0c40fed14bd96f63aafa3c881ee05930",
+    "mtime": 1782376521.794674,
+    "ast_hash": "5d68b743793d778e1641a363866d518a",
     "semantic_hash": ""
   },
   "src/render/buffers/IndexBuffer.h": {
-    "mtime": 1781872147.6691375,
-    "ast_hash": "877bac8dc60cd0e3cf7b300fe3ffefbf",
+    "mtime": 1782377408.0442226,
+    "ast_hash": "416bf514fc2e8455f36911f123c2879e",
     "semantic_hash": ""
   },
   "src/render/buffers/VertexBuffer.cpp": {
-    "mtime": 1781872147.6711373,
-    "ast_hash": "209e2deddcac962b4697463b1d8be27a",
+    "mtime": 1782376494.2746446,
+    "ast_hash": "32cc3d9cca72f632fa2e0e7ce27d4272",
     "semantic_hash": ""
   },
   "src/render/buffers/VertexBuffer.h": {
-    "mtime": 1781872147.6721373,
-    "ast_hash": "4ed0ec7bcb2cb8a628c3c35b84f8729d",
+    "mtime": 1782377406.8866522,
+    "ast_hash": "1e2cc68107ed61600c5a2b0603d131be",
     "semantic_hash": ""
   },
   "src/render/shaders/ShaderLib.cpp": {
@@ -515,13 +505,13 @@
     "semantic_hash": ""
   },
   "src/render/passes/GeometryPass.cpp": {
-    "mtime": 1782319431.830209,
-    "ast_hash": "2e648969347eb98fe1dfdca521b2827c",
+    "mtime": 1782376907.0058444,
+    "ast_hash": "3ee93399858f6d40217c6f85fa9fd847",
     "semantic_hash": ""
   },
   "src/render/passes/GeometryPass.h": {
-    "mtime": 1782319431.8372092,
-    "ast_hash": "d00e99d989d3c0a7e8a861d3590d4601",
+    "mtime": 1782376829.4159398,
+    "ast_hash": "0aad4f45ab9470c9369de0f2f6fb6ae6",
     "semantic_hash": ""
   },
   "src/render/passes/IBLPass.cpp": {
@@ -535,13 +525,13 @@
     "semantic_hash": ""
   },
   "src/render/passes/LightingPass.cpp": {
-    "mtime": 1782351654.2300453,
-    "ast_hash": "eecced2819079a2695cfb3d1c9edd23f",
+    "mtime": 1782376944.8207595,
+    "ast_hash": "49c3c3c1ed3a65379fa4788e7c0056ea",
     "semantic_hash": ""
   },
   "src/render/passes/LightingPass.h": {
-    "mtime": 1782351617.8167796,
-    "ast_hash": "14a3b425e67b20bbc9111608bdcd19d1",
+    "mtime": 1782377414.3747952,
+    "ast_hash": "4147713506f45e1e6a2b0c923a1d3731",
     "semantic_hash": ""
   },
   "src/render/passes/Pass.h": {
@@ -575,23 +565,23 @@
     "semantic_hash": ""
   },
   "src/render/passes/SSAOPass.cpp": {
-    "mtime": 1782319431.94621,
-    "ast_hash": "a1ea974bc2e2c616ffe31c21f1666620",
+    "mtime": 1782376926.5333679,
+    "ast_hash": "9409c80b2c7b05eade42ffb7f0e1088d",
     "semantic_hash": ""
   },
   "src/render/passes/SSAOPass.h": {
-    "mtime": 1782319431.9522095,
-    "ast_hash": "d1c6223d98bccfbfa962d3f8280114ad",
+    "mtime": 1782376844.52678,
+    "ast_hash": "0a807c16e11645c2af7823145ce2a697",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.cpp": {
-    "mtime": 1782348215.3910813,
-    "ast_hash": "105136fa6d7b113ccd391d3cd60fd406",
+    "mtime": 1782376933.8997834,
+    "ast_hash": "a1e5949ef3d45740daa9c88785b8b77e",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.h": {
-    "mtime": 1782319432.1923914,
-    "ast_hash": "d48e5993a3292b545c8a1455711f51c3",
+    "mtime": 1782377046.1188214,
+    "ast_hash": "645c2cb7e3f48e3c626d3b0983dff311",
     "semantic_hash": ""
   },
   "src/render/passes/SyncObjects.h": {
@@ -627,6 +617,41 @@
   "src/ui/PropertyEditor.h": {
     "mtime": 1782052741.4739797,
     "ast_hash": "370c118b2379ead4c39d27d6d8c4be45",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/Buffer.cpp": {
+    "mtime": 1782376314.0380208,
+    "ast_hash": "a400e61508d968d42e0c934e22758fac",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/Buffer.h": {
+    "mtime": 1782376249.4133334,
+    "ast_hash": "c05f051cdd2cb39da2fb776c235f3e04",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/GPUBuffer.cpp": {
+    "mtime": 1782375924.6694572,
+    "ast_hash": "4ccc7e27789933ee6462f86a7b3f63b5",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/GPUBuffer.h": {
+    "mtime": 1782375974.7086818,
+    "ast_hash": "6af198f6eb7ed6308ca73d016f30183b",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/StagingBuffer.cpp": {
+    "mtime": 1782375883.6879275,
+    "ast_hash": "7d99395bc5f8985594ce60bd5909cea5",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/StagingBuffer.h": {
+    "mtime": 1782375873.4890914,
+    "ast_hash": "8503f962a81ef9e45ab556990257c994",
+    "semantic_hash": ""
+  },
+  "src/render/buffers/UniformBuffer.h": {
+    "mtime": 1782375942.963067,
+    "ast_hash": "be2e949bc565961689be06486c07debd",
     "semantic_hash": ""
   }
 }
