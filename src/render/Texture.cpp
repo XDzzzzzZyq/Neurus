@@ -1,6 +1,7 @@
 #include "Texture.h"
 #include "buffers/StagingBuffer.h"
 #include "asset/ImageData.h"
+#include "render/Barrier.h"
 
 #include "Log.h"
 
@@ -281,10 +282,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		cmdBufs[0].begin(beginInfo);
 
 		// --- 4. Transition all levels: UNDEFINED → TRANSFER_DST ---
-		tex.m_image->TransitionLayout(cmdBufs[0],
-		                              vk::ImageLayout::eUndefined,
-		                              vk::ImageLayout::eTransferDstOptimal,
-		                              0, mipLevels);
+		Barrier::Transition(*cmdBufs[0], *tex.m_image, ImageState::TransferDst);
 
 		// --- 5. Copy staging buffer → image (level 0 only) ---
 		const vk::BufferImageCopy copyRegion(
@@ -311,10 +309,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		else
 		{
 			// Single mip level: transition directly to SHADER_READ_ONLY
-			tex.m_image->TransitionLayout(cmdBufs[0],
-			                              vk::ImageLayout::eTransferDstOptimal,
-			                              vk::ImageLayout::eShaderReadOnlyOptimal,
-			                              0, 1);
+			Barrier::Transition(*cmdBufs[0], *tex.m_image, ImageState::ShaderRead);
 		}
 
 		cmdBufs[0].end();
@@ -358,8 +353,7 @@ bool Texture::SaveImage(Image& image,
                          const std::string& path,
                          bool remapSigned)
 {
-	const vk::Image vkImage = *image.ImageHandle();
-	const vk::ImageLayout prevLayout = image.CurrentLayout();
+	const ImageState prevState = image.State();
 
 	// --- 1. Transition to TRANSFER_SRC ---
 	{
@@ -371,38 +365,22 @@ bool Texture::SaveImage(Image& image,
 
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		vk::AccessFlags srcAccess = {};
-		vk::PipelineStageFlags srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
-		if (prevLayout != vk::ImageLayout::eUndefined)
-		{
-			srcAccess = vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
-			srcStage = vk::PipelineStageFlagBits::eAllCommands;
-		}
+		Barrier::Transition(*cmdBufs[0], image, ImageState::TransferSrc);
 
-		vk::ImageMemoryBarrier barrier(
-			srcAccess, vk::AccessFlagBits::eTransferRead,
-			prevLayout, vk::ImageLayout::eTransferSrcOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, vkImage,
-			vk::ImageSubresourceRange(Image::AspectFromFormat(image.Format()), 0, 1, 0, 1));
-		cmdBufs[0].pipelineBarrier(srcStage, vk::PipelineStageFlagBits::eTransfer,
-		                           {}, {}, {}, barrier);
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
 		queue.submit(submitInfo);
 		queue.waitIdle();
-		image.SetCurrentLayout(vk::ImageLayout::eTransferSrcOptimal);
 	}
 
 	// --- 2. Read back ---
-	std::vector<uint8_t> rawData = image.ReadImageToBuffer(
-		device, physicalDevice, queue, queueFamilyIndex,
-		vk::ImageLayout::eTransferSrcOptimal);
+	auto imageData = image.ReadImageData(device, physicalDevice, queue, queueFamilyIndex);
 
-	if (rawData.empty()) return false;
+	if (!imageData.IsValid()) return false;
 
 	// --- 3. Transition back ---
-	if (prevLayout != vk::ImageLayout::eUndefined)
+	if (prevState != ImageState::Undefined)
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
 		                                 queueFamilyIndex);
@@ -412,27 +390,17 @@ bool Texture::SaveImage(Image& image,
 
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		const vk::AccessFlags dstAccess =
-			vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
-		constexpr vk::PipelineStageFlags dstStage = vk::PipelineStageFlagBits::eAllCommands;
+		Barrier::Transition(*cmdBufs[0], image, prevState);
 
-		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eTransferRead, dstAccess,
-			vk::ImageLayout::eTransferSrcOptimal, prevLayout,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED, vkImage,
-			vk::ImageSubresourceRange(Image::AspectFromFormat(image.Format()), 0, 1, 0, 1));
-		cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-		                           dstStage, {}, {}, {}, barrier);
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
 		queue.submit(submitInfo);
 		queue.waitIdle();
-		image.SetCurrentLayout(prevLayout);
 	}
 
 	// --- 4. Save pixel data ---
-	return ImageData::SavePixelData(rawData.data(), image.Format(), image.Extent(), path, remapSigned);
+	return imageData.SavePNG(path, remapSigned);
 }
 
 // ===========================================================================

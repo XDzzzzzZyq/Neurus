@@ -8,6 +8,7 @@
 #include "passes/RenderCache.h"         // for GetShadowMap
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
+#include "render/Barrier.h"
 
 #include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
@@ -292,18 +293,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	// Transition cubemap to depth attachment layout (all faces/layers)
 	{
 		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
-		vk::ImageMemoryBarrier barrier(
-			{}, vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*cubemap.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
-			                          0, 1, 0, kShadowFaceCount));
-		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-		                       vk::PipelineStageFlagBits::eLateFragmentTests,
-		                       {}, {}, {}, barrier);
-		cubemap.SetCurrentLayout(vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
 	}
 
 	const vk::Viewport viewport(0.f, 0.f,
@@ -428,22 +418,10 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		}
 	}
 
-	// Transition cubemap to SHADER_READ_ONLY for sampling
+	// Transition cubemap to ShaderRead for sampling in subsequent passes
 	{
 		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
-		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eDepthStencilAttachmentWrite,
-			vk::AccessFlagBits::eShaderRead,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::ImageLayout::eShaderReadOnlyOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*cubemap.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
-			                          0, 1, 0, kShadowFaceCount));
-		cmdBuf.pipelineBarrier(vk::PipelineStageFlagBits::eLateFragmentTests,
-		                       vk::PipelineStageFlagBits::eComputeShader,
-		                       {}, {}, {}, barrier);
-		cubemap.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+		Barrier::Transition(cmdBuf, cubemap, ImageState::ShaderRead);
 	}
 }
 

@@ -14,6 +14,8 @@ add_library(neurus_render STATIC
 	buffers/UniformBuffer.h
 	buffers/VertexBuffer.h
 	buffers/VertexBuffer.cpp
+	Barrier.h
+	Barrier.cpp
 	Image.h
 	Image.cpp
 	DescriptorManager.h

@@ -9,6 +9,7 @@
 #include "passes/RenderContext.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
+#include "render/Barrier.h"
 #include "shaders/ShaderModule.h"
 #include "Texture.h"
 
@@ -87,19 +88,9 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			cmdBufs[0].begin(vk::CommandBufferBeginInfo(
 				vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-			m_fallbackIrradianceCube->TransitionLayout(
-				cmdBufs[0],
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				0, VK_REMAINING_MIP_LEVELS,
-				0, VK_REMAINING_ARRAY_LAYERS);
+			Barrier::Transition(*cmdBufs[0], *m_fallbackIrradianceCube, ImageState::ShaderRead);
 
-			m_fallbackPrefilteredCube->TransitionLayout(
-				cmdBufs[0],
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				0, VK_REMAINING_MIP_LEVELS,
-				0, VK_REMAINING_ARRAY_LAYERS);
+			Barrier::Transition(*cmdBufs[0], *m_fallbackPrefilteredCube, ImageState::ShaderRead);
 
 			cmdBufs[0].end();
 
@@ -449,11 +440,9 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 	}
 
-	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
-	//     and HDRColor to GENERAL for compute write.
-	//     Also transition SSAO and ShadowIntensity from GENERAL to SHADER_READ_ONLY_OPTIMAL.
-	//     Uses pipelineBarrier2 (synchronization2) for correct layout
-	//     tracking with VK_KHR_dynamic_rendering.
+	// --- 2. Transition all images for compute shader access ---
+	//     Uses Barrier::Transition which reads the image's current ImageState
+	//     and emits the appropriate vk::ImageMemoryBarrier2.
 	{
 		const std::array<AttachmentName, 4> gBufferInputs = {
 			AttachmentName::Position,
@@ -462,80 +451,21 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			AttachmentName::MetallicRoughness,
 		};
 
-		std::array<vk::ImageMemoryBarrier2, 7> barriers;
-
 		for (size_t i = 0; i < 4; ++i)
 		{
 			auto& attachment = cache.GetAttachment(gBufferInputs[i], renderExtent);
-			const vk::ImageLayout oldLayout = attachment.CurrentLayout();
-
-			barriers[i] = vk::ImageMemoryBarrier2(
-				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
-					? vk::PipelineStageFlagBits2::eColorAttachmentOutput
-					: vk::PipelineStageFlagBits2::eComputeShader,         // srcStage
-				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
-					? vk::AccessFlagBits2::eColorAttachmentWrite
-					: vk::AccessFlagBits2::eShaderWrite,                  // srcAccess
-				vk::PipelineStageFlagBits2::eComputeShader,               // dstStage
-				vk::AccessFlagBits2::eShaderRead,                         // dstAccess
-				oldLayout,                                                 // oldLayout (actual)
-				vk::ImageLayout::eShaderReadOnlyOptimal,                  // newLayout
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*attachment.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-
-			// Update CPU-side layout tracking
-			attachment.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+			Barrier::Transition(cmdBuf, attachment, ImageState::ShaderRead);
 		}
 
-		// HDRColor: current layout → GENERAL
+		// HDRColor: current state → ShaderWrite (compute write)
 		auto& hdrColor = cache.GetAttachment(AttachmentName::HDRColor, renderExtent);
-		const vk::ImageLayout hdrOldLayout = hdrColor.CurrentLayout();
-		barriers[4] = vk::ImageMemoryBarrier2(
-			(hdrOldLayout == vk::ImageLayout::eUndefined)
-				? vk::PipelineStageFlagBits2::eTopOfPipe
-				: vk::PipelineStageFlagBits2::eAllCommands,            // srcStage
-			(hdrOldLayout == vk::ImageLayout::eUndefined)
-				? vk::AccessFlagBits2::eNone
-				: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
-			vk::PipelineStageFlagBits2::eComputeShader,             // dstStage
-			vk::AccessFlagBits2::eShaderWrite,                      // dstAccess
-			hdrOldLayout,                                            // oldLayout - tracked, correct
-			vk::ImageLayout::eGeneral,                              // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*hdrColor.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1));
+		Barrier::Transition(cmdBuf, hdrColor, ImageState::ShaderWrite);
 
-		// Update CPU-side layout tracking (the barrier did this implicitly on GPU)
-		hdrColor.SetCurrentLayout(vk::ImageLayout::eGeneral);
-
-		// SSAO: GENERAL → SHADER_READ_ONLY (was written by SSAOPass, now read by lighting)
+		// SSAO: if never written (Undefined), clear to 1.0 (no occlusion), then ShaderRead
 		auto& ssao = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
-		vk::ImageLayout ssaoOldLayout = ssao.CurrentLayout();
-
-		// If SSAO attachment hasn't been written (layout = UNDEFINED), clear to 1.0 (no occlusion)
-		bool ssaoWasCleared = false;
-		if (ssaoOldLayout == vk::ImageLayout::eUndefined)
+		if (ssao.State() == ImageState::Undefined)
 		{
-			const auto preClearBarrier = vk::ImageMemoryBarrier2(
-				vk::PipelineStageFlagBits2::eTopOfPipe,
-				vk::AccessFlagBits2::eNone,
-				vk::PipelineStageFlagBits2::eTransfer,
-				vk::AccessFlagBits2::eTransferWrite,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eTransferDstOptimal,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*ssao.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-
-			const vk::DependencyInfo preDep({}, {}, {}, preClearBarrier);
-			cmdBuf.pipelineBarrier2(preDep);
+			Barrier::Transition(cmdBuf, ssao, ImageState::TransferDst);
 
 			vk::ClearColorValue clearWhite(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f});
 			cmdBuf.clearColorImage(*ssao.ImageHandle(),
@@ -543,57 +473,14 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			                       clearWhite,
 			                       vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
 			                                                  0, 1, 0, 1));
-
-			ssaoOldLayout = vk::ImageLayout::eTransferDstOptimal;
-			ssao.SetCurrentLayout(vk::ImageLayout::eTransferDstOptimal);
-			ssaoWasCleared = true;
 		}
+		Barrier::Transition(cmdBuf, ssao, ImageState::ShaderRead);
 
-		const vk::PipelineStageFlags2 ssaoSrcStage = ssaoWasCleared
-			? vk::PipelineStageFlagBits2::eTransfer
-			: vk::PipelineStageFlagBits2::eComputeShader;
-		const vk::AccessFlags2 ssaoSrcAccess = ssaoWasCleared
-			? vk::AccessFlagBits2::eTransferWrite
-			: vk::AccessFlagBits2::eShaderWrite;
-
-		barriers[5] = vk::ImageMemoryBarrier2(
-			ssaoSrcStage,                                               // srcStage
-			ssaoSrcAccess,                                              // srcAccess
-			vk::PipelineStageFlagBits2::eComputeShader,               // dstStage (lighting read)
-			vk::AccessFlagBits2::eShaderRead,                          // dstAccess
-			ssaoOldLayout,                                              // oldLayout
-			vk::ImageLayout::eShaderReadOnlyOptimal,                   // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*ssao.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1));
-
-		ssao.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-
-		// ShadowIntensity: GENERAL → SHADER_READ_ONLY (read by lighting)
+		// ShadowIntensity: if never written (Undefined), clear to 0.0 (no shadow), then ShaderRead
 		auto& shadowAtt = cache.GetAttachment(AttachmentName::ShadowIntensity, renderExtent);
-		vk::ImageLayout shadowOldLayout = shadowAtt.CurrentLayout();
-
-		// If shadow hasn't been computed (layout = UNDEFINED), clear to 0.0 (no shadow)
-		bool shadowWasCleared = false;
-		if (shadowOldLayout == vk::ImageLayout::eUndefined)
+		if (shadowAtt.State() == ImageState::Undefined)
 		{
-			const auto preClearBarrier = vk::ImageMemoryBarrier2(
-				vk::PipelineStageFlagBits2::eTopOfPipe,
-				vk::AccessFlagBits2::eNone,
-				vk::PipelineStageFlagBits2::eTransfer,
-				vk::AccessFlagBits2::eTransferWrite,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eTransferDstOptimal,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*shadowAtt.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-
-			const vk::DependencyInfo preDep({}, {}, {}, preClearBarrier);
-			cmdBuf.pipelineBarrier2(preDep);
+			Barrier::Transition(cmdBuf, shadowAtt, ImageState::TransferDst);
 
 			vk::ClearColorValue clearBlack(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f});
 			cmdBuf.clearColorImage(*shadowAtt.ImageHandle(),
@@ -601,36 +488,8 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			                       clearBlack,
 			                       vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
 			                                                  0, 1, 0, 1));
-
-			shadowOldLayout = vk::ImageLayout::eTransferDstOptimal;
-			shadowAtt.SetCurrentLayout(vk::ImageLayout::eTransferDstOptimal);
-			shadowWasCleared = true;
 		}
-
-		const vk::PipelineStageFlags2 shadowSrcStage = shadowWasCleared
-			? vk::PipelineStageFlagBits2::eTransfer
-			: vk::PipelineStageFlagBits2::eComputeShader;
-		const vk::AccessFlags2 shadowSrcAccess = shadowWasCleared
-			? vk::AccessFlagBits2::eTransferWrite
-			: vk::AccessFlagBits2::eShaderWrite;
-
-		barriers[6] = vk::ImageMemoryBarrier2(
-			shadowSrcStage,
-			shadowSrcAccess,
-			vk::PipelineStageFlagBits2::eComputeShader,
-			vk::AccessFlagBits2::eShaderRead,
-			shadowOldLayout,
-			vk::ImageLayout::eShaderReadOnlyOptimal,
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*shadowAtt.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1));
-
-		shadowAtt.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-
-		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
-		cmdBuf.pipelineBarrier2(depInfo);
+		Barrier::Transition(cmdBuf, shadowAtt, ImageState::ShaderRead);
 	}
 
 	// --- 3. Bind compute pipeline ---

@@ -208,18 +208,9 @@ std::unique_ptr<Image> Environment::GenerateFallbackImage(
 		pixels[i + 3] = 1.0f;
 	}
 
-	auto image = std::make_unique<Image>(
-		device, physicalDevice,
-		vk::Extent2D{eqWidth, eqHeight},
-		vk::Format::eR32G32B32A32Sfloat,
-		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-		/*mipLevels=*/1,
-		Image::ImageType::e2D,
-		"Env_FallbackEquirect");
-
-	const size_t dataSize = pixels.size() * sizeof(float);
-	image->UploadPixelData(device, physicalDevice, queue, queueFamilyIndex,
-	                       pixels.data(), dataSize);
+	ImageData imageData(pixels.data(), eqWidth, eqHeight, vk::Format::eR32G32B32A32Sfloat);
+	auto image = Image::FromImageData(device, physicalDevice, queue, queueFamilyIndex,
+	                                  imageData, "Env_FallbackEquirect");
 
 	NEURUS_LOG("[Environment] Created pink-purple fallback equirect (" << eqWidth << "x" << eqHeight << ")");
 	return image;

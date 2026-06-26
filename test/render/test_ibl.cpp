@@ -7,7 +7,7 @@
  *   - C2E (cubemap → equirect) compute shader roundtrip matches input
  *   - Cubemap 6-face readback and .hdr saving (Radiance format)
  *   - Cubemap 6-face .png saving (LDR)
- *   - Direct HDR float image saving via ImageData::SavePixelDataHDR
+ *   - Direct HDR float image saving via ImageData::SaveHDR
  *
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
  */
@@ -17,6 +17,7 @@
 #include "shared/TestVulkanShared.h"
 
 #include "asset/ImageData.h"
+#include "render/Barrier.h"
 #include "render/ComputePipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/Image.h"
@@ -243,17 +244,7 @@ protected:
 		auto& cmd = BeginCmd();
 
 		// Undefined → TransferDst
-		vk::ImageMemoryBarrier preBarrier(
-			vk::AccessFlagBits::eNone,
-			vk::AccessFlagBits::eTransferWrite,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eTransferDstOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*img.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-		                    vk::PipelineStageFlagBits::eTransfer,
-		                    {}, {}, {}, {preBarrier});
+		Barrier::Transition(*cmd, img, ImageState::TransferDst);
 
 		vk::BufferImageCopy copyRegion(0, 0, 0,
 			vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
@@ -262,21 +253,10 @@ protected:
 		cmd.copyBufferToImage(*stagingBuf, *img.ImageHandle(),
 		                       vk::ImageLayout::eTransferDstOptimal, {copyRegion});
 
-		// TransferDst → ShaderReadOnly
-		vk::ImageMemoryBarrier postBarrier(
-			vk::AccessFlagBits::eTransferWrite,
-			vk::AccessFlagBits::eShaderRead,
-			vk::ImageLayout::eTransferDstOptimal,
-			vk::ImageLayout::eShaderReadOnlyOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*img.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-		                    vk::PipelineStageFlagBits::eComputeShader,
-		                    {}, {}, {}, {postBarrier});
+		// TransferDst → ShaderRead
+		Barrier::Transition(*cmd, img, ImageState::ShaderRead);
 
 		EndSubmitWait(cmd);
-		img.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
 	}
 
 	// -------------------------------------------------------------------
@@ -302,19 +282,9 @@ protected:
 
 		auto& cmd = BeginCmd();
 
-		// Transition cubemap: UNDEFINED → GENERAL
-		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eNone,
-			vk::AccessFlagBits::eShaderWrite,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eGeneral,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*cubeDst.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-		                    vk::PipelineStageFlagBits::eComputeShader,
-		                    {}, {}, {}, {barrier});
-		cubeDst.SetCurrentLayout(vk::ImageLayout::eGeneral);
+		// Transition cubemap: UNDEFINED → ShaderWrite (all 6 faces)
+		vk::ImageSubresourceRange cubeRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
+		Barrier::Transition(*cmd, cubeDst, ImageState::ShaderWrite, cubeRange);
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_e2cPipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
@@ -360,19 +330,8 @@ protected:
 
 		auto& cmd = BeginCmd();
 
-		// Transition output equirect: UNDEFINED → GENERAL
-		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eNone,
-			vk::AccessFlagBits::eShaderWrite,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eGeneral,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*equiDst.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-		                    vk::PipelineStageFlagBits::eComputeShader,
-		                    {}, {}, {}, {barrier});
-		equiDst.SetCurrentLayout(vk::ImageLayout::eGeneral);
+		// Transition output equirect: UNDEFINED → ShaderWrite
+		Barrier::Transition(*cmd, equiDst, ImageState::ShaderWrite);
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_c2ePipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
@@ -390,8 +349,7 @@ protected:
 	// Readback helpers
 	// -------------------------------------------------------------------
 
-	std::vector<float> readbackFloatImage(const Image& img,
-	                                       vk::ImageLayout currentLayout,
+	std::vector<float> readbackFloatImage(Image& img,
 	                                       uint32_t width, uint32_t height)
 	{
 		auto& dev = *m_device;
@@ -410,21 +368,8 @@ protected:
 
 		auto& cmd = BeginCmd();
 
-		// Transition to TRANSFER_SRC if needed
-		if (currentLayout != vk::ImageLayout::eTransferSrcOptimal)
-		{
-			vk::ImageMemoryBarrier transBarrier(
-				vk::AccessFlagBits::eShaderWrite,
-				vk::AccessFlagBits::eTransferRead,
-				currentLayout,
-				vk::ImageLayout::eTransferSrcOptimal,
-				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-				*img.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-			                    vk::PipelineStageFlagBits::eTransfer,
-			                    {}, {}, {}, {transBarrier});
-		}
+		// Transition to TRANSFER_SRC
+		Barrier::Transition(*cmd, img, ImageState::TransferSrc);
 
 		vk::BufferImageCopy copyRegion(0, 0, 0,
 			vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
@@ -447,7 +392,7 @@ protected:
 		return result;
 	}
 
-	std::vector<float> readbackCubemapFaces(const Image& cubeImg)
+	std::vector<float> readbackCubemapFaces(Image& cubeImg)
 	{
 		auto& dev = *m_device;
 		auto& pd  = PhysicalDevice();
@@ -466,18 +411,9 @@ protected:
 
 		auto& cmd = BeginCmd();
 
-		// Transition to TRANSFER_SRC
-		vk::ImageMemoryBarrier transBarrier(
-			vk::AccessFlagBits::eShaderWrite,
-			vk::AccessFlagBits::eTransferRead,
-			vk::ImageLayout::eGeneral,
-			vk::ImageLayout::eTransferSrcOptimal,
-			VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-			*cubeImg.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-		                    vk::PipelineStageFlagBits::eTransfer,
-		                    {}, {}, {}, {transBarrier});
+		// Transition to TRANSFER_SRC (all 6 faces)
+		vk::ImageSubresourceRange cubeTransRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
+		Barrier::Transition(*cmd, cubeImg, ImageState::TransferSrc, cubeTransRange);
 
 		// Copy all 6 faces (layerCount = 6)
 		vk::BufferImageCopy copyRegion(0, 0, 0,
@@ -562,9 +498,7 @@ TEST_F(IBLConversionTest, E2C_C2E_Roundtrip_ProducesMatchingPixels)
 	runC2E(*m_cubemapImage, *m_outputEquirect);
 
 	// Read back result
-	auto resultPixels = readbackFloatImage(*m_outputEquirect,
-	                                       vk::ImageLayout::eGeneral,
-	                                       kEquiWidth, kEquiHeight);
+	auto resultPixels = readbackFloatImage(*m_outputEquirect, kEquiWidth, kEquiHeight);
 
 	// Compare with tolerance (bilinear filtering in both directions causes precision loss)
 	const float kTolerance = 0.15f;
@@ -619,7 +553,8 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsHDR_ProducesValidFiles)
 	{
 		const std::string path = outDir + "faces.hdr/cube_face_" + kFaceNames[face] + ".hdr";
 		const float* faceData = cubeData.data() + face * faceFloats;
-		bool saved = ImageData::SavePixelDataHDR(faceData, kCubeFaceRes, kCubeFaceRes, path);
+		ImageData faceImg(faceData, kCubeFaceRes, kCubeFaceRes, vk::Format::eR32G32B32A32Sfloat);
+		bool saved = faceImg.SaveHDR(path);
 		EXPECT_TRUE(saved) << "Failed to save HDR face " << kFaceNames[face];
 
 		if (saved)
@@ -648,7 +583,8 @@ TEST_F(IBLConversionTest, SaveHDRFloatImage_ProducesValidHDRFile)
 	ensureDir(outDir + ".");
 
 	const std::string hdrPath = outDir + "test_gradient.hdr";
-	bool saved = ImageData::SavePixelDataHDR(pixels.data(), 64, 32, hdrPath);
+	ImageData gradientImg(pixels.data(), 64, 32, vk::Format::eR32G32B32A32Sfloat);
+	bool saved = gradientImg.SaveHDR(hdrPath);
 	EXPECT_TRUE(saved) << "Failed to save HDR file";
 
 	if (saved)
@@ -702,10 +638,8 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 		const uint16_t* faceSrc = halfData + face * facePixelCount * 4;
 		auto u8Data = ImageData::ConvertHalfToU8(faceSrc, kCubeFaceRes, kCubeFaceRes, false);
 
-		bool saved = ImageData::SavePixelData(u8Data.data(),
-		                                       vk::Format::eR8G8B8A8Unorm,
-		                                       vk::Extent2D{kCubeFaceRes, kCubeFaceRes},
-		                                       path);
+		ImageData img(u8Data.data(), kCubeFaceRes, kCubeFaceRes, vk::Format::eR8G8B8A8Unorm);
+		bool saved = img.SavePNG(path);
 		EXPECT_TRUE(saved) << "Failed to save PNG face " << kFaceNames[face];
 	}
 }

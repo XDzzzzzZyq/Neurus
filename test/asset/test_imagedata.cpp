@@ -242,7 +242,7 @@ TEST(ImageDataTest, ConstructorAndGetters)
 	EXPECT_EQ(img.GetWidth(), 1u);
 	EXPECT_EQ(img.GetHeight(), 1u);
 	EXPECT_EQ(img.GetFormat(), vk::Format::eR8G8B8A8Unorm);
-	EXPECT_EQ(img.GetPixelData(), static_cast<const void*>(pixelData));
+	EXPECT_EQ(img.GetPixelData()[0], 255u);
 }
 
 TEST(ImageDataTest, Constructor_NonSquare)
@@ -253,5 +253,5 @@ TEST(ImageDataTest, Constructor_NonSquare)
 	EXPECT_EQ(img.GetWidth(), 4u);
 	EXPECT_EQ(img.GetHeight(), 4u);
 	EXPECT_EQ(img.GetFormat(), vk::Format::eR8G8B8A8Srgb);
-	EXPECT_NE(img.GetPixelData(), nullptr);
+	EXPECT_FALSE(img.GetPixelData().empty());
 }

@@ -25,6 +25,7 @@
 #include "render/passes/GeometryPass.h"    // for GeometryRenderItem definition
 #include "render/passes/RenderContext.h"
 #include "render/Image.h"
+#include "render/Barrier.h"
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/shaders/ShaderModule.h"
@@ -421,9 +422,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	// Transition to COLOR_ATTACHMENT_OPTIMAL
 	{
 		auto& cmd = BeginCmd();
-		tempColor.TransitionLayout(cmd,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eColorAttachmentOptimal);
+		Barrier::Transition(*cmd, tempColor, ImageState::ColorAttachment);
 		EndSubmitWait(cmd);
 	}
 
@@ -441,9 +440,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 	// Transition to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
 	{
 		auto& cmd = BeginCmd();
-		depthImage.TransitionLayout(cmd,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		Barrier::Transition(*cmd, depthImage, ImageState::DepthAttachment);
 		EndSubmitWait(cmd);
 	}
 
@@ -581,9 +578,7 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		cmd.endRendering();
 
 		// Transition color image → TRANSFER_SRC for readback
-		tempColor.TransitionLayout(cmd,
-			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ImageLayout::eTransferSrcOptimal);
+		Barrier::Transition(*cmd, tempColor, ImageState::TransferSrc);
 
 		EndSubmitWait(cmd);
 	}
@@ -728,9 +723,8 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		const std::string tmpPath = refPath + ".tmp";
 
 		// Save captured depth as PNG (reuse u8Data)
-		const bool captured = ImageData::SavePixelData(
-			u8Data.data(), vk::Format::eR8Unorm,
-			vk::Extent2D(kRes, kRes), tmpPath);
+		ImageData img(u8Data.data(), kRes, kRes, vk::Format::eR8Unorm);
+		const bool captured = img.SavePNG(tmpPath);
 		ASSERT_TRUE(captured) << "Failed to capture depth map for reference";
 
 		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
@@ -790,11 +784,8 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	// Transition colour cubemap to colour-attachment layout
 	{
 		auto& cmd = BeginCmd();
-		verifyCube.TransitionLayout(cmd,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eColorAttachmentOptimal,
-			0, 1,  // mip 0, 1 level
-			0, 6); // all 6 array layers
+		vk::ImageSubresourceRange range(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
+		Barrier::Transition(*cmd, verifyCube, ImageState::ColorAttachment, range);
 		EndSubmitWait(cmd);
 	}
 
@@ -820,11 +811,8 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		m_multiviewDepthPass->Record(*cmd, *m_renderCache, ctx);
 
 		// Transition colour cubemap for readback (must happen after rendering)
-		verifyCube.TransitionLayout(cmd,
-			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ImageLayout::eTransferSrcOptimal,
-			0, 1,  // mip 0, 1 level
-			0, 6); // all 6 array layers
+		vk::ImageSubresourceRange range(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
+		Barrier::Transition(*cmd, verifyCube, ImageState::TransferSrc, range);
 
 		EndSubmitWait(cmd);
 	}
@@ -975,9 +963,8 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			// Convert depth to u8
 			std::vector<uint8_t> u8Data = DepthToU8(depthData);
 
-			const bool captured = ImageData::SavePixelData(
-				u8Data.data(), vk::Format::eR8Unorm,
-				vk::Extent2D(kRes, kRes), tmpPath);
+			ImageData img(u8Data.data(), kRes, kRes, vk::Format::eR8Unorm);
+			const bool captured = img.SavePNG(tmpPath);
 			ASSERT_TRUE(captured) << "Failed to save depth map for face " << face;
 
 			const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);

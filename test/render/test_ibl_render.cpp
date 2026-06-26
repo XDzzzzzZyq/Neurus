@@ -33,6 +33,7 @@
 
 // --- Asset layer ---
 #include "asset/MeshData.h"
+#include "asset/ImageData.h"
 
 // --- Scene layer ---
 #include "scene/Camera.h"
@@ -167,19 +168,9 @@ protected:
 		// --- Generate equirect gradient & upload to GPU ---
 		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
 
-		m_equirectImage = std::make_unique<Image>(
-			dev, pd,
-			vk::Extent2D{kEquiWidth, kEquiHeight},
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eSampled |
-			    vk::ImageUsageFlagBits::eTransferDst,
-			/*mipLevels=*/1,
-			Image::ImageType::e2D,
-			"IBLRenderTest_Equirect");
-
-		m_equirectImage->UploadPixelData(dev, pd, m_queue, m_graphicsQueueFamily,
-		                                  gradientPixels.data(),
-		                                  gradientPixels.size() * sizeof(float));
+		ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, vk::Format::eR32G32B32A32Sfloat);
+		m_equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
+		                                       imgData, "IBLRenderTest_Equirect");
 
 		// --- Generate IBL cubemaps into Environment ---
 		m_iblPass->Generate(*m_equirectImage,
@@ -492,19 +483,10 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 	// 2g. Re-create equirect gradient + upload to GPU.
 	{
-		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
-		m_equirectImage = std::make_unique<Image>(
-			dev, pd,
-			vk::Extent2D{kEquiWidth, kEquiHeight},
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eSampled |
-			    vk::ImageUsageFlagBits::eTransferDst,
-			/*mipLevels=*/1,
-			Image::ImageType::e2D,
-			"IBLRenderTest_Equirect_Reload");
-		m_equirectImage->UploadPixelData(dev, pd, m_queue, m_graphicsQueueFamily,
-		                                 gradientPixels.data(),
-		                                 gradientPixels.size() * sizeof(float));
+	auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
+	ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, vk::Format::eR32G32B32A32Sfloat);
+	m_equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
+	                                       imgData, "IBLRenderTest_Equirect_Reload");
 	}
 
 	// 2h. Generate IBL cubemaps into the new Environment.

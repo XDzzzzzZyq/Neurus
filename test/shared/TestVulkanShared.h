@@ -16,6 +16,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include "render/passes/RenderCache.h"
+#include "render/Barrier.h"
 
 #include <array>
 #include <cstdint>
@@ -196,14 +197,14 @@ protected:
 
 		for (const auto& att : colorAtts)
 		{
-			am.GetAttachment(att, extent).TransitionLayout(
-				cmd, vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal);
+			neurus::Barrier::Transition(*cmd,
+				am.GetAttachment(att, extent),
+				neurus::ImageState::ColorAttachment);
 		}
 
-		am.GetAttachment(neurus::AttachmentName::Depth, extent).TransitionLayout(
-			cmd, vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		neurus::Barrier::Transition(*cmd,
+			am.GetAttachment(neurus::AttachmentName::Depth, extent),
+			neurus::ImageState::DepthAttachment);
 
 		fixture.EndSubmitWait(cmd);
 	}

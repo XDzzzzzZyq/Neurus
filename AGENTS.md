@@ -111,11 +111,11 @@ Follow Karpathy Guidelines. For each task:
    - Visual correctness in the rendered viewport (use screenshots for analysis)
    - Runtime behavior: resize the window, interact with the viewport, verify no deadlocks or freezes.
    Most importantly, the design of test should be comprehensive (mathematical verification, reference image test, etc.), forming a logic chain that proves the correctness of each component.
-4. Before committing, keep ALL relevant documents updated.
 
 ```
 $output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
 ```
+4. Before committing, keep ALL relevant documents and guidances (`.github/instructions/*.md`) updated.
 
 After each development phase, stop and wait for user verification.
 
@@ -134,13 +134,16 @@ Neurus/
 ├── res/shaders/            # GLSL shader source files
 ├── src/
 │   ├── render/             # Renderer layer (Vulkan-HPP)
-│   │   ├── DeferredRenderer.h/cpp # Deferred PBR pipeline (active renderer)
+│   │   ├── Barrier.h/cpp            # Centralized image barrier management
+│   │   ├── DeferredRenderer.h/cpp   # Deferred PBR pipeline (active renderer)
+│   │   ├── Image.h/cpp              # GPU image with state tracking (ImageState)
 │   │   ├── ShaderProgram.h/cpp
 │   │   ├── Swapchain.h/cpp
 │   │   ├── VulkanContext.h/cpp
 │   │   └── passes/          # Render passes
 │   │       ├── RenderCache.h/cpp     # Cross-frame mutable resource pool
 │   │       ├── RenderContext.h       # Per-frame immutable scene snapshot
+│   │       ├── SyncObjects.h/cpp     # Fence, Semaphore, FrameSync, BufferBarrier
 │   │       ├── GeometryPass.h/cpp
 │   │       ├── SSAOPass.h/cpp
 │   │       ├── LightingPass.h/cpp

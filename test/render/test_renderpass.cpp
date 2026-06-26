@@ -6,6 +6,7 @@
 #include "shared/TestVulkanShared.h"
 #include "render/passes/RenderPassManager.h"
 #include "render/Image.h"
+#include "render/Barrier.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -160,9 +161,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
 	// Transition to color attachment optimal layout
 	{
 		auto& cmd = BeginCmd();
-		colorAttachment.TransitionLayout(cmd,
-		                                 vk::ImageLayout::eUndefined,
-		                                 vk::ImageLayout::eColorAttachmentOptimal);
+		Barrier::Transition(*cmd, colorAttachment, ImageState::ColorAttachment);
 		EndSubmitWait(cmd);
 	}
 
@@ -223,12 +222,8 @@ TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
 	// Transition layouts
 	{
 		auto& cmd = BeginCmd();
-		colorAttachment.TransitionLayout(cmd,
-		                                 vk::ImageLayout::eUndefined,
-		                                 vk::ImageLayout::eColorAttachmentOptimal);
-		depthAttachment.TransitionLayout(cmd,
-		                                 vk::ImageLayout::eUndefined,
-		                                 vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		Barrier::Transition(*cmd, colorAttachment, ImageState::ColorAttachment);
+		Barrier::Transition(*cmd, depthAttachment, ImageState::DepthAttachment);
 		EndSubmitWait(cmd);
 	}
 
@@ -303,11 +298,9 @@ TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
 		auto& cmd = BeginCmd();
 		for (auto& ca : colorAttachments)
 		{
-			ca.TransitionLayout(cmd, vk::ImageLayout::eUndefined,
-			                    vk::ImageLayout::eColorAttachmentOptimal);
+			Barrier::Transition(*cmd, ca, ImageState::ColorAttachment);
 		}
-		depthAttachment.TransitionLayout(cmd, vk::ImageLayout::eUndefined,
-		                                 vk::ImageLayout::eDepthStencilAttachmentOptimal);
+		Barrier::Transition(*cmd, depthAttachment, ImageState::DepthAttachment);
 		EndSubmitWait(cmd);
 	}
 
@@ -358,9 +351,7 @@ TEST_F(RenderPassManagerTest, BeginEndPass_PostFX_NoValidationError)
 
 	{
 		auto& cmd = BeginCmd();
-		colorAttachment.TransitionLayout(cmd,
-		                                 vk::ImageLayout::eUndefined,
-		                                 vk::ImageLayout::eColorAttachmentOptimal);
+		Barrier::Transition(*cmd, colorAttachment, ImageState::ColorAttachment);
 		EndSubmitWait(cmd);
 	}
 

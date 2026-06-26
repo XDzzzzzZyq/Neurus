@@ -7,8 +7,8 @@
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
+#include "render/Barrier.h"
 #include "shaders/ShaderModule.h"
-#include "passes/SyncObjects.h"
 
 #include "Log.h"
 
@@ -126,36 +126,15 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 		cmdBufs[0].begin(beginInfo);
 
-		// Transition equirect to SHADER_READ_ONLY if needed
-		const auto eqLayout = equirectImage.CurrentLayout();
-		if (eqLayout != vk::ImageLayout::eShaderReadOnlyOptimal)
-		{
-			const auto barrier = ImageBarrier(
-				*equirectImage.ImageHandle(),
-				eqLayout,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				vk::PipelineStageFlagBits2::eAllCommands,
-				vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderRead);
-			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-			cmdBufs[0].pipelineBarrier2(depInfo);
-		}
+		// Transition equirect to ShaderRead if needed
+		// Uses explicit subresource overload — does not update m_state on const input
+		Barrier::Transition(*cmdBufs[0],
+		                    const_cast<Image&>(equirectImage),
+		                    ImageState::ShaderRead,
+		                    equirectImage.SubresourceRange());
 
-		// Transition diffuse cubemap to GENERAL for compute write
-		{
-			const auto barrier = ImageBarrier(
-				*diffuseOut.ImageHandle(),
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eGeneral,
-				vk::PipelineStageFlagBits2::eTopOfPipe,
-				vk::AccessFlagBits2::eNone,
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderWrite);
-			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-			cmdBufs[0].pipelineBarrier2(depInfo);
-			diffuseOut.SetCurrentLayout(vk::ImageLayout::eGeneral);
-		}
+		// Transition diffuse cubemap to ShaderWrite for compute write
+		Barrier::Transition(*cmdBufs[0], diffuseOut, ImageState::ShaderWrite);
 
 		// Write descriptors with diffuse cubemap view as output
 		WriteDescriptors(equirectImage, equirectSampler, diffArrayView);
@@ -173,16 +152,19 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		                kDefaultIrradianceSteps,
 		                /*roughnessSq=*/0.0f);
 
-		// Memory barrier: make diffuse cubemap visible
+		// Memory barrier: make diffuse cubemap visible (same-layout, kept raw)
 		{
-			const auto barrier = ImageBarrier(
-				*diffuseOut.ImageHandle(),
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eGeneral,
+			const vk::ImageMemoryBarrier2 barrier(
 				vk::PipelineStageFlagBits2::eComputeShader,
 				vk::AccessFlagBits2::eShaderWrite,
 				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderRead);
+				vk::AccessFlagBits2::eShaderRead,
+				vk::ImageLayout::eGeneral,
+				vk::ImageLayout::eGeneral,
+				VK_QUEUE_FAMILY_IGNORED,
+				VK_QUEUE_FAMILY_IGNORED,
+				*diffuseOut.ImageHandle(),
+				diffuseOut.SubresourceRange());
 			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
 			cmdBufs[0].pipelineBarrier2(depInfo);
 		}
@@ -206,25 +188,11 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		// Transition specular cubemap at this mip to GENERAL
-		{
-			const auto barrier = vk::ImageMemoryBarrier2(
-				(mip == 0) ? vk::PipelineStageFlagBits2::eTopOfPipe
-				           : vk::PipelineStageFlagBits2::eComputeShader,
-				(mip == 0) ? vk::AccessFlagBits2::eNone
-				           : vk::AccessFlagBits2::eShaderWrite,
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderWrite,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eGeneral,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*specularOut.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          mip, 1, 0, 6));
-			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-			cmdBufs[0].pipelineBarrier2(depInfo);
-		}
+		// Transition specular cubemap at this mip to ShaderWrite
+		// Uses explicit subresource range — does not update m_state
+		Barrier::Transition(*cmdBufs[0], specularOut, ImageState::ShaderWrite,
+		                    vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+		                                              mip, 1, 0, 6));
 
 		// Write descriptors using per-mip specular view
 		WriteDescriptors(equirectImage, equirectSampler, specularMipViews[mip]);
@@ -272,38 +240,11 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 	{
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		// Diffuse cubemap: GENERAL → SHADER_READ_ONLY
-		{
-			const auto barrier = ImageBarrier(
-				*diffuseOut.ImageHandle(),
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderWrite,
-				vk::PipelineStageFlagBits2::eAllCommands,
-				vk::AccessFlagBits2::eShaderRead);
-			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-			cmdBufs[0].pipelineBarrier2(depInfo);
-			diffuseOut.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-		}
+		// Diffuse cubemap: ShaderWrite → ShaderRead
+		Barrier::Transition(*cmdBufs[0], diffuseOut, ImageState::ShaderRead);
 
-		// Specular cubemap (all mips): GENERAL → SHADER_READ_ONLY
-		{
-			const auto barrier = ImageBarrier(
-				*specularOut.ImageHandle(),
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderWrite,
-				vk::PipelineStageFlagBits2::eAllCommands,
-				vk::AccessFlagBits2::eShaderRead,
-				vk::ImageAspectFlagBits::eColor,
-				/*baseMip=*/0,
-				/*levelCount=*/kSpecularMipLevels);
-			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-			cmdBufs[0].pipelineBarrier2(depInfo);
-			specularOut.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
-		}
+		// Specular cubemap (all mips): ShaderWrite → ShaderRead
+		Barrier::Transition(*cmdBufs[0], specularOut, ImageState::ShaderRead);
 
 		cmdBufs[0].end();
 

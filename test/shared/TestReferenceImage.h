@@ -60,7 +60,7 @@ inline int ComparePixels(
  *
  * - If reference doesn't exist: renames .tmp → refPath, returns -1
  *   (caller should issue GTEST_SKIP)
- * - If reference exists: loads both via ImageData::LoadFromPath,
+ * - If reference exists: loads both via ImageData(path) constructor,
  *   compares via ComparePixels, removes .tmp, returns bad pixel count
  *
  * @param refPath          Full path to the reference PNG file.
@@ -81,15 +81,15 @@ inline int CheckReferenceOrGenerate(const std::string& refPath, int maxDiffPerCh
 	}
 
 	// Second run — load and compare
-	auto tmpResult = ImageData::LoadFromPath(tmpPath);
-	auto refResult = ImageData::LoadFromPath(refPath);
+	auto tmpResult = ImageData(tmpPath);
+	auto refResult = ImageData(refPath);
 
-	if (!tmpResult.valid() || !refResult.valid())
+	if (!tmpResult.IsValid() || !refResult.IsValid())
 		return -2;  // load failure
 
 	int bad = ComparePixels(
-		tmpResult.pixelData.data(), refResult.pixelData.data(),
-		static_cast<int>(tmpResult.width), static_cast<int>(tmpResult.height),
+		tmpResult.GetPixelData().data(), refResult.GetPixelData().data(),
+		static_cast<int>(tmpResult.GetWidth()), static_cast<int>(tmpResult.GetHeight()),
 		maxDiffPerChannel);
 
 	std::remove(tmpPath.c_str());

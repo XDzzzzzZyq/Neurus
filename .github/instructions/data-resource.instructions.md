@@ -14,14 +14,15 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 ## Location
 
 - `src/asset/MeshData.h/cpp` - Mesh geometry data (vertices, indices)
-- `src/asset/ImageData.h/cpp` - Image pixel data (CPU-side, raw or decoded)
+- `src/asset/ImageData.h/cpp` - Image pixel data (CPU-side, owning vector, PNG/HDR save)
 - `src/render/buffers/Buffer.h` - Virtual base class (Buffer) with m_buffer, m_memory
 - `src/render/buffers/StagingBuffer.h/cpp` - Host-visible staging buffer (StagingBuffer) for CPU↔GPU transfers
 - `src/render/buffers/GPUBuffer.h/cpp` - Device-local GPU buffer (GPUBuffer) with staging Map/Unmap
 - `src/render/buffers/UniformBuffer.h` - Template uniform buffer (UniformBuffer<T>) for host-visible struct upload
 - `src/render/buffers/VertexBuffer.h/cpp` - Vertex buffer (VertexBuffer, inherits GPUBuffer)
 - `src/render/buffers/IndexBuffer.h/cpp` - Index buffer (IndexBuffer, inherits GPUBuffer)
-- `src/render/Image.h/cpp` - GPU image abstraction (allocation, views, transitions, mipmaps)
+- `src/render/Image.h/cpp` - GPU image with ImageState tracking, FromImageData factory, mipmap gen
+- `src/render/Barrier.h/cpp` - Centralized image barrier: ImageState → Vulkan layout/stage/access
 - `src/render/Texture.h/cpp` - Texture resource (combines Image + sampler + descriptor)
 - `src/render/DescriptorManager.h/cpp` - Descriptor pool/set lifecycle management
 
@@ -33,9 +34,10 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
    - Provide MeshData struct for GPU upload
 
 2. **Image Data Loading** (`src/asset/ImageData.h/cpp`)
-   - Decode PNG/BMP/HDR files into raw pixel buffers
-   - Provide ImageData struct with format, dimensions, pixel data
-   - CPU-side representation; GPU upload handled by renderer
+   - Decode PNG/BMP/HDR files into owned pixel buffers (std::vector&lt;uint8_t&gt;)
+   - Owns width, height, and format metadata
+   - Member functions: `SavePNG()` / `SaveHDR()` for disk output
+   - Constructor from path auto-loads; CPU-side representation; GPU upload via `Image::FromImageData`
 
 3. **Buffer Class Hierarchy** (`src/render/buffers/Buffer.h`)
    - Virtual base class `Buffer` with `m_buffer`, `m_memory`
@@ -47,7 +49,8 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 4. **GPU Image Abstraction** (`src/render/Image.h/cpp`)
    - Create `vk::raii::Image` with appropriate tiling, usage, memory
    - Create `vk::raii::ImageView` and `vk::raii::Sampler`
-   - Image layout transitions and mipmap generation
+   - Track logical state via `ImageState` enum; all transitions through `Barrier::Transition`
+   - Mipmap generation via `GenerateMipmaps()`
 
 5. **Texture Management** (`src/render/Texture.h/cpp`)
    - Combines GPU Image + ImageView + Sampler into a single resource
@@ -65,6 +68,10 @@ File System (OBJ, PNG)
     │
     ▼
 src/asset/: MeshData / ImageData (CPU-side loading)
+    │                              ▲
+    │  Image::FromImageData()      │  Image::ReadImageData()
+    ▼                              │
+src/render/: Image (GPU) ──────────┘
     │
     ▼
 src/render/buffers/: Buffer / StagingBuffer / GPUBuffer / UniformBuffer (GPU buffers)
@@ -72,6 +79,8 @@ src/render/buffers/: Buffer / StagingBuffer / GPUBuffer / UniformBuffer (GPU buf
     ▼
 Renderer passes (GeometryPass, LightingPass): consume GPU resources
 ```
+
+All image layout transitions go through `Barrier::Transition()`.
 
 ## Architectural Boundaries
 
@@ -91,10 +100,11 @@ Renderer passes (GeometryPass, LightingPass): consume GPU resources
 ## Current Scope
 
 - OBJ mesh loading via MeshData (icosphere, cube, etc.)
-- PNG/HDR image decoding via ImageData
+- PNG/HDR image decoding via ImageData (owns pixel data, member SavePNG/SaveHDR)
 - Buffer hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer<T>) for vertex, index, uniform, and storage buffers
-- Image for GPU image allocation and layout transitions
+- Image for GPU image allocation with ImageState tracking and Barrier::Transition for layout changes
 - Texture class combining image + sampler + descriptor
+- Barrier for centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - DescriptorManager with per-frame descriptor pool rotation
 - RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`) and per-light shadow cubemap management (`GetShadowMap(lightUID)`)
 

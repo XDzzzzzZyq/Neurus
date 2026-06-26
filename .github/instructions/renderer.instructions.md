@@ -9,6 +9,8 @@ renders frames. It must remain stateless with respect to application logic.
 
 - `src/render/VulkanContext.h` - Instance, physical device, logical device, queues
 - `src/render/Swapchain.h` - Swapchain creation, image acquisition, presentation, recreation
+- `src/render/Image.h/cpp` - GPU image with ImageState tracking and mipmap generation
+- `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 
@@ -145,6 +147,29 @@ IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, write
     ▼
 Blit HDRColor → Swapchain (vkCmdBlitImage)
 ```
+
+### ImageState & Barrier Convention
+
+All image layout transitions **MUST** go through `Barrier::Transition()`, never raw
+`vk::ImageMemoryBarrier` / `vk::ImageMemoryBarrier2`:
+
+```cpp
+// DO: use Barrier
+Barrier::Transition(cmdBuf, myImage, ImageState::ShaderRead);
+
+// DON'T: raw Vulkan barriers on Image objects
+// vk::ImageMemoryBarrier2 barrier(...); cmd.pipelineBarrier2(...);
+```
+
+- `Image` tracks its logical state via `ImageState m_state`.
+- `Barrier::Transition(cmd, image, after)` reads `image.State()` as the "before"
+  layout, emits a `vkCmdPipelineBarrier2`, and updates `m_state` to `after`.
+- `Barrier::Transition(cmd, image, after, subresourceRange)` does the same but
+  with an explicit subresource range — does **not** update `m_state` (caller
+  must manage state for partial transitions).
+- Raw `vk::ImageMemoryBarrier2` is acceptable **only** for:
+  - Raw `VkImage` handles not wrapped in `Image` (e.g. swapchain images)
+  - Same-layout memory barriers (`eGeneral → eGeneral`) within compute passes
 
 ### SSAO Convention
 - **AO value**: 1.0 = fully occluded (black), 0.0 = no occlusion (lit)

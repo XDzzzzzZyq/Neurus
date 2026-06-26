@@ -6,22 +6,49 @@
 
 #include <memory>
 #include <type_traits>
+#include <vector>
 
 namespace neurus {
+
+// Forward declaration for friend access
+class Barrier;
+
+/**
+ * @brief High-level image state used by Barrier for layout transitions.
+ *
+ * Maps to the appropriate vk::ImageLayout, vk::PipelineStageFlags2,
+ * and vk::AccessFlags2 via Barrier::ToVulkanImageState().
+ */
+enum class ImageState
+{
+	Undefined,       ///< Initial state, no valid data
+
+	TransferSrc,     ///< Source for transfer (copy/blit) operations
+	TransferDst,     ///< Destination for transfer (copy/blit) operations
+
+	ColorAttachment, ///< Color render target
+	DepthAttachment, ///< Depth/stencil render target
+
+	ShaderRead,      ///< Sampled or input attachment read in shaders
+	ShaderWrite,     ///< Storage image write in compute shaders
+
+	Present,         ///< Ready for presentation
+};
 
 /**
  * @brief RAII wrapper around vk::raii::Image + vk::raii::DeviceMemory + vk::raii::ImageView.
  *
  * Owns image creation, memory allocation/binding, and view creation.
- * Provides helpers for layout transitions and mipmap generation via blit.
+ * Tracks current logical state via ImageState for use with Barrier::Transition().
  *
- * Holds an ImageData member that records the CPU-side pixel data used to
- * create the image (analogous to Mesh::o_mesh holding MeshData).
+ * ImageData is used only during construction — no CPU-side data is retained.
  *
  * Non-copyable, movable.
  */
 class Image
 {
+	friend class Barrier;
+
 public:
 	/** @brief Type of image being created (determines view type and create flags). */
 	enum class ImageType
@@ -32,18 +59,20 @@ public:
 	};
 
 	/**
-	 * @brief Creates the image, allocates device memory, binds it, and creates a default image view.
+	 * @brief Creates a GPU image from scratch (no pixel data upload).
 	 *
-	 * @param device        Logical device.
+	 * The image starts in ImageState::Undefined.  Use Barrier::Transition() to
+	 * move it to a usable state, or call the ImageData constructor for automatic
+	 * upload.
+	 *
+	 * @param device         Logical device.
 	 * @param physicalDevice Physical device (for memory type queries and format support).
-	 * @param extent        Image dimensions.
-	 * @param format        Pixel format.
-	 * @param usage         Usage flags (e.g. Sampled | TransferDst).
-	 * @param mipLevels     Number of mip levels (1 = no mip chain).
-	 * @param imageType     Image type (2D, Cube, Depth/Stencil).
-	 * @param debugName     Optional debug name for the image (set via VK_EXT_debug_utils in Debug builds).
-	 *                      The string is NOT retained; it is used immediately and may be a temporary.
-	 * @param imageData     Optional CPU-side pixel data (stored for reference, not uploaded).
+	 * @param extent         Image dimensions.
+	 * @param format         Pixel format.
+	 * @param usage          Usage flags (e.g. Sampled | TransferDst).
+	 * @param mipLevels      Number of mip levels (1 = no mip chain).
+	 * @param imageType      Image type (2D, Cube, Depth/Stencil).
+	 * @param debugName      Optional debug name for the image.
 	 */
 	Image(const vk::raii::Device& device,
 	      const vk::raii::PhysicalDevice& physicalDevice,
@@ -52,8 +81,29 @@ public:
 	      vk::ImageUsageFlags usage,
 	      uint32_t mipLevels = 1,
 	      ImageType imageType = ImageType::e2D,
-	      const char* debugName = nullptr,
-	      const ImageData& imageData = {});
+	      const char* debugName = nullptr);
+
+	/**
+	 * @brief Creates a GPU image from CPU-side ImageData (loads from file and uploads).
+	 *
+	 * Uses ImageData for dimensions, format, and pixel content.  Automatically
+	 * creates the image, uploads pixel data via staging buffer, and leaves the
+	 * image in ImageState::ShaderRead.
+	 *
+	 * @param device          Logical device.
+	 * @param physicalDevice  Physical device for memory allocation.
+	 * @param queue           Queue for staging upload.
+	 * @param queueFamilyIndex Queue family index for transient command pools.
+	 * @param imageData       CPU-side image data (moved in, must be valid).
+	 * @param debugName       Optional debug name for the image.
+	 * @return A unique pointer to the GPU Image, or nullptr if imageData is invalid.
+	 */
+	static std::unique_ptr<Image> FromImageData(const vk::raii::Device& device,
+	                                            const vk::raii::PhysicalDevice& physicalDevice,
+	                                            vk::Queue queue,
+	                                            uint32_t queueFamilyIndex,
+	                                            ImageData& imageData,
+	                                            const char* debugName = "Image");
 
 	~Image() = default;
 
@@ -63,33 +113,11 @@ public:
 	Image(Image&&) noexcept = default;
 	Image& operator=(Image&&) noexcept = default;
 
-	// --- Layout transitions ---
-
-	/**
-	 * @brief Inserts a pipeline barrier to transition image layout.
-	 *
-	 * @param cmdBuf         Command buffer to record the barrier into.
-	 * @param oldLayout      Current layout (use eUndefined for first transition).
-	 * @param newLayout      Target layout.
-	 * @param baseMipLevel   First mip level to transition.
-	 * @param levelCount     Number of mip levels to transition (default: all remaining).
-	 * @param baseArrayLayer First array layer to transition.
-	 * @param layerCount     Number of array layers to transition (default: all remaining).
-	 */
-	void TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
-	                      vk::ImageLayout oldLayout,
-	                      vk::ImageLayout newLayout,
-	                      uint32_t baseMipLevel = 0,
-	                      uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
-	                      uint32_t baseArrayLayer = 0,
-	                      uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS);
-
 	/**
 	 * @brief Generates mipmaps via vkCmdBlitImage.
 	 *
-	 * Assumes level 0 is in VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL and
-	 * subsequent levels are in VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL.
-	 * All levels end in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+	 * The image must be in ImageState::TransferDst (all levels).  Level 0 is
+	 * blitted to level 1, then 1→2, etc.  All levels end in ImageState::ShaderRead.
 	 *
 	 * @note The image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT and
 	 *       VK_IMAGE_USAGE_TRANSFER_DST_BIT.
@@ -98,85 +126,19 @@ public:
 	 */
 	void GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf);
 
-	// --- GPU readback ---
-
 	/**
-	 * @brief Uploads raw pixel data from CPU to this GPU image via staging buffer.
+	 * @brief Reads image data from the GPU back into an ImageData.
 	 *
-	 * Creates a host-visible staging buffer, copies the pixel data to it,
-	 * records a vkCmdCopyBufferToImage command, submits, and waits for
-	 * completion.  The image is transitioned from UNDEFINED → TRANSFER_DST_OPTIMAL
-	 * before the copy and left in SHADER_READ_ONLY_OPTIMAL after completion.
+	 * The image must be in ImageState::TransferSrc.  Creates a transient
+	 * command buffer, records vkCmdCopyImageToBuffer into a staging buffer,
+	 * submits, waits, and returns the pixel data as ImageData.
 	 *
-	 * @note The image MUST have VK_IMAGE_USAGE_TRANSFER_DST_BIT.
-	 * @param device          Logical device.
-	 * @param physicalDevice  Physical device for memory queries.
-	 * @param queue           Queue for staging upload submits.
-	 * @param queueFamilyIndex Queue family index for temp command pool.
-	 * @param pixelData       Pointer to raw pixel bytes.
-	 * @param dataSize        Total byte count (must match extent × bytesPerPixel).
+	 * @return ImageData with the pixel content, or default-constructed on failure.
 	 */
-	void UploadPixelData(const vk::raii::Device& device,
-	                     const vk::raii::PhysicalDevice& physicalDevice,
-	                     vk::Queue queue,
-	                     uint32_t queueFamilyIndex,
-	                     const void* pixelData,
-	                     size_t dataSize);
-
-	/**
-	 * @brief Reads image data from the GPU into a host‑side byte vector.
-	 *
-	 * Creates a transient command buffer, records vkCmdCopyImageToBuffer
-	 * from this image into a staging buffer, submits, waits for completion,
-	 * and returns the raw pixel data.  The image must be in a TRANSFER_SRC
-	 * compatible layout (typically eTransferSrcOptimal).
-	 *
-	 * @param currentLayout    Current layout of the image (must be transfer‑src compatible).
-	 * @return Raw pixel data (size = width × height × bytesPerPixel).
-	 */
-	std::vector<uint8_t> ReadImageToBuffer(const vk::raii::Device& device,
-	                                       const vk::raii::PhysicalDevice& physicalDevice,
-	                                       vk::Queue queue,
-	                                       uint32_t queueFamilyIndex,
-	                                       vk::ImageLayout currentLayout) const;
-
-	/**
-	 * @brief Static overload for raw VkImage handles (swapchain, etc.).
-	 *
-	 * Same behaviour as the member version but accepts an explicit image
-	 * handle, format, and extent.  Useful for swapchain screenshots where
-	 * no Image wrapper exists.
-	 */
-	static std::vector<uint8_t> ReadImageToBuffer(const vk::raii::Device& device,
-	                                               const vk::raii::PhysicalDevice& physicalDevice,
-	                                               vk::Queue queue,
-	                                               uint32_t queueFamilyIndex,
-	                                               vk::Image image,
-	                                               vk::Format format,
-	                                               vk::Extent2D extent,
-	                                               vk::ImageLayout currentLayout);
-
-	/**
-	 * @brief Loads an image from file (PNG, HDR, BMP, JPG, etc.) and uploads to GPU.
-	 *
-	 * Uses ImageData::LoadFromPath() for CPU-side format detection and loading,
-	 * then creates an Image with the appropriate format and uploads pixel data.
-	 * HDR files use R32G32B32A32_SFLOAT; LDR files use R8G8B8A8_SRGB.
-	 *
-	 * @param device           Logical device.
-	 * @param physicalDevice   Physical device for memory allocation.
-	 * @param queue            Queue for staging upload.
-	 * @param queueFamilyIndex Queue family index.
-	 * @param path             File path to the image.
-	 * @param debugName        Optional debug name for the image.
-	 * @return Unique pointer to GPU Image, or nullptr on failure.
-	 */
-	static std::unique_ptr<Image> LoadFromPath(const vk::raii::Device& device,
-	                                           const vk::raii::PhysicalDevice& physicalDevice,
-	                                           vk::Queue queue,
-	                                           uint32_t queueFamilyIndex,
-	                                           const std::string& path,
-	                                           const char* debugName = "Equirect_LoadFromPath");
+	ImageData ReadImageData(const vk::raii::Device& device,
+	                        const vk::raii::PhysicalDevice& physicalDevice,
+	                        vk::Queue queue,
+	                        uint32_t queueFamilyIndex) const;
 
 	// --- Getters ---
 
@@ -217,35 +179,11 @@ public:
 	/** @brief Image type. */
 	ImageType Type() const { return m_imageType; }
 
-	/** @brief CPU-side pixel data used to create this image (may be default-constructed). */
-	const ImageData& GetImageData() const { return m_imageData; }
+	/** @brief Current logical image state (updated by Barrier::Transition). */
+	ImageState State() const { return m_state; }
 
-	/**
-	 * @brief Returns the Vulkan image aspect flags for a given format.
-	 *
-	 * Maps D16_UNORM / D32_SFLOAT to eDepth, D24_UNORM_S8_UINT / D32_SFLOAT_S8_UINT
-	 * to eDepth | eStencil, and all other formats to eColor.
-	 */
-	static vk::ImageAspectFlags AspectFromFormat(vk::Format format);
-
-	// --- Layout state ---
-
-	/**
-	 * @brief Returns the tracked current layout of the image.
-	 *
-	 * Updated by TransitionLayout() and SetCurrentLayout().  Initialised to
-	 * eUndefined.  This is a CPU-side convenience; the real layout is
-	 * maintained by Vulkan and the validation layer.
-	 */
-	vk::ImageLayout CurrentLayout() const { return m_currentLayout; }
-
-	/**
-	 * @brief Sets the tracked current layout to the given value.
-	 *
-	 * Call after recording barriers that do NOT go through TransitionLayout()
-	 * (e.g. pipelineBarrier2 or dynamic-rendering barriers in user code).
-	 */
-	void SetCurrentLayout(vk::ImageLayout layout) { m_currentLayout = layout; }
+	/** @brief Default subresource range covering the full image. */
+	const vk::ImageSubresourceRange& SubresourceRange() const { return m_subresourceRange; }
 
 private:
 	// --- Construction helpers ---
@@ -257,9 +195,25 @@ private:
 	void createFaceViews(const vk::raii::Device& device);
 	void createMultiviewView(const vk::raii::Device& device);
 
-	// --- Layout helpers ---
-	static vk::AccessFlags AccessFlagsForLayout(vk::ImageLayout layout);
-	static vk::PipelineStageFlags PipelineStageForLayout(vk::ImageLayout layout);
+	/**
+	 * @brief Uploads ImageData to this GPU image via staging buffer.
+	 *
+	 * Creates a host-visible staging buffer, copies the pixel data to it,
+	 * records vkCmdCopyBufferToImage, submits, and waits.
+	 * Transitions: Undefined → TransferDst → (copy) → ShaderRead.
+	 */
+	void UploadImageData(const vk::raii::Device& device,
+	                     const vk::raii::PhysicalDevice& physicalDevice,
+	                     vk::Queue queue,
+	                     uint32_t queueFamilyIndex,
+	                     const ImageData& imageData);
+
+	/**
+	 * @brief Returns the Vulkan image aspect flags for a given format.
+	 */
+	static vk::ImageAspectFlags AspectFromFormat(vk::Format format);
+
+	/** @brief Memory type selection helper. */
 	static uint32_t FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
 	                               uint32_t typeFilter,
 	                               vk::MemoryPropertyFlags properties);
@@ -280,12 +234,10 @@ private:
 	uint32_t m_mipLevels = 1;
 	uint32_t m_arrayLayers = 1;
 	ImageType m_imageType = ImageType::e2D;
+	vk::ImageSubresourceRange m_subresourceRange{};
 
-	// --- CPU-side data (optional, stored for reference) ---
-	ImageData m_imageData;
-
-	// --- Tracked current layout (CPU-side for convenience) ---
-	vk::ImageLayout m_currentLayout = vk::ImageLayout::eUndefined;
+	// --- State tracking ---
+	ImageState m_state = ImageState::Undefined;
 };
 
 } // namespace neurus

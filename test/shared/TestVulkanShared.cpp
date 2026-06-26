@@ -6,6 +6,7 @@
 #include "TestVulkanShared.h"
 
 #include "render/Image.h"
+#include "render/Barrier.h"
 
 #include <iostream>
 
@@ -306,24 +307,7 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 
 		auto& hdrColor = am.GetAttachment(AttachmentName::HDRColor, vk::Extent2D{renderWidth, renderHeight});
 
-		vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eShaderWrite,
-			vk::AccessFlagBits::eTransferRead,
-			vk::ImageLayout::eGeneral,
-			vk::ImageLayout::eTransferSrcOptimal,
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*hdrColor.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1));
-
-		cmd.pipelineBarrier(
-			vk::PipelineStageFlagBits::eComputeShader,
-			vk::PipelineStageFlagBits::eTransfer,
-			{},
-			{},
-			{},
-			{barrier});
+		Barrier::Transition(*cmd, hdrColor, ImageState::TransferSrc);
 
 		// Copy image → buffer
 		vk::BufferImageCopy copyRegion(

@@ -5,95 +5,14 @@
 
 #include "shared/TestVulkanShared.h"
 #include "render/passes/SyncObjects.h"
+#include "render/Barrier.h"
+#include "render/Image.h"
 
 #include <chrono>
 #include <memory>
 #include <vector>
 
 using namespace neurus;
-
-// ============================================================================
-// Barrier helper tests - pure construction, no device required
-// ============================================================================
-
-/**
- * @test ImageBarrier constructs a valid vk::ImageMemoryBarrier2 with default params.
- */
-TEST(SyncObjectsTest, ImageBarrier_DefaultParams)
-{
-	vk::Image dummyImage = VK_NULL_HANDLE;
-	auto barrier = ImageBarrier(
-		dummyImage,
-		vk::ImageLayout::eUndefined,
-		vk::ImageLayout::eColorAttachmentOptimal);
-
-	EXPECT_EQ(barrier.oldLayout, vk::ImageLayout::eUndefined);
-	EXPECT_EQ(barrier.newLayout, vk::ImageLayout::eColorAttachmentOptimal);
-	EXPECT_EQ(barrier.srcStageMask, vk::PipelineStageFlagBits2::eTopOfPipe);
-	EXPECT_EQ(barrier.dstStageMask, vk::PipelineStageFlagBits2::eBottomOfPipe);
-	EXPECT_EQ(barrier.srcAccessMask, vk::AccessFlagBits2::eNone);
-	EXPECT_EQ(barrier.dstAccessMask, vk::AccessFlagBits2::eNone);
-	EXPECT_EQ(barrier.image, dummyImage);
-}
-
-/**
- * @test ImageBarrier accepts custom stage/access masks.
- */
-TEST(SyncObjectsTest, ImageBarrier_CustomStages)
-{
-	vk::Image dummyImage = VK_NULL_HANDLE;
-	auto barrier = ImageBarrier(
-		dummyImage,
-		vk::ImageLayout::eUndefined,
-		vk::ImageLayout::eShaderReadOnlyOptimal,
-		vk::PipelineStageFlagBits2::eTransfer,
-		vk::AccessFlagBits2::eTransferWrite,
-		vk::PipelineStageFlagBits2::eFragmentShader,
-		vk::AccessFlagBits2::eShaderRead);
-
-	EXPECT_EQ(barrier.oldLayout, vk::ImageLayout::eUndefined);
-	EXPECT_EQ(barrier.newLayout, vk::ImageLayout::eShaderReadOnlyOptimal);
-	EXPECT_EQ(barrier.srcStageMask, vk::PipelineStageFlagBits2::eTransfer);
-	EXPECT_EQ(barrier.srcAccessMask, vk::AccessFlagBits2::eTransferWrite);
-	EXPECT_EQ(barrier.dstStageMask, vk::PipelineStageFlagBits2::eFragmentShader);
-	EXPECT_EQ(barrier.dstAccessMask, vk::AccessFlagBits2::eShaderRead);
-}
-
-/**
- * @test BufferBarrier constructs a valid vk::BufferMemoryBarrier2 with default params.
- */
-TEST(SyncObjectsTest, BufferBarrier_DefaultParams)
-{
-	vk::Buffer dummyBuffer = VK_NULL_HANDLE;
-	auto barrier = BufferBarrier(dummyBuffer, 0, VK_WHOLE_SIZE);
-
-	EXPECT_EQ(barrier.buffer, dummyBuffer);
-	EXPECT_EQ(barrier.offset, 0u);
-	EXPECT_EQ(barrier.size, VK_WHOLE_SIZE);
-	EXPECT_EQ(barrier.srcStageMask, vk::PipelineStageFlagBits2::eTopOfPipe);
-	EXPECT_EQ(barrier.dstStageMask, vk::PipelineStageFlagBits2::eBottomOfPipe);
-	EXPECT_EQ(barrier.srcAccessMask, vk::AccessFlagBits2::eNone);
-	EXPECT_EQ(barrier.dstAccessMask, vk::AccessFlagBits2::eNone);
-}
-
-/**
- * @test BufferBarrier accepts custom pipeline stages and access masks.
- */
-TEST(SyncObjectsTest, BufferBarrier_CustomStages)
-{
-	vk::Buffer dummyBuffer = VK_NULL_HANDLE;
-	auto barrier = BufferBarrier(
-		dummyBuffer, 256, 1024,
-		vk::PipelineStageFlagBits2::eVertexShader,
-		vk::AccessFlagBits2::eVertexAttributeRead,
-		vk::PipelineStageFlagBits2::eComputeShader,
-		vk::AccessFlagBits2::eShaderWrite);
-
-	EXPECT_EQ(barrier.offset, 256u);
-	EXPECT_EQ(barrier.size, 1024u);
-	EXPECT_EQ(barrier.srcStageMask, vk::PipelineStageFlagBits2::eVertexShader);
-	EXPECT_EQ(barrier.dstStageMask, vk::PipelineStageFlagBits2::eComputeShader);
-}
 
 // ============================================================================
 // Device-dependent tests - require a Vulkan-capable GPU
@@ -105,6 +24,57 @@ protected:
 	// VulkanTestShared provides SetUp/TearDown with full Vulkan bootstrap,
 	// plus m_hasVulkan, m_device, PhysicalDevice(), and graphics queue helpers.
 };
+
+// ============================================================================
+// Barrier::ToVulkanImageState tests
+// ============================================================================
+
+TEST_F(SyncObjectsDeviceTest, Barrier_ToVulkanImageState_Basic)
+{
+	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
+	auto& pd = PhysicalDevice();
+	Image image(*m_device, pd, {64, 64}, vk::Format::eR8G8B8A8Unorm,
+	            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, 1);
+
+	auto state = Barrier::ToVulkanImageState(ImageState::Undefined, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eUndefined);
+	EXPECT_EQ(state.stage, vk::PipelineStageFlagBits2::eTopOfPipe);
+	EXPECT_EQ(state.access, vk::AccessFlagBits2::eNone);
+
+	state = Barrier::ToVulkanImageState(ImageState::ColorAttachment, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eColorAttachmentOptimal);
+
+	state = Barrier::ToVulkanImageState(ImageState::TransferSrc, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eTransferSrcOptimal);
+
+	state = Barrier::ToVulkanImageState(ImageState::TransferDst, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eTransferDstOptimal);
+
+	state = Barrier::ToVulkanImageState(ImageState::ShaderRead, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eShaderReadOnlyOptimal);
+
+	state = Barrier::ToVulkanImageState(ImageState::ShaderWrite, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eGeneral);
+
+	state = Barrier::ToVulkanImageState(ImageState::Present, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::ePresentSrcKHR);
+}
+
+TEST_F(SyncObjectsDeviceTest, Barrier_ToVulkanImageState_DepthShaderRead)
+{
+	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
+	auto& pd = PhysicalDevice();
+	auto fmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
+	if (!(fmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
+		GTEST_SKIP() << "D32_SFLOAT depth attachment not supported.";
+
+	Image image(*m_device, pd, {64, 64}, vk::Format::eD32Sfloat,
+	            vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+	            1, Image::ImageType::eDepthStencil);
+
+	auto state = Barrier::ToVulkanImageState(ImageState::ShaderRead, image);
+	EXPECT_EQ(state.layout, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
+}
 
 /**
  * @test Default-constructed Fence (unsignaled) can be created without error.

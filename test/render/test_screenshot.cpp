@@ -3,6 +3,7 @@
 #include "shared/TestVulkanShared.h"
 #include "render/Screenshot.h"
 #include "render/Image.h"
+#include "asset/ImageData.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -60,14 +61,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(64, 64);
 
-	// --- Create an Image with TRANSFER_SRC | TRANSFER_DST | SAMPLED ---
-	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
-	                  vk::ImageUsageFlagBits::eSampled |
-	                      vk::ImageUsageFlagBits::eTransferSrc |
-	                      vk::ImageUsageFlagBits::eTransferDst,
-	                  1);
-
-	// --- Upload red pixel data ---
+	// --- Create an Image with red pixel data ---
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
 	std::vector<uint8_t> redPixels(pixelCount * 4);
 	for (size_t i = 0; i < pixelCount; ++i)
@@ -77,8 +71,10 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 		redPixels[i * 4 + 2] = 0;    // B
 		redPixels[i * 4 + 3] = 255;  // A
 	}
-	image.UploadPixelData(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                      redPixels.data(), redPixels.size());
+	ImageData imgData(redPixels.data(), extent.width, extent.height, vk::Format::eR8G8B8A8Unorm);
+	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
+	ASSERT_NE(imagePtr, nullptr);
+	Image& image = *imagePtr;
 
 	// --- Capture to PNG ---
 	m_testOutputPath = "screenshots/test_rgba8.png";
@@ -115,13 +111,6 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 
 	const vk::Extent2D extent(32, 32);
 
-	// --- Create an Image with RGBA16F format ---
-	Image image(*m_device, pd, extent, vk::Format::eR16G16B16A16Sfloat,
-	                  vk::ImageUsageFlagBits::eSampled |
-	                      vk::ImageUsageFlagBits::eTransferSrc |
-	                      vk::ImageUsageFlagBits::eTransferDst,
-	                  1);
-
 	// --- Upload half-float data (0.5, 0.25, 0.75, 1.0) ---
 	// Half-float 0.5 = 0x3800, 0.25 = 0x3400, 0.75 = 0x3A00, 1.0 = 0x3C00
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
@@ -137,8 +126,10 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 		halfData[i * 4 + 2] = h0_75;
 		halfData[i * 4 + 3] = h1_0;
 	}
-	image.UploadPixelData(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                      halfData.data(), halfData.size() * sizeof(uint16_t));
+	ImageData imgData(halfData.data(), extent.width, extent.height, vk::Format::eR16G16B16A16Sfloat);
+	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
+	ASSERT_NE(imagePtr, nullptr);
+	Image& image = *imagePtr;
 
 	// --- Capture to PNG ---
 	m_testOutputPath = "screenshots/test_rgba16f.png";
@@ -167,16 +158,12 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 	auto& pd = m_physicalDevices[m_selectedPdIndex];
 	const vk::Extent2D extent(16, 16);
 
-	Image image(*m_device, pd, extent, vk::Format::eR8G8B8A8Unorm,
-	                  vk::ImageUsageFlagBits::eSampled |
-	                      vk::ImageUsageFlagBits::eTransferSrc |
-	                      vk::ImageUsageFlagBits::eTransferDst,
-	                  1);
-
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
 	std::vector<uint8_t> pixels(pixelCount * 4, 128);
-	image.UploadPixelData(*m_device, pd, m_queue, m_graphicsQueueFamily,
-	                      pixels.data(), pixels.size());
+	ImageData imgData(pixels.data(), extent.width, extent.height, vk::Format::eR8G8B8A8Unorm);
+	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
+	ASSERT_NE(imagePtr, nullptr);
+	Image& image = *imagePtr;
 
 	// --- Use a nested directory that doesn't exist ---
 	const std::string nestedPath = "screenshots/nested/subdir/test_auto_dir.png";

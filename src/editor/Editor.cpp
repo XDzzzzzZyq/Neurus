@@ -350,7 +350,8 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 	env->BuildIBLTextures(device, pd);
 
 	// Load HDR or fallback
-	auto equirect = Image::LoadFromPath(device, pd, queue, qfi, env->GetEquirectPath());
+	ImageData hdrData(env->GetEquirectPath());
+	auto equirect = Image::FromImageData(device, pd, queue, qfi, hdrData);
 	if (!equirect)
 	{
 		equirect = Environment::GenerateFallbackImage(device, pd, queue, qfi);

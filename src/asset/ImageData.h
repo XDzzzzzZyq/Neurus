@@ -2,9 +2,9 @@
  * @file ImageData.h
  * @brief CPU-side image data class and low‑level pixel format helpers.
  *
- * Stores raw pixel data (non-owning) along with dimensions and format.
+ * Owns raw pixel data (std::vector<uint8_t>) along with dimensions and format.
  * Provides static helpers for pixel‑byte queries, half‑float conversion,
- * BGR swizzle, and CPU‑side PNG output.
+ * BGR swizzle, and member functions for CPU‑side PNG/HDR output.
  *
  * Pure CPU data - no Vulkan/GPU resources.  Analogous to MeshData.
  */
@@ -18,47 +18,42 @@
 
 namespace neurus {
 
-/**
- * @brief Result of loading an image file from disk.
- *
- * Holds dimensions, Vulkan pixel format, and owning pixel data.
- * HDR images (.hdr) are loaded as R32G32B32A32_SFLOAT (16 bytes/pixel).
- * LDR images (.png, .bmp, .jpg, .tga) are loaded as R8G8B8A8_SRGB (4 bytes/pixel).
- */
-struct ImageLoadResult
-{
-	std::vector<uint8_t> pixelData;  ///< Raw pixel bytes (format-dependent byte count)
-	uint32_t width = 0;
-	uint32_t height = 0;
-	vk::Format format = vk::Format::eUndefined;
-
-	/** @brief True if a valid image was loaded. */
-	bool valid() const { return width > 0 && height > 0 && !pixelData.empty(); }
-};
-
 class ImageData
 {
 public:
+	/**
+	 * @brief Default constructor. Creates an invalid/empty ImageData.
+	 */
 	ImageData() = default;
 
 	/**
-	 * @brief Constructs ImageData with pixel data, dimensions, and format.
-	 * @param data  Non-owning pointer to raw pixel bytes.
-	 * @param w     Image width in pixels.
-	 * @param h     Image height in pixels.
-	 * @param fmt   Vulkan pixel format.
+	 * @brief Constructs ImageData by loading an image from a file path.
+	 *
+	 * Auto-detects HDR vs LDR format using stb_is_hdr().
+	 * HDR images (.hdr) are loaded as R32G32B32A32_SFLOAT.
+	 * LDR images (.png, .bmp, .jpg, .tga) are loaded as R8G8B8A8_SRGB.
+	 *
+	 * @param path File path to the image.
 	 */
-	ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt)
-		: m_pixelData(data)
-		, m_width(w)
-		, m_height(h)
-		, m_format(fmt)
-	{
-	}
+	explicit ImageData(const std::string& path);
+
+	/**
+	 * @brief Constructs ImageData from raw pixel data, copying it into the owned vector.
+	 * @param data Non-owning pointer to raw pixel bytes.
+	 * @param w    Image width in pixels.
+	 * @param h    Image height in pixels.
+	 * @param fmt  Vulkan pixel format.
+	 */
+	ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt);
+
+	// --- Validity ---
+
+	/** @brief True if a valid image is loaded (non-zero dimensions, non-empty pixel data). */
+	bool IsValid() const { return m_width > 0 && m_height > 0 && !m_pixelData.empty(); }
 
 	// --- Getters ---
 
-	const void* GetPixelData() const { return m_pixelData; }
+	const std::vector<uint8_t>& GetPixelData() const { return m_pixelData; }
 	uint32_t GetWidth() const { return m_width; }
 	uint32_t GetHeight() const { return m_height; }
 	vk::Format GetFormat() const { return m_format; }
@@ -91,52 +86,44 @@ public:
 	static void SwizzleBGRtoRGB(void* data, uint32_t width,
 	                            uint32_t height, uint32_t channels);
 
-	/**
-	 * @brief Writes raw pixel data to a PNG file (CPU‑side only).
-	 *
-	 * No GPU readback - caller must provide already‑read pixel data.
-	 * Used for swapchain screenshots where no Image wrapper exists.
-	 */
-	static bool SavePixelData(const void* rawData,
-	                          vk::Format format,
-	                          vk::Extent2D extent,
-	                          const std::string& path,
-	                          bool remapSigned = false);
+	// -------------------------------------------------------------------
+	// Save (member functions — use owned pixel data)
+	// -------------------------------------------------------------------
 
 	/**
-	 * @brief Writes raw HDR float pixel data to a Radiance .hdr file.
-	 *
-	 * Input data is interpreted as R32G32B32A32_SFLOAT pixels (16 bytes per pixel).
-	 * Output is RGBE-encoded in the Radiance HDR format.
-	 *
-	 * @param pixelData  Pointer to R32G32B32A32_SFLOAT pixel data.
-	 * @param width      Image width in pixels.
-	 * @param height     Image height in pixels.
-	 * @param path       Output file path (.hdr extension recommended).
+	 * @brief Writes the owned pixel data to a PNG file (CPU‑side only).
+	 * @param path        Output file path.
+	 * @param remapSigned If true, remap signed values for normal maps.
 	 * @return true on success.
 	 */
-	static bool SavePixelDataHDR(const void* pixelData,
-	                             uint32_t width,
-	                             uint32_t height,
-	                             const std::string& path);
+	bool SavePNG(const std::string& path, bool remapSigned = false) const;
 
 	/**
-	 * @brief Loads an image from file, auto-detecting HDR vs LDR.
+	 * @brief Writes the owned pixel data to a Radiance .hdr file.
 	 *
-	 * Uses stbi_is_hdr() to detect Radiance HDR format; falls back to
-	 * stbi_load() for standard LDR formats (PNG, BMP, JPG, TGA, etc.).
-	 * Always forces 4-channel RGBA output.
+	 * Expects R32G32B32A32_SFLOAT pixel data (16 bytes per pixel).
+	 * Output is RGBE-encoded in the Radiance HDR format.
 	 *
-	 * @param path File path to the image.
-	 * @return ImageLoadResult with pixel data, dimensions, and VkFormat.
+	 * @param path Output file path (.hdr extension recommended).
+	 * @return true on success.
 	 */
-	static ImageLoadResult LoadFromPath(const std::string& path);
+	bool SaveHDR(const std::string& path) const;
 
 private:
+	// --- Internal helpers ---
+
 	static float HalfToFloat(uint16_t half);
 	static void EnsureDirectory(const std::string& filePath);
 
-	const void* m_pixelData = nullptr;  // non-owning reference
+	/**
+	 * @brief Loads pixel data from file, filling m_pixelData, m_width, m_height, m_format.
+	 * @param path File path to the image.
+	 */
+	void LoadFromPath(const std::string& path);
+
+	// --- Data ---
+
+	std::vector<uint8_t> m_pixelData;  ///< Owning pixel data (format-dependent byte count)
 	uint32_t m_width = 0;
 	uint32_t m_height = 0;
 	vk::Format m_format = vk::Format::eUndefined;

@@ -5,6 +5,7 @@
 
 #include "DeferredRenderer.h"
 
+#include "Barrier.h"
 #include "passes/RenderCache.h"
 #include "passes/GeometryPass.h"
 #include "passes/IBLPass.h"
@@ -370,17 +371,17 @@ void DeferredRenderer::DrawFrame()
 	m_device.resetFences(*fence);
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---
-	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
+	vk::CommandBuffer cmdBufRaw = *m_commandBuffers[imageIndex];
 
 	// No-args DrawFrame is deprecated and used only as camera-fallback.
 	// Pass empty render items (no geometry drawn) - the fallback exists only
 	// to prevent a crash when no camera is configured.
-	recordFrame(cmdBuf, imageIndex, fallbackCam, {}, nullptr);
+	recordFrame(m_commandBuffers[imageIndex], imageIndex, fallbackCam, {}, nullptr);
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
-	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBuf, *renderFinished);
+	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBufRaw, *renderFinished);
 	m_graphicsQueue.submit(submitInfo, *fence);
 
 	// --- Present ---
@@ -481,14 +482,14 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	}
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---
-	vk::CommandBuffer cmdBuf = *m_commandBuffers[imageIndex];
+	vk::CommandBuffer cmdBufRaw = *m_commandBuffers[imageIndex];
 
-	recordFrame(cmdBuf, imageIndex, *activeCam, renderItems, &scene);
+	recordFrame(m_commandBuffers[imageIndex], imageIndex, *activeCam, renderItems, &scene);
 
 	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
-	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBuf, *renderFinished);
+	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBufRaw, *renderFinished);
 	m_graphicsQueue.submit(submitInfo, *fence);
 
 	// --- Present ---
@@ -589,7 +590,7 @@ void DeferredRenderer::recreateSwapchain()
 // Frame recording
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex,
+void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
                                    const Camera& camera,
                                    const std::vector<GeometryRenderItem>& renderItems,
                                    const Scene* scene)
@@ -636,30 +637,22 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 	// Barrier 1: HDRColor GENERAL → TRANSFER_SRC_OPTIMAL
 	// Barrier 2: Swapchain image UNDEFINED → TRANSFER_DST_OPTIMAL
 	{
-		const auto hdrBarrier = ImageBarrier(
-			hdrImage,
-			vk::ImageLayout::eGeneral,
-			vk::ImageLayout::eTransferSrcOptimal,
-			vk::PipelineStageFlagBits2::eComputeShader,
-			vk::AccessFlagBits2::eShaderWrite,
-			vk::PipelineStageFlagBits2::eTransfer,
-			vk::AccessFlagBits2::eTransferRead);
+		Barrier::Transition(*cmdBuf, hdrColor, ImageState::TransferSrc);
 
-		const auto scBarrier = ImageBarrier(
-			swapchainImage,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eTransferDstOptimal,
+		const auto scBarrier = vk::ImageMemoryBarrier2(
 			vk::PipelineStageFlagBits2::eTopOfPipe,
 			vk::AccessFlagBits2::eNone,
 			vk::PipelineStageFlagBits2::eTransfer,
-			vk::AccessFlagBits2::eTransferWrite);
+			vk::AccessFlagBits2::eTransferWrite,
+			vk::ImageLayout::eUndefined,
+			vk::ImageLayout::eTransferDstOptimal,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			swapchainImage,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
-		const std::array<vk::ImageMemoryBarrier2, 2> barriers = { hdrBarrier, scBarrier };
-		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
+		const vk::DependencyInfo depInfo({}, {}, {}, scBarrier);
 		cmdBuf.pipelineBarrier2(depInfo);
-
-		// Update CPU-side layout tracking
-		hdrColor.SetCurrentLayout(vk::ImageLayout::eTransferSrcOptimal);
 	}
 
 	// --- Blit: HDRColor → swapchain image ---
@@ -684,14 +677,17 @@ void DeferredRenderer::recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex
 
 	// --- Transition swapchain image to PRESENT_SRC_KHR ---
 	{
-		const auto barrier = ImageBarrier(
-			swapchainImage,
-			vk::ImageLayout::eTransferDstOptimal,
-			vk::ImageLayout::ePresentSrcKHR,
+		const auto barrier = vk::ImageMemoryBarrier2(
 			vk::PipelineStageFlagBits2::eTransfer,
 			vk::AccessFlagBits2::eTransferWrite,
 			vk::PipelineStageFlagBits2::eBottomOfPipe,
-			vk::AccessFlagBits2::eNone);
+			vk::AccessFlagBits2::eNone,
+			vk::ImageLayout::eTransferDstOptimal,
+			vk::ImageLayout::ePresentSrcKHR,
+			VK_QUEUE_FAMILY_IGNORED,
+			VK_QUEUE_FAMILY_IGNORED,
+			swapchainImage,
+			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
 		const vk::DependencyInfo depInfo({}, {}, {}, barrier);
 		cmdBuf.pipelineBarrier2(depInfo);
@@ -835,34 +831,12 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 
 		// Transition cubemap → SHADER_READ_ONLY (if not already)
 		{
-			vk::ImageMemoryBarrier barrier(
-				vk::AccessFlagBits::eShaderRead,
-				vk::AccessFlagBits::eShaderRead,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				vk::ImageLayout::eShaderReadOnlyOptimal,
-				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-				*cubemap.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eDepth,
-				                          0, 1, 0, 6));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-			                    vk::PipelineStageFlagBits::eComputeShader,
-			                    {}, {}, {}, barrier);
+			Barrier::Transition(*cmd, cubemap, ImageState::ShaderRead);
 		}
 
 		// Transition equirect → GENERAL
 		{
-			vk::ImageMemoryBarrier barrier(
-				{}, vk::AccessFlagBits::eShaderWrite,
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eGeneral,
-				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-				*equirectImage.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
-			                    vk::PipelineStageFlagBits::eComputeShader,
-			                    {}, {}, {}, barrier);
-			equirectImage.SetCurrentLayout(vk::ImageLayout::eGeneral);
+			Barrier::Transition(*cmd, equirectImage, ImageState::ShaderWrite);
 		}
 
 		// Bind and dispatch
@@ -877,18 +851,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 
 		// Transition equirect → TRANSFER_SRC for readback
 		{
-			vk::ImageMemoryBarrier barrier(
-				vk::AccessFlagBits::eShaderWrite,
-				vk::AccessFlagBits::eTransferRead,
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eTransferSrcOptimal,
-				VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
-				*equirectImage.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-			cmd.pipelineBarrier(vk::PipelineStageFlagBits::eComputeShader,
-			                    vk::PipelineStageFlagBits::eTransfer,
-			                    {}, {}, {}, barrier);
+			Barrier::Transition(*cmd, equirectImage, ImageState::TransferSrc);
 		}
 
 		cmd.end();
@@ -900,16 +863,16 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 
 	// --- 6. Read back equirect as grayscale PNG ---
 	//     The C2E output is rgba32f; we read only the R channel (depth value).
-	std::vector<uint8_t> rawData = equirectImage.ReadImageToBuffer(
-		m_device, m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
-		vk::ImageLayout::eTransferSrcOptimal);
+	auto equirectData = equirectImage.ReadImageData(
+		m_device, m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex);
 
-	if (rawData.empty())
+	if (!equirectData.IsValid())
 	{
 		NEURUS_ERR("[ExportShadowDepthEquirect] Readback failed");
 		return {};
 	}
 
+	const auto& rawPixelData = equirectData.GetPixelData();
 	// Convert rgba32f → grayscale uint8
 	const size_t pixelCount = static_cast<size_t>(equiWidth) * equiHeight;
 	std::vector<uint8_t> grayPixels(pixelCount);
@@ -918,7 +881,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 	{
 		// Each pixel is 4 × float = 16 bytes; the R channel is at byte offset 0
 		float r;
-		std::memcpy(&r, &rawData[i * 16], sizeof(float));
+		std::memcpy(&r, &rawPixelData[i * 16], sizeof(float));
 		// Clamp to [0, 1] and convert to uint8
 		r = std::max(0.0f, std::min(1.0f, r));
 		grayPixels[i] = static_cast<uint8_t>(r * 255.0f + 0.5f);
@@ -926,9 +889,8 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 
 	const std::string path = Screenshot::timestampedFilename(filenamePrefix, ".png");
 
-	const bool saved = ImageData::SavePixelData(
-		grayPixels.data(), vk::Format::eR8Unorm,
-		vk::Extent2D{equiWidth, equiHeight}, path);
+	ImageData grayImg(grayPixels.data(), equiWidth, equiHeight, vk::Format::eR8Unorm);
+	const bool saved = grayImg.SavePNG(path);
 
 	if (saved)
 	{

@@ -55,20 +55,6 @@ Image& RenderCache::GetAttachment(const AttachmentName name, const vk::Extent2D 
 	return it->second;
 }
 
-Image& RenderCache::GetAttachment(const AttachmentName name, const vk::Extent2D extent,
-                                  const vk::ImageLayout targetLayout)
-{
-	Image& attachment = GetAttachment(name, extent);
-
-	if (targetLayout != vk::ImageLayout::eUndefined &&
-	    attachment.CurrentLayout() != targetLayout)
-	{
-		attachment.SetCurrentLayout(targetLayout);
-	}
-
-	return attachment;
-}
-
 const Image& RenderCache::GetAttachment(const AttachmentName name) const
 {
 	const auto it = m_attachments.find(name);

@@ -8,8 +8,8 @@
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
+#include "render/Barrier.h"
 #include "passes/RenderContext.h"
-#include "passes/SyncObjects.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"
@@ -339,8 +339,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
-	// --- 2. Transition G-Buffer images to SHADER_READ_ONLY_OPTIMAL ---
-	//     and SSAO attachment to GENERAL for compute write.
+	// --- 2. Transition G-Buffer images to ShaderRead and SSAO attachment to ShaderWrite ---
 	{
 		const std::array<AttachmentName, 3> gBufferInputs = {
 			AttachmentName::Position,
@@ -348,57 +347,15 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 			AttachmentName::Albedo,
 		};
 
-		std::array<vk::ImageMemoryBarrier2, 4> barriers;
-
 		for (size_t i = 0; i < 3; ++i)
 		{
 			auto& attachment = cache.GetAttachment(gBufferInputs[i], renderExtent);
-			const vk::ImageLayout oldLayout = attachment.CurrentLayout();
-
-			barriers[i] = vk::ImageMemoryBarrier2(
-				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
-					? vk::PipelineStageFlagBits2::eColorAttachmentOutput
-					: vk::PipelineStageFlagBits2::eAllCommands,              // srcStage
-				(oldLayout == vk::ImageLayout::eColorAttachmentOptimal)
-					? vk::AccessFlagBits2::eColorAttachmentWrite
-					: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
-				vk::PipelineStageFlagBits2::eComputeShader,                  // dstStage
-				vk::AccessFlagBits2::eShaderRead,                            // dstAccess
-				oldLayout,                                                    // oldLayout
-				vk::ImageLayout::eShaderReadOnlyOptimal,                     // newLayout
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*attachment.ImageHandle(),
-				vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-				                          0, 1, 0, 1));
-
-			attachment.SetCurrentLayout(vk::ImageLayout::eShaderReadOnlyOptimal);
+			Barrier::Transition(cmdBuf, attachment, ImageState::ShaderRead);
 		}
 
-		// SSAO attachment: current layout → GENERAL
+		// SSAO attachment: current state → ShaderWrite (compute write)
 		auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
-		const vk::ImageLayout ssaoOldLayout = ssaoAtt.CurrentLayout();
-		barriers[3] = vk::ImageMemoryBarrier2(
-			(ssaoOldLayout == vk::ImageLayout::eUndefined)
-				? vk::PipelineStageFlagBits2::eTopOfPipe
-				: vk::PipelineStageFlagBits2::eAllCommands,                  // srcStage
-			(ssaoOldLayout == vk::ImageLayout::eUndefined)
-				? vk::AccessFlagBits2::eNone
-				: vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,  // srcAccess
-			vk::PipelineStageFlagBits2::eComputeShader,                      // dstStage
-			vk::AccessFlagBits2::eShaderWrite,                               // dstAccess
-			ssaoOldLayout,                                                    // oldLayout
-			vk::ImageLayout::eGeneral,                                       // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*ssaoAtt.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1));
-
-		ssaoAtt.SetCurrentLayout(vk::ImageLayout::eGeneral);
-
-		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
-		cmdBuf.pipelineBarrier2(depInfo);
+		Barrier::Transition(cmdBuf, ssaoAtt, ImageState::ShaderWrite);
 	}
 
 	// --- 3. Bind compute pipeline ---

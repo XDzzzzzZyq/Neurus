@@ -47,10 +47,11 @@ are shared across layers.
 
 **Renderer Layer** (`src/render/`)
 - Pure rendering service with no application logic
-- Owns ALL GPU resources (device, swapchain, pipeline, command buffers, buffers, images, descriptors, RenderCache)
+- Owns ALL GPU resources (device, swapchain, pipeline, command buffers, buffers, images, descriptors, RenderCache, Barrier state mapping)
 - Owns VkDevice, VkSwapchainKHR, VkPipeline, VkCommandPool
 - Consumes read-only VkSurfaceKHR from UI layer
 - Consumes per-frame RenderContext (immutable scene snapshot) for pass dispatch
+- Centralized image barrier management via `Barrier::Transition` (ImageState → Vulkan layout/stage/access)
 - Must NOT mutate application state
 - Must NOT depend on Editor or UI layers
 
@@ -111,13 +112,14 @@ Renderer Layer owns:
   VkSwapchainKHR (consumes UI's VkSurfaceKHR)
   VkPipeline + VkPipelineLayout
   VkCommandPool + VkCommandBuffers
-  RenderCache (cross-frame mutable resource pool, lazy GetAttachment / GetShadowMap)
-  All framebuffer attachments (via RenderCache, dynamic rendering)
+   RenderCache (cross-frame mutable resource pool, lazy GetAttachment / GetShadowMap)
+   All framebuffer attachments (via RenderCache, dynamic rendering)
 
-  Also through src/render/ abstractions:
-  VkBuffer + VkDeviceMemory pairs (Buffer hierarchy: GPUBuffer, StagingBuffer, UniformBuffer<T>)
-  VkImage + VkDeviceMemory + VkImageView triples (Image, Texture)
-  VkDescriptorPool + VkDescriptorSet (DescriptorManager)
+   Also through src/render/ abstractions:
+   VkBuffer + VkDeviceMemory pairs (Buffer hierarchy: GPUBuffer, StagingBuffer, UniformBuffer<T>)
+   VkImage + VkDeviceMemory + VkImageView triples (Image, Texture)
+   VkDescriptorPool + VkDescriptorSet (DescriptorManager)
+   Barrier::Transition (centralized layout transitions, ImageState → Vulkan mapping)
 ```
 
 ## Design Constraints
@@ -172,6 +174,7 @@ compute pass, and full G-Buffer pipeline through the four-layer architecture.
 - Embedded SPIR-V shaders (compiled at CMake time)
 - OBJ mesh loading with MeshData
 - Deferred PBR pipeline: ShadowDepthPass → GeometryPass (G-Buffer) → SSAOPass → LightingPass (compute) → IBLPass
+- Centralized image barrier system (Barrier::Transition, ImageState enum)
 - Screenshot capture + TextureData PNG readback
 - GPU tests with shared VulkanTestShared base class
 - Reference-image regression tests (capture → compare PNG)

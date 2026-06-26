@@ -43,12 +43,8 @@ enum class AttachmentName
  *
  * Non-copyable, movable.
  *
- * @note Images are created with VK_IMAGE_LAYOUT_UNDEFINED CPU tracking.
- *       Callers that need a specific layout should use the three-argument
- *       GetAttachment(name, extent, targetLayout) overload to set the
- *       CPU-tracked layout.  The actual GPU layout transition is the
- *       caller's responsibility (e.g. via a pipeline barrier or
- *       vkCmdBeginRendering / vkCmdEndRendering).
+ * @note Images are created with ImageState::Undefined CPU tracking.
+ *       Callers that need a specific layout should use Barrier::Transition().
  */
 class RenderCache
 {
@@ -78,30 +74,14 @@ public:
 	 * attachment is returned unchanged. Call CleanScreenSpace() first to
 	 * force re-creation at a new extent.
 	 *
-	 * Newly created images have VK_IMAGE_LAYOUT_UNDEFINED CPU tracking.
-	 * Use the three-argument overload to set a specific CPU-tracked layout
-	 * (the caller is responsible for the actual GPU transition).
+	 * Newly created images start in ImageState::Undefined.
+	 * Use Barrier::Transition() to move them to a usable state.
 	 *
 	 * @param name   Attachment identifier.
 	 * @param extent Image dimensions for lazy creation.
 	 * @return Non-owning reference to the attachment image.
 	 */
 	Image& GetAttachment(AttachmentName name, vk::Extent2D extent);
-
-	/**
-	 * @brief Returns (or lazily creates) the Image AND enforces the given CPU-tracked layout.
-	 *
-	 * Convenience overload that calls GetAttachment(name, extent) and then
-	 * updates the CPU-tracked layout to @p targetLayout via SetCurrentLayout()
-	 * if it differs.  The caller is responsible for performing any actual GPU
-	 * layout transition (e.g. via vkCmdBeginRendering).
-	 *
-	 * @param name         Attachment identifier.
-	 * @param extent       Image dimensions for lazy creation.
-	 * @param targetLayout Desired CPU-tracked layout.
-	 * @return Non-owning reference to the attachment image.
-	 */
-	Image& GetAttachment(AttachmentName name, vk::Extent2D extent, vk::ImageLayout targetLayout);
 
 	// --- Per-light shadow resources (lazily created) ---
 

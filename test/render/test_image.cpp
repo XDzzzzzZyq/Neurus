@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include "render/Image.h"
+#include "render/Barrier.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -138,13 +139,11 @@ TEST_F(ImageTest, TransitionLayout_Basic)
 
 	{
 		auto& cmd = BeginCmd();
-		// UNDEFINED → COLOR_ATTACHMENT_OPTIMAL
-		image.TransitionLayout(cmd, vk::ImageLayout::eUndefined,
-		                       vk::ImageLayout::eColorAttachmentOptimal);
+		// UNDEFINED → ColorAttachment
+		Barrier::Transition(*cmd, image, ImageState::ColorAttachment);
 
-		// COLOR_ATTACHMENT_OPTIMAL → SHADER_READ_ONLY_OPTIMAL
-		image.TransitionLayout(cmd, vk::ImageLayout::eColorAttachmentOptimal,
-		                       vk::ImageLayout::eShaderReadOnlyOptimal);
+		// ColorAttachment → ShaderRead
+		Barrier::Transition(*cmd, image, ImageState::ShaderRead);
 		EndSubmitWait(cmd);
 	}
 
@@ -170,10 +169,8 @@ TEST_F(ImageTest, TransitionLayout_MipLevels)
 	{
 		auto& cmd = BeginCmd();
 		// Transition all 4 mip levels
-		image.TransitionLayout(cmd,
-		                       vk::ImageLayout::eUndefined,
-		                       vk::ImageLayout::eTransferDstOptimal,
-		                       0, 4);  // baseMip=0, levelCount=4
+		vk::ImageSubresourceRange range(vk::ImageAspectFlagBits::eColor, 0, 4, 0, 1);
+		Barrier::Transition(*cmd, image, ImageState::TransferDst, range);
 		EndSubmitWait(cmd);
 	}
 
@@ -199,10 +196,8 @@ TEST_F(ImageTest, TransitionLayout_SingleMipLevel)
 	{
 		auto& cmd = BeginCmd();
 		// Transition only mip level 1
-		image.TransitionLayout(cmd,
-		                       vk::ImageLayout::eUndefined,
-		                       vk::ImageLayout::eTransferSrcOptimal,
-		                       1, 1);  // baseMip=1, levelCount=1
+		vk::ImageSubresourceRange range(vk::ImageAspectFlagBits::eColor, 1, 1, 0, 1);
+		Barrier::Transition(*cmd, image, ImageState::TransferSrc, range);
 		EndSubmitWait(cmd);
 	}
 
@@ -241,10 +236,7 @@ TEST_F(ImageTest, GenerateMipmaps_Completes)
 	{
 		auto& cmd = BeginCmd();
 		// First transition to TRANSFER_DST so GenerateMipmaps can blit into lower levels
-		image.TransitionLayout(cmd,
-		                       vk::ImageLayout::eUndefined,
-		                       vk::ImageLayout::eTransferDstOptimal,
-		                       0, image.MipLevels());
+		Barrier::Transition(*cmd, image, ImageState::TransferDst);
 
 		image.GenerateMipmaps(cmd);
 		EndSubmitWait(cmd);

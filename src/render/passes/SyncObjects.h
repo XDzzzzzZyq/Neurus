@@ -129,53 +129,6 @@ struct FrameSync
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Creates a vk::ImageMemoryBarrier2 for pipeline barrier commands.
- *
- * Default parameters target a full-image colour layout transition with no
- * queue-family ownership transfer.
- *
- * @param image              The image to transition.
- * @param oldLayout          Current image layout.
- * @param newLayout          Target image layout.
- * @param srcStage           Source pipeline stage mask.
- * @param srcAccess          Source access mask.
- * @param dstStage           Destination pipeline stage mask.
- * @param dstAccess          Destination access mask.
- * @param aspectMask         Image aspect mask (default: eColor).
- * @param baseMipLevel       First mip level (default: 0).
- * @param levelCount         Number of mip levels (default: VK_REMAINING_MIP_LEVELS).
- * @param baseArrayLayer     First array layer (default: 0).
- * @param layerCount         Number of array layers (default: VK_REMAINING_ARRAY_LAYERS).
- * @return A fully populated vk::ImageMemoryBarrier2.
- */
-[[nodiscard]] inline vk::ImageMemoryBarrier2 ImageBarrier(
-	vk::Image image,
-	vk::ImageLayout oldLayout,
-	vk::ImageLayout newLayout,
-	vk::PipelineStageFlags2 srcStage = vk::PipelineStageFlagBits2::eTopOfPipe,
-	vk::AccessFlags2 srcAccess = vk::AccessFlagBits2::eNone,
-	vk::PipelineStageFlags2 dstStage = vk::PipelineStageFlagBits2::eBottomOfPipe,
-	vk::AccessFlags2 dstAccess = vk::AccessFlagBits2::eNone,
-	vk::ImageAspectFlags aspectMask = vk::ImageAspectFlagBits::eColor,
-	uint32_t baseMipLevel = 0,
-	uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
-	uint32_t baseArrayLayer = 0,
-	uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS)
-{
-	return vk::ImageMemoryBarrier2(
-		srcStage,
-		srcAccess,
-		dstStage,
-		dstAccess,
-		oldLayout,
-		newLayout,
-		VK_QUEUE_FAMILY_IGNORED,
-		VK_QUEUE_FAMILY_IGNORED,
-		image,
-		vk::ImageSubresourceRange(aspectMask, baseMipLevel, levelCount, baseArrayLayer, layerCount));
-}
-
-/**
  * @brief Creates a vk::BufferMemoryBarrier2 for pipeline barrier commands.
  *
  * Default parameters target the full buffer with no queue-family transfer.

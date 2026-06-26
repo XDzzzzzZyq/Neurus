@@ -207,7 +207,7 @@ private:
 	 *
 	 * @param renderItems Pre-built render items from scene meshes (may be empty).
 	 */
-	void recordFrame(vk::CommandBuffer cmdBuf, uint32_t imageIndex,
+	void recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
 	                 const Camera& camera,
 	                 const std::vector<GeometryRenderItem>& renderItems,
 	                 const Scene* scene = nullptr);

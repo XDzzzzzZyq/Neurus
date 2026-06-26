@@ -6,7 +6,7 @@
 #include "passes/GeometryPass.h"
 
 #include "passes/RenderCache.h"
-#include "passes/SyncObjects.h"
+#include "render/Barrier.h"
 #include "PipelineBuilder.h"
 #include "passes/RenderPassManager.h"
 #include "shaders/ShaderModule.h"
@@ -178,12 +178,10 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		m_cameraUBO.Unmap();
 	}
 
-	// --- 2. Collect G-Buffer attachment image views and set CPU-tracked layout ---
-	//     GetAttachment(name, extent, targetLayout) ensures the CPU-side layout
-	//     tracking is correct for subsequent passes (SSAO, Lighting) that check
-	//     CurrentLayout().  The actual GPU transition from eUndefined (first frame)
-	//     or eShaderReadOnlyOptimal (subsequent frames) is handled implicitly by
-	//     vkCmdBeginRendering / vkCmdEndRendering in BeginPass/EndPass.
+	// --- 2. Collect G-Buffer attachment image views ---
+	//     Attachments start in ImageState::Undefined (first frame) or
+	//     ImageState::ColorAttachment (subsequent frames from previous pass).
+	//     Barrier::Transition reads the current state and emits the appropriate barrier.
 	const std::array<AttachmentName, 4> gBufferColorAttachments = {
 		AttachmentName::Position,
 		AttachmentName::Normal,
@@ -195,51 +193,14 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	colorViews.reserve(4);
 	for (const auto& attName : gBufferColorAttachments)
 	{
-		colorViews.push_back(
-			*cache.GetAttachment(attName, renderExtent,
-			                     vk::ImageLayout::eColorAttachmentOptimal)
-			       .ImageViewHandle());
+		auto& att = cache.GetAttachment(attName, renderExtent);
+		Barrier::Transition(cmdBuf, att, ImageState::ColorAttachment);
+		colorViews.push_back(*att.ImageViewHandle());
 	}
-	vk::ImageView depthView =
-		*cache.GetAttachment(AttachmentName::Depth, renderExtent,
-		                     vk::ImageLayout::eDepthStencilAttachmentOptimal)
-		       .ImageViewHandle();
 
-	// --- 2b. Transition G-Buffer images to attachment layouts for this pass ---
-	//     Uses eUndefined as oldLayout to discard previous contents (beginRendering
-	//     will clear them anyway).  On first frame the GPU layout really is
-	//     eUndefined; on subsequent frames this is a "don't care" discard.
-	//     CPU-side tracking was already set by GetAttachment above.
-	{
-		std::array<vk::ImageMemoryBarrier2, 5> barriers;
-
-		for (size_t i = 0; i < 4; ++i)
-		{
-			const auto& att = cache.GetAttachment(gBufferColorAttachments[i], renderExtent);
-			barriers[i] = ImageBarrier(
-				*att.ImageHandle(),
-				vk::ImageLayout::eUndefined,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::PipelineStageFlagBits2::eTopOfPipe,
-				vk::AccessFlagBits2::eNone,
-				vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-				vk::AccessFlagBits2::eColorAttachmentWrite);
-		}
-
-		const auto& depthAtt = cache.GetAttachment(AttachmentName::Depth, renderExtent);
-		barriers[4] = ImageBarrier(
-			*depthAtt.ImageHandle(),
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::PipelineStageFlagBits2::eTopOfPipe,
-			vk::AccessFlagBits2::eNone,
-			vk::PipelineStageFlagBits2::eEarlyFragmentTests,
-			vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-			vk::ImageAspectFlagBits::eDepth);
-
-		const vk::DependencyInfo depInfo({}, {}, {}, barriers);
-		cmdBuf.pipelineBarrier2(depInfo);
-	}
+	auto& depthAtt = cache.GetAttachment(AttachmentName::Depth, renderExtent);
+	Barrier::Transition(cmdBuf, depthAtt, ImageState::DepthAttachment);
+	vk::ImageView depthView = *depthAtt.ImageViewHandle();
 
 	// --- 3. Begin G-Buffer dynamic rendering pass ---
 	const auto clearValues = RenderPassManager::PresetClearValues(

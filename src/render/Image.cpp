@@ -1,4 +1,5 @@
 #include "Image.h"
+#include "Barrier.h"
 
 #include "Log.h"
 
@@ -19,19 +20,25 @@ Image::Image(const vk::raii::Device& device,
              const vk::ImageUsageFlags usage,
              const uint32_t mipLevels,
              const ImageType imageType,
-             const char* debugName,
-             const ImageData& imageData)
+             const char* debugName)
 	: m_extent(extent)
 	, m_format(format)
 	, m_usage(usage)
 	, m_mipLevels(mipLevels)
 	, m_imageType(imageType)
-	, m_imageData(imageData)
-	, m_currentLayout(vk::ImageLayout::eUndefined)
 {
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
 	createImageView(device, debugName);
+
+	// --- Populate subresource range ---
+	m_subresourceRange = vk::ImageSubresourceRange(
+		AspectFromFormat(m_format),
+		0,               // baseMipLevel
+		m_mipLevels,     // levelCount
+		0,               // baseArrayLayer
+		m_arrayLayers    // layerCount
+	);
 
 	if (m_imageType == ImageType::eCube)
 	{
@@ -76,6 +83,37 @@ Image::Image(const vk::raii::Device& device,
 		          << (debugName ? debugName : "")
 		          << (debugName ? "'" : ""));
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Static factory: FromImageData
+// ---------------------------------------------------------------------------
+
+std::unique_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
+                                            const vk::raii::PhysicalDevice& physicalDevice,
+                                            vk::Queue queue,
+                                            uint32_t queueFamilyIndex,
+                                            ImageData& imageData,
+                                            const char* debugName)
+{
+	if (!imageData.IsValid())
+	{
+		NEURUS_ERR("[Image] FromImageData: invalid ImageData provided");
+		return nullptr;
+	}
+
+	auto image = std::make_unique<Image>(
+		device, physicalDevice,
+		vk::Extent2D{imageData.GetWidth(), imageData.GetHeight()},
+		imageData.GetFormat(),
+		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+		1,
+		ImageType::e2D,
+		debugName);
+
+	image->UploadImageData(device, physicalDevice, queue, queueFamilyIndex, imageData);
+
+	return image;
 }
 
 // ---------------------------------------------------------------------------
@@ -202,46 +240,6 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 }
 
 // ---------------------------------------------------------------------------
-// Layout transition
-// ---------------------------------------------------------------------------
-
-void Image::TransitionLayout(const vk::raii::CommandBuffer& cmdBuf,
-                                   const vk::ImageLayout oldLayout,
-                                   const vk::ImageLayout newLayout,
-                                   const uint32_t baseMipLevel,
-                                   const uint32_t levelCount,
-                                   const uint32_t baseArrayLayer,
-                                   const uint32_t layerCount)
-{
-	const vk::ImageSubresourceRange subresourceRange(
-		AspectFromFormat(m_format),
-		baseMipLevel,
-		levelCount,
-		baseArrayLayer,
-		layerCount);
-
-	const vk::ImageMemoryBarrier barrier(
-		AccessFlagsForLayout(oldLayout),
-		AccessFlagsForLayout(newLayout),
-		oldLayout,
-		newLayout,
-		VK_QUEUE_FAMILY_IGNORED,
-		VK_QUEUE_FAMILY_IGNORED,
-		*m_image,
-		subresourceRange);
-
-	cmdBuf.pipelineBarrier(
-		PipelineStageForLayout(oldLayout),
-		PipelineStageForLayout(newLayout),
-		{},
-		{},
-		{},
-		{ barrier });
-
-	m_currentLayout = newLayout;
-}
-
-// ---------------------------------------------------------------------------
 // Mipmap generation via vkCmdBlitImage
 // ---------------------------------------------------------------------------
 
@@ -259,12 +257,17 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 
 	for (uint32_t i = 1; i < m_mipLevels; ++i)
 	{
-		// --- Transition level (i-1) TRANSFER_DST → TRANSFER_SRC ---
-		TransitionLayout(cmdBuf,
-		                 vk::ImageLayout::eTransferDstOptimal,
-		                 vk::ImageLayout::eTransferSrcOptimal,
-		                 i - 1, 1,
-		                 0, m_arrayLayers);
+		// At this point, level (i-1) is guaranteed to be in TransferDst:
+		//   - Iteration 1: set by the initial full-image barrier before GenerateMipmaps
+		//   - Iteration N: level (i-1) was the blit destination in iteration (N-1)
+		// We reset m_state so Barrier::Transition reads the correct "old" layout.
+
+		// --- Transition level (i-1) TransferDst → TransferSrc ---
+		m_state = ImageState::TransferDst;
+		{
+			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, m_arrayLayers);
+			Barrier::Transition(*cmdBuf, *this, ImageState::TransferSrc, range);
+		}
 
 		const int32_t srcWidth  = mipWidth;
 		const int32_t srcHeight = mipHeight;
@@ -286,44 +289,51 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 		blit.dstOffsets[0] = vk::Offset3D(0, 0, 0);
 		blit.dstOffsets[1] = vk::Offset3D(dstWidth, dstHeight, 1);
 
+		auto vulkanSrcState = Barrier::ToVulkanImageState(ImageState::TransferSrc, *this);
+		auto vulkanDstState = Barrier::ToVulkanImageState(ImageState::TransferDst, *this);
+
 		cmdBuf.blitImage(
-			*m_image, vk::ImageLayout::eTransferSrcOptimal,
-			*m_image, vk::ImageLayout::eTransferDstOptimal,
+			*m_image, vulkanSrcState.layout,
+			*m_image, vulkanDstState.layout,
 			{ blit },
 			vk::Filter::eLinear);
 
-		// --- Transition level (i-1) TRANSFER_SRC → SHADER_READ_ONLY ---
-		TransitionLayout(cmdBuf,
-		                 vk::ImageLayout::eTransferSrcOptimal,
-		                 vk::ImageLayout::eShaderReadOnlyOptimal,
-		                 i - 1, 1,
-		                 0, m_arrayLayers);
+		// --- Transition level (i-1) TransferSrc → ShaderRead ---
+		m_state = ImageState::TransferSrc;
+		{
+			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, m_arrayLayers);
+			Barrier::Transition(*cmdBuf, *this, ImageState::ShaderRead, range);
+		}
 
 		mipWidth  = dstWidth;
 		mipHeight = dstHeight;
 	}
 
-	// --- Transition last level TRANSFER_DST → SHADER_READ_ONLY ---
-	TransitionLayout(cmdBuf,
-	                 vk::ImageLayout::eTransferDstOptimal,
-	                 vk::ImageLayout::eShaderReadOnlyOptimal,
-	                 m_mipLevels - 1, 1,
-	                 0, m_arrayLayers);
+	// --- Transition last mip level TransferDst → ShaderRead ---
+	m_state = ImageState::TransferDst;
+	{
+		vk::ImageSubresourceRange lastRange(aspect, m_mipLevels - 1, 1, 0, m_arrayLayers);
+		Barrier::Transition(*cmdBuf, *this, ImageState::ShaderRead, lastRange);
+	}
+
+	// Update CPU-side state tracking to reflect the final layout
+	m_state = ImageState::ShaderRead;
 }
 
 // ---------------------------------------------------------------------------
 // CPU → GPU upload
 // ---------------------------------------------------------------------------
 
-void Image::UploadPixelData(const vk::raii::Device& device,
+void Image::UploadImageData(const vk::raii::Device& device,
                             const vk::raii::PhysicalDevice& physicalDevice,
                             vk::Queue queue,
                             uint32_t queueFamilyIndex,
-                            const void* pixelData,
-                            size_t dataSize)
+                            const ImageData& imageData)
 {
+	const auto& pixelData = imageData.GetPixelData();
+	const vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(pixelData.size());
+
 	// --- Create staging buffer ---
-	const vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(dataSize);
 	vk::BufferCreateInfo stagingCI({}, bufferSize, vk::BufferUsageFlagBits::eTransferSrc);
 	vk::raii::Buffer stagingBuffer(device, stagingCI);
 
@@ -339,7 +349,7 @@ void Image::UploadPixelData(const vk::raii::Device& device,
 
 	// --- Copy pixel data to staging buffer ---
 	void* mapped = stagingMemory.mapMemory(0, bufferSize);
-	std::memcpy(mapped, pixelData, dataSize);
+	std::memcpy(mapped, pixelData.data(), static_cast<size_t>(bufferSize));
 	stagingMemory.unmapMemory();
 
 	// --- Transient command buffer ---
@@ -351,27 +361,8 @@ void Image::UploadPixelData(const vk::raii::Device& device,
 
 	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-	// --- Transition image UNDEFINED → TRANSFER_DST_OPTIMAL ---
-	{
-		const vk::ImageMemoryBarrier barrier(
-			{},                                                       // srcAccessMask
-			vk::AccessFlagBits::eTransferWrite,                       // dstAccessMask
-			vk::ImageLayout::eUndefined,                              // oldLayout
-			vk::ImageLayout::eTransferDstOptimal,                     // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*m_image,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, m_arrayLayers));
-
-		cmdBufs[0].pipelineBarrier(
-			vk::PipelineStageFlagBits::eTopOfPipe,
-			vk::PipelineStageFlagBits::eTransfer,
-			{},
-			{},
-			{},
-			{ barrier });
-	}
+	// --- Transition image Undefined → TransferDst ---
+	Barrier::Transition(*cmdBufs[0], *this, ImageState::TransferDst);
 
 	// --- Copy buffer → image ---
 	{
@@ -380,7 +371,7 @@ void Image::UploadPixelData(const vk::raii::Device& device,
 		copyRegion.bufferRowLength   = 0;
 		copyRegion.bufferImageHeight = 0;
 		copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-			vk::ImageAspectFlagBits::eColor, 0, 0, m_arrayLayers);
+			AspectFromFormat(m_format), 0, 0, m_arrayLayers);
 		copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 		copyRegion.imageExtent = vk::Extent3D(m_extent.width, m_extent.height, 1);
 
@@ -389,127 +380,41 @@ void Image::UploadPixelData(const vk::raii::Device& device,
 		                             { copyRegion });
 	}
 
-	// --- Transition image TRANSFER_DST_OPTIMAL → SHADER_READ_ONLY_OPTIMAL ---
+	// --- Transition mip level 0 TransferDst → ShaderRead (only the uploaded mip) ---
 	{
-		const vk::ImageMemoryBarrier barrier(
-			vk::AccessFlagBits::eTransferWrite,                       // srcAccessMask
-			vk::AccessFlagBits::eShaderRead,                           // dstAccessMask
-			vk::ImageLayout::eTransferDstOptimal,                      // oldLayout
-			vk::ImageLayout::eShaderReadOnlyOptimal,                  // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*m_image,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, m_arrayLayers));
-
-		cmdBufs[0].pipelineBarrier(
-			vk::PipelineStageFlagBits::eTransfer,
-			vk::PipelineStageFlagBits::eFragmentShader,
-			{},
-			{},
-			{},
-			{ barrier });
+		vk::ImageSubresourceRange mip0Range(AspectFromFormat(m_format), 0, 1, 0, m_arrayLayers);
+		Barrier::Transition(*cmdBufs[0], *this, ImageState::ShaderRead, mip0Range);
 	}
+
+	// Update CPU-side state tracking (other mips stay in TransferDst for mipmap generation)
+	m_state = ImageState::ShaderRead;
 
 	cmdBufs[0].end();
 
 	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
 	queue.submit(submitInfo);
 	queue.waitIdle();
-
-	m_currentLayout = vk::ImageLayout::eShaderReadOnlyOptimal;
-}
-
-// ---------------------------------------------------------------------------
-// Static factory: LoadFromPath
-// ---------------------------------------------------------------------------
-
-std::unique_ptr<Image> Image::LoadFromPath(const vk::raii::Device& device,
-                                           const vk::raii::PhysicalDevice& physicalDevice,
-                                           vk::Queue queue,
-                                           uint32_t queueFamilyIndex,
-                                           const std::string& path,
-                                           const char* debugName)
-{
-	auto result = ImageData::LoadFromPath(path);
-	if (!result.valid())
-	{
-		NEURUS_ERR("[Image] Failed to load image from path: " << path);
-		return nullptr;
-	}
-
-	auto image = std::make_unique<Image>(
-		device, physicalDevice,
-		vk::Extent2D{result.width, result.height},
-		result.format,
-		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
-		1,
-		ImageType::e2D,
-		debugName);
-
-	image->UploadPixelData(device, physicalDevice, queue, queueFamilyIndex,
-	                       result.pixelData.data(), result.pixelData.size());
-
-	return image;
 }
 
 // ---------------------------------------------------------------------------
 // GPU readback
 // ---------------------------------------------------------------------------
 
-std::vector<uint8_t> Image::ReadImageToBuffer(
-	const vk::raii::Device& device,
-	const vk::raii::PhysicalDevice& physicalDevice,
-	vk::Queue queue,
-	uint32_t queueFamilyIndex,
-	vk::ImageLayout currentLayout) const
+ImageData Image::ReadImageData(const vk::raii::Device& device,
+                               const vk::raii::PhysicalDevice& physicalDevice,
+                               vk::Queue queue,
+                               uint32_t queueFamilyIndex) const
 {
-	// Delegate to the static overload using our own image handle, format and extent.
-	return ReadImageToBuffer(device, physicalDevice, queue, queueFamilyIndex,
-	                         *m_image, m_format, m_extent, currentLayout);
-}
+	const uint32_t bytesPerPixel = ImageData::PixelByteSize(m_format);
 
-// ---------------------------------------------------------------------------
-// Static ReadImageToBuffer (raw VkImage overload)
-// ---------------------------------------------------------------------------
+	if (bytesPerPixel == 0)
+	{
+		NEURUS_ERR("[Image] ReadImageData: unsupported format " << vk::to_string(m_format));
+		return ImageData();
+	}
 
-std::vector<uint8_t> Image::ReadImageToBuffer(
-	const vk::raii::Device& device,
-	const vk::raii::PhysicalDevice& physicalDevice,
-	vk::Queue queue,
-	uint32_t queueFamilyIndex,
-	vk::Image image,
-	vk::Format format,
-	vk::Extent2D extent,
-	vk::ImageLayout currentLayout)
-{
-	// Shared implementation - refactor member version to delegate here later.
-	const uint32_t bytesPerPixel = [&]() -> uint32_t {
-		switch (format)
-		{
-		case vk::Format::eR8G8B8A8Unorm:
-		case vk::Format::eR8G8B8A8Srgb:
-		case vk::Format::eB8G8R8A8Unorm:
-		case vk::Format::eB8G8R8A8Srgb:
-			return 4;
-		case vk::Format::eR16G16B16A16Sfloat:
-		case vk::Format::eR16G16B16A16Unorm:
-		case vk::Format::eR16G16B16A16Snorm:
-			return 8;
-		case vk::Format::eR32G32B32A32Sfloat:
-			return 16;
-		case vk::Format::eR8Unorm:
-		case vk::Format::eR8Srgb:
-			return 1;
-		default:
-			return 0;
-		}
-	}();
-
-	if (bytesPerPixel == 0) return {};
-
-	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(extent.width) *
-	                                 extent.height * bytesPerPixel;
+	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(m_extent.width) *
+	                                 m_extent.height * bytesPerPixel;
 
 	// --- Staging buffer ---
 	vk::BufferCreateInfo stagingCI({}, imageSize, vk::BufferUsageFlagBits::eTransferDst);
@@ -533,15 +438,17 @@ std::vector<uint8_t> Image::ReadImageToBuffer(
 
 	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
+	auto vulkanState = Barrier::ToVulkanImageState(ImageState::TransferSrc, *this);
+
 	vk::BufferImageCopy copyRegion;
 	copyRegion.bufferOffset = 0;
 	copyRegion.bufferRowLength = 0;
 	copyRegion.bufferImageHeight = 0;
-	copyRegion.imageSubresource = vk::ImageSubresourceLayers(AspectFromFormat(format), 0, 0, 1);
+	copyRegion.imageSubresource = vk::ImageSubresourceLayers(AspectFromFormat(m_format), 0, 0, 1);
 	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
-	copyRegion.imageExtent = vk::Extent3D(extent.width, extent.height, 1);
+	copyRegion.imageExtent = vk::Extent3D(m_extent.width, m_extent.height, 1);
 
-	cmdBufs[0].copyImageToBuffer(image, currentLayout, *stagingBuffer, copyRegion);
+	cmdBufs[0].copyImageToBuffer(*m_image, vulkanState.layout, *stagingBuffer, copyRegion);
 
 	vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite,
 	                          vk::AccessFlagBits::eHostRead);
@@ -555,67 +462,16 @@ std::vector<uint8_t> Image::ReadImageToBuffer(
 	queue.submit(submitInfo);
 	queue.waitIdle();
 
-	std::vector<uint8_t> pixelData(static_cast<size_t>(imageSize));
 	void* mapped = stagingMemory.mapMemory(0, imageSize);
-	std::memcpy(pixelData.data(), mapped, static_cast<size_t>(imageSize));
+	ImageData result(mapped, m_extent.width, m_extent.height, m_format);
 	stagingMemory.unmapMemory();
 
-	return pixelData;
+	return result;
 }
 
 // ---------------------------------------------------------------------------
 // Static helpers
 // ---------------------------------------------------------------------------
-
-vk::AccessFlags Image::AccessFlagsForLayout(const vk::ImageLayout layout)
-{
-	switch (layout)
-	{
-	case vk::ImageLayout::eUndefined:
-	case vk::ImageLayout::ePresentSrcKHR:
-		return {};
-	case vk::ImageLayout::eTransferDstOptimal:
-		return vk::AccessFlagBits::eTransferWrite;
-	case vk::ImageLayout::eTransferSrcOptimal:
-		return vk::AccessFlagBits::eTransferRead;
-	case vk::ImageLayout::eColorAttachmentOptimal:
-		return vk::AccessFlagBits::eColorAttachmentWrite;
-	case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-		return vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-	case vk::ImageLayout::eShaderReadOnlyOptimal:
-		return vk::AccessFlagBits::eShaderRead;
-	case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
-		return vk::AccessFlagBits::eShaderRead;
-	case vk::ImageLayout::eGeneral:
-		return vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite;
-	default:
-		return {};
-	}
-}
-
-vk::PipelineStageFlags Image::PipelineStageForLayout(const vk::ImageLayout layout)
-{
-	switch (layout)
-	{
-	case vk::ImageLayout::eUndefined:
-	case vk::ImageLayout::ePresentSrcKHR:
-		return vk::PipelineStageFlagBits::eTopOfPipe;
-	case vk::ImageLayout::eTransferDstOptimal:
-	case vk::ImageLayout::eTransferSrcOptimal:
-		return vk::PipelineStageFlagBits::eTransfer;
-	case vk::ImageLayout::eColorAttachmentOptimal:
-		return vk::PipelineStageFlagBits::eColorAttachmentOutput;
-	case vk::ImageLayout::eDepthStencilAttachmentOptimal:
-		return vk::PipelineStageFlagBits::eEarlyFragmentTests;
-	case vk::ImageLayout::eShaderReadOnlyOptimal:
-	case vk::ImageLayout::eDepthStencilReadOnlyOptimal:
-		return vk::PipelineStageFlagBits::eFragmentShader;
-	case vk::ImageLayout::eGeneral:
-		return vk::PipelineStageFlagBits::eAllCommands;
-	default:
-		return vk::PipelineStageFlagBits::eTopOfPipe;
-	}
-}
 
 vk::ImageAspectFlags Image::AspectFromFormat(const vk::Format format)
 {
@@ -627,13 +483,13 @@ vk::ImageAspectFlags Image::AspectFromFormat(const vk::Format format)
 	case vk::Format::eD32SfloatS8Uint:
 		return vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
 
-	// Depth‑only formats
+	// Depth-only formats
 	case vk::Format::eD16Unorm:
 	case vk::Format::eD32Sfloat:
 	case vk::Format::eX8D24UnormPack32:
 		return vk::ImageAspectFlagBits::eDepth;
 
-	// Stencil‑only
+	// Stencil-only
 	case vk::Format::eS8Uint:
 		return vk::ImageAspectFlagBits::eStencil;
 
