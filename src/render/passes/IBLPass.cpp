@@ -153,22 +153,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		                /*roughnessSq=*/0.0f);
 
 		// Memory barrier: make diffuse cubemap visible (same-layout, kept raw)
-		{
-			const vk::ImageMemoryBarrier2 barrier(
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderWrite,
-				vk::PipelineStageFlagBits2::eComputeShader,
-				vk::AccessFlagBits2::eShaderRead,
-				vk::ImageLayout::eGeneral,
-				vk::ImageLayout::eGeneral,
-				VK_QUEUE_FAMILY_IGNORED,
-				VK_QUEUE_FAMILY_IGNORED,
-				*diffuseOut.ImageHandle(),
-				diffuseOut.AllSubresources());
-			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-			cmdBufs[0].pipelineBarrier2(depInfo);
-		}
-
+		Barrier::Transition(*cmdBufs[0], diffuseOut, ImageState::ColorShaderRead);
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));

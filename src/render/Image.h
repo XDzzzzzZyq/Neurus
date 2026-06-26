@@ -130,16 +130,26 @@ public:
 	/**
 	 * @brief Reads image data from the GPU back into an ImageData.
 	 *
-	 * The image must be in ImageState::TransferSrc.  Creates a transient
-	 * command buffer, records vkCmdCopyImageToBuffer into a staging buffer,
-	 * submits, waits, and returns the pixel data as ImageData.
+	 * Transitions the specified subresource range to ImageState::TransferSrc,
+	 * records vkCmdCopyImageToBuffer into a staging buffer, submits, waits,
+	 * and returns the pixel data as ImageData.
 	 *
+	 * The image is left in ImageState::TransferSrc after the call.
+	 * The caller is responsible for transitioning back if needed.
+	 *
+	 * @param device            Logical device.
+	 * @param physicalDevice    Physical device for memory allocation.
+	 * @param queue             Queue for staging upload.
+	 * @param queueFamilyIndex  Queue family index for transient command pools.
+	 * @param subresourceRange  Subresource range to read.  nullptr means
+	 *                          mip level 0, layer 0 only (single layer).
 	 * @return ImageData with the pixel content, or default-constructed on failure.
 	 */
 	ImageData ReadImageData(const vk::raii::Device& device,
 	                        const vk::raii::PhysicalDevice& physicalDevice,
 	                        vk::Queue queue,
-	                        uint32_t queueFamilyIndex) const;
+	                        uint32_t queueFamilyIndex,
+	                        const vk::ImageSubresourceRange* subresourceRange = nullptr);
 
 	// --- Getters ---
 

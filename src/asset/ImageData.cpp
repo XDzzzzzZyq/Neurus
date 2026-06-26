@@ -171,19 +171,20 @@ ImageData::ImageData(const std::string& path)
 	LoadFromPath(path);
 }
 
-ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt)
+ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
+                     uint32_t arrayLayers)
 	: m_width(w)
 	, m_height(h)
 	, m_format(fmt)
 {
-	if (!data || w == 0 || h == 0)
+	if (!data || w == 0 || h == 0 || arrayLayers == 0)
 		return;
 
 	const uint32_t bpp = PixelByteSize(fmt);
 	if (bpp == 0)
 		return;
 
-	const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * bpp;
+	const size_t byteCount = static_cast<size_t>(w) * h * bpp * arrayLayers;
 	m_pixelData.resize(byteCount);
 	std::memcpy(m_pixelData.data(), data, byteCount);
 }

@@ -16,6 +16,8 @@
 
 #include "shared/TestVulkanShared.h"
 
+#include "shared/TestReferenceImage.h"
+
 #include "asset/ImageData.h"
 #include "render/Barrier.h"
 #include "render/ComputePipelineBuilder.h"
@@ -44,11 +46,6 @@
 #endif
 
 using namespace neurus;
-
-// ---------------------------------------------------------------------------
-// Reference output directory (relative to test working dir = build/debug/test/)
-// ---------------------------------------------------------------------------
-static const char* kReferenceDir = "../../../test/render/reference/ibl/";
 
 // ---------------------------------------------------------------------------
 // Test fixture
@@ -346,107 +343,8 @@ protected:
 	}
 
 	// -------------------------------------------------------------------
-	// Readback helpers
-	// -------------------------------------------------------------------
-
-	std::vector<float> readbackFloatImage(Image& img,
-	                                       uint32_t width, uint32_t height)
-	{
-		auto& dev = *m_device;
-		auto& pd  = PhysicalDevice();
-
-		const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(width) * height * 16;
-		vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
-		vk::raii::Buffer stagingBuf(dev, stagingCI);
-
-		auto memReqs = stagingBuf.getMemoryRequirements();
-		const uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
-			vk::MemoryPropertyFlagBits::eHostVisible |
-			vk::MemoryPropertyFlagBits::eHostCoherent);
-		vk::raii::DeviceMemory stagingMem(dev, vk::MemoryAllocateInfo(memReqs.size, memType));
-		stagingBuf.bindMemory(*stagingMem, 0);
-
-		auto& cmd = BeginCmd();
-
-		// Transition to TRANSFER_SRC
-		Barrier::Transition(*cmd, img, ImageState::TransferSrc);
-
-		vk::BufferImageCopy copyRegion(0, 0, 0,
-			vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-			vk::Offset3D(0, 0, 0),
-			vk::Extent3D(width, height, 1));
-		cmd.copyImageToBuffer(*img.ImageHandle(), vk::ImageLayout::eTransferSrcOptimal,
-		                       *stagingBuf, {copyRegion});
-
-		vk::MemoryBarrier memBarrier(vk::AccessFlagBits::eTransferWrite,
-		                             vk::AccessFlagBits::eHostRead);
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-		                    vk::PipelineStageFlagBits::eHost,
-		                    {}, {memBarrier}, {}, {});
-		EndSubmitWait(cmd);
-
-		std::vector<float> result(static_cast<size_t>(width) * height * 4);
-		void* mapped = stagingMem.mapMemory(0, bufSize);
-		std::memcpy(result.data(), mapped, static_cast<size_t>(bufSize));
-		stagingMem.unmapMemory();
-		return result;
-	}
-
-	std::vector<float> readbackCubemapFaces(Image& cubeImg)
-	{
-		auto& dev = *m_device;
-		auto& pd  = PhysicalDevice();
-		const uint32_t faceRes = kCubeFaceRes;
-
-		const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(faceRes) * faceRes * 6 * 16;
-		vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
-		vk::raii::Buffer stagingBuf(dev, stagingCI);
-
-		auto memReqs = stagingBuf.getMemoryRequirements();
-		const uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
-			vk::MemoryPropertyFlagBits::eHostVisible |
-			vk::MemoryPropertyFlagBits::eHostCoherent);
-		vk::raii::DeviceMemory stagingMem(dev, vk::MemoryAllocateInfo(memReqs.size, memType));
-		stagingBuf.bindMemory(*stagingMem, 0);
-
-		auto& cmd = BeginCmd();
-
-		// Transition to TRANSFER_SRC (all 6 faces)
-		vk::ImageSubresourceRange cubeTransRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
-		Barrier::Transition(*cmd, cubeImg, ImageState::TransferSrc, cubeTransRange);
-
-		// Copy all 6 faces (layerCount = 6)
-		vk::BufferImageCopy copyRegion(0, 0, 0,
-			vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 6),
-			vk::Offset3D(0, 0, 0),
-			vk::Extent3D(faceRes, faceRes, 1));
-		cmd.copyImageToBuffer(*cubeImg.ImageHandle(), vk::ImageLayout::eTransferSrcOptimal,
-		                       *stagingBuf, {copyRegion});
-
-		vk::MemoryBarrier memBarrier(vk::AccessFlagBits::eTransferWrite,
-		                             vk::AccessFlagBits::eHostRead);
-		cmd.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-		                    vk::PipelineStageFlagBits::eHost,
-		                    {}, {memBarrier}, {}, {});
-		EndSubmitWait(cmd);
-
-		std::vector<float> result(static_cast<size_t>(faceRes) * faceRes * 6 * 4);
-		void* mapped = stagingMem.mapMemory(0, bufSize);
-		std::memcpy(result.data(), mapped, static_cast<size_t>(bufSize));
-		stagingMem.unmapMemory();
-		return result;
-	}
-
-	// -------------------------------------------------------------------
 	// Utility
 	// -------------------------------------------------------------------
-
-	static void ensureDir(const std::string& filePath)
-	{
-		const auto parent = std::filesystem::path(filePath).parent_path();
-		if (!parent.empty() && !std::filesystem::exists(parent))
-			std::filesystem::create_directories(parent);
-	}
 
 	// -------------------------------------------------------------------
 	// Member state
@@ -498,7 +396,9 @@ TEST_F(IBLConversionTest, E2C_C2E_Roundtrip_ProducesMatchingPixels)
 	runC2E(*m_cubemapImage, *m_outputEquirect);
 
 	// Read back result
-	auto resultPixels = readbackFloatImage(*m_outputEquirect, kEquiWidth, kEquiHeight);
+	auto resultData = m_outputEquirect->ReadImageData(
+		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	const float* resultPixels = reinterpret_cast<const float*>(resultData.GetPixelData().data());
 
 	// Compare with tolerance (bilinear filtering in both directions causes precision loss)
 	const float kTolerance = 0.15f;
@@ -540,19 +440,22 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsHDR_ProducesValidFiles)
 	                                        "IBLTest_HDR_Src");
 	runE2C(*equiImg, *m_cubemapImage);
 
-	// Read back cubemap faces
-	auto cubeData = readbackCubemapFaces(*m_cubemapImage);
+	// Read back cubemap faces (all 6 layers)
+	vk::ImageSubresourceRange cubeAll(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
+	auto cubeData = m_cubemapImage->ReadImageData(
+		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily, &cubeAll);
+	const float* cubeFloats = reinterpret_cast<const float*>(cubeData.GetPixelData().data());
 	const size_t faceFloats = static_cast<size_t>(kCubeFaceRes) * kCubeFaceRes * 4;
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
 
-	const std::string outDir = kReferenceDir;
-	ensureDir(outDir + "faces.hdr/.");
+	const std::string outDir = std::string(neurus::test::kReferenceDir) + "ibl/";
+	std::filesystem::create_directories(std::filesystem::path(outDir + "faces.hdr"));
 
 	for (int face = 0; face < 6; ++face)
 	{
 		const std::string path = outDir + "faces.hdr/cube_face_" + kFaceNames[face] + ".hdr";
-		const float* faceData = cubeData.data() + face * faceFloats;
+		const float* faceData = cubeFloats + face * faceFloats;
 		ImageData faceImg(faceData, kCubeFaceRes, kCubeFaceRes, vk::Format::eR32G32B32A32Sfloat);
 		bool saved = faceImg.SaveHDR(path);
 		EXPECT_TRUE(saved) << "Failed to save HDR face " << kFaceNames[face];
@@ -579,10 +482,9 @@ TEST_F(IBLConversionTest, SaveHDRFloatImage_ProducesValidHDRFile)
 {
 	auto pixels = GenerateEquirectGradient(64, 32);
 
-	const std::string outDir = kReferenceDir;
-	ensureDir(outDir + ".");
+	const std::string hdrPath = std::string(neurus::test::kReferenceDir) + "ibl/test_gradient.hdr";
+	std::filesystem::create_directories(std::filesystem::path(hdrPath).parent_path());
 
-	const std::string hdrPath = outDir + "test_gradient.hdr";
 	ImageData gradientImg(pixels.data(), 64, 32, vk::Format::eR32G32B32A32Sfloat);
 	bool saved = gradientImg.SaveHDR(hdrPath);
 	EXPECT_TRUE(saved) << "Failed to save HDR file";
@@ -622,14 +524,16 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 	runE2C(*equiImg, *m_cubemapImage);
 
 	// Read back cubemap faces as RGBA32F
-	auto cubeData = readbackCubemapFaces(*m_cubemapImage);
-	const auto* halfData = reinterpret_cast<const uint16_t*>(cubeData.data());
+	vk::ImageSubresourceRange cubeAll(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
+	auto cubeData = m_cubemapImage->ReadImageData(
+		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily, &cubeAll);
+	const auto* halfData = reinterpret_cast<const uint16_t*>(cubeData.GetPixelData().data());
 	const size_t facePixelCount = static_cast<size_t>(kCubeFaceRes) * kCubeFaceRes;
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
 
-	const std::string outDir = kReferenceDir;
-	ensureDir(outDir + "faces.png/.");
+	const std::string outDir = std::string(neurus::test::kReferenceDir) + "ibl/";
+	std::filesystem::create_directories(std::filesystem::path(outDir + "faces.png"));
 
 	for (int face = 0; face < 6; ++face)
 	{

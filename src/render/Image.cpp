@@ -392,9 +392,10 @@ void Image::UploadImageData(const vk::raii::Device& device,
 // ---------------------------------------------------------------------------
 
 ImageData Image::ReadImageData(const vk::raii::Device& device,
-                               const vk::raii::PhysicalDevice& physicalDevice,
-                               vk::Queue queue,
-                               uint32_t queueFamilyIndex) const
+                                const vk::raii::PhysicalDevice& physicalDevice,
+                                vk::Queue queue,
+                                uint32_t queueFamilyIndex,
+                                const vk::ImageSubresourceRange* subresourceRange)
 {
 	const uint32_t bytesPerPixel = ImageData::PixelByteSize(m_format);
 
@@ -404,8 +405,16 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 		return ImageData();
 	}
 
+	// Determine what to read (default: mip 0, layer 0)
+	const auto range = subresourceRange
+		? *subresourceRange
+		: vk::ImageSubresourceRange(AspectFromFormat(m_format), 0, 1, 0, 1);
+
+	const uint32_t layerCount = range.layerCount;
+	const uint32_t baseLayer  = range.baseArrayLayer;
+
 	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(m_extent.width) *
-	                                 m_extent.height * bytesPerPixel;
+	                                 m_extent.height * bytesPerPixel * layerCount;
 
 	// --- Staging buffer ---
 	vk::BufferCreateInfo stagingCI({}, imageSize, vk::BufferUsageFlagBits::eTransferDst);
@@ -429,17 +438,21 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 
 	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-	auto vulkanState = Barrier::ToVulkanImageState(ImageState::TransferSrc);
+	// --- Transition the requested subresource range to TransferSrc ---
+	Barrier::Transition(*cmdBufs[0], *this, ImageState::TransferSrc, range);
 
+	// --- Copy image to buffer ---
 	vk::BufferImageCopy copyRegion;
-	copyRegion.bufferOffset = 0;
-	copyRegion.bufferRowLength = 0;
+	copyRegion.bufferOffset      = 0;
+	copyRegion.bufferRowLength   = 0;
 	copyRegion.bufferImageHeight = 0;
-	copyRegion.imageSubresource = vk::ImageSubresourceLayers(AspectFromFormat(m_format), 0, 0, 1);
+	copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
+		AspectFromFormat(m_format), range.baseMipLevel, baseLayer, layerCount);
 	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 	copyRegion.imageExtent = vk::Extent3D(m_extent.width, m_extent.height, 1);
 
-	cmdBufs[0].copyImageToBuffer(*m_image, vulkanState.layout, *stagingBuffer, copyRegion);
+	cmdBufs[0].copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal,
+	                             *stagingBuffer, { copyRegion });
 
 	vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite,
 	                          vk::AccessFlagBits::eHostRead);
@@ -454,7 +467,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	queue.waitIdle();
 
 	void* mapped = stagingMemory.mapMemory(0, imageSize);
-	ImageData result(mapped, m_extent.width, m_extent.height, m_format);
+	ImageData result(mapped, m_extent.width, m_extent.height, m_format, layerCount);
 	stagingMemory.unmapMemory();
 
 	return result;

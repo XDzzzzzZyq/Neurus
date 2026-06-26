@@ -39,12 +39,15 @@ public:
 
 	/**
 	 * @brief Constructs ImageData from raw pixel data, copying it into the owned vector.
-	 * @param data Non-owning pointer to raw pixel bytes.
-	 * @param w    Image width in pixels.
-	 * @param h    Image height in pixels.
-	 * @param fmt  Vulkan pixel format.
+	 * @param data        Non-owning pointer to raw pixel bytes.
+	 * @param w           Image width in pixels.
+	 * @param h           Image height in pixels.
+	 * @param fmt         Vulkan pixel format.
+	 * @param arrayLayers Number of array layers (default 1). Total copy size is
+	 *                    w * h * PixelByteSize(fmt) * arrayLayers.
 	 */
-	ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt);
+	ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
+	          uint32_t arrayLayers = 1);
 
 	// --- Validity ---
 
@@ -123,7 +126,7 @@ private:
 
 	// --- Data ---
 
-	std::vector<uint8_t> m_pixelData;  ///< Owning pixel data (format-dependent byte count)
+	std::vector<uint8_t> m_pixelData;  ///< Owning pixel data (raw bytes, format-dependent byte count)
 	uint32_t m_width = 0;
 	uint32_t m_height = 0;
 	vk::Format m_format = vk::Format::eUndefined;
