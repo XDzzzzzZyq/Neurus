@@ -396,24 +396,10 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
-	// --- 7. Memory barrier: make SSAO output visible for lighting pass ---
+	// --- 7. Transition SSAO output: General → ShaderRead for lighting pass ---
 	{
-		const auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
-		const vk::ImageMemoryBarrier2 barrier(
-			vk::PipelineStageFlagBits2::eComputeShader,          // srcStage
-			vk::AccessFlagBits2::eShaderWrite,                    // srcAccess
-			vk::PipelineStageFlagBits2::eComputeShader,            // dstStage
-			vk::AccessFlagBits2::eShaderRead,                      // dstAccess
-			vk::ImageLayout::eGeneral,                             // oldLayout
-			vk::ImageLayout::eGeneral,                             // newLayout
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			*ssaoAtt.ImageHandle(),
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                          0, 1, 0, 1));
-
-		const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-		cmdBuf.pipelineBarrier2(depInfo);
+		auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
+		Barrier::Transition(cmdBuf, ssaoAtt, ImageState::ColorShaderRead);
 	}
 }
 
