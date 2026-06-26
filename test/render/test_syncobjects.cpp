@@ -36,27 +36,27 @@ TEST_F(SyncObjectsDeviceTest, Barrier_ToVulkanImageState_Basic)
 	Image image(*m_device, pd, {64, 64}, vk::Format::eR8G8B8A8Unorm,
 	            vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, 1);
 
-	auto state = Barrier::ToVulkanImageState(ImageState::Undefined, image);
+	auto state = Barrier::ToVulkanImageState(ImageState::Undefined);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eUndefined);
 	EXPECT_EQ(state.stage, vk::PipelineStageFlagBits2::eTopOfPipe);
 	EXPECT_EQ(state.access, vk::AccessFlagBits2::eNone);
 
-	state = Barrier::ToVulkanImageState(ImageState::ColorAttachment, image);
+	state = Barrier::ToVulkanImageState(ImageState::ColorAttachment);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eColorAttachmentOptimal);
 
-	state = Barrier::ToVulkanImageState(ImageState::TransferSrc, image);
+	state = Barrier::ToVulkanImageState(ImageState::TransferSrc);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eTransferSrcOptimal);
 
-	state = Barrier::ToVulkanImageState(ImageState::TransferDst, image);
+	state = Barrier::ToVulkanImageState(ImageState::TransferDst);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eTransferDstOptimal);
 
-	state = Barrier::ToVulkanImageState(ImageState::ShaderRead, image);
+	state = Barrier::ToVulkanImageState(ImageState::ColorShaderRead);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eShaderReadOnlyOptimal);
 
-	state = Barrier::ToVulkanImageState(ImageState::ShaderWrite, image);
+	state = Barrier::ToVulkanImageState(ImageState::ShaderWrite);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eGeneral);
 
-	state = Barrier::ToVulkanImageState(ImageState::Present, image);
+	state = Barrier::ToVulkanImageState(ImageState::Present);
 	EXPECT_EQ(state.layout, vk::ImageLayout::ePresentSrcKHR);
 }
 
@@ -72,7 +72,7 @@ TEST_F(SyncObjectsDeviceTest, Barrier_ToVulkanImageState_DepthShaderRead)
 	            vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 	            1, Image::ImageType::eDepthStencil);
 
-	auto state = Barrier::ToVulkanImageState(ImageState::ShaderRead, image);
+	auto state = Barrier::ToVulkanImageState(ImageState::DepthShaderRead);
 	EXPECT_EQ(state.layout, vk::ImageLayout::eDepthStencilReadOnlyOptimal);
 }
 

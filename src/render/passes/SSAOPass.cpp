@@ -350,7 +350,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 		for (size_t i = 0; i < 3; ++i)
 		{
 			auto& attachment = cache.GetAttachment(gBufferInputs[i], renderExtent);
-			Barrier::Transition(cmdBuf, attachment, ImageState::ShaderRead);
+			Barrier::Transition(cmdBuf, attachment, ImageState::ColorShaderRead);
 		}
 
 		// SSAO attachment: current state → ShaderWrite (compute write)

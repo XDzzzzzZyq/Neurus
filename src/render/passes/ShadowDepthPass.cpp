@@ -418,10 +418,10 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		}
 	}
 
-	// Transition cubemap to ShaderRead for sampling in subsequent passes
+	// Transition cubemap to DepthShaderRead for sampling in subsequent passes
 	{
 		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
-		Barrier::Transition(cmdBuf, cubemap, ImageState::ShaderRead);
+		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
 	}
 }
 

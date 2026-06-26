@@ -29,8 +29,9 @@ enum class ImageState
 	ColorAttachment, ///< Color render target
 	DepthAttachment, ///< Depth/stencil render target
 
-	ShaderRead,      ///< Sampled or input attachment read in shaders
-	ShaderWrite,     ///< Storage image write in compute shaders
+	ColorShaderRead,  ///< Sampled/input attachment read for color images
+	DepthShaderRead,  ///< Sampled/input attachment read for depth images
+	ShaderWrite,      ///< Storage image write in compute shaders
 
 	Present,         ///< Ready for presentation
 };
@@ -88,7 +89,7 @@ public:
 	 *
 	 * Uses ImageData for dimensions, format, and pixel content.  Automatically
 	 * creates the image, uploads pixel data via staging buffer, and leaves the
-	 * image in ImageState::ShaderRead.
+	 * image in ImageState::ColorShaderRead.
 	 *
 	 * @param device          Logical device.
 	 * @param physicalDevice  Physical device for memory allocation.
@@ -117,7 +118,7 @@ public:
 	 * @brief Generates mipmaps via vkCmdBlitImage.
 	 *
 	 * The image must be in ImageState::TransferDst (all levels).  Level 0 is
-	 * blitted to level 1, then 1→2, etc.  All levels end in ImageState::ShaderRead.
+	 * blitted to level 1, then 1→2, etc.  All levels end in ImageState::ColorShaderRead.
 	 *
 	 * @note The image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT and
 	 *       VK_IMAGE_USAGE_TRANSFER_DST_BIT.
@@ -182,8 +183,22 @@ public:
 	/** @brief Current logical image state (updated by Barrier::Transition). */
 	ImageState State() const { return m_state; }
 
-	/** @brief Default subresource range covering the full image. */
-	const vk::ImageSubresourceRange& SubresourceRange() const { return m_subresourceRange; }
+	// --- Subresource range helpers ---
+
+	/** @brief Subresource range covering the entire image (all mips, all layers). */
+	vk::ImageSubresourceRange AllSubresources() const;
+
+	/** @brief Subresource range for a single mip level (all layers). */
+	vk::ImageSubresourceRange Mip(uint32_t level) const;
+
+	/** @brief Subresource range for a contiguous range of mip levels (all layers). */
+	vk::ImageSubresourceRange Mips(uint32_t base, uint32_t count) const;
+
+	/** @brief Subresource range for a single array layer (all mips). */
+	vk::ImageSubresourceRange Layer(uint32_t layer) const;
+
+	/** @brief Subresource range for a contiguous range of array layers (all mips). */
+	vk::ImageSubresourceRange Layers(uint32_t base, uint32_t count) const;
 
 private:
 	// --- Construction helpers ---
@@ -200,7 +215,7 @@ private:
 	 *
 	 * Creates a host-visible staging buffer, copies the pixel data to it,
 	 * records vkCmdCopyBufferToImage, submits, and waits.
-	 * Transitions: Undefined → TransferDst → (copy) → ShaderRead.
+	 * Transitions: Undefined → TransferDst → (copy) → ColorShaderRead.
 	 */
 	void UploadImageData(const vk::raii::Device& device,
 	                     const vk::raii::PhysicalDevice& physicalDevice,
@@ -234,7 +249,6 @@ private:
 	uint32_t m_mipLevels = 1;
 	uint32_t m_arrayLayers = 1;
 	ImageType m_imageType = ImageType::e2D;
-	vk::ImageSubresourceRange m_subresourceRange{};
 
 	// --- State tracking ---
 	ImageState m_state = ImageState::Undefined;

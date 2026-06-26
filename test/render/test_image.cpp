@@ -143,7 +143,7 @@ TEST_F(ImageTest, TransitionLayout_Basic)
 		Barrier::Transition(*cmd, image, ImageState::ColorAttachment);
 
 		// ColorAttachment → ShaderRead
-		Barrier::Transition(*cmd, image, ImageState::ShaderRead);
+		Barrier::Transition(*cmd, image, ImageState::ColorShaderRead);
 		EndSubmitWait(cmd);
 	}
 

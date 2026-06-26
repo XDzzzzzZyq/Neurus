@@ -31,15 +31,6 @@ Image::Image(const vk::raii::Device& device,
 	allocateAndBindMemory(device, physicalDevice);
 	createImageView(device, debugName);
 
-	// --- Populate subresource range ---
-	m_subresourceRange = vk::ImageSubresourceRange(
-		AspectFromFormat(m_format),
-		0,               // baseMipLevel
-		m_mipLevels,     // levelCount
-		0,               // baseArrayLayer
-		m_arrayLayers    // layerCount
-	);
-
 	if (m_imageType == ImageType::eCube)
 	{
 		createFaceViews(device);
@@ -289,8 +280,8 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 		blit.dstOffsets[0] = vk::Offset3D(0, 0, 0);
 		blit.dstOffsets[1] = vk::Offset3D(dstWidth, dstHeight, 1);
 
-		auto vulkanSrcState = Barrier::ToVulkanImageState(ImageState::TransferSrc, *this);
-		auto vulkanDstState = Barrier::ToVulkanImageState(ImageState::TransferDst, *this);
+		auto vulkanSrcState = Barrier::ToVulkanImageState(ImageState::TransferSrc);
+		auto vulkanDstState = Barrier::ToVulkanImageState(ImageState::TransferDst);
 
 		cmdBuf.blitImage(
 			*m_image, vulkanSrcState.layout,
@@ -302,7 +293,7 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 		m_state = ImageState::TransferSrc;
 		{
 			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, m_arrayLayers);
-			Barrier::Transition(*cmdBuf, *this, ImageState::ShaderRead, range);
+			Barrier::Transition(*cmdBuf, *this, ImageState::ColorShaderRead, range);
 		}
 
 		mipWidth  = dstWidth;
@@ -313,11 +304,11 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 	m_state = ImageState::TransferDst;
 	{
 		vk::ImageSubresourceRange lastRange(aspect, m_mipLevels - 1, 1, 0, m_arrayLayers);
-		Barrier::Transition(*cmdBuf, *this, ImageState::ShaderRead, lastRange);
+		Barrier::Transition(*cmdBuf, *this, ImageState::ColorShaderRead, lastRange);
 	}
 
 	// Update CPU-side state tracking to reflect the final layout
-	m_state = ImageState::ShaderRead;
+	m_state = ImageState::ColorShaderRead;
 }
 
 // ---------------------------------------------------------------------------
@@ -383,11 +374,11 @@ void Image::UploadImageData(const vk::raii::Device& device,
 	// --- Transition mip level 0 TransferDst → ShaderRead (only the uploaded mip) ---
 	{
 		vk::ImageSubresourceRange mip0Range(AspectFromFormat(m_format), 0, 1, 0, m_arrayLayers);
-		Barrier::Transition(*cmdBufs[0], *this, ImageState::ShaderRead, mip0Range);
+		Barrier::Transition(*cmdBufs[0], *this, ImageState::ColorShaderRead, mip0Range);
 	}
 
 	// Update CPU-side state tracking (other mips stay in TransferDst for mipmap generation)
-	m_state = ImageState::ShaderRead;
+	m_state = ImageState::ColorShaderRead;
 
 	cmdBufs[0].end();
 
@@ -438,7 +429,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 
 	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-	auto vulkanState = Barrier::ToVulkanImageState(ImageState::TransferSrc, *this);
+	auto vulkanState = Barrier::ToVulkanImageState(ImageState::TransferSrc);
 
 	vk::BufferImageCopy copyRegion;
 	copyRegion.bufferOffset = 0;
@@ -553,6 +544,35 @@ void Image::createMultiviewView(const vk::raii::Device& device)
 		vk::ComponentMapping(),
 		vk::ImageSubresourceRange(aspect, 0, 1, 0, 6));
 	m_multiviewView = vk::raii::ImageView(device, ci);
+}
+
+// ---------------------------------------------------------------------------
+// Subresource range helpers
+// ---------------------------------------------------------------------------
+
+vk::ImageSubresourceRange Image::AllSubresources() const
+{
+	return { AspectFromFormat(m_format), 0, m_mipLevels, 0, m_arrayLayers };
+}
+
+vk::ImageSubresourceRange Image::Mip(uint32_t level) const
+{
+	return { AspectFromFormat(m_format), level, 1, 0, m_arrayLayers };
+}
+
+vk::ImageSubresourceRange Image::Mips(uint32_t base, uint32_t count) const
+{
+	return { AspectFromFormat(m_format), base, count, 0, m_arrayLayers };
+}
+
+vk::ImageSubresourceRange Image::Layer(uint32_t layer) const
+{
+	return { AspectFromFormat(m_format), 0, m_mipLevels, layer, 1 };
+}
+
+vk::ImageSubresourceRange Image::Layers(uint32_t base, uint32_t count) const
+{
+	return { AspectFromFormat(m_format), 0, m_mipLevels, base, count };
 }
 
 } // namespace neurus

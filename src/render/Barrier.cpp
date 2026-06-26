@@ -6,7 +6,7 @@ namespace neurus {
 // ToVulkanImageState
 // ---------------------------------------------------------------------------
 
-VulkanImageState Barrier::ToVulkanImageState(ImageState state, const Image& image)
+VulkanImageState Barrier::ToVulkanImageState(ImageState state)
 {
 	switch (state)
 	{
@@ -41,25 +41,26 @@ VulkanImageState Barrier::ToVulkanImageState(ImageState state, const Image& imag
 	case ImageState::DepthAttachment:
 		return {
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::PipelineStageFlagBits2::eEarlyFragmentTests,
+			vk::PipelineStageFlagBits2::eEarlyFragmentTests |
+			    vk::PipelineStageFlagBits2::eLateFragmentTests,
 			vk::AccessFlagBits2::eDepthStencilAttachmentWrite
 		};
 
-	case ImageState::ShaderRead:
-		{
-			const bool isDepth = (image.Format() == vk::Format::eD16Unorm ||
-			                      image.Format() == vk::Format::eD32Sfloat ||
-			                      image.Format() == vk::Format::eD16UnormS8Uint ||
-			                      image.Format() == vk::Format::eD24UnormS8Uint ||
-			                      image.Format() == vk::Format::eD32SfloatS8Uint ||
-			                      image.Format() == vk::Format::eX8D24UnormPack32);
-			return {
-				isDepth ? vk::ImageLayout::eDepthStencilReadOnlyOptimal
-				        : vk::ImageLayout::eShaderReadOnlyOptimal,
-				vk::PipelineStageFlagBits2::eFragmentShader,
-				vk::AccessFlagBits2::eShaderRead
-			};
-		}
+	case ImageState::ColorShaderRead:
+		return {
+			vk::ImageLayout::eShaderReadOnlyOptimal,
+			vk::PipelineStageFlagBits2::eFragmentShader |
+			    vk::PipelineStageFlagBits2::eComputeShader,
+			vk::AccessFlagBits2::eShaderRead
+		};
+
+	case ImageState::DepthShaderRead:
+		return {
+			vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+			vk::PipelineStageFlagBits2::eFragmentShader |
+			    vk::PipelineStageFlagBits2::eComputeShader,
+			vk::AccessFlagBits2::eShaderRead
+		};
 
 	case ImageState::ShaderWrite:
 		return {
@@ -92,7 +93,7 @@ void Barrier::Transition(VkCommandBuffer cmd,
                           Image& image,
                           ImageState after)
 {
-	Transition(cmd, image, after, image.m_subresourceRange);
+	Transition(cmd, image, after, image.AllSubresources());
 	image.m_state = after;
 }
 
@@ -107,8 +108,8 @@ void Barrier::Transition(VkCommandBuffer cmd,
 {
 	const ImageState before = image.m_state;
 
-	const auto beforeState = ToVulkanImageState(before, image);
-	const auto afterState  = ToVulkanImageState(after, image);
+	const auto beforeState = ToVulkanImageState(before);
+	const auto afterState  = ToVulkanImageState(after);
 
 	const vk::ImageMemoryBarrier2 barrier(
 		beforeState.stage,

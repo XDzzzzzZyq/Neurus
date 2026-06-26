@@ -155,7 +155,7 @@ All image layout transitions **MUST** go through `Barrier::Transition()`, never 
 
 ```cpp
 // DO: use Barrier
-Barrier::Transition(cmdBuf, myImage, ImageState::ShaderRead);
+Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 
 // DON'T: raw Vulkan barriers on Image objects
 // vk::ImageMemoryBarrier2 barrier(...); cmd.pipelineBarrier2(...);

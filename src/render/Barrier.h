@@ -24,7 +24,7 @@ struct VulkanImageState
  * for Image objects — use Barrier instead.
  *
  * Usage:
- *   Barrier::Transition(cmdBuf, myImage, ImageState::ShaderRead);
+ *   Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
  */
 class Barrier
 {
@@ -33,10 +33,9 @@ public:
 	 * @brief Converts a logical ImageState to its Vulkan counterparts.
 	 *
 	 * @param state  The logical image state.
-	 * @param image  The image (used to determine depth vs color for ShaderRead).
 	 * @return VulkanImageState with layout, stage, and access.
 	 */
-	static VulkanImageState ToVulkanImageState(ImageState state, const Image& image);
+	static VulkanImageState ToVulkanImageState(ImageState state);
 
 	/**
 	 * @brief Records a pipeline barrier transitioning an Image to a new state.

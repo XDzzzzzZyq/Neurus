@@ -309,7 +309,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		else
 		{
 			// Single mip level: transition directly to SHADER_READ_ONLY
-			Barrier::Transition(*cmdBufs[0], *tex.m_image, ImageState::ShaderRead);
+			Barrier::Transition(*cmdBufs[0], *tex.m_image, ImageState::ColorShaderRead);
 		}
 
 		cmdBufs[0].end();

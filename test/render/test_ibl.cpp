@@ -254,7 +254,7 @@ protected:
 		                       vk::ImageLayout::eTransferDstOptimal, {copyRegion});
 
 		// TransferDst → ShaderRead
-		Barrier::Transition(*cmd, img, ImageState::ShaderRead);
+		Barrier::Transition(*cmd, img, ImageState::ColorShaderRead);
 
 		EndSubmitWait(cmd);
 	}

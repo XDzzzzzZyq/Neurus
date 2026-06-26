@@ -831,7 +831,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 
 		// Transition cubemap → SHADER_READ_ONLY (if not already)
 		{
-			Barrier::Transition(*cmd, cubemap, ImageState::ShaderRead);
+			Barrier::Transition(*cmd, cubemap, ImageState::ColorShaderRead);
 		}
 
 		// Transition equirect → GENERAL

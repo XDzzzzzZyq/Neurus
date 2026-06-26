@@ -130,8 +130,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		// Uses explicit subresource overload — does not update m_state on const input
 		Barrier::Transition(*cmdBufs[0],
 		                    const_cast<Image&>(equirectImage),
-		                    ImageState::ShaderRead,
-		                    equirectImage.SubresourceRange());
+		                    ImageState::ColorShaderRead,
+		                    equirectImage.AllSubresources());
 
 		// Transition diffuse cubemap to ShaderWrite for compute write
 		Barrier::Transition(*cmdBufs[0], diffuseOut, ImageState::ShaderWrite);
@@ -164,7 +164,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 				VK_QUEUE_FAMILY_IGNORED,
 				VK_QUEUE_FAMILY_IGNORED,
 				*diffuseOut.ImageHandle(),
-				diffuseOut.SubresourceRange());
+				diffuseOut.AllSubresources());
 			const vk::DependencyInfo depInfo({}, {}, {}, barrier);
 			cmdBufs[0].pipelineBarrier2(depInfo);
 		}
@@ -241,10 +241,10 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
 		// Diffuse cubemap: ShaderWrite → ShaderRead
-		Barrier::Transition(*cmdBufs[0], diffuseOut, ImageState::ShaderRead);
+		Barrier::Transition(*cmdBufs[0], diffuseOut, ImageState::ColorShaderRead);
 
 		// Specular cubemap (all mips): ShaderWrite → ShaderRead
-		Barrier::Transition(*cmdBufs[0], specularOut, ImageState::ShaderRead);
+		Barrier::Transition(*cmdBufs[0], specularOut, ImageState::ColorShaderRead);
 
 		cmdBufs[0].end();
 
