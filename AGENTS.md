@@ -111,10 +111,6 @@ Follow Karpathy Guidelines. For each task:
    - Visual correctness in the rendered viewport (use screenshots for analysis)
    - Runtime behavior: resize the window, interact with the viewport, verify no deadlocks or freezes.
    Most importantly, the design of test should be comprehensive (mathematical verification, reference image test, etc.), forming a logic chain that proves the correctness of each component.
-
-```
-$output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
-```
 4. Before committing, keep ALL relevant documents and guidances (`.github/instructions/*.md`) updated.
 
 After each development phase, stop and wait for user verification.
