@@ -277,67 +277,19 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 	uint32_t renderWidth,
 	uint32_t renderHeight)
 {
-	const vk::DeviceSize imageByteSize = renderWidth * renderHeight * 8; // RGBA16F = 8 B/px
+	auto& hdrColor = am.GetAttachment(AttachmentName::HDRColor,
+	                                  vk::Extent2D{renderWidth, renderHeight});
 
-	// Staging buffer: host-visible, TRANSFER_DST
-	vk::BufferCreateInfo stagingCI({}, imageByteSize, vk::BufferUsageFlagBits::eTransferDst);
-	vk::raii::Buffer stagingBuf(device, stagingCI);
+	auto imgData = hdrColor.ReadImageData(device, pd, queue, qfi);
 
-	auto stagingMemReqs = stagingBuf.getMemoryRequirements();
-	uint32_t stagingMemTypeIndex = FindMemoryType(pd,
-	                                              stagingMemReqs.memoryTypeBits,
-	                                              vk::MemoryPropertyFlagBits::eHostVisible |
-	                                                  vk::MemoryPropertyFlagBits::eHostCoherent);
-	vk::MemoryAllocateInfo stagingAllocInfo(stagingMemReqs.size, stagingMemTypeIndex);
-	vk::raii::DeviceMemory stagingMem(device, stagingAllocInfo);
-	stagingBuf.bindMemory(*stagingMem, 0);
-
-	// Transition HDR output: GENERAL → TRANSFER_SRC_OPTIMAL
-	{
-		// Transient command pool for one-shot operations
-		vk::raii::CommandPool tempPool(device,
-			vk::CommandPoolCreateInfo(
-				vk::CommandPoolCreateFlagBits::eTransient, qfi));
-		vk::raii::CommandBuffers cmdBufs(device,
-			vk::CommandBufferAllocateInfo(*tempPool,
-				vk::CommandBufferLevel::ePrimary, 1));
-		auto& cmd = cmdBufs[0];
-		cmd.begin(vk::CommandBufferBeginInfo(
-			vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-
-		auto& hdrColor = am.GetAttachment(AttachmentName::HDRColor, vk::Extent2D{renderWidth, renderHeight});
-
-		Barrier::Transition(*cmd, hdrColor, ImageState::TransferSrc);
-
-		// Copy image → buffer
-		vk::BufferImageCopy copyRegion(
-			0, 0, 0,
-			vk::ImageSubresourceLayers(
-				vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-			vk::Offset3D(0, 0, 0),
-			vk::Extent3D(renderWidth, renderHeight, 1));
-
-		cmd.copyImageToBuffer(*hdrColor.ImageHandle(),
-		                      vk::ImageLayout::eTransferSrcOptimal,
-		                      *stagingBuf,
-		                      {copyRegion});
-
-		cmd.end();
-		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		queue.submit(submitInfo, nullptr);
-		device.waitIdle();
-	}
-
-	// Map, convert half-float → float
+	// Convert half-float → float
 	const uint32_t pixelCount = renderWidth * renderHeight;
 	std::vector<float> result(pixelCount * 4);
-	void* mapped = stagingMem.mapMemory(0, imageByteSize);
-	const auto* src = static_cast<const uint16_t*>(mapped);
+	const auto* src = reinterpret_cast<const uint16_t*>(imgData.GetPixelData().data());
 	for (size_t i = 0; i < pixelCount * 4; ++i)
 	{
 		result[i] = HalfToFloat(src[i]);
 	}
-	stagingMem.unmapMemory();
 
 	return result;
 }

@@ -190,7 +190,7 @@ protected:
 	}
 
 	// -------------------------------------------------------------------
-	// Image upload helpers
+	// Image upload helper (delegates to Image::FromImageData)
 	// -------------------------------------------------------------------
 
 	std::unique_ptr<Image> createAndUploadEquirect(const std::vector<float>& pixelData,
@@ -198,62 +198,9 @@ protected:
 	                                                uint32_t height,
 	                                                const char* debugName)
 	{
-		auto& dev = *m_device;
-		auto& pd  = PhysicalDevice();
-
-		auto img = std::make_unique<Image>(
-			dev, pd, vk::Extent2D{width, height},
-			vk::Format::eR32G32B32A32Sfloat,
-			vk::ImageUsageFlagBits::eSampled |
-			    vk::ImageUsageFlagBits::eTransferDst |
-			    vk::ImageUsageFlagBits::eStorage,
-			/*mipLevels=*/1,
-			Image::ImageType::e2D,
-			debugName);
-
-		uploadPixelsToImage(*img, pixelData.data(),
-		                    static_cast<vk::DeviceSize>(pixelData.size() * sizeof(float)),
-		                    width, height);
-		return img;
-	}
-
-	void uploadPixelsToImage(Image& img, const void* data, vk::DeviceSize dataSize,
-	                         uint32_t width, uint32_t height)
-	{
-		auto& dev = *m_device;
-		auto& pd  = PhysicalDevice();
-
-		// Staging buffer
-		vk::BufferCreateInfo stagingCI({}, dataSize, vk::BufferUsageFlagBits::eTransferSrc);
-		vk::raii::Buffer stagingBuf(dev, stagingCI);
-
-		auto memReqs = stagingBuf.getMemoryRequirements();
-		const uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
-			vk::MemoryPropertyFlagBits::eHostVisible |
-			vk::MemoryPropertyFlagBits::eHostCoherent);
-		vk::raii::DeviceMemory stagingMem(dev, vk::MemoryAllocateInfo(memReqs.size, memType));
-		stagingBuf.bindMemory(*stagingMem, 0);
-
-		void* mapped = stagingMem.mapMemory(0, dataSize);
-		std::memcpy(mapped, data, static_cast<size_t>(dataSize));
-		stagingMem.unmapMemory();
-
-		auto& cmd = BeginCmd();
-
-		// Undefined → TransferDst
-		Barrier::Transition(*cmd, img, ImageState::TransferDst);
-
-		vk::BufferImageCopy copyRegion(0, 0, 0,
-			vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-			vk::Offset3D(0, 0, 0),
-			vk::Extent3D(width, height, 1));
-		cmd.copyBufferToImage(*stagingBuf, *img.ImageHandle(),
-		                       vk::ImageLayout::eTransferDstOptimal, {copyRegion});
-
-		// TransferDst → ShaderRead
-		Barrier::Transition(*cmd, img, ImageState::ColorShaderRead);
-
-		EndSubmitWait(cmd);
+		ImageData imgData(pixelData.data(), width, height, vk::Format::eR32G32B32A32Sfloat);
+		return Image::FromImageData(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
+		                            imgData, debugName, vk::ImageUsageFlagBits::eStorage);
 	}
 
 	// -------------------------------------------------------------------

@@ -85,7 +85,8 @@ std::unique_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
                                             vk::Queue queue,
                                             uint32_t queueFamilyIndex,
                                             ImageData& imageData,
-                                            const char* debugName)
+                                            const char* debugName,
+                                            vk::ImageUsageFlags extraUsage)
 {
 	if (!imageData.IsValid())
 	{
@@ -97,7 +98,9 @@ std::unique_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
 		device, physicalDevice,
 		vk::Extent2D{imageData.GetWidth(), imageData.GetHeight()},
 		imageData.GetFormat(),
-		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+		vk::ImageUsageFlagBits::eSampled |
+		    vk::ImageUsageFlagBits::eTransferDst |
+		    extraUsage,
 		1,
 		ImageType::e2D,
 		debugName);

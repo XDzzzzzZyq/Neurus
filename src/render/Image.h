@@ -97,6 +97,7 @@ public:
 	 * @param queueFamilyIndex Queue family index for transient command pools.
 	 * @param imageData       CPU-side image data (moved in, must be valid).
 	 * @param debugName       Optional debug name for the image.
+	 * @param extraUsage      Additional usage flags (OR-ed with Sampled|TransferDst).
 	 * @return A unique pointer to the GPU Image, or nullptr if imageData is invalid.
 	 */
 	static std::unique_ptr<Image> FromImageData(const vk::raii::Device& device,
@@ -104,7 +105,8 @@ public:
 	                                            vk::Queue queue,
 	                                            uint32_t queueFamilyIndex,
 	                                            ImageData& imageData,
-	                                            const char* debugName = "Image");
+	                                            const char* debugName = "Image",
+	                                            vk::ImageUsageFlags extraUsage = {});
 
 	~Image() = default;
 

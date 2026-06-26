@@ -577,60 +577,21 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 
 		cmd.endRendering();
 
-		// Transition color image → TRANSFER_SRC for readback
-		Barrier::Transition(*cmd, tempColor, ImageState::TransferSrc);
-
 		EndSubmitWait(cmd);
 	}
 
 	// -------------------------------------------------------------------
-	// Step 8: Copy color image → staging buffer (float values)
+	// Step 8: Read back color image via ReadImageData (float values)
 	// -------------------------------------------------------------------
-	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRes) * kRes * 4 * sizeof(float);
-
-	vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
-	vk::raii::Buffer stagingBuf(*m_device, stagingCI);
-
-	auto memReqs = stagingBuf.getMemoryRequirements();
-	uint32_t memType = FindHostVisibleMemType(pd, memReqs);
-	ASSERT_LT(memType, UINT32_MAX) << "No host-visible+coherent memory type";
-
-	vk::MemoryAllocateInfo allocInfo(memReqs.size, memType);
-	vk::raii::DeviceMemory stagingMem(*m_device, allocInfo);
-	stagingBuf.bindMemory(*stagingMem, 0);
-
-	{
-		auto& cmd = BeginCmd();
-		vk::BufferImageCopy copyRegion{};
-		copyRegion.bufferOffset      = 0;
-		copyRegion.bufferRowLength   = 0;
-		copyRegion.bufferImageHeight = 0;
-		copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-			vk::ImageAspectFlagBits::eColor, 0, 0, 1);
-		copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
-		copyRegion.imageExtent = vk::Extent3D(kRes, kRes, 1);
-		cmd.copyImageToBuffer(
-			*tempColor.ImageHandle(),
-			vk::ImageLayout::eTransferSrcOptimal,
-			*stagingBuf,
-			copyRegion);
-		EndSubmitWait(cmd);
-	}
-
-	// -------------------------------------------------------------------
-	// Step 9: Map and extract depth values (R channel of float RGBA)
-	// -------------------------------------------------------------------
-	void* mapped = stagingMem.mapMemory(0, bufSize);
+	auto imgData = tempColor.ReadImageData(*m_device, pd, m_queue, m_graphicsQueueFamily);
+	const float* rgbaFloats = reinterpret_cast<const float*>(imgData.GetPixelData().data());
 	std::vector<float> depthData(kRes * kRes);
-	{
-		const float* rgbaFloats = static_cast<const float*>(mapped);
-		for (uint32_t i = 0; i < kRes * kRes; ++i)
-			depthData[i] = rgbaFloats[i * 4];  // R channel = depth
-	}
+	for (uint32_t i = 0; i < kRes * kRes; ++i)
+		depthData[i] = rgbaFloats[i * 4];  // R channel = depth
 
-	// --- Debug: print before unmap ---
+	// --- Debug: first 32 raw bytes + first 8 depth values ---
 	{
-		const uint8_t* rawBytes = static_cast<const uint8_t*>(mapped);
+		const uint8_t* rawBytes = imgData.GetPixelData().data();
 		std::cout << "Raw first 32 bytes (hex): ";
 		for (int i = 0; i < 32; ++i)
 			std::cout << std::hex << static_cast<int>(rawBytes[i]) << " ";
@@ -654,8 +615,6 @@ TEST_F(ShadowCubemapTest, Face3Depth)
 		          << " zeros=" << zeroCount << " ones(approx)=" << oneCount
 		          << " total=" << depthData.size() << std::endl;
 	}
-
-	stagingMem.unmapMemory();
 
 	// -------------------------------------------------------------------
 	// Step 9: Pixel-by-pixel verification
