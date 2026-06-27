@@ -15,7 +15,7 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"

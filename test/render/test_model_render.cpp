@@ -21,11 +21,11 @@
 #include "shared/TestVulkanShared.h"
 
 // Render layer
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
+#include "scene/Material.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/RenderContext.h"
-#include "render/Material.h"
+#include "render/RenderContext.h"
 #include "render/Texture.h"
 #include "asset/ImageData.h"
 #include "render/Texture.h"

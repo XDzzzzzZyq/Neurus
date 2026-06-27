@@ -6,11 +6,11 @@
 #include "DeferredRenderer.h"
 
 #include "Barrier.h"
-#include "passes/RenderCache.h"
+#include "RenderCache.h"
 #include "passes/GeometryPass.h"
 #include "passes/IBLPass.h"
 #include "passes/LightingPass.h"
-#include "passes/RenderContext.h"
+#include "RenderContext.h"
 #include "Image.h"
 #include "Texture.h"
 #include "Screenshot.h"

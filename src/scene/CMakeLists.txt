@@ -7,6 +7,9 @@
 # Consumed by: editor, render, test
 
 	add_library(neurus_scene STATIC
+	Material.h
+	Material.cpp
+	MeshBindings.cpp
 	Camera.h
 	Camera.cpp
 	DefaultScene.h

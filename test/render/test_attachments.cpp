@@ -2,7 +2,7 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
 #include "render/Image.h"
 
 using namespace neurus;

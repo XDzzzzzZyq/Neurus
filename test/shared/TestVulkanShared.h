@@ -15,7 +15,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
 #include "render/Barrier.h"
 
 #include <array>

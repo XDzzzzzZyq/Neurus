@@ -3,13 +3,13 @@
  * @brief Screen-Space Ambient Occlusion compute pass implementation.
  */
 
-#include "passes/RenderCache.h"
+#include "RenderCache.h"
 #include "passes/SSAOPass.h"
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
-#include "passes/RenderContext.h"
+#include "RenderContext.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"

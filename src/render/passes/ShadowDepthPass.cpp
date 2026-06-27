@@ -5,7 +5,7 @@
 
 #include "passes/ShadowDepthPass.h"
 #include "passes/GeometryPass.h"       // for GeometryRenderItem
-#include "passes/RenderCache.h"         // for GetShadowMap
+#include "RenderCache.h"         // for GetShadowMap
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"

@@ -35,9 +35,9 @@ add_library(neurus_render STATIC
 	Texture.cpp
 	PipelineBuilder.h
 	PipelineBuilder.cpp
-	Material.h
-	Material.cpp
-	MeshBindings.cpp
+	RenderCache.h
+	RenderCache.cpp
+	RenderContext.h
 	DeferredRenderer.h
 	DeferredRenderer.cpp
 	Screenshot.h

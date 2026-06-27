@@ -23,7 +23,7 @@
 
 #include "render/passes/ShadowDepthPass.h"
 #include "render/passes/GeometryPass.h"    // for GeometryRenderItem definition
-#include "render/passes/RenderContext.h"
+#include "render/RenderContext.h"
 #include "render/Image.h"
 #include "render/Barrier.h"
 #include "render/PipelineBuilder.h"

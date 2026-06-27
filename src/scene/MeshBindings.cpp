@@ -13,7 +13,7 @@
  */
 
 #include "scene/Mesh.h"
-#include "render/Material.h"
+#include "scene/Material.h"
 
 namespace neurus
 {

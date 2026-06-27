@@ -16,10 +16,10 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
+#include "render/RenderContext.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/RenderContext.h"
 #include "render/buffers/GPUBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"

@@ -20,11 +20,11 @@
 #include "shared/TestDeferredScene.h"
 
 // --- Render layer ---
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
+#include "render/RenderContext.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
-#include "render/passes/RenderContext.h"
-#include "render/Material.h"
+#include "scene/Material.h"
 #include "render/Screenshot.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"

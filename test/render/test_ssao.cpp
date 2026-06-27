@@ -17,9 +17,9 @@
 #include "shared/TestCornellBox.h"
 
 // --- Render layer ---
-#include "render/passes/RenderCache.h"
+#include "render/RenderCache.h"
+#include "render/RenderContext.h"
 #include "render/passes/GeometryPass.h"
-#include "render/passes/RenderContext.h"
 #include "render/passes/SSAOPass.h"
 #include "render/Screenshot.h"
 

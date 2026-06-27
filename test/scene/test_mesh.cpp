@@ -14,7 +14,7 @@
 #include "scene/Transform.h"
 #include "scene/UID.h"
 #include "asset/MeshData.h"
-#include "render/Material.h"
+#include "scene/Material.h"
 
 using namespace neurus;
 

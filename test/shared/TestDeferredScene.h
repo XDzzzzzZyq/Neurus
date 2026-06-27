@@ -25,7 +25,7 @@
 
 #include "Log.h"
 #include "render/passes/GeometryPass.h"
-#include "render/Material.h"
+#include "scene/Material.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 

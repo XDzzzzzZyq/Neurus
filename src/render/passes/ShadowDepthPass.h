@@ -6,7 +6,7 @@
 #pragma once
 
 #include "passes/Pass.h"
-#include "passes/RenderContext.h"
+#include "RenderContext.h"
 #include "../Image.h"
 #include "../DescriptorManager.h"
 #include "../buffers/BufferLayout.h"

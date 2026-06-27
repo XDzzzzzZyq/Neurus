@@ -1,6 +1,6 @@
 #include "Screenshot.h"
 #include "Image.h"
-#include "passes/RenderCache.h"
+#include "RenderCache.h"
 #include "asset/ImageData.h"
 #include "Texture.h"
 #include "render/Barrier.h"

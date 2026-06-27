@@ -6,7 +6,7 @@
 #include "passes/GeometryPass.h"
 
 #include "passes/Pass.h"
-#include "passes/RenderCache.h"
+#include "RenderCache.h"
 #include "render/Barrier.h"
 #include "PipelineBuilder.h"
 #include "shaders/ShaderModule.h"

@@ -1,4 +1,4 @@
-#include "passes/RenderCache.h"
+#include "RenderCache.h"
 
 #include "Log.h"
 

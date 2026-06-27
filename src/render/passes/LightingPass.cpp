@@ -5,8 +5,8 @@
 
 #include "passes/LightingPass.h"
 
-#include "passes/RenderCache.h"
-#include "passes/RenderContext.h"
+#include "RenderCache.h"
+#include "RenderContext.h"
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
