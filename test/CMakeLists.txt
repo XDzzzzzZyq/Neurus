@@ -48,6 +48,7 @@ add_executable(neurus_test
 	scene/test_debug.cpp
 	project/test_project_roundtrip.cpp
 	project/test_default_project.cpp
+	core/test_graph.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE
