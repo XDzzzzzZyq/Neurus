@@ -398,7 +398,8 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
                                 const vk::raii::PhysicalDevice& physicalDevice,
                                 vk::Queue queue,
                                 uint32_t queueFamilyIndex,
-                                const vk::ImageSubresourceRange* subresourceRange)
+                                const vk::ImageSubresourceRange* subresourceRange,
+                                vk::Extent2D readExtent)
 {
 	const uint32_t bytesPerPixel = ImageData::PixelByteSize(m_format);
 
@@ -408,6 +409,11 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 		return ImageData();
 	}
 
+	// Extent to read: explicit override or full image
+	const vk::Extent2D copyExtent = (readExtent.width == 0 && readExtent.height == 0)
+		? m_extent
+		: readExtent;
+
 	// Determine what to read (default: mip 0, layer 0)
 	const auto range = subresourceRange
 		? *subresourceRange
@@ -416,8 +422,8 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	const uint32_t layerCount = range.layerCount;
 	const uint32_t baseLayer  = range.baseArrayLayer;
 
-	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(m_extent.width) *
-	                                 m_extent.height * bytesPerPixel * layerCount;
+	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(copyExtent.width) *
+	                                 copyExtent.height * bytesPerPixel * layerCount;
 
 	// --- Staging buffer ---
 	vk::BufferCreateInfo stagingCI({}, imageSize, vk::BufferUsageFlagBits::eTransferDst);
@@ -452,7 +458,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
 		AspectFromFormat(m_format), range.baseMipLevel, baseLayer, layerCount);
 	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
-	copyRegion.imageExtent = vk::Extent3D(m_extent.width, m_extent.height, 1);
+	copyRegion.imageExtent = vk::Extent3D(copyExtent.width, copyExtent.height, 1);
 
 	cmdBufs[0].copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal,
 	                             *stagingBuffer, { copyRegion });
@@ -470,7 +476,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	queue.waitIdle();
 
 	void* mapped = stagingMemory.mapMemory(0, imageSize);
-	ImageData result(mapped, m_extent.width, m_extent.height, m_format, layerCount);
+	ImageData result(mapped, copyExtent.width, copyExtent.height, m_format, layerCount);
 	stagingMemory.unmapMemory();
 
 	return result;

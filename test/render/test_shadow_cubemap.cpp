@@ -41,31 +41,6 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
-// File-level helpers
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Finds a host-visible, host-coherent memory type index.
- * @param pd         Physical device for memory property query.
- * @param memReqs    Memory requirements from a buffer allocation.
- * @return Memory type index, or UINT32_MAX if none found.
- */
-static uint32_t FindHostVisibleMemType(const vk::raii::PhysicalDevice& pd,
-                                        const vk::MemoryRequirements& memReqs)
-{
-	auto memProps = pd.getMemoryProperties();
-	for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-	{
-		if ((memReqs.memoryTypeBits & (1u << i)) &&
-		    (memProps.memoryTypes[i].propertyFlags &
-		     (vk::MemoryPropertyFlagBits::eHostVisible |
-		      vk::MemoryPropertyFlagBits::eHostCoherent)))
-			return i;
-	}
-	return UINT32_MAX;
-}
-
-// ---------------------------------------------------------------------------
 // Test fixture
 // ---------------------------------------------------------------------------
 
@@ -320,79 +295,28 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		EndSubmitWait(cmd);
 	}
 
-	// Transition cache's colour cubemap to TransferSrc for readback
-	{
-		auto& cmd = BeginCmd();
-		auto& colorCube = m_renderCache->GetShadowColorMap(lightUID, {kRes, kRes});
-		Barrier::Transition(*cmd, colorCube, ImageState::TransferSrc);
-		EndSubmitWait(cmd);
-	}
-
 	// -------------------------------------------------------------------
-	// Step 4: Read back the actual depth cubemap (D32_SFLOAT, not colour)
+	// Step 4: Read back the actual depth cubemap (D32_SFLOAT)
 	// -------------------------------------------------------------------
 	{
 		auto& shadowCubemap = m_renderCache->GetShadowMap(lightUID);
-
-		// Transition depth cubemap from DepthShaderRead → TransferSrc (depth aspect)
-		{
-			auto& cmd = BeginCmd();
-			vk::ImageSubresourceRange depthRange(
-				vk::ImageAspectFlagBits::eDepth, 0, 1, 0, 6);
-			Barrier::Transition(*cmd, shadowCubemap, ImageState::TransferSrc, depthRange);
-			EndSubmitWait(cmd);
-		}
-
-		const vk::DeviceSize depthBufSize =
-			static_cast<vk::DeviceSize>(kRes) * kRes * sizeof(float);  // D32_SFLOAT = 4 bytes/px
-
 		std::cout << "\n=== Depth Cubemap Readback (D32_SFLOAT) ===\n";
 
 		for (uint32_t face = 0; face < 6; ++face)
 		{
-			// Staging buffer (host-visible, host-coherent)
-			vk::BufferCreateInfo stagingCI({}, depthBufSize, vk::BufferUsageFlagBits::eTransferDst);
-			vk::raii::Buffer stagingBuf(*m_device, stagingCI);
-
-			auto memReqs = stagingBuf.getMemoryRequirements();
-			uint32_t memType = FindHostVisibleMemType(pd, memReqs);
-			ASSERT_LT(memType, UINT32_MAX) << "No host-visible+coherent memory type";
-
-			vk::MemoryAllocateInfo allocInfo(memReqs.size, memType);
-			vk::raii::DeviceMemory stagingMem(*m_device, allocInfo);
-			stagingBuf.bindMemory(*stagingMem, 0);
-
-			// Copy depth face → staging buffer (256×256 rendered region only)
-			{
-				auto& cmd = BeginCmd();
-				vk::BufferImageCopy copyRegion{};
-				copyRegion.bufferOffset      = 0;
-				copyRegion.bufferRowLength   = 0;
-				copyRegion.bufferImageHeight = 0;
-				copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-					vk::ImageAspectFlagBits::eDepth, 0, face, 1);
-				copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
-				copyRegion.imageExtent = vk::Extent3D(kRes, kRes, 1);
-				cmd.copyImageToBuffer(
-					*shadowCubemap.ImageHandle(),
-					vk::ImageLayout::eTransferSrcOptimal,
-					*stagingBuf,
-					copyRegion);
-				EndSubmitWait(cmd);
-			}
-
-			// Map and extract float depth (direct memcpy, no RGBA unpack needed)
-			void* mapped = stagingMem.mapMemory(0, depthBufSize);
-			std::vector<float> depthData(kRes * kRes);
-			std::memcpy(depthData.data(), mapped, static_cast<size_t>(depthBufSize));
-			stagingMem.unmapMemory();
+			auto layerRange = shadowCubemap.Layer(face);
+			auto data = shadowCubemap.ReadImageData(
+				*m_device, pd, m_queue, m_graphicsQueueFamily,
+				&layerRange, {kRes, kRes});
+			const float* depthData = reinterpret_cast<const float*>(data.GetPixelData().data());
 
 			// Debug: depth range summary
 			{
 				float minVal = depthData[0], maxVal = depthData[0];
 				int zeroCount = 0, oneCount = 0;
-				for (const float v : depthData)
+				for (uint32_t i = 0; i < kRes * kRes; ++i)
 				{
+					const float v = depthData[i];
 					minVal = std::min(minVal, v);
 					maxVal = std::max(maxVal, v);
 					if (v == 0.0f) zeroCount++;
@@ -400,11 +324,11 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 				}
 				std::cout << "[DepthCubemap Face " << face << "] Depth: min=" << minVal
 				          << " max=" << maxVal << " zeros=" << zeroCount
-				          << " ones~=" << oneCount << " total=" << depthData.size()
+				          << " ones~=" << oneCount << " total=" << (kRes * kRes)
 				          << std::endl;
 			}
 
-			// Pixel-by-pixel mathematical verification (same as colour path)
+			// Pixel-by-pixel mathematical verification
 			int cubePixels  = 0;
 			int planePixels = 0;
 			int bgPixels    = 0;
@@ -460,54 +384,25 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 5: Read back each face layer and verify against expected depth
+	// Step 5: Read back colour cubemap from cache and verify
 	// -------------------------------------------------------------------
-	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRes) * kRes * 4 * sizeof(float);
+	auto& colorCube = m_renderCache->GetShadowColorMap(lightUID, {kRes, kRes});
 	bool anyReferenceGenerated = false;
 
 	for (uint32_t face = 0; face < 6; ++face)
 	{
 		NEURUS_LOG("[AllFacesDepth] Reading back face " << face);
 
-		// 5a. Copy face layer -> staging buffer
-		vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
-		vk::raii::Buffer stagingBuf(*m_device, stagingCI);
+		auto layerRange = colorCube.Layer(face);
+		auto data = colorCube.ReadImageData(
+			*m_device, pd, m_queue, m_graphicsQueueFamily,
+			&layerRange);
+		const float* rgbaFloats = reinterpret_cast<const float*>(data.GetPixelData().data());
 
-		auto memReqs = stagingBuf.getMemoryRequirements();
-		uint32_t memType = FindHostVisibleMemType(pd, memReqs);
-		ASSERT_LT(memType, UINT32_MAX) << "No host-visible+coherent memory type";
-
-		vk::MemoryAllocateInfo allocInfo(memReqs.size, memType);
-		vk::raii::DeviceMemory stagingMem(*m_device, allocInfo);
-		stagingBuf.bindMemory(*stagingMem, 0);
-
-		{
-			auto& cmd = BeginCmd();
-			vk::BufferImageCopy copyRegion{};
-			copyRegion.bufferOffset      = 0;
-			copyRegion.bufferRowLength   = 0;
-			copyRegion.bufferImageHeight = 0;
-			copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-				vk::ImageAspectFlagBits::eColor, 0, face, 1);
-			copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
-			copyRegion.imageExtent = vk::Extent3D(kRes, kRes, 1);
-			auto& colorCube = m_renderCache->GetShadowColorMap(lightUID, {kRes, kRes});
-			cmd.copyImageToBuffer(
-				*colorCube.ImageHandle(),
-				vk::ImageLayout::eTransferSrcOptimal,
-				*stagingBuf,
-				copyRegion);
-			EndSubmitWait(cmd);
-		}
-
-		// 5b. Map and extract depth data (R channel of float RGBA)
-		void* mapped = stagingMem.mapMemory(0, bufSize);
+		// Extract R channel (depth value written by depth_to_color.frag)
 		std::vector<float> depthData(kRes * kRes);
-		{
-			const float* rgbaFloats = static_cast<const float*>(mapped);
-			for (uint32_t i = 0; i < kRes * kRes; ++i)
-				depthData[i] = rgbaFloats[i * 4];
-		}
+		for (uint32_t i = 0; i < kRes * kRes; ++i)
+			depthData[i] = rgbaFloats[i * 4];
 
 		// Debug: depth range summary
 		{
@@ -526,8 +421,6 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			          << std::endl;
 		}
 
-		stagingMem.unmapMemory();
-
 		// 5c. Pixel-by-pixel mathematical verification
 		int cubePixels  = 0;
 		int planePixels = 0;
@@ -542,7 +435,6 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 				const float expected =
 					ComputeExpectedDepth(face, px, py, lightPos, Light::point_shadow_far, kRes, viewPos);
 
-				// Categorize pixel
 				const float sxV = (2.f * static_cast<float>(px) + 1.f) / static_cast<float>(kRes) - 1.f;
 				const float syV = (2.f * static_cast<float>(py) + 1.f) / static_cast<float>(kRes) - 1.f;
 				const glm::vec3 dir = glm::normalize(FaceDirection(face, sxV, syV));
@@ -603,7 +495,6 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 				+ "shadow/CubemapDepth_Face" + std::to_string(face) + ".png";
 			const std::string tmpPath = refPath + ".tmp";
 
-			// Convert depth to u8
 			std::vector<uint8_t> u8Data = DepthToU8(depthData);
 
 			ImageData img(u8Data.data(), kRes, kRes, vk::Format::eR8Unorm);
