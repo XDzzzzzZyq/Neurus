@@ -193,7 +193,8 @@ public:
 	 * @param filenamePrefix Prefix for the output PNG filename.
 	 * @return The output file path on success, empty string on failure.
 	 */
-	std::string ExportShadowDepthEquirect(const std::string& filenamePrefix);
+	std::string ExportShadowDepthEquirect(const std::string& filenamePrefix,
+	                                         const Scene* scene = nullptr);
 
 private:
 	/**
@@ -272,8 +273,6 @@ private:
 	// --- Last acquired swapchain image index (for screenshot) ---
 	uint32_t m_lastImageIndex = 0;
 
-	// --- Active shadow-casting light UID (-1 = none) ---
-	int m_activeShadowLightUID = -1;
 };
 
 } // namespace neurus

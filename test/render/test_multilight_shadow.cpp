@@ -11,8 +11,7 @@
  *   - Second run: compares pixel-by-pixel with ±2 tolerance → PASS/FAIL
  *
  * This is the RED phase of TDD — the test compiles and runs but the shadow
- * passes currently only handle a single light (GetActiveLightUID returns
- * lightUIDs[0]).  The reference generated on first run will reflect
+ * passes initially only handle a single light.  The reference generated on first run will reflect
  * single-shadow behaviour.  When shadow pass loops are implemented
  * (Wave 2-3), the reference must be regenerated.
  *
@@ -164,7 +163,6 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	ctx.renderItems  = &renderItems;
 	ctx.scene        = shadowRes.scene.get();
-	ctx.lightUIDs    = shadowRes.lightUIDs;   // both shadow-casting lights
 
 	// -------------------------------------------------------------------
 	// Step 3: Transition G-Buffer to renderable layouts
@@ -259,7 +257,6 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	ctx.renderItems  = &shadowRes.renderItems;
 	ctx.scene        = shadowRes.scene.get();
-	ctx.lightUIDs    = shadowRes.lightUIDs;
 
 	// -------------------------------------------------------------------
 	// Transition + upload + record

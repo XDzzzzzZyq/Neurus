@@ -20,6 +20,7 @@
 #include "scene/Scene.h"
 
 #include <array>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
@@ -131,7 +132,8 @@ LightingPass::~LightingPass() = default;
 // Light SSBO management
 // ---------------------------------------------------------------------------
 
-void LightingPass::UploadLights(const Scene& scene)
+void LightingPass::UploadLights(const Scene& scene,
+                               const std::unordered_map<int32_t, int>* shadowIndexMap)
 {
 	// Collect only point lights
 	std::vector<PointLightGpu> gpuLights;
@@ -160,6 +162,13 @@ void LightingPass::UploadLights(const Scene& scene)
 		// Lighting parameters
 		gpu.power = light->light_power;
 		gpu.radius = light->light_radius;
+
+		// Shadow map index lookup
+		if (shadowIndexMap)
+		{
+			const auto it = shadowIndexMap->find(id);
+			gpu.shadowMapIndex = (it != shadowIndexMap->end()) ? it->second : -1;
+		}
 
 		gpuLights.push_back(gpu);
 	}
@@ -368,7 +377,21 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const uint32_t frameIndex = ctx.frameIndex;
 
 	// --- 1. Write descriptor set for this frame slot ---
-	m_currentLightUID = ctx.GetActiveLightUID();
+	// Find first shadow-casting point light for shadow intensity binding
+	{
+		m_currentLightUID = -1;
+		if (ctx.scene)
+		{
+			for (const auto& [uid, light] : ctx.scene->light_list)
+			{
+				if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
+				{
+					m_currentLightUID = uid;
+					break;
+				}
+			}
+		}
+	}
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
 	// --- 1b. Write IBL cubemap descriptors (bindings 7-8) from scene Environment or fallback ---
@@ -478,7 +501,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		Barrier::Transition(cmdBuf, ssao, ImageState::ColorShaderRead);
 
 		// ShadowIntensity: if never written (Undefined), clear to 0.0 (no shadow), then ShaderRead
-		auto& shadowAtt = cache.GetShadowIntensity(ctx.GetActiveLightUID(), renderExtent);
+		auto& shadowAtt = cache.GetShadowIntensity(m_currentLightUID, renderExtent);
 		if (shadowAtt.State() == ImageState::Undefined)
 		{
 			Barrier::Transition(cmdBuf, shadowAtt, ImageState::TransferDst);

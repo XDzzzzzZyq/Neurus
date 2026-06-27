@@ -179,7 +179,6 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = cameraPos;
 	ctx.renderItems  = &renderItems;
-	ctx.lightUIDs = {lightUID};
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------

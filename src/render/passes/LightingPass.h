@@ -28,6 +28,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include <memory>
+#include <unordered_map>
 
 namespace neurus {
 
@@ -145,16 +146,20 @@ public:
 	 * @brief Converts scene point lights to PointLightGpu and uploads as SSBO.
 	 *
 	 * Iterates scene.light_list, filters to POINTLIGHT type, converts
-	 * each Light to a PointLightGpu struct (std140, 48 bytes), and
+	 * each Light to a PointLightGpu struct (std140, 64 bytes), and
 	 * uploads the array as a device-local storage buffer.
 	 *
 	 * If the scene has no point lights, the light SSBO is released,
 	 * the descriptor binding uses PARTIALLY_BOUND (no update when null),
 	 * and GetLightCount() returns 0.
 	 *
-	 * @param scene Scene containing the light list.
+	 * @param scene           Scene containing the light list.
+	 * @param shadowIndexMap  Optional map from light UID → shadow map index.
+	 *                        If non-null, each PointLightGpu's shadowMapIndex
+	 *                        is set from the lookup; otherwise remains -1.
 	 */
-	void UploadLights(const Scene& scene);
+	void UploadLights(const Scene& scene,
+	                  const std::unordered_map<int32_t, int>* shadowIndexMap = nullptr);
 
 	/**
 	 * @brief Returns the light SSBO or nullptr when no lights are present.

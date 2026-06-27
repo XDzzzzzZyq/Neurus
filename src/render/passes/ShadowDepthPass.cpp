@@ -250,139 +250,91 @@ void ShadowDepthPass::updateUBO(const glm::vec3& lightPos, float farPlane)
 
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	// Guard: skip if no scene or no active shadow-casting light
-	if (!ctx.scene || ctx.GetActiveLightUID() < 0) { return; }
-
-	// Look up the active light
-	auto it = ctx.scene->light_list.find(ctx.GetActiveLightUID());
-	if (it == ctx.scene->light_list.end()) return;
-	auto lightPtr = it->second;
-
-	const glm::vec3 lightPos = lightPtr->GetPosition();
-	const float farPlane = (lightPtr->light_type == LightType::POINTLIGHT)
-		? Light::point_shadow_far
-		: Light::sun_shadow_far;
-
-	const ShadowMode mode = (lightPtr->light_type == LightType::POINTLIGHT) ? ShadowMode::Multiview : ShadowMode::SingleFace;
-
-	updateUBO(lightPos, farPlane);
-
-	const size_t itemCount = ctx.renderItems ? ctx.renderItems->size() : 0;
-
-	// Transition cubemap to depth attachment layout (all faces/layers)
-	{
-		auto& cubemap = cache.GetShadowMap(ctx.GetActiveLightUID());
-		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
-	}
+	// Guard: skip if no scene
+	if (!ctx.scene) { return; }
 
 	const vk::Viewport viewport(0.f, 0.f,
 	                            static_cast<float>(m_resolution),
 	                            static_cast<float>(m_resolution),
 	                            0.f, 1.f);
 	const vk::Rect2D scissor({0, 0}, {m_resolution, m_resolution});
-	cmdBuf.setViewport(0, viewport);
-	cmdBuf.setScissor(0, scissor);
 
-	const vk::ClearValue clearValue = vk::ClearDepthStencilValue(1.0f, 0);
-
-	if (mode == ShadowMode::Multiview)
+	for (const auto& [uid, lightPtr] : ctx.scene->light_list)
 	{
-		// --- Multiview: render all 6 faces in a single pass ---
-		// Always colour+depth on this GPU - the depth-only pipeline is unreliable
+		// Skip lights that don't cast shadows
+		if (!lightPtr || !lightPtr->use_shadow) continue;
 
-		const auto& pipeline       = m_multiviewColorPipeline;
-		const auto& pipelineLayout = m_multiviewColorPipelineLayout;
+		const glm::vec3 lightPos = lightPtr->GetPosition();
+		const float farPlane = (lightPtr->light_type == LightType::POINTLIGHT)
+			? Light::point_shadow_far
+			: Light::sun_shadow_far;
 
-		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                          pipelineLayout, 0,
-		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+		const ShadowMode mode = (lightPtr->light_type == LightType::POINTLIGHT)
+			? ShadowMode::Multiview : ShadowMode::SingleFace;
 
-		// --- Transition colour cubemap to ColorAttachment for rendering ---
+		updateUBO(lightPos, farPlane);
+
+		cmdBuf.setViewport(0, viewport);
+		cmdBuf.setScissor(0, scissor);
+
+		// Transition cubemap to depth attachment layout (all faces/layers)
 		{
-			auto& colorCube = cache.GetShadowColorMap(ctx.GetActiveLightUID(), {m_resolution, m_resolution});
-			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
+			auto& cubemap = cache.GetShadowMap(uid);
+			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
 		}
 
-		// --- Depth attachment ---
-		vk::RenderingAttachmentInfo depthAtt(
-			cache.GetShadowMap(ctx.GetActiveLightUID()).ArrayView(),
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			vk::ClearDepthStencilValue(1.0f, 0));
-
-		// --- Colour attachment: RenderCache colour cubemap ---
-		vk::ImageView colorView = cache.GetShadowColorMap(ctx.GetActiveLightUID(), {m_resolution, m_resolution}).ArrayView();
-
-		vk::RenderingAttachmentInfo colorAtt(
-			colorView,
-			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
-
-		vk::RenderingInfo renderInfo(
-			{}, {{0, 0}, {m_resolution, m_resolution}},
-			1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
-
-		cmdBuf.beginRendering(renderInfo);
-
-		if (ctx.renderItems)
+		if (mode == ShadowMode::Multiview)
 		{
-			for (const auto& item : *ctx.renderItems)
+			// --- Multiview: render all 6 faces in a single pass ---
+			// Always colour+depth on this GPU - the depth-only pipeline is unreliable
+
+			const auto& pipeline       = m_multiviewColorPipeline;
+			const auto& pipelineLayout = m_multiviewColorPipelineLayout;
+
+			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
+			cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+			                          pipelineLayout, 0,
+			                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+
+			// --- Transition colour cubemap to ColorAttachment for rendering ---
 			{
-				cmdBuf.pushConstants<glm::mat4>(pipelineLayout,
-				    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
-				cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-				cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-				cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+				auto& colorCube = cache.GetShadowColorMap(uid, {m_resolution, m_resolution});
+				Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
 			}
-		}
 
-		cmdBuf.endRendering();
-	}
-	else
-	{
-		// --- SingleFace: 6 sequential passes, one per cubemap face ---
-
-		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
-		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                          m_pipelineLayout, 0,
-		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
-
-		for (uint32_t face = 0; face < kShadowFaceCount; ++face)
-		{
+			// --- Depth attachment ---
 			vk::RenderingAttachmentInfo depthAtt(
-				*(cache.GetShadowMap(ctx.GetActiveLightUID()).FaceView(face)),
+				cache.GetShadowMap(uid).ArrayView(),
 				vk::ImageLayout::eDepthStencilAttachmentOptimal,
 				vk::ResolveModeFlagBits::eNone, nullptr,
 				vk::ImageLayout::eUndefined,
 				vk::AttachmentLoadOp::eClear,
 				vk::AttachmentStoreOp::eStore,
-				clearValue);
+				vk::ClearDepthStencilValue(1.0f, 0));
+
+			// --- Colour attachment: RenderCache colour cubemap ---
+			vk::ImageView colorView = cache.GetShadowColorMap(uid, {m_resolution, m_resolution}).ArrayView();
+
+			vk::RenderingAttachmentInfo colorAtt(
+				colorView,
+				vk::ImageLayout::eColorAttachmentOptimal,
+				vk::ResolveModeFlagBits::eNone, nullptr,
+				vk::ImageLayout::eUndefined,
+				vk::AttachmentLoadOp::eClear,
+				vk::AttachmentStoreOp::eStore,
+				vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
 
 			vk::RenderingInfo renderInfo(
 				{}, {{0, 0}, {m_resolution, m_resolution}},
-				1, 0, {}, &depthAtt, nullptr);
+				1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
 
 			cmdBuf.beginRendering(renderInfo);
-
-			// Push face index at offset 64 (after model)
-			const int32_t faceIdx = static_cast<int32_t>(face);
-			cmdBuf.pushConstants<int32_t>(m_pipelineLayout,
-			                              vk::ShaderStageFlagBits::eVertex,
-			                              sizeof(glm::mat4), faceIdx);
 
 			if (ctx.renderItems)
 			{
 				for (const auto& item : *ctx.renderItems)
 				{
-					cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
+					cmdBuf.pushConstants<glm::mat4>(pipelineLayout,
 					    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
 					cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
 					cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
@@ -391,18 +343,68 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			}
 
 			cmdBuf.endRendering();
-		}
-	}
 
-	// Transition cubemap to DepthShaderRead for sampling in subsequent passes
-	{
-		auto& cubemap = cache.GetShadowMap(ctx.GetActiveLightUID());
-		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
-	}
-	// Transition colour cubemap to ColorShaderRead for sampling
-	{
-		auto& colorCube = cache.GetShadowColorMap(ctx.GetActiveLightUID(), {m_resolution, m_resolution});
-		Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
+			// Transition colour cubemap to ColorShaderRead for sampling in subsequent passes
+			{
+				auto& colorCube = cache.GetShadowColorMap(uid, {m_resolution, m_resolution});
+				Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
+			}
+		}
+		else
+		{
+			// --- SingleFace: 6 sequential passes, one per cubemap face ---
+
+			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
+			cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+			                          m_pipelineLayout, 0,
+			                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+
+			const vk::ClearValue clearValue = vk::ClearDepthStencilValue(1.0f, 0);
+
+			for (uint32_t face = 0; face < kShadowFaceCount; ++face)
+			{
+				vk::RenderingAttachmentInfo depthAtt(
+					*(cache.GetShadowMap(uid).FaceView(face)),
+					vk::ImageLayout::eDepthStencilAttachmentOptimal,
+					vk::ResolveModeFlagBits::eNone, nullptr,
+					vk::ImageLayout::eUndefined,
+					vk::AttachmentLoadOp::eClear,
+					vk::AttachmentStoreOp::eStore,
+					clearValue);
+
+				vk::RenderingInfo renderInfo(
+					{}, {{0, 0}, {m_resolution, m_resolution}},
+					1, 0, {}, &depthAtt, nullptr);
+
+				cmdBuf.beginRendering(renderInfo);
+
+				// Push face index at offset 64 (after model)
+				const int32_t faceIdx = static_cast<int32_t>(face);
+				cmdBuf.pushConstants<int32_t>(m_pipelineLayout,
+				                              vk::ShaderStageFlagBits::eVertex,
+				                              sizeof(glm::mat4), faceIdx);
+
+				if (ctx.renderItems)
+				{
+					for (const auto& item : *ctx.renderItems)
+					{
+						cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
+						    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
+						cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
+						cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
+						cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+					}
+				}
+
+				cmdBuf.endRendering();
+			}
+		}
+
+		// Transition cubemap to DepthShaderRead for sampling in subsequent passes
+		{
+			auto& cubemap = cache.GetShadowMap(uid);
+			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
+		}
 	}
 }
 

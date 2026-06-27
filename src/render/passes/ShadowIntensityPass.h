@@ -81,11 +81,11 @@ public:
 	 *   8. Dispatches ceil(width/16) x ceil(height/16) x 1 thread groups.
 	 *   9. Transitions ShadowIntensity to ColorShaderRead for lighting pass.
 	 *
-	 * Early-returns when GetActiveLightUID() < 0 (no shadow-casting light).
+	 * Early-returns when ctx.scene is nullptr (no scene).
 	 *
 	 * @param cmdBuf  Command buffer in recording state.
 	 * @param cache   Render cache for attachment/shadow map access.
-	 * @param ctx     Per-frame context (render extent, frame index, lightUIDs).
+	 * @param ctx     Per-frame context (render extent, frame index, scene).
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 

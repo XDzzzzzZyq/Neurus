@@ -50,10 +50,12 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 namespace neurus {
@@ -212,13 +214,9 @@ DeferredRenderer::~DeferredRenderer()
 
 void DeferredRenderer::UploadLights(const Scene& scene)
 {
-	if (m_lightingPass)
-	{
-		m_lightingPass->UploadLights(scene);
-	}
+	// --- Collect ALL shadow-casting point light UIDs (sorted for deterministic index) ---
+	std::vector<int32_t> shadowUIDs;
 
-	// --- Configure shadow depth pass from the first point light with use_shadow ---
-	m_activeShadowLightUID = -1;
 	if (m_shadowDepthPass)
 	{
 		for (const auto& [id, light] : scene.light_list)
@@ -226,10 +224,25 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 			if (!light) continue;
 			if (light->light_type == LightType::POINTLIGHT && light->use_shadow)
 			{
-				m_activeShadowLightUID = id;
-				break;  // Only first shadow-casting point light for MVP
+				shadowUIDs.push_back(id);
 			}
 		}
+	}
+
+	// Sort for deterministic shadowMapIndex assignment (0,1,2...)
+	std::sort(shadowUIDs.begin(), shadowUIDs.end());
+
+	// --- Build shadow index map: light UID → 0,1,2... ---
+	std::unordered_map<int32_t, int> uidToShadowIndex;
+	for (size_t i = 0; i < shadowUIDs.size(); ++i)
+	{
+		uidToShadowIndex[shadowUIDs[i]] = static_cast<int>(i);
+	}
+
+	// --- Upload lights to GPU, assigning shadowMapIndex per light ---
+	if (m_lightingPass)
+	{
+		m_lightingPass->UploadLights(scene, &uidToShadowIndex);
 	}
 }
 
@@ -600,7 +613,6 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	ctx.invProjView = glm::inverse(cameraData.viewProj);
 	ctx.renderItems = &renderItems;
 	ctx.scene = scene;
-	ctx.lightUIDs = {m_activeShadowLightUID};
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
 	m_geometryPass->Record(cmdBuf, *m_renderCache, ctx);
@@ -727,10 +739,8 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 	}
 
 	// Also export shadow cubemap as equirectangular PNG
-	if (m_shadowDepthPass)
-	{
-		ExportShadowDepthEquirect("screenshots/shadow_depth_point_0_equirect");
-	}
+	// Note: shadow export requires scene context, not available in batch capture.
+	// Use ExportShadowDepthEquirect() directly with a scene reference for shadow dumps.
 
 	return count;
 }
@@ -739,14 +749,30 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 // C2E — Shadow cubemap → Equirectangular export
 // ===========================================================================
 
-std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filenamePrefix)
+std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filenamePrefix,
+                                                          const Scene* scene)
 {
-	if (!m_shadowDepthPass || m_activeShadowLightUID < 0)
+	// Find first shadow-casting point light from scene
+	const Light* shadowLight = nullptr;
+	if (scene)
+	{
+		for (const auto& [uid, light] : scene->light_list)
+		{
+			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
+			{
+				shadowLight = light.get();
+				break;
+			}
+		}
+	}
+
+	if (!m_shadowDepthPass || !shadowLight)
 	{
 		return {};
 	}
 
-	auto& cubemap = m_renderCache->GetShadowMap(m_activeShadowLightUID);
+	const int32_t lightUID = shadowLight->GetObjectID();
+	auto& cubemap = m_renderCache->GetShadowMap(lightUID);
 	const uint32_t cubeRes = m_shadowDepthPass->Resolution();
 	const uint32_t equiWidth = cubeRes * 2;
 	const uint32_t equiHeight = cubeRes;

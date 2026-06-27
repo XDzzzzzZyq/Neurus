@@ -160,96 +160,86 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 {
 	const vk::Extent2D renderExtent = ctx.renderExtent;
 	const uint32_t    frameIndex   = ctx.frameIndex;
-	const int32_t     lightUID     = ctx.GetActiveLightUID();
 
-	// --- Early out: no shadow-casting light in this frame ---
-	if (lightUID < 0)
+	// --- Early out: no scene ---
+	if (!ctx.scene)
 	{
 		return;
 	}
 
-	m_currentLightUID = lightUID;
-
-	// --- 1. Write descriptor set for this frame slot ---
-	WriteDescriptors(frameIndex, renderExtent, cache);
-
-	// --- 2. Transition G-Buffer Position to ColorShaderRead ---
+	// --- 1. Transition G-Buffer Position to ColorShaderRead (once for all lights) ---
 	{
 		auto& posAtt = cache.GetAttachment(AttachmentName::Position, renderExtent);
 		Barrier::Transition(cmdBuf, posAtt, ImageState::ColorShaderRead);
 	}
 
-	// --- 3. Transition shadow depth cubemap from DepthAttachment (post-ShadowDepthPass) to DepthShaderRead ---
-	{
-		auto& shadowCube = cache.GetShadowMap(lightUID);
-		Barrier::Transition(cmdBuf, shadowCube, ImageState::DepthShaderRead);
-	}
-
-	// --- 4. Transition ShadowIntensity to ShaderWrite ---
-	{
-		auto& shadowIntensity = cache.GetShadowIntensity(lightUID, renderExtent);
-		Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ShaderWrite);
-	}
-
-	// --- 5. Look up light world position from scene ---
-	float lightPosX = 0.0f;
-	float lightPosY = 0.0f;
-	float lightPosZ = 0.0f;
-
-	if (ctx.scene)
-	{
-		auto it = ctx.scene->light_list.find(lightUID);
-		if (it != ctx.scene->light_list.end())
-		{
-			const auto& pos = it->second->GetPosition();
-			lightPosX = pos.x;
-			lightPosY = pos.y;
-			lightPosZ = pos.z;
-		}
-	}
-
-	// --- 6. Bind compute pipeline ---
+	// --- 2. Bind compute pipeline (once for all lights) ---
 	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
 
-	// --- 7. Bind descriptor set ---
-	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          *m_pipelineBuilder->pipelineLayout(),
-	                          0,                                    // firstSet
-	                          {m_descriptorSets[frameIndex].handle()},
-	                          {});
-
-	// --- 8. Push constants ---
+	// --- 3. Dispatch shadow evaluation for each shadow-casting light ---
+	for (const auto& [uid, light] : ctx.scene->light_list)
 	{
-		struct ShadowEvalPushConstants
+		// Skip non-shadow-casting lights
+		if (!light || !light->use_shadow) continue;
+
+		m_currentLightUID = uid;
+
+		// --- Transition shadow depth cubemap: post-ShadowDepthPass → DepthShaderRead ---
 		{
-			float lightPosX, lightPosY, lightPosZ;
-			float farPlane;
-			float bias;
-		};
+			auto& shadowCube = cache.GetShadowMap(uid);
+			Barrier::Transition(cmdBuf, shadowCube, ImageState::DepthShaderRead);
+		}
 
-		ShadowEvalPushConstants pc = {};
-		pc.lightPosX = lightPosX;
-		pc.lightPosY = lightPosY;
-		pc.lightPosZ = lightPosZ;
-		pc.farPlane  = Light::point_shadow_far;
-		pc.bias      = m_bias;
+		// --- Transition ShadowIntensity to ShaderWrite ---
+		{
+			auto& shadowIntensity = cache.GetShadowIntensity(uid, renderExtent);
+			Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ShaderWrite);
+		}
 
-		cmdBuf.pushConstants<ShadowEvalPushConstants>(
-			*m_pipelineBuilder->pipelineLayout(),
-			vk::ShaderStageFlagBits::eCompute,
-			0,
-			pc);
-	}
+		// --- Write descriptor set for this frame slot ---
+		WriteDescriptors(frameIndex, renderExtent, cache);
 
-	// --- 9. Dispatch ---
-	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
-	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
-	cmdBuf.dispatch(groupCountX, groupCountY, 1);
+		// --- Bind descriptor set ---
+		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+		                          *m_pipelineBuilder->pipelineLayout(),
+		                          0,
+		                          {m_descriptorSets[frameIndex].handle()},
+		                          {});
 
-	// --- 10. Transition ShadowIntensity output: General → ColorShaderRead for lighting pass ---
-	{
-		auto& shadowIntensity = cache.GetShadowIntensity(lightUID, renderExtent);
-		Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ColorShaderRead);
+		// --- Push constants ---
+		{
+			struct ShadowEvalPushConstants
+			{
+				float lightPosX, lightPosY, lightPosZ;
+				float farPlane;
+				float bias;
+			};
+
+			const auto& pos = light->GetPosition();
+			ShadowEvalPushConstants pc = {};
+			pc.lightPosX = pos.x;
+			pc.lightPosY = pos.y;
+			pc.lightPosZ = pos.z;
+			pc.farPlane  = Light::point_shadow_far;
+			pc.bias      = m_bias;
+
+			cmdBuf.pushConstants<ShadowEvalPushConstants>(
+				*m_pipelineBuilder->pipelineLayout(),
+				vk::ShaderStageFlagBits::eCompute,
+				0,
+				pc);
+		}
+
+		// --- Dispatch ---
+		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
+		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+		cmdBuf.dispatch(groupCountX, groupCountY, 1);
+
+		// --- Transition ShadowIntensity output: General → ColorShaderRead for lighting pass ---
+		{
+			auto& shadowIntensity = cache.GetShadowIntensity(uid, renderExtent);
+			Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ColorShaderRead);
+		}
 	}
 }
 
