@@ -322,6 +322,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		ctx.renderExtent = vk::Extent2D(kRes, kRes);
 		ctx.renderItems  = &renderItems;
 		ctx.lightUID     = shadowRes.scene->light_list.begin()->first;
+		ctx.scene        = shadowRes.scene.get();
 		ctx.optionalColorView   = verifyCube.ArrayView();
 		ctx.optionalColorFormat = vk::Format::eR32G32B32A32Sfloat;
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
