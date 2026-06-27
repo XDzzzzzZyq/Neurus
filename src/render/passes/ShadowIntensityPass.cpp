@@ -123,14 +123,14 @@ void ShadowIntensityPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D exten
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 
-	// --- Binding 1: Shadow colour cubemap (combined image sampler, samplerCube) ---
+	// --- Binding 1: Shadow depth cubemap (combined image sampler, samplerCube) ---
 	{
-		auto& shadowCube = cache.GetShadowColorMap(m_currentLightUID, extent);
+		auto& shadowCube = cache.GetShadowMap(m_currentLightUID);
 
 		vk::DescriptorImageInfo imageInfo(
 			*m_sampler,                                     // sampler
-			*shadowCube.ImageViewHandle(),                  // imageView (cube type, colour aspect)
-			vk::ImageLayout::eShaderReadOnlyOptimal         // imageLayout (matches ColorShaderRead)
+			*shadowCube.ImageViewHandle(),                  // imageView (cube type, depth aspect)
+			vk::ImageLayout::eDepthStencilReadOnlyOptimal   // imageLayout (matches DepthShaderRead)
 		);
 
 		dstSet.WriteImage(1, imageInfo,
@@ -179,10 +179,10 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		Barrier::Transition(cmdBuf, posAtt, ImageState::ColorShaderRead);
 	}
 
-	// --- 3. Transition shadow cubemap from ColorAttachment (post-ShadowDepthPass) to ColorShaderRead ---
+	// --- 3. Transition shadow depth cubemap from DepthAttachment (post-ShadowDepthPass) to DepthShaderRead ---
 	{
-		auto& shadowCube = cache.GetShadowColorMap(lightUID, renderExtent);
-		Barrier::Transition(cmdBuf, shadowCube, ImageState::ColorShaderRead);
+		auto& shadowCube = cache.GetShadowMap(lightUID);
+		Barrier::Transition(cmdBuf, shadowCube, ImageState::DepthShaderRead);
 	}
 
 	// --- 4. Transition ShadowIntensity to ShaderWrite ---

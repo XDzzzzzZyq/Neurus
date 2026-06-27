@@ -85,7 +85,8 @@ Image& RenderCache::GetShadowMap(const int lightUID)
 	              kShadowRes,
 	              vk::Format::eD32Sfloat,
 	              vk::ImageUsageFlagBits::eDepthStencilAttachment |
-	                  vk::ImageUsageFlagBits::eSampled,
+	                  vk::ImageUsageFlagBits::eSampled |
+	                  vk::ImageUsageFlagBits::eTransferSrc,
 	              1,                           // mipLevels
 	              Image::ImageType::eCube,
 	              debugName.c_str()); // debug name

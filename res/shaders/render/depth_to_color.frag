@@ -20,5 +20,6 @@ void main()
 {
 	float dist = length(fragWorldPos - lightWorldPos);
 	float depth = dist / farPlane;
+	gl_FragDepth = depth;
 	outColor = vec4(depth, depth, depth, 1.0);
 }

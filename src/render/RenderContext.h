@@ -68,12 +68,6 @@ struct RenderContext
 	/// @brief Scene data for light SSBO uploads (nullable). Used by LightingPass.
 	const Scene* scene = nullptr;
 
-	/// @brief Optional colour attachment for multiview shadow depth passes.
-	///        When set and the pass is in Multiview mode, records colour+depth
-	///        instead of depth-only (used for verification readback in tests).
-	vk::ImageView optionalColorView = nullptr;
-	vk::Format optionalColorFormat = vk::Format::eUndefined;
-
 	/// @brief Active shadow-casting light UID (-1 = no shadow-casting light).
 	int32_t lightUID = -1;
 };

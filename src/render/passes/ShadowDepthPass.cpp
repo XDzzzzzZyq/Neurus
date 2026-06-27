@@ -200,7 +200,7 @@ void ShadowDepthPass::createMultiviewColorPipeline(const vk::raii::Device& devic
 		                  vk::CullModeFlagBits::eNone,
 		                  vk::FrontFace::eClockwise)
 		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLess)
+		.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
 		.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
 			VK_FALSE,
 			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
@@ -314,10 +314,8 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			vk::AttachmentStoreOp::eStore,
 			vk::ClearDepthStencilValue(1.0f, 0));
 
-		// --- Colour attachment: external view or RenderCache colour cubemap ---
-		vk::ImageView colorView = ctx.optionalColorView
-			? ctx.optionalColorView
-			: cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution}).ArrayView();
+		// --- Colour attachment: RenderCache colour cubemap ---
+		vk::ImageView colorView = cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution}).ArrayView();
 
 		vk::RenderingAttachmentInfo colorAtt(
 			colorView,
