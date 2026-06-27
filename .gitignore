@@ -81,6 +81,7 @@ temp/
 
 # Plan drafts and metafiles
 .omo/
+.ocx/
 graphify-out/cache/
 graphify-out/.graphify_python
 graphify-out/.graphify_root
