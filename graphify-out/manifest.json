@@ -135,48 +135,48 @@
     "semantic_hash": "e150294705324a8ecec6e3f3820f5f2e"
   },
   "src/render/DeferredRenderer.cpp": {
-    "mtime": 1782530849.8148916,
-    "ast_hash": "4cbc5621aee55ee27f623c511176e7f6",
+    "mtime": 1782557286.1874225,
+    "ast_hash": "7af4e8a045ca292f9b296824ac772666",
     "semantic_hash": ""
   },
   "src/render/DeferredRenderer.h": {
-    "mtime": 1782528564.785792,
-    "ast_hash": "07dd8161d7713d9e9bb8a6b5a6add10a",
+    "mtime": 1782557235.6312222,
+    "ast_hash": "305db04e2ec9343f0a61fa86a69251ad",
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.cpp": {
-    "mtime": 1782351590.816159,
+    "mtime": 1782550155.3531334,
     "ast_hash": "1fa54651ffd16f5f71d7d29576e02db0",
     "semantic_hash": "1fa54651ffd16f5f71d7d29576e02db0"
   },
   "src/render/DescriptorManager.h": {
-    "mtime": 1782377405.8611162,
+    "mtime": 1782550158.5581155,
     "ast_hash": "c7d0241c75c3ef223912ae31296e38b2",
     "semantic_hash": "c7d0241c75c3ef223912ae31296e38b2"
   },
   "src/render/Image.cpp": {
-    "mtime": 1782490668.961934,
-    "ast_hash": "b17797d2ee9d21e5309e593a148c4ce8",
+    "mtime": 1782564416.0556617,
+    "ast_hash": "8d7d4af4b359c16accd712923f39fc87",
     "semantic_hash": ""
   },
   "src/render/Image.h": {
-    "mtime": 1782490668.9631443,
-    "ast_hash": "c2a6278cd60a48d6971ceb9855c91cb6",
+    "mtime": 1782564394.444401,
+    "ast_hash": "870b65bf735f239821fb461f2a3bfc1d",
     "semantic_hash": ""
   },
   "src/render/PipelineBuilder.cpp": {
-    "mtime": 1781871939.9782922,
+    "mtime": 1782563024.464398,
     "ast_hash": "df63325083efe1d685afe729674ba6c9",
     "semantic_hash": "df63325083efe1d685afe729674ba6c9"
   },
   "src/render/PipelineBuilder.h": {
-    "mtime": 1781871939.9797986,
+    "mtime": 1782563029.5786607,
     "ast_hash": "7a33d9251a9698b67aa34a6bd06a8527",
     "semantic_hash": "7a33d9251a9698b67aa34a6bd06a8527"
   },
   "src/render/Screenshot.cpp": {
-    "mtime": 1782530850.3612063,
-    "ast_hash": "3157f0460bb413155daedf0024d100ba",
+    "mtime": 1782561187.0563633,
+    "ast_hash": "1d1853bba160294eeed65fb8d435b114",
     "semantic_hash": ""
   },
   "src/render/Screenshot.h": {
@@ -315,9 +315,9 @@
     "semantic_hash": "a25fec061c770d2b07bb4b7877727e4e"
   },
   "src/scene/Light.h": {
-    "mtime": 1781872147.7038841,
-    "ast_hash": "f9fab45a1b182aafeca7d8d89a594f73",
-    "semantic_hash": "f9fab45a1b182aafeca7d8d89a594f73"
+    "mtime": 1782546493.0157073,
+    "ast_hash": "4a91601fb98b4ec799994e4a79aeaae3",
+    "semantic_hash": ""
   },
   "src/scene/Mesh.cpp": {
     "mtime": 1781872147.7048883,
@@ -475,8 +475,8 @@
     "semantic_hash": "c417762f9032d160c12b1fbd5a5fe186"
   },
   "src/render/passes/GeometryPass.cpp": {
-    "mtime": 1782530850.9872844,
-    "ast_hash": "ce70d7a70587d57169546ce17d0235d6",
+    "mtime": 1782531990.400914,
+    "ast_hash": "7c2fbdc10d9fbcf20c4518e4794131c5",
     "semantic_hash": ""
   },
   "src/render/passes/GeometryPass.h": {
@@ -495,14 +495,14 @@
     "semantic_hash": "a73f0ddb003757ee3de82e67315362ed"
   },
   "src/render/passes/LightingPass.cpp": {
-    "mtime": 1782530852.0183125,
-    "ast_hash": "2f07ae8af68f3dfec3091bed3d479c90",
+    "mtime": 1782561182.6045225,
+    "ast_hash": "b4cc0b6ecf6617dd873f434090021bd0",
     "semantic_hash": ""
   },
   "src/render/passes/LightingPass.h": {
-    "mtime": 1782377414.3747952,
-    "ast_hash": "4147713506f45e1e6a2b0c923a1d3731",
-    "semantic_hash": "4147713506f45e1e6a2b0c923a1d3731"
+    "mtime": 1782561169.3660812,
+    "ast_hash": "2fe1df5abc8658190edc6aba03ec34a1",
+    "semantic_hash": ""
   },
   "src/render/passes/Pass.h": {
     "mtime": 1782528267.0293007,
@@ -510,23 +510,23 @@
     "semantic_hash": ""
   },
   "src/render/passes/SSAOPass.cpp": {
-    "mtime": 1782530854.2932103,
-    "ast_hash": "528d9c4e6191e753af33e95a323ae6ee",
+    "mtime": 1782531988.8642037,
+    "ast_hash": "9efb9137918d09f7dff08a3cae8ea3e0",
     "semantic_hash": ""
   },
   "src/render/passes/SSAOPass.h": {
-    "mtime": 1782376844.52678,
-    "ast_hash": "0a807c16e11645c2af7823145ce2a697",
-    "semantic_hash": "0a807c16e11645c2af7823145ce2a697"
+    "mtime": 1782531983.7792802,
+    "ast_hash": "06784f7cad33432b5ce8541cc6c33440",
+    "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.cpp": {
-    "mtime": 1782530852.6450884,
-    "ast_hash": "bf99de2c29883459c277f9bf479058fc",
+    "mtime": 1782563778.6363156,
+    "ast_hash": "51c1a8fc27f60b2b135544c6f0be74bc",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.h": {
-    "mtime": 1782530853.1939404,
-    "ast_hash": "7ccfb50fd5f75a91def3b5b161e6e81c",
+    "mtime": 1782547570.7473116,
+    "ast_hash": "8cd7772beccdeb962336f95b6d2c5d82",
     "semantic_hash": ""
   },
   "src/render/passes/SyncObjects.h": {
@@ -630,18 +630,18 @@
     "semantic_hash": ""
   },
   "src/render/RenderCache.cpp": {
-    "mtime": 1782530837.2015965,
-    "ast_hash": "910da4962e7ee2d111386f10f21ac643",
+    "mtime": 1782562098.0711176,
+    "ast_hash": "613acc8cf40dad3937d69a3e0ee1053a",
     "semantic_hash": ""
   },
   "src/render/RenderCache.h": {
-    "mtime": 1782530836.6382992,
-    "ast_hash": "532d6dc515de25b8a5b276632f7e6a88",
+    "mtime": 1782561139.8496523,
+    "ast_hash": "c45aa6b5d90787ea02cdf7c9910aa898",
     "semantic_hash": ""
   },
   "src/render/RenderContext.h": {
-    "mtime": 1782319431.9392102,
-    "ast_hash": "45fb6adb29f67a6a30e899a44aff6e4c",
+    "mtime": 1782563777.552309,
+    "ast_hash": "a3cfe38cc47eb367e6682ba84a39ab9b",
     "semantic_hash": ""
   },
   "src/scene/Material.cpp": {
@@ -657,6 +657,16 @@
   "src/scene/MeshBindings.cpp": {
     "mtime": 1782530837.71951,
     "ast_hash": "314a4b4fd5df2199f3690a26d6c88caa",
+    "semantic_hash": ""
+  },
+  "src/render/passes/ShadowIntensityPass.cpp": {
+    "mtime": 1782562667.0952039,
+    "ast_hash": "73af78d90570af9bb9be0220ce97ece4",
+    "semantic_hash": ""
+  },
+  "src/render/passes/ShadowIntensityPass.h": {
+    "mtime": 1782556434.1809402,
+    "ast_hash": "0e2e59352efd8990d9b172d769951eef",
     "semantic_hash": ""
   }
 }
