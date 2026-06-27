@@ -78,6 +78,7 @@ Image& RenderCache::GetShadowMap(const int lightUID)
 	}
 
 	constexpr vk::Extent2D kShadowRes{1024, 1024};
+	const std::string debugName = "ShadowDepthCubemap_Light_" + std::to_string(lightUID);
 
 	Image cubemap(*m_device,
 	              *m_physicalDevice,
@@ -87,7 +88,7 @@ Image& RenderCache::GetShadowMap(const int lightUID)
 	                  vk::ImageUsageFlagBits::eSampled,
 	              1,                           // mipLevels
 	              Image::ImageType::eCube,
-	              "ShadowDepthCubemap_Light"); // debug name
+	              debugName.c_str()); // debug name
 
 	const auto [insertedIt, _] = m_shadowMaps.emplace(lightUID, std::move(cubemap));
 	return insertedIt->second;
@@ -101,6 +102,7 @@ Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D ex
 		return it->second;
 	}
 
+	const std::string debugName = "ShadowIntensity_Light_" + std::to_string(lightUID);
 	Image intensity(*m_device,
 	                *m_physicalDevice,
 	                extent,
@@ -111,7 +113,7 @@ Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D ex
 	                    vk::ImageUsageFlagBits::eTransferDst,
 	                1,                         // mipLevels
 	                Image::ImageType::e2D,
-	                "ShadowIntensity_Light");  // debug name
+	                debugName.c_str());  // debug name
 
 	const auto [insertedIt, _] = m_shadowIntensities.emplace(lightUID, std::move(intensity));
 	return insertedIt->second;
@@ -125,6 +127,7 @@ Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D ext
 		return it->second;
 	}
 
+	const std::string debugName = "ShadowColorCubemap_Light_" + std::to_string(lightUID);
 	Image colorCube(*m_device,
 	                *m_physicalDevice,
 	                extent,
@@ -134,7 +137,7 @@ Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D ext
 	                    vk::ImageUsageFlagBits::eTransferSrc,
 	                1,                           // mipLevels
 	                Image::ImageType::eCube,
-	                "ShadowColorCubemap_Light"); // debug name
+	                debugName.c_str()); // debug name
 
 	const auto [insertedIt, _] = m_shadowColorMaps.emplace(lightUID, std::move(colorCube));
 	return insertedIt->second;
