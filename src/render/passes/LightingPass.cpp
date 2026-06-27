@@ -368,7 +368,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const uint32_t frameIndex = ctx.frameIndex;
 
 	// --- 1. Write descriptor set for this frame slot ---
-	m_currentLightUID = ctx.lightUID;
+	m_currentLightUID = ctx.GetActiveLightUID();
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
 	// --- 1b. Write IBL cubemap descriptors (bindings 7-8) from scene Environment or fallback ---
@@ -478,7 +478,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		Barrier::Transition(cmdBuf, ssao, ImageState::ColorShaderRead);
 
 		// ShadowIntensity: if never written (Undefined), clear to 0.0 (no shadow), then ShaderRead
-		auto& shadowAtt = cache.GetShadowIntensity(ctx.lightUID, renderExtent);
+		auto& shadowAtt = cache.GetShadowIntensity(ctx.GetActiveLightUID(), renderExtent);
 		if (shadowAtt.State() == ImageState::Undefined)
 		{
 			Barrier::Transition(cmdBuf, shadowAtt, ImageState::TransferDst);

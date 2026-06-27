@@ -68,8 +68,11 @@ struct RenderContext
 	/// @brief Scene data for light SSBO uploads (nullable). Used by LightingPass.
 	const Scene* scene = nullptr;
 
-	/// @brief Active shadow-casting light UID (-1 = no shadow-casting light).
-	int32_t lightUID = -1;
+	/// @brief Active shadow-casting light UIDs (empty = no shadow-casting light).
+	std::vector<int32_t> lightUIDs;
+
+	/// @brief Convenience: returns the first/active light UID, or -1 if none.
+	int32_t GetActiveLightUID() const { return lightUIDs.empty() ? -1 : lightUIDs[0]; }
 };
 
 } // namespace neurus

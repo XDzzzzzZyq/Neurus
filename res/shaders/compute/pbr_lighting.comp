@@ -40,8 +40,10 @@ struct PointLight
 	float _pad1;    // offset 28
 	float power;    // offset 32, size 4
 	float radius;   // offset 36, size 4
-	float _pad2[2]; // offset 40 → struct size 48 (16-byte aligned)
-};
+	float _pad2[2]; // offset 40, size 8
+	int shadowMapIndex; // offset 48, size 4 — index into shadow cubemap array; -1 == no shadow
+	float _pad3;        // offset 52, size 4
+}; // struct size 56, array stride 64 (std140, 16-byte aligned)
 
 layout(std140, binding = 5) buffer LightBuffer
 {

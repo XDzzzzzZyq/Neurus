@@ -251,10 +251,10 @@ void ShadowDepthPass::updateUBO(const glm::vec3& lightPos, float farPlane)
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	// Guard: skip if no scene or no active shadow-casting light
-	if (!ctx.scene || ctx.lightUID < 0) { return; }
+	if (!ctx.scene || ctx.GetActiveLightUID() < 0) { return; }
 
 	// Look up the active light
-	auto it = ctx.scene->light_list.find(ctx.lightUID);
+	auto it = ctx.scene->light_list.find(ctx.GetActiveLightUID());
 	if (it == ctx.scene->light_list.end()) return;
 	auto lightPtr = it->second;
 
@@ -271,7 +271,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 	// Transition cubemap to depth attachment layout (all faces/layers)
 	{
-		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
+		auto& cubemap = cache.GetShadowMap(ctx.GetActiveLightUID());
 		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
 	}
 
@@ -300,13 +300,13 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// --- Transition colour cubemap to ColorAttachment for rendering ---
 		{
-			auto& colorCube = cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution});
+			auto& colorCube = cache.GetShadowColorMap(ctx.GetActiveLightUID(), {m_resolution, m_resolution});
 			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
 		}
 
 		// --- Depth attachment ---
 		vk::RenderingAttachmentInfo depthAtt(
-			cache.GetShadowMap(ctx.lightUID).ArrayView(),
+			cache.GetShadowMap(ctx.GetActiveLightUID()).ArrayView(),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
@@ -315,7 +315,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			vk::ClearDepthStencilValue(1.0f, 0));
 
 		// --- Colour attachment: RenderCache colour cubemap ---
-		vk::ImageView colorView = cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution}).ArrayView();
+		vk::ImageView colorView = cache.GetShadowColorMap(ctx.GetActiveLightUID(), {m_resolution, m_resolution}).ArrayView();
 
 		vk::RenderingAttachmentInfo colorAtt(
 			colorView,
@@ -358,7 +358,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		for (uint32_t face = 0; face < kShadowFaceCount; ++face)
 		{
 			vk::RenderingAttachmentInfo depthAtt(
-				*(cache.GetShadowMap(ctx.lightUID).FaceView(face)),
+				*(cache.GetShadowMap(ctx.GetActiveLightUID()).FaceView(face)),
 				vk::ImageLayout::eDepthStencilAttachmentOptimal,
 				vk::ResolveModeFlagBits::eNone, nullptr,
 				vk::ImageLayout::eUndefined,
@@ -396,12 +396,12 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 	// Transition cubemap to DepthShaderRead for sampling in subsequent passes
 	{
-		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
+		auto& cubemap = cache.GetShadowMap(ctx.GetActiveLightUID());
 		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
 	}
 	// Transition colour cubemap to ColorShaderRead for sampling
 	{
-		auto& colorCube = cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution});
+		auto& colorCube = cache.GetShadowColorMap(ctx.GetActiveLightUID(), {m_resolution, m_resolution});
 		Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
 	}
 }

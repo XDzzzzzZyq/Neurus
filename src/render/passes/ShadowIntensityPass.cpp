@@ -160,7 +160,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 {
 	const vk::Extent2D renderExtent = ctx.renderExtent;
 	const uint32_t    frameIndex   = ctx.frameIndex;
-	const int32_t     lightUID     = ctx.lightUID;
+	const int32_t     lightUID     = ctx.GetActiveLightUID();
 
 	// --- Early out: no shadow-casting light in this frame ---
 	if (lightUID < 0)

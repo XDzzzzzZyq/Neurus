@@ -66,8 +66,7 @@ git worktree remove ../Neurus_Feature
 
 **`task()` subagents cannot target a worktree directory.**
 - Subagents spawned via `task()` always operate in the main workspace root.
-- For worktree work, use direct `edit`/`read`/`write` tools with absolute paths to the worktree.
-- Plan simple refactoring tasks to be completable with direct edits rather than delegation.
+- Use the tools and skills `opencode-worktree` for parallelism and isolation of feature work.
 
 **Build and test from the main workspace after merge.**
 - After merging, the main workspace contains the combined code.

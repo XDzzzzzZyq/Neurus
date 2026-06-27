@@ -49,7 +49,9 @@ class Scene;
  *   vec3 pos    (offset 16, padded to 16)
  *   float power (offset 32)
  *   float radius(offset 36)
- *   Total: 48 bytes (aligned to 16).
+ *   int32_t shadowMapIndex(offset 48)
+ *   float _pad3(offset 52)
+ *   Total: 64 bytes (aligned to 16, sizeof rounded up to 16-byte boundary).
  */
 struct alignas(16) PointLightGpu
 {
@@ -59,9 +61,11 @@ struct alignas(16) PointLightGpu
 	float _pad1;                     ///< std140 padding after vec3
 	float power;                     ///< Luminous intensity
 	float radius;                    ///< Physical radius
-	float _pad2[2];                  ///< std140 padding to 48 bytes
+	float _pad2[2];                  ///< std140 padding
+	int32_t shadowMapIndex = -1;     ///< Index into shadow maps array; -1 = no shadow
+	float _pad3 = 0.0f;              ///< Padding to 64 bytes (16-byte aligned struct)
 };
-static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std140)");
+static_assert(sizeof(PointLightGpu) == 64, "PointLightGpu must be 64 bytes (std140)");
 
 /**
  * @brief Push constants for the PBR lighting compute shader.

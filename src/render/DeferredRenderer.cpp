@@ -600,7 +600,7 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	ctx.invProjView = glm::inverse(cameraData.viewProj);
 	ctx.renderItems = &renderItems;
 	ctx.scene = scene;
-	ctx.lightUID = m_activeShadowLightUID;
+	ctx.lightUIDs = {m_activeShadowLightUID};
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
 	m_geometryPass->Record(cmdBuf, *m_renderCache, ctx);
