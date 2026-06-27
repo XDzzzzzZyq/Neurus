@@ -179,7 +179,7 @@ compute pass, and full G-Buffer pipeline through the four-layer architecture.
 - GPU tests with shared VulkanTestShared base class
 - Reference-image regression tests (capture → compare PNG)
 - Render caches: RenderCache, DescriptorCache
-- RenderPassManager for dynamic rendering pass control
+- Pass base class with PassType enum + static query helpers; GeometryPass owns BeginPass/EndPass
 
 **Features out of scope:**
 - glTF/PNG file loading, asset pipeline (OBJ loading is in scope)
