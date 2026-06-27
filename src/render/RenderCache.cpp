@@ -230,12 +230,6 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 		return { vk::Format::eD32Sfloat,
 		         vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 		         eCube };
-	case AttachmentName::ShadowIntensity:
-		// R8 shadow intensity: written by shadow evaluation compute shader
-		return { vk::Format::eR8Unorm,
-		         vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eSampled |
-		             vk::ImageUsageFlagBits::eTransferSrc | vk::ImageUsageFlagBits::eTransferDst,
-		         e2D };
 	}
 
 	throw std::invalid_argument("RenderCache::ConfigFor: unknown attachment name");
@@ -258,7 +252,6 @@ const char* AttachmentNameToString(const AttachmentName name)
 	case AttachmentName::SSAO:              return "SSAO";
 	case AttachmentName::SSR:               return "SSR";
 	case AttachmentName::ShadowDepth:       return "ShadowDepth";
-	case AttachmentName::ShadowIntensity:   return "ShadowIntensity";
 	}
 	return "Unknown";
 }

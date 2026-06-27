@@ -298,6 +298,12 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		                          pipelineLayout, 0,
 		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
 
+		// --- Transition colour cubemap to ColorAttachment for rendering ---
+		{
+			auto& colorCube = cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution});
+			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
+		}
+
 		// --- Depth attachment ---
 		vk::RenderingAttachmentInfo depthAtt(
 			cache.GetShadowMap(ctx.lightUID).ArrayView(),
@@ -394,6 +400,11 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	{
 		auto& cubemap = cache.GetShadowMap(ctx.lightUID);
 		Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
+	}
+	// Transition colour cubemap to ColorShaderRead for sampling
+	{
+		auto& colorCube = cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution});
+		Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
 	}
 }
 

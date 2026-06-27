@@ -237,5 +237,8 @@ private:
 	std::unique_ptr<Image> m_fallbackIrradianceCube;
 	std::unique_ptr<Image> m_fallbackPrefilteredCube;
 	vk::raii::Sampler m_fallbackCubeSampler = nullptr;
+
+	// --- Current light UID (set before WriteDescriptors) ---
+	int32_t m_currentLightUID = -1;
 };
 } // namespace neurus
