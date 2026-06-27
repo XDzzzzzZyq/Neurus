@@ -84,21 +84,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 3. Create render pass manager ---
 	m_renderPassManager = std::make_unique<RenderPassManager>();
 
-	// --- 4. Create fallback SSBO for zero-light scenes ---
-	//     LightingPass::Record needs a valid GPUBuffer reference even when
-	//     no lights are present (the SSBO descriptor must be bound, even
-	//     though the shader won't read it when lightCount=0).
-	{
-		uint8_t zero[sizeof(PointLightGpu)] = {};
-		m_fallbackSSBO = std::make_unique<GPUBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			sizeof(PointLightGpu),
-			vk::BufferUsageFlagBits::eStorageBuffer);
-		m_fallbackSSBO->Upload(zero, sizeof(PointLightGpu));
-		NEURUS_LOG("[DeferredRenderer] Created fallback SSBO (zero-light)");
-	}
-
-	// --- 5. Create geometry pass ---
+	// --- 4. Create geometry pass ---
 	{
 		auto geoPass = std::make_unique<GeometryPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
@@ -109,7 +95,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_passes.push_back(std::move(geoPass));
 	}
 
-	// --- 7. Create lighting pass ---
+	// --- 5. Create lighting pass ---
 	{
 		auto lightPass = std::make_unique<LightingPass>(
 			device, physicalDevice,
@@ -120,7 +106,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_passes.push_back(std::move(lightPass));
 	}
 
-	// --- 7b. Create SSAO pass ---
+	// --- 6. Create SSAO pass ---
 	{
 		auto ssaoPass = std::make_unique<SSAOPass>(
 			device, physicalDevice,
@@ -131,7 +117,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_passes.push_back(std::move(ssaoPass));
 	}
 
-	// --- 7c. Create IBL pass (pure compute service) ---
+	// --- 7. Create IBL pass (pure compute service) ---
 	{
 		auto iblPass = std::make_unique<IBLPass>(
 			device, physicalDevice,
@@ -143,7 +129,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
 	}
 
-	// --- 7d. Create shadow depth pass (cubemap depth from light's POV) ---
+	// --- 8. Create shadow depth pass (cubemap depth from light's POV) ---
 	{
 		auto shadowDepth = std::make_unique<ShadowDepthPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
@@ -153,11 +139,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_passes.push_back(std::move(shadowDepth));
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
 	}
-
-	// --- 7e. Shadow evaluation removed (broken, to be re-implemented) ---
-
-	// --- 8. Create command pool ---
-	// (initialized in member initializer list via createCommandPool)
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
 	uint32_t imageCount = m_swapchain->imageCount();

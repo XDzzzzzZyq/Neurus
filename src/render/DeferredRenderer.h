@@ -253,9 +253,6 @@ private:
 	IBLPass*    m_iblPass      = nullptr;
 	ShadowDepthPass* m_shadowDepthPass = nullptr;
 
-	// --- Fallback SSBO for zero-light scenes (LightingPass needs a valid ref) ---
-	std::unique_ptr<GPUBuffer> m_fallbackSSBO;
-
 	// --- Command pool ---
 	vk::raii::CommandPool m_commandPool;
 
