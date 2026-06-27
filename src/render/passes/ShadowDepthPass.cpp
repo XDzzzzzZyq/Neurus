@@ -10,6 +10,9 @@
 #include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"
 
+#include "scene/Light.h"
+#include "scene/Scene.h"
+
 #include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
 #include "shadow_depth_multiview.vert.h"
@@ -48,13 +51,9 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
                                    const vk::raii::PhysicalDevice& physicalDevice,
                                    vk::Queue graphicsQueue,
                                    uint32_t queueFamilyIndex,
-                                   uint32_t resolution,
-                                   float farPlane,
-                                   ShadowMode mode)
+                                   uint32_t resolution)
 	: Pass()
 	, m_resolution(resolution)
-	, m_farPlane(farPlane)
-	, m_mode(mode)
 	, m_pipelineLayout(nullptr)
 	, m_pipeline(nullptr)
 	, m_multiviewPipelineLayout(nullptr)
@@ -69,36 +68,10 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	m_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
 	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
+	createSingleFacePipeline(device);
 
-	if (m_mode == ShadowMode::Multiview)
-	{
-		createMultiviewPipeline(device);
-		createMultiviewColorPipeline(device);
-	}
-	else
-		createSingleFacePipeline(device);
-
-	updateUBO();
-
-	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution << " farPlane=" << farPlane
-	           << " lightPos=(" << m_lightPosition.x << "," << m_lightPosition.y << "," << m_lightPosition.z << ")"
+	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " UBOsize=" << sizeof(LightUBO));
-}
-
-// ===========================================================================
-// createDepthmap — 2D depth map for directional lights / single-face tests
-// ===========================================================================
-
-void ShadowDepthPass::createDepthmap(const vk::raii::Device& device,
-                                      const vk::raii::PhysicalDevice& physicalDevice)
-{
-	m_depthmap = std::make_unique<Image>(device, physicalDevice,
-		vk::Extent2D{m_resolution, m_resolution},
-		kDepthFmt,
-		vk::ImageUsageFlagBits::eDepthStencilAttachment |
-			vk::ImageUsageFlagBits::eTransferSrc,
-		1u, Image::ImageType::e2D,
-		"ShadowDepthMap2D");
 }
 
 // ===========================================================================
@@ -250,11 +223,11 @@ void ShadowDepthPass::createMultiviewColorPipeline(const vk::raii::Device& devic
 // UBO update
 // ===========================================================================
 
-void ShadowDepthPass::updateUBO()
+void ShadowDepthPass::updateUBO(const glm::vec3& lightPos, float farPlane)
 {
 	const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
-	                                        kNearPlane, m_farPlane);
-	const glm::vec3& p = m_lightPosition;
+	                                        kNearPlane, farPlane);
+	const glm::vec3& p = lightPos;
 
 	LightUBO ubo{};
 	ubo.faceVP[0] = proj * glm::lookAt(p, p + glm::vec3( 1, 0, 0), glm::vec3( 0,-1, 0));
@@ -264,20 +237,14 @@ void ShadowDepthPass::updateUBO()
 	ubo.faceVP[4] = proj * glm::lookAt(p, p + glm::vec3( 0, 0, 1), glm::vec3( 0,-1, 0));
 	ubo.faceVP[5] = proj * glm::lookAt(p, p + glm::vec3( 0, 0,-1), glm::vec3( 0,-1, 0));
 	ubo.lpx = p.x; ubo.lpy = p.y; ubo.lpz = p.z;
-	ubo.farPlane = m_farPlane;
+	ubo.farPlane = farPlane;
 
-	NEURUS_LOG("[ShadowDepthPass] UBO: farPlane=" << m_farPlane
+	NEURUS_LOG("[ShadowDepthPass] UBO: farPlane=" << farPlane
 	           << " nearPlane=" << kNearPlane
 	           << " lightPos=(" << p.x << "," << p.y << "," << p.z << ")"
 	           << " sizeof=" << sizeof(LightUBO));
 
 	m_ubo->Upload(ubo);
-}
-
-void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
-{
-	m_lightPosition = position;
-	updateUBO();
 }
 
 // ===========================================================================
@@ -286,6 +253,23 @@ void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
 
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	// Guard: skip if no scene or no active shadow-casting light
+	if (!ctx.scene || ctx.lightUID < 0) { return; }
+
+	// Look up the active light
+	auto it = ctx.scene->light_list.find(ctx.lightUID);
+	if (it == ctx.scene->light_list.end()) return;
+	auto lightPtr = it->second;
+
+	const glm::vec3 lightPos = lightPtr->GetPosition();
+	const float farPlane = (lightPtr->light_type == LightType::POINTLIGHT)
+		? Light::point_shadow_far
+		: Light::sun_shadow_far;
+
+	const ShadowMode mode = ShadowMode::SingleFace;
+
+	updateUBO(lightPos, farPlane);
+
 	const size_t itemCount = ctx.renderItems ? ctx.renderItems->size() : 0;
 
 	// Transition cubemap to depth attachment layout (all faces/layers)
@@ -304,7 +288,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 	const vk::ClearValue clearValue = vk::ClearDepthStencilValue(1.0f, 0);
 
-	if (m_mode == ShadowMode::Multiview)
+	if (mode == ShadowMode::Multiview)
 	{
 		// --- Multiview: render all 6 faces in a single pass ---
 
