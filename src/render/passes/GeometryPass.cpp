@@ -169,12 +169,8 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const auto& renderItems = *ctx.renderItems;
 	const auto& renderExtent = ctx.renderExtent;
 
-	// --- 1. Upload camera data to UBO (host-visible, synchronous memcpy) ---
-	{
-		void* mapped = m_cameraUBO.Map();
-		std::memcpy(mapped, &cameraData, sizeof(CameraUBOData));
-		m_cameraUBO.Unmap();
-	}
+	// --- 1. Upload camera data to UBO ---
+	m_cameraUBO.Upload(cameraData);
 
 	// --- 2. Collect G-Buffer attachment image views ---
 	//     Attachments start in ImageState::Undefined (first frame) or

@@ -93,11 +93,11 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 
 	// --- Generate and upload kernel + initial camera data ---
 	{
-		const auto kernel = GenerateKernel();
+		m_kernelSamples = GenerateKernel();
 		SSAOParamsGpu initialParams = {};
 		for (size_t i = 0; i < kMaxKernelSamples; ++i)
 		{
-			initialParams.kernelSamples[i] = kernel[i];
+			initialParams.kernelSamples[i] = m_kernelSamples[i];
 		}
 
 		m_paramsUBO = std::make_unique<UniformBuffer<SSAOParamsGpu>>(
@@ -308,32 +308,21 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	const vk::Extent2D renderExtent = ctx.renderExtent;
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
-	// --- 0. Update per-frame SSAO params UBO (camera matrices) ---
-	//     Maps the host-visible UBO and overwrites only the first 128 bytes
-	//     (viewProj + view + cameraPos).  Kernel samples (offset 144) are
-	//     written once in the constructor and left intact.
-	if (m_paramsUBO)
+	// --- 0. Update per-frame SSAO params UBO (camera matrices + kernel) ---
 	{
-		void* mapped = m_paramsUBO->Map();
-		auto* params = static_cast<SSAOParamsGpu*>(mapped);
-
-		// View-projection matrix (column-major)
+		SSAOParamsGpu params{};
 		const float* vp = &ctx.viewProj[0][0];
-		for (int i = 0; i < 16; ++i) params->viewProj[i] = vp[i];
-
-		// View matrix
+		for (int i = 0; i < 16; ++i) params.viewProj[i] = vp[i];
 		const float* vm = &ctx.view[0][0];
-		for (int i = 0; i < 16; ++i) params->view[i] = vm[i];
+		for (int i = 0; i < 16; ++i) params.view[i] = vm[i];
+		params.camX = ctx.cameraPos.x;
+		params.camY = ctx.cameraPos.y;
+		params.camZ = ctx.cameraPos.z;
+		params.camW = 0.0f;
+		for (size_t i = 0; i < kMaxKernelSamples; ++i)
+			params.kernelSamples[i] = m_kernelSamples[i];
 
-		// Camera position
-		params->camX = ctx.cameraPos.x;
-		params->camY = ctx.cameraPos.y;
-		params->camZ = ctx.cameraPos.z;
-		params->camW = 0.0f;
-
-		// Kernel samples are NOT touched — they remain from construction
-
-		m_paramsUBO->Unmap();
+		m_paramsUBO->Upload(params);
 	}
 
 	// --- 1. Write descriptor set for this frame slot ---

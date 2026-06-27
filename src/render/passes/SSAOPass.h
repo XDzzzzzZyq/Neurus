@@ -203,6 +203,9 @@ private:
 	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> m_paramsUBO;   ///< SSAO params (camera + kernel), host-visible
 	std::unique_ptr<GPUBuffer> m_noiseUBO;    ///< Noise rotation vectors, device-local
 
+	// --- Kernel samples (persistent across frames) ---
+	std::array<KernelSampleGpu, kMaxKernelSamples> m_kernelSamples{};
+
 	// --- Push constant data ---
 	int32_t m_kernelLength = kDefaultKernelLength;
 	float   m_radius       = 0.15f;

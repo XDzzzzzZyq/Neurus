@@ -271,9 +271,7 @@ void ShadowDepthPass::updateUBO()
 	           << " lightPos=(" << p.x << "," << p.y << "," << p.z << ")"
 	           << " sizeof=" << sizeof(LightUBO));
 
-	void* mapped = m_ubo->Map();
-	std::memcpy(mapped, &ubo, sizeof(LightUBO));
-	m_ubo->Unmap();
+	m_ubo->Upload(ubo);
 }
 
 void ShadowDepthPass::SetLightPosition(const glm::vec3& position)
