@@ -20,7 +20,6 @@
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
 #include "render/passes/RenderContext.h"
-#include "render/passes/RenderPassManager.h"
 #include "render/buffers/GPUBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
@@ -74,13 +73,9 @@ protected:
 		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 
-		// --- Render pass manager ---
-		m_renderPassManager = std::make_unique<RenderPassManager>();
-
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
@@ -190,7 +185,6 @@ protected:
 
 	// --- Render pass infrastructure ---
 	std::unique_ptr<RenderCache>  m_renderCache;
-	std::unique_ptr<RenderPassManager>  m_renderPassManager;
 
 	// --- Systems under test ---
 	std::unique_ptr<GeometryPass>  m_geometryPass;

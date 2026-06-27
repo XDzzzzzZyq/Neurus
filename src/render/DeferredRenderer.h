@@ -32,7 +32,6 @@ namespace neurus {
 
 // --- Forward declarations ---
 class RenderCache;
-class RenderPassManager;
 class VertexBuffer;
 class IndexBuffer;
 class GPUBuffer;
@@ -64,7 +63,7 @@ public:
 	/**
 	 * @brief Creates the full deferred pipeline.
 	 *
-	 * Construction order: Swapchain → RenderCache → RenderPassManager →
+	 * Construction order: Swapchain → RenderCache →
 	 * GeometryPass → LightingPass → sync objects. Mesh buffers are uploaded
 	 * directly to GPU by Mesh objects. LightingPass owns its own light SSBO.
 	 * SPIR-V shaders are embedded at compile time (no constructor parameters needed).
@@ -242,7 +241,6 @@ private:
 
 	// --- Deferred pipeline ---
 	std::unique_ptr<RenderCache> m_renderCache;
-	std::unique_ptr<RenderPassManager> m_renderPassManager;
 	// --- Polymorphic pass container (owning) ---
 	std::vector<std::unique_ptr<Pass>> m_passes;
 

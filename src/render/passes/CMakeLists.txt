@@ -11,9 +11,8 @@ add_library(neurus_render_passes STATIC
 	LightingPass.h
 	LightingPass.cpp
 	Pass.h
+	Pass.cpp
 	RenderContext.h
-	RenderPassManager.h
-	RenderPassManager.cpp
 	ShadowDepthPass.h
 	ShadowDepthPass.cpp
 	SSAOPass.h

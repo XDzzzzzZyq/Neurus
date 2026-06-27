@@ -5,10 +5,10 @@
 
 #include "passes/GeometryPass.h"
 
+#include "passes/Pass.h"
 #include "passes/RenderCache.h"
 #include "render/Barrier.h"
 #include "PipelineBuilder.h"
-#include "passes/RenderPassManager.h"
 #include "shaders/ShaderModule.h"
 
 #include "Log.h"
@@ -27,13 +27,11 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            vk::Queue queue,
                            uint32_t queueFamilyIndex,
-                           RenderPassManager& renderPassManager,
                            const uint32_t* vertSpv,
                            size_t vertSize,
                            const uint32_t* fragSpv,
                            size_t fragSize)
 	: m_physicalDevice(&physicalDevice)
-	, m_renderPassManager(&renderPassManager)
 	// --- Descriptor set layout ---
 	, m_cameraLayout(CreateCameraLayout(device))
 	// --- Camera UBO (host-visible for per-frame memcpy update) ---
@@ -203,15 +201,13 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	vk::ImageView depthView = *depthAtt.ImageViewHandle();
 
 	// --- 3. Begin G-Buffer dynamic rendering pass ---
-	const auto clearValues = RenderPassManager::PresetClearValues(
-		RenderPassManager::PassType::G_BUFFER);
+	const auto clearValues = Pass::PresetClearValues(Pass::PassType::G_BUFFER);
 
-	m_renderPassManager->BeginPass(cmdBuf,
-	                                RenderPassManager::PassType::G_BUFFER,
-	                                colorViews,
-	                                &depthView,
-	                                clearValues,
-	                                renderExtent);
+	BeginPass(cmdBuf,
+	          colorViews,
+	          &depthView,
+	          clearValues,
+	          renderExtent);
 
 	// --- 4. Set viewport and scissor (dynamic state) ---
 	const vk::Viewport viewport(0.0f, 0.0f,
@@ -254,7 +250,87 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	}
 
 	// --- 8. End dynamic rendering pass ---
-	m_renderPassManager->EndPass(cmdBuf);
+	EndPass(cmdBuf);
+}
+
+// ---------------------------------------------------------------------------
+// BeginPass / EndPass (G_BUFFER-specific, moved from RenderPassManager)
+// ---------------------------------------------------------------------------
+
+void GeometryPass::BeginPass(vk::CommandBuffer cmdBuf,
+                              std::span<const vk::ImageView> colorImageViews,
+                              const vk::ImageView* pDepthImageView,
+                              std::span<const vk::ClearValue> clearValues,
+                              vk::Extent2D renderExtent)
+{
+	const uint32_t colorCount = static_cast<uint32_t>(colorImageViews.size());
+
+	if (colorCount != Pass::ColorAttachmentCount(Pass::PassType::G_BUFFER))
+	{
+		throw std::invalid_argument(
+			"GeometryPass::BeginPass: expected 4 color attachments, got "
+			+ std::to_string(colorCount));
+	}
+
+	const bool depthProvided = (pDepthImageView != nullptr);
+	if (!depthProvided)
+	{
+		throw std::invalid_argument(
+			"GeometryPass::BeginPass: depth attachment required for G_BUFFER pass");
+	}
+
+	// --- Build color attachment infos ---
+	const auto colorLoadOp  = Pass::ColorLoadOpFor(Pass::PassType::G_BUFFER);
+	const auto colorStoreOp = Pass::ColorStoreOpFor(Pass::PassType::G_BUFFER);
+
+	std::vector<vk::RenderingAttachmentInfo> colorAttachmentInfos;
+	colorAttachmentInfos.reserve(colorCount);
+
+	for (uint32_t i = 0; i < colorCount; ++i)
+	{
+		colorAttachmentInfos.push_back(vk::RenderingAttachmentInfo(
+			colorImageViews[i],
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ResolveModeFlagBits::eNone,
+			nullptr,
+			vk::ImageLayout::eUndefined,
+			colorLoadOp,
+			colorStoreOp,
+			(i < static_cast<uint32_t>(clearValues.size())) ? clearValues[i] : vk::ClearValue{}));
+	}
+
+	// --- Build depth attachment info ---
+	const auto depthLoadOp  = Pass::DepthLoadOpFor(Pass::PassType::G_BUFFER);
+	const auto depthStoreOp = Pass::DepthStoreOpFor(Pass::PassType::G_BUFFER);
+
+	const size_t depthClearIndex = colorCount;
+
+	vk::RenderingAttachmentInfo depthAttachmentInfo(
+		*pDepthImageView,
+		vk::ImageLayout::eDepthStencilAttachmentOptimal,
+		vk::ResolveModeFlagBits::eNone,
+		nullptr,
+		vk::ImageLayout::eUndefined,
+		depthLoadOp,
+		depthStoreOp,
+		(depthClearIndex < clearValues.size()) ? clearValues[depthClearIndex] : vk::ClearValue{});
+
+	// --- Build rendering info ---
+	vk::RenderingInfo renderingInfo(
+		{},
+		vk::Rect2D({0, 0}, renderExtent),
+		1,
+		0,
+		colorAttachmentInfos,
+		&depthAttachmentInfo,
+		nullptr);
+
+	cmdBuf.beginRendering(renderingInfo);
+}
+
+void GeometryPass::EndPass(vk::CommandBuffer cmdBuf)
+{
+	cmdBuf.endRendering();
 }
 
 } // namespace neurus

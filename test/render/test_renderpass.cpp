@@ -1,44 +1,30 @@
-// Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
+/**
+ * @file test_renderpass.cpp
+ * @brief Tests for Pass type queries — static methods moved from RenderPassManager.
+ *
+ * All tests here are compile-time / CPU-only; no Vulkan GPU required.
+ * They verifies PassType enum values, ColorAttachmentCount, HasDepth,
+ * and PresetClearValues for every pass type.
+ */
 
 #include <gtest/gtest.h>
 
-#include "shared/TestVulkanShared.h"
-#include "render/passes/RenderPassManager.h"
-#include "render/Image.h"
-#include "render/Barrier.h"
-
-#include <vulkan/vulkan_raii.hpp>
-
-#include <memory>
+#include "render/passes/Pass.h"
 
 using namespace neurus;
-
-/**
- * @brief Tests for RenderPassManager - dynamic rendering pass orchestration.
- *
- * Validates BeginPass/EndPass using VK_KHR_dynamic_rendering with preset
- * clear values per pass type.
- *
- * @note These tests require a Vulkan 1.4-capable GPU. They will be skipped
- *       in CI environments without GPU access.
- */
-class RenderPassManagerTest : public VulkanTestShared
-{
-};
 
 // ---------------------------------------------------------------------------
 // Pass Type Enum Values
 // ---------------------------------------------------------------------------
 
-TEST_F(RenderPassManagerTest, PassType_EnumValuesExist)
+TEST(PassTypeTest, EnumValuesExist)
 {
 	// Verify all pass type enum values are defined
-	auto gBuffer = RenderPassManager::PassType::G_BUFFER;
-	auto lighting = RenderPassManager::PassType::LIGHTING;
-	auto shadow = RenderPassManager::PassType::SHADOW;
-	auto composite = RenderPassManager::PassType::COMPOSITE;
-	auto postFx = RenderPassManager::PassType::POST_FX;
+	auto gBuffer   = Pass::PassType::G_BUFFER;
+	auto lighting  = Pass::PassType::LIGHTING;
+	auto shadow    = Pass::PassType::SHADOW;
+	auto composite = Pass::PassType::COMPOSITE;
+	auto postFx    = Pass::PassType::POST_FX;
 
 	// Just ensure they compile and are distinct
 	EXPECT_NE(static_cast<int>(gBuffer), static_cast<int>(lighting));
@@ -51,41 +37,40 @@ TEST_F(RenderPassManagerTest, PassType_EnumValuesExist)
 // Color Attachment Count per Pass Type
 // ---------------------------------------------------------------------------
 
-TEST_F(RenderPassManagerTest, ColorAttachmentCount_PerPassType)
+TEST(PassTypeTest, ColorAttachmentCount_PerPassType)
 {
-	// G_BUFFER: 4 color attachments (Position, Normal, Albedo, MetallicRoughness) + depth
-	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::G_BUFFER), 4u);
-	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::LIGHTING), 1u);
-	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::SHADOW), 0u);
-	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::COMPOSITE), 1u);
-	EXPECT_EQ(RenderPassManager::ColorAttachmentCount(RenderPassManager::PassType::POST_FX), 1u);
+	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::G_BUFFER), 4u);
+	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::LIGHTING), 1u);
+	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::SHADOW), 0u);
+	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::COMPOSITE), 1u);
+	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::POST_FX), 1u);
 }
 
 // ---------------------------------------------------------------------------
 // Depth Attachment Presence per Pass Type
 // ---------------------------------------------------------------------------
 
-TEST_F(RenderPassManagerTest, HasDepth_PerPassType)
+TEST(PassTypeTest, HasDepth_PerPassType)
 {
-	EXPECT_TRUE(RenderPassManager::HasDepth(RenderPassManager::PassType::G_BUFFER));
-	EXPECT_FALSE(RenderPassManager::HasDepth(RenderPassManager::PassType::LIGHTING));
-	EXPECT_TRUE(RenderPassManager::HasDepth(RenderPassManager::PassType::SHADOW));
-	EXPECT_FALSE(RenderPassManager::HasDepth(RenderPassManager::PassType::COMPOSITE));
-	EXPECT_FALSE(RenderPassManager::HasDepth(RenderPassManager::PassType::POST_FX));
+	EXPECT_TRUE (Pass::HasDepth(Pass::PassType::G_BUFFER));
+	EXPECT_FALSE(Pass::HasDepth(Pass::PassType::LIGHTING));
+	EXPECT_TRUE (Pass::HasDepth(Pass::PassType::SHADOW));
+	EXPECT_FALSE(Pass::HasDepth(Pass::PassType::COMPOSITE));
+	EXPECT_FALSE(Pass::HasDepth(Pass::PassType::POST_FX));
 }
 
 // ---------------------------------------------------------------------------
 // Preset Clear Values per Pass Type
 // ---------------------------------------------------------------------------
 
-TEST_F(RenderPassManagerTest, PresetClearValues_G_Buffer)
+TEST(PassTypeTest, PresetClearValues_G_Buffer)
 {
-	const auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::G_BUFFER);
+	const auto clearValues = Pass::PresetClearValues(Pass::PassType::G_BUFFER);
 
 	// G_BUFFER: 4 color clear values + 1 depth clear value = 5
 	ASSERT_EQ(clearValues.size(), 5u);
 
-	// All color clear values should be of type ClearColorValue
+	// All color clear values should be black
 	for (size_t i = 0; i < 4; ++i)
 	{
 		EXPECT_EQ(clearValues[i].color.float32[0], 0.0f);
@@ -99,23 +84,22 @@ TEST_F(RenderPassManagerTest, PresetClearValues_G_Buffer)
 	EXPECT_EQ(clearValues[4].depthStencil.stencil, 0u);
 }
 
-TEST_F(RenderPassManagerTest, PresetClearValues_Lighting)
+TEST(PassTypeTest, PresetClearValues_Lighting)
 {
-	const auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::LIGHTING);
+	const auto clearValues = Pass::PresetClearValues(Pass::PassType::LIGHTING);
 
 	// LIGHTING: 1 color clear value, no depth
 	ASSERT_EQ(clearValues.size(), 1u);
 
-	// Color clear to black
 	EXPECT_FLOAT_EQ(clearValues[0].color.float32[0], 0.0f);
 	EXPECT_FLOAT_EQ(clearValues[0].color.float32[1], 0.0f);
 	EXPECT_FLOAT_EQ(clearValues[0].color.float32[2], 0.0f);
 	EXPECT_FLOAT_EQ(clearValues[0].color.float32[3], 0.0f);
 }
 
-TEST_F(RenderPassManagerTest, PresetClearValues_Shadow)
+TEST(PassTypeTest, PresetClearValues_Shadow)
 {
-	const auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::SHADOW);
+	const auto clearValues = Pass::PresetClearValues(Pass::PassType::SHADOW);
 
 	// SHADOW: no color, 1 depth clear value only
 	ASSERT_EQ(clearValues.size(), 1u);
@@ -124,278 +108,18 @@ TEST_F(RenderPassManagerTest, PresetClearValues_Shadow)
 	EXPECT_EQ(clearValues[0].depthStencil.stencil, 0u);
 }
 
-TEST_F(RenderPassManagerTest, PresetClearValues_Composite)
+TEST(PassTypeTest, PresetClearValues_Composite)
 {
-	const auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::COMPOSITE);
+	const auto clearValues = Pass::PresetClearValues(Pass::PassType::COMPOSITE);
 
-	// COMPOSITE: 1 color clear value
 	ASSERT_EQ(clearValues.size(), 1u);
 	EXPECT_FLOAT_EQ(clearValues[0].color.float32[0], 0.0f);
 }
 
-TEST_F(RenderPassManagerTest, PresetClearValues_PostFX)
+TEST(PassTypeTest, PresetClearValues_PostFX)
 {
-	const auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::POST_FX);
+	const auto clearValues = Pass::PresetClearValues(Pass::PassType::POST_FX);
 
-	// POST_FX: 1 color clear value
 	ASSERT_EQ(clearValues.size(), 1u);
 	EXPECT_FLOAT_EQ(clearValues[0].color.float32[0], 0.0f);
-}
-
-// ---------------------------------------------------------------------------
-// BeginPass / EndPass - Basic Smoke Test (single color, no depth)
-// ---------------------------------------------------------------------------
-
-TEST_F(RenderPassManagerTest, BeginEndPass_SingleColor_NoValidationError)
-{
-	if (!m_hasVulkan)
-	{
-		GTEST_SKIP() << "No Vulkan-capable GPU found.";
-	}
-
-	// Create a simple color attachment
-	auto colorAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
-	                             vk::Format::eR8G8B8A8Unorm,
-	                             vk::ImageUsageFlagBits::eColorAttachment, 1);
-
-	// Transition to color attachment optimal layout
-	{
-		auto& cmd = BeginCmd();
-		Barrier::Transition(*cmd, colorAttachment, ImageState::ColorAttachment);
-		EndSubmitWait(cmd);
-	}
-
-	// Begin and end a rendering pass
-	RenderPassManager rpManager;
-	{
-		auto& cmd = BeginCmd();
-
-		std::vector<vk::ImageView> colorViews = { *colorAttachment.ImageViewHandle() };
-		auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::LIGHTING);
-		vk::Extent2D extent(128, 128);
-
-		rpManager.BeginPass(cmd, RenderPassManager::PassType::LIGHTING,
-		                    colorViews, nullptr, clearValues, extent);
-
-		// Set viewport + scissor (required by spec)
-		vk::Viewport viewport(0.0f, 0.0f, 128.0f, 128.0f, 0.0f, 1.0f);
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, vk::Rect2D({0, 0}, {128, 128}));
-
-		rpManager.EndPass(cmd);
-
-		EndSubmitWait(cmd);
-	}
-
-	SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// BeginPass / EndPass - Depth Attachment
-// ---------------------------------------------------------------------------
-
-TEST_F(RenderPassManagerTest, BeginEndPass_WithDepth_NoValidationError)
-{
-	if (!m_hasVulkan)
-	{
-		GTEST_SKIP() << "No Vulkan-capable GPU found.";
-	}
-
-	auto& pd = PhysicalDevice();
-
-	// Check depth format support
-	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
-	if (!(depthFmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
-	{
-		GTEST_SKIP() << "D32_SFLOAT depth attachment not supported.";
-	}
-
-	// Create color + depth attachments
-	auto colorAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
-	                             vk::Format::eR8G8B8A8Unorm,
-	                             vk::ImageUsageFlagBits::eColorAttachment, 1);
-	auto depthAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
-	                             vk::Format::eD32Sfloat,
-	                             vk::ImageUsageFlagBits::eDepthStencilAttachment, 1,
-	                             Image::ImageType::eDepthStencil);
-
-	// Transition layouts
-	{
-		auto& cmd = BeginCmd();
-		Barrier::Transition(*cmd, colorAttachment, ImageState::ColorAttachment);
-		Barrier::Transition(*cmd, depthAttachment, ImageState::DepthAttachment);
-		EndSubmitWait(cmd);
-	}
-
-	// Begin/end pass with depth (using SHADOW pass type which has depth)
-	RenderPassManager rpManager;
-	{
-		auto& cmd = BeginCmd();
-
-		std::vector<vk::ImageView> colorViews;  // SHADOW has 0 color attachments
-		vk::ImageView depthView = *depthAttachment.ImageViewHandle();
-		auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::SHADOW);
-		vk::Extent2D extent(128, 128);
-
-		rpManager.BeginPass(cmd, RenderPassManager::PassType::SHADOW,
-		                    colorViews, &depthView, clearValues, extent);
-
-		vk::Viewport viewport(0.0f, 0.0f, 128.0f, 128.0f, 0.0f, 1.0f);
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, vk::Rect2D({0, 0}, {128, 128}));
-
-		rpManager.EndPass(cmd);
-
-		EndSubmitWait(cmd);
-	}
-
-	SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// BeginPass / EndPass - G-Buffer (multiple color + depth)
-// ---------------------------------------------------------------------------
-
-TEST_F(RenderPassManagerTest, BeginEndPass_GBuffer_NoValidationError)
-{
-	if (!m_hasVulkan)
-	{
-		GTEST_SKIP() << "No Vulkan-capable GPU found.";
-	}
-
-	auto& pd = PhysicalDevice();
-
-	auto depthFmtProps = pd.getFormatProperties(vk::Format::eD32Sfloat);
-	if (!(depthFmtProps.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment))
-	{
-		GTEST_SKIP() << "D32_SFLOAT depth attachment not supported.";
-	}
-
-	// Create 4 color attachments + 1 depth
-	std::vector<vk::Format> gbufferColorFormats = {
-		vk::Format::eR16G16B16A16Sfloat,  // Position
-		vk::Format::eR16G16B16A16Sfloat,  // Normal
-		vk::Format::eR8G8B8A8Srgb,        // Albedo
-		vk::Format::eR8G8B8A8Unorm,       // MetallicRoughness
-	};
-
-	std::vector<Image> colorAttachments;
-	colorAttachments.reserve(gbufferColorFormats.size());
-	for (const auto& fmt : gbufferColorFormats)
-	{
-		colorAttachments.push_back(
-			Image(*m_device, pd, vk::Extent2D(128, 128), fmt,
-			            vk::ImageUsageFlagBits::eColorAttachment, 1));
-	}
-
-	auto depthAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
-	                             vk::Format::eD32Sfloat,
-	                             vk::ImageUsageFlagBits::eDepthStencilAttachment, 1,
-	                             Image::ImageType::eDepthStencil);
-
-	// Transition all layouts
-	{
-		auto& cmd = BeginCmd();
-		for (auto& ca : colorAttachments)
-		{
-			Barrier::Transition(*cmd, ca, ImageState::ColorAttachment);
-		}
-		Barrier::Transition(*cmd, depthAttachment, ImageState::DepthAttachment);
-		EndSubmitWait(cmd);
-	}
-
-	// Begin/end G-Buffer pass
-	RenderPassManager rpManager;
-	{
-		auto& cmd = BeginCmd();
-
-		std::vector<vk::ImageView> colorViews;
-		colorViews.reserve(colorAttachments.size());
-		for (auto& ca : colorAttachments)
-		{
-			colorViews.push_back(*ca.ImageViewHandle());
-		}
-		vk::ImageView depthView = *depthAttachment.ImageViewHandle();
-		auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::G_BUFFER);
-		vk::Extent2D extent(128, 128);
-
-		rpManager.BeginPass(cmd, RenderPassManager::PassType::G_BUFFER,
-		                    colorViews, &depthView, clearValues, extent);
-
-		vk::Viewport viewport(0.0f, 0.0f, 128.0f, 128.0f, 0.0f, 1.0f);
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, vk::Rect2D({0, 0}, {128, 128}));
-
-		rpManager.EndPass(cmd);
-
-		EndSubmitWait(cmd);
-	}
-
-	SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// Post-FX pass (1 color, load=DONT_CARE, store=STORE)
-// ---------------------------------------------------------------------------
-
-TEST_F(RenderPassManagerTest, BeginEndPass_PostFX_NoValidationError)
-{
-	if (!m_hasVulkan)
-	{
-		GTEST_SKIP() << "No Vulkan-capable GPU found.";
-	}
-
-	auto colorAttachment = Image(*m_device, PhysicalDevice(), vk::Extent2D(128, 128),
-	                             vk::Format::eR8G8B8A8Unorm,
-	                             vk::ImageUsageFlagBits::eColorAttachment, 1);
-
-	{
-		auto& cmd = BeginCmd();
-		Barrier::Transition(*cmd, colorAttachment, ImageState::ColorAttachment);
-		EndSubmitWait(cmd);
-	}
-
-	RenderPassManager rpManager;
-	{
-		auto& cmd = BeginCmd();
-
-		std::vector<vk::ImageView> colorViews = { *colorAttachment.ImageViewHandle() };
-		auto clearValues = RenderPassManager::PresetClearValues(RenderPassManager::PassType::POST_FX);
-		vk::Extent2D extent(128, 128);
-
-		rpManager.BeginPass(cmd, RenderPassManager::PassType::POST_FX,
-		                    colorViews, nullptr, clearValues, extent);
-
-		vk::Viewport viewport(0.0f, 0.0f, 128.0f, 128.0f, 0.0f, 1.0f);
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, vk::Rect2D({0, 0}, {128, 128}));
-
-		rpManager.EndPass(cmd);
-
-		EndSubmitWait(cmd);
-	}
-
-	SUCCEED();
-}
-
-// ---------------------------------------------------------------------------
-// Non-copyable, movable
-// ---------------------------------------------------------------------------
-
-TEST_F(RenderPassManagerTest, NonCopyable)
-{
-	static_assert(!std::is_copy_constructible_v<RenderPassManager>,
-	              "RenderPassManager must not be copy-constructible");
-	static_assert(!std::is_copy_assignable_v<RenderPassManager>,
-	              "RenderPassManager must not be copy-assignable");
-	SUCCEED();
-}
-
-TEST_F(RenderPassManagerTest, Movable)
-{
-	static_assert(std::is_move_constructible_v<RenderPassManager>,
-	              "RenderPassManager must be move-constructible");
-	static_assert(std::is_move_assignable_v<RenderPassManager>,
-	              "RenderPassManager must be move-assignable");
-	SUCCEED();
 }

@@ -24,7 +24,6 @@
 #include "render/passes/IBLPass.h"
 #include "render/passes/LightingPass.h"
 #include "render/passes/RenderContext.h"
-#include "render/passes/RenderPassManager.h"
 #include "render/Image.h"
 #include "render/Material.h"
 #include "render/Screenshot.h"
@@ -138,12 +137,10 @@ protected:
 
 		// --- Render pass infrastructure ---
 		m_renderCache = std::make_unique<RenderCache>(dev, pd);
-		m_renderPassManager = std::make_unique<RenderPassManager>();
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			dev, pd, m_queue, m_graphicsQueueFamily,
-			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 
@@ -184,8 +181,7 @@ protected:
 	}
 
 	// --- Render pass infrastructure ---
-	std::unique_ptr<RenderCache>  m_renderCache;
-	std::unique_ptr<RenderPassManager>  m_renderPassManager;
+		std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<LightingPass>       m_lightingPass;
 	std::unique_ptr<IBLPass>            m_iblPass;
@@ -446,7 +442,6 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	m_iblPass.reset();
 	m_lightingPass.reset();
 	m_geometryPass.reset();
-	m_renderPassManager.reset();
 	m_renderCache.reset();
 
 	// 2d. Destroy IBL GPU resources (Environment + equirect).
@@ -458,11 +453,9 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	// 2e. Recreate RenderCache + passes (simulating renderer init).
 	SCOPED_TRACE("Recreate passes");
 	m_renderCache = std::make_unique<RenderCache>(dev, pd);
-	m_renderPassManager = std::make_unique<RenderPassManager>();
 
 	m_geometryPass = std::make_unique<GeometryPass>(
 		dev, pd, m_queue, m_graphicsQueueFamily,
-		*m_renderPassManager,
 		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 

@@ -10,7 +10,7 @@
  * Architecture:
  * - Owns the graphics pipeline, descriptor set layout, descriptor pool,
  *   camera UBO, and camera descriptor set (set 0).
- * - Borrows RenderCache and RenderPassManager (non-owning references).
+ * - Borrows RenderCache (non-owning reference).
  * - Receives pre-assembled GeometryRenderItem batches from the caller.
  * - Each GeometryRenderItem bundles GPU buffers + model matrices.
  *
@@ -27,6 +27,7 @@
 #include "RenderContext.h"
 
 #include <glm/glm.hpp>
+#include <span>
 #include <vulkan/vulkan_raii.hpp>
 
 #include <vector>
@@ -35,7 +36,6 @@ namespace neurus {
 
 // --- Forward declarations ---
 class RenderCache;
-class RenderPassManager;
 
 /**
  * @brief Camera data uploaded to the GPU each frame.
@@ -81,7 +81,7 @@ struct GeometryRenderItem
  * Creates a graphics pipeline with 4 MRT colour attachments
  * (Position, Normal, Albedo, MetallicRoughness) + depth.
  * Uses PipelineBuilder for pipeline construction and
- * RenderPassManager::PassType::G_BUFFER for pass control.
+ * Pass::PassType::G_BUFFER for pass control.
  *
  * Non-copyable, movable.
  */
@@ -95,8 +95,6 @@ public:
 	 * @param physicalDevice      Physical device (for format queries).
 	 * @param queue               Graphics queue (for staging uploads).
 	 * @param queueFamilyIndex    Queue family index (for temp command pool).
-	 * @param attachmentManager   G-Buffer attachment provider (borrowed).
-	 * @param renderPassManager   Dynamic-rendering pass manager (borrowed).
 	 * @param vertSpv             Embedded vertex shader SPIR-V data.
 	 * @param vertSize            Vertex shader SPIR-V size in bytes.
 	 * @param fragSpv             Embedded fragment shader SPIR-V data.
@@ -108,7 +106,6 @@ public:
 	             const vk::raii::PhysicalDevice& physicalDevice,
 	             vk::Queue queue,
 	             uint32_t queueFamilyIndex,
-	             RenderPassManager& renderPassManager,
 	             const uint32_t* vertSpv,
 	             size_t vertSize,
 	             const uint32_t* fragSpv,
@@ -155,7 +152,6 @@ private:
 
 	// --- References (non-owning) ---
 	const vk::raii::PhysicalDevice* m_physicalDevice;
-	RenderPassManager* m_renderPassManager;
 
 	// --- Descriptor resources ---
 	DescriptorSetLayout m_cameraLayout;             ///< Set 0 layout definition
@@ -173,6 +169,15 @@ private:
 
 	// --- Vertex input layout ---
 	BufferLayout m_vertexLayout;
+
+	// --- Dynamic rendering (G_BUFFER-specific) ---
+	void BeginPass(vk::CommandBuffer cmdBuf,
+	               std::span<const vk::ImageView> colorImageViews,
+	               const vk::ImageView* pDepthImageView,
+	               std::span<const vk::ClearValue> clearValues,
+	               vk::Extent2D renderExtent);
+
+	void EndPass(vk::CommandBuffer cmdBuf);
 };
 
 } // namespace neurus

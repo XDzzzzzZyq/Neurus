@@ -11,7 +11,6 @@
 #include "passes/IBLPass.h"
 #include "passes/LightingPass.h"
 #include "passes/RenderContext.h"
-#include "passes/RenderPassManager.h"
 #include "Image.h"
 #include "Texture.h"
 #include "Screenshot.h"
@@ -81,14 +80,10 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
 	m_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
 
-	// --- 3. Create render pass manager ---
-	m_renderPassManager = std::make_unique<RenderPassManager>();
-
-	// --- 4. Create geometry pass ---
+	// --- 3. Create geometry pass ---
 	{
 		auto geoPass = std::make_unique<GeometryPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			*m_renderPassManager,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
 		m_geometryPass = geoPass.get();
@@ -195,7 +190,7 @@ DeferredRenderer::~DeferredRenderer()
 	WaitIdle();
 	// vk::raii destructors clean up automatically in reverse declaration order.
 	// m_passes vector destroys all passes in construction order (GeometryPass → LightingPass →
-	//   SSAOPass → IBLPass), before RenderPassManager and RenderCache.
+	//   SSAOPass → IBLPass), before RenderCache.
 }
 
 // ---------------------------------------------------------------------------
