@@ -9,7 +9,6 @@
 #include "RenderContext.h"
 #include "../Image.h"
 #include "../DescriptorManager.h"
-#include "../buffers/BufferLayout.h"
 #include "../buffers/UniformBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -20,8 +19,6 @@
 namespace neurus {
 
 struct GeometryRenderItem;
-
-constexpr uint32_t kShadowFaceCount = 6;
 
 /** @brief Shadow depth pass rendering mode. */
 enum class ShadowMode
@@ -34,15 +31,12 @@ class ShadowDepthPass : public Pass
 {
 public:
 	static constexpr uint32_t kDefaultResolution = 1024;
-	static constexpr float    kDefaultFarPlane   = 25.0f;
 
 	ShadowDepthPass(const vk::raii::Device& device,
 	                const vk::raii::PhysicalDevice& physicalDevice,
 	                vk::Queue graphicsQueue,
 	                uint32_t queueFamilyIndex,
-	                uint32_t resolution = kDefaultResolution,
-	                float farPlane = kDefaultFarPlane,
-	                ShadowMode mode = ShadowMode::SingleFace);
+	                uint32_t resolution = kDefaultResolution);
 
 	~ShadowDepthPass() override = default;
 	ShadowDepthPass(const ShadowDepthPass&) = delete;
@@ -50,18 +44,10 @@ public:
 	ShadowDepthPass(ShadowDepthPass&&) noexcept = default;
 	ShadowDepthPass& operator=(ShadowDepthPass&&) noexcept = default;
 
-	void SetLightPosition(const glm::vec3& position);
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& /*cache*/, const RenderContext& ctx) override;
 
-	void createDepthmap(const vk::raii::Device& device,
-	                    const vk::raii::PhysicalDevice& physicalDevice);
-
 	// --- Accessors ---
-	ShadowMode Mode() const { return m_mode; }
-	Image& Depthmap() { return *m_depthmap; }
 	uint32_t Resolution() const { return m_resolution; }
-	const BufferLayout& VertexLayout() const { return m_vtxLayout; }
-	const DescriptorSetLayout& LightDescriptorLayout() const { return m_layout; }
 	const DescriptorSetLayout& GetLightLayout() const { return m_layout; }
 	vk::DescriptorSet GetLightSetHandle() const { return m_set->handle(); }
 
@@ -75,14 +61,6 @@ public:
 	              "LightUBO size must match std140 layout");
 
 	UniformBuffer<LightUBO>& GetUBO() { return *m_ubo; }
-	const vk::raii::Pipeline& GetPipeline() const
-	{
-		return m_mode == ShadowMode::Multiview ? m_multiviewPipeline : m_pipeline;
-	}
-	const vk::raii::PipelineLayout& GetPipelineLayout() const
-	{
-		return m_mode == ShadowMode::Multiview ? m_multiviewPipelineLayout : m_pipelineLayout;
-	}
 
 private:
 	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
@@ -93,16 +71,12 @@ private:
 	void createSingleFacePipeline(const vk::raii::Device& device);
 	void createMultiviewPipeline(const vk::raii::Device& device);
 	void createMultiviewColorPipeline(const vk::raii::Device& device);
-	void updateUBO();
+	void updateUBO(const glm::vec3& lightPos, float farPlane);
 
 	// --- Parameters ---
 	uint32_t m_resolution;
-	float m_farPlane;
-	glm::vec3 m_lightPosition{0.0f};
-	ShadowMode m_mode = ShadowMode::SingleFace;
 
 	// --- GPU resources ---
-	std::unique_ptr<Image> m_depthmap;
 	std::unique_ptr<UniformBuffer<LightUBO>> m_ubo;
 	DescriptorSetLayout m_layout;
 	DescriptorPool m_pool;
