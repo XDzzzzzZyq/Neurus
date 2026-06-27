@@ -5,8 +5,8 @@
  *        pixel against mathematically-computed expected depth values.
  *
  * Mathematical verification:
- *   - Cube unit at [-0.5, +0.5]^3, plane at y=0 spanning [-5,5] in XZ
- *   - Point light at (0, 3, 0), farPlane from Light::point_shadow_far
+ *   - Cube unit at [-0.5, +0.5]^3 positioned at (0,3,0), plane at y=0 spanning [-10,10] in XZ
+ *   - Point light at (0, 6, 0), farPlane from Light::point_shadow_far
  *   - Depth = dist(lightPos, worldPos) / farPlane written by fragment shader
  *   - For each pixel (px,py) on each face, ray-cast from light to determine expected depth
  *   - Compare pixel-by-pixel with tolerance +/-3/255 (~0.01176)
@@ -128,26 +128,29 @@ protected:
 	 * @brief Categorize a pixel as cube, plane, or background based on ray intersection.
 	 * @param dir       Normalized world-space direction from light through pixel.
 	 * @param lightPos  World-space position of the point light.
+	 * @param cubePos   World-space position of the cube centre (default origin).
 	 * @return PixelCategory indicating what geometry (if any) the ray hits first.
 	 */
-	static PixelCategory CategorizePixel(const glm::vec3& dir, const glm::vec3& lightPos)
+	static PixelCategory CategorizePixel(const glm::vec3& dir, const glm::vec3& lightPos,
+	                                     const glm::vec3& cubePos = glm::vec3(0.0f))
 	{
-		// Plane y=0 intersection (bounded to [-5, 5] in XZ)
+		// Plane y=0 intersection (bounded to [-10, 10] in XZ)
 		const float t_plane = -lightPos.y / dir.y;
 		bool hitsPlane = false;
 		if (t_plane > 0.0f)
 		{
 			const glm::vec3 hp = lightPos + t_plane * dir;
-			hitsPlane = (std::abs(hp.x) <= 5.0f && std::abs(hp.z) <= 5.0f);
+			hitsPlane = (std::abs(hp.x) <= 10.0f && std::abs(hp.z) <= 10.0f);
 		}
 
-		// Cube AABB [-0.5, 0.5]^3 slab test
+		// Cube AABB slab test (cube centered at cubePos, extent ±0.5)
 		const float eps = 0.001f;
 		float tMin = eps, tMax = 1e10f;
 		bool parallelMiss = false;
 		for (int axis = 0; axis < 3; ++axis)
 		{
-			const float lo = -0.5f, hi = 0.5f;
+			const float centre = (&cubePos.x)[axis];
+			const float lo = centre - 0.5f, hi = centre + 0.5f;
 			const float origin = (&lightPos.x)[axis];
 			const float d       = (&dir.x)[axis];
 			if (std::abs(d) > 1e-7f)
@@ -196,12 +199,14 @@ protected:
 	 * Uses FaceDirection() to determine the world-space ray from the light
 	 * for the given pixel, then intersects with the cube AABB and plane.
 	 * @param faceIdx Cubemap face index 0-5.
+	 * @param cubePos World-space position of the cube centre (default origin).
 	 * @return Expected depth = t / farPlane where t is distance to first hit.
 	 */
 	static float ComputeExpectedDepth(uint32_t faceIdx,
 	                                  uint32_t px, uint32_t py,
 	                                  const glm::vec3& lightPos,
-	                                  float farPlane, uint32_t res)
+	                                  float farPlane, uint32_t res,
+	                                  const glm::vec3& cubePos)
 	{
 		const float sx = (2.0f * static_cast<float>(px) + 1.0f) / static_cast<float>(res) - 1.0f;
 		const float sy = (2.0f * static_cast<float>(py) + 1.0f) / static_cast<float>(res) - 1.0f;
@@ -214,43 +219,45 @@ protected:
 		if (t_plane > 0.0f)
 		{
 			const glm::vec3 hitPoint = lightPos + t_plane * dir;
-			if (std::abs(hitPoint.x) <= 5.0f && std::abs(hitPoint.z) <= 5.0f)
+			if (std::abs(hitPoint.x) <= 10.0f && std::abs(hitPoint.z) <= 10.0f)
 				hitsPlaneInBounds = true;
 		}
 
-		// --- Cube AABB [-0.5, 0.5]^3 slab test ---
+		// --- Cube AABB slab test (cube centered at cubePos, extent ±0.5) ---
 		const float eps = 0.001f;
 		float t_min_cube = eps;
 		float t_max_cube = 1e10f;
 
+		const float cx = cubePos.x, cy = cubePos.y, cz = cubePos.z;
+
 		if (std::abs(dir.x) > 1e-7f)
 		{
-			const float t1 = (-0.5f - lightPos.x) / dir.x;
-			const float t2 = ( 0.5f - lightPos.x) / dir.x;
+			const float t1 = (cx - 0.5f - lightPos.x) / dir.x;
+			const float t2 = (cx + 0.5f - lightPos.x) / dir.x;
 			t_min_cube = std::max(t_min_cube, std::min(t1, t2));
 			t_max_cube = std::min(t_max_cube, std::max(t1, t2));
 		}
-		else if (lightPos.x < -0.5f || lightPos.x > 0.5f)
+		else if (lightPos.x < cx - 0.5f || lightPos.x > cx + 0.5f)
 			t_min_cube = 1e10f;
 
 		if (std::abs(dir.y) > 1e-7f)
 		{
-			const float t1 = (-0.5f - lightPos.y) / dir.y;
-			const float t2 = ( 0.5f - lightPos.y) / dir.y;
+			const float t1 = (cy - 0.5f - lightPos.y) / dir.y;
+			const float t2 = (cy + 0.5f - lightPos.y) / dir.y;
 			t_min_cube = std::max(t_min_cube, std::min(t1, t2));
 			t_max_cube = std::min(t_max_cube, std::max(t1, t2));
 		}
-		else if (lightPos.y < -0.5f || lightPos.y > 0.5f)
+		else if (lightPos.y < cy - 0.5f || lightPos.y > cy + 0.5f)
 			t_min_cube = 1e10f;
 
 		if (std::abs(dir.z) > 1e-7f)
 		{
-			const float t1 = (-0.5f - lightPos.z) / dir.z;
-			const float t2 = ( 0.5f - lightPos.z) / dir.z;
+			const float t1 = (cz - 0.5f - lightPos.z) / dir.z;
+			const float t2 = (cz + 0.5f - lightPos.z) / dir.z;
 			t_min_cube = std::max(t_min_cube, std::min(t1, t2));
 			t_max_cube = std::min(t_max_cube, std::max(t1, t2));
 		}
-		else if (lightPos.z < -0.5f || lightPos.z > 0.5f)
+		else if (lightPos.z < cz - 0.5f || lightPos.z > cz + 0.5f)
 			t_min_cube = 1e10f;
 
 		const bool hitsCube = (t_min_cube < t_max_cube && t_min_cube > eps);
@@ -311,6 +318,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	// Step 3: Light position is read from ctx.scene->light_list at Record() time.
 	// -------------------------------------------------------------------
 	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
+	const glm::vec3 viewPos = shadowRes.cubePos;
 
 	// -------------------------------------------------------------------
 	// Step 4: Render all 6 faces into depth cubemap + optional colour output.
@@ -414,13 +422,13 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			{
 				const float actual   = depthData[py * kRes + px];
 				const float expected =
-					ComputeExpectedDepth(face, px, py, lightPos, Light::point_shadow_far, kRes);
+					ComputeExpectedDepth(face, px, py, lightPos, Light::point_shadow_far, kRes, viewPos);
 
 				// Categorize pixel
 				const float sxV = (2.f * static_cast<float>(px) + 1.f) / static_cast<float>(kRes) - 1.f;
 				const float syV = (2.f * static_cast<float>(py) + 1.f) / static_cast<float>(kRes) - 1.f;
 				const glm::vec3 dir = glm::normalize(FaceDirection(face, sxV, syV));
-				auto cat = CategorizePixel(dir, lightPos);
+				auto cat = CategorizePixel(dir, lightPos, viewPos);
 
 				if (cat == PixelCategory::Cube)       cubePixels++;
 				else if (cat == PixelCategory::Plane)  planePixels++;

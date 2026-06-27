@@ -3,7 +3,8 @@
  * @brief Header-only helper for a simple shadow-map test scene: Cube + Plane.
  *
  * Provides LoadSimpleShadow() which procedurally generates a unit cube
- * (centered at origin) and a large ground plane (y=0, [-5,5] in XZ),
+ * (centered at origin, positioned at (0,3,0) via SetPosition) and a large
+ * ground plane (y=0, [-10,10] in XZ),
  * uploads them to GPU via Scene/Mesh/Light, and returns render items
  * suitable for ShadowDepthPass.
  *
@@ -23,6 +24,7 @@
 #include "scene/Scene.h"
 #include "scene/Mesh.h"
 #include "scene/Light.h"
+#include "scene/Camera.h"
 #include "asset/MeshData.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/buffers/IndexBuffer.h"
@@ -49,6 +51,7 @@ namespace test {
 struct SimpleShadowResources
 {
 	std::shared_ptr<Scene> scene;
+	glm::vec3               cubePos;        // World-space position of the cube (default: (0,3,0))
 	std::vector<GeometryRenderItem> renderItems;
 };
 
@@ -56,13 +59,13 @@ struct SimpleShadowResources
  * @brief Builds the simple shadow-map test scene procedurally.
  *
  * Generates:
- *   - A unit cube (12 triangles, 8 vertices, 36 indices) centered at origin,
- *     covering [-0.5, +0.5]^3.
+ *   - A unit cube (12 triangles, 8 vertices, 36 indices) centred at origin
+ *     covering [-0.5, +0.5]^3, positioned at (0,3,0) via SetPosition.
  *   - A ground-plane quad (2 triangles, 4 vertices, 6 indices) at y=0,
- *     spanning [-5,5] in XZ, facing +Y.
+ *     spanning [-10,10] in XZ, facing +Y.
  *
- * Both meshes use identity model matrices (geometry is already in world space).
- * The light is positioned at (0, 3, 0) — directly above the cube, casting
+ * The plane uses identity; the cube's model matrix shifts it to (0, 3, 0).
+ * The light is positioned at (0, 6, 0) — above the cube, casting
  * shadows downward onto the plane.
  *
  * @note All buffers use device-local memory.  A staging upload is performed
@@ -72,7 +75,8 @@ struct SimpleShadowResources
  * @param physicalDevice   Physical device (for memory properties).
  * @param graphicsQueue    Graphics queue for staging uploads.
  * @param queueFamilyIndex Queue family index for GPUBuffer creation.
- * @return Fully populated SimpleShadowResources.
+ * @return Fully populated SimpleShadowResources with scene, renderItems,
+ *         shadowCamera, and cubePos.
  */
 inline SimpleShadowResources LoadSimpleShadow(
 	const vk::raii::Device& device,
@@ -119,6 +123,7 @@ f 2 6 7 3
 		cubeMesh->o_name = "SimpleShadowCube";
 		cubeMesh->o_mesh = cubeMeshData;
 		cubeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
+		cubeMesh->SetPosition(glm::vec3(0.0f, 3.0f, 0.0f));  // raise cube above plane
 
 		res.scene->UseMesh(cubeMesh);
 
@@ -127,23 +132,24 @@ f 2 6 7 3
 		item.indexBuffer  = cubeMesh->GetIndexBuffer()->buffer();
 		item.indexCount   = cubeMesh->GetGPUIndexCount();
 		item.indexType    = vk::IndexType::eUint32;
-		// Identity: cube geometry is already in world space at origin.
-		item.pushConstants.model        = glm::mat4(1.0f);
+		// Cube pushed to (0, 3, 0) via model matrix; geometry at origin.
+		item.pushConstants.model        = cubeMesh->GetModelMatrix();
 		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 		res.renderItems.push_back(item);
+		res.cubePos = cubeMesh->GetPosition();
 	}
 
 	// ===================================================================
-	//  2. Plane: large quad at y=0, [-5,5] in XZ, facing +Y
+	//  2. Plane: large quad at y=0, [-10,10] in XZ, facing +Y
 	//     4 vertices, 2 triangles (6 indices)
 	// ===================================================================
 
 	const char* kPlaneObj = R"OBJ(
-v -5 0 -5
-v 5 0 -5
-v 5 0 5
-v -5 0 5
+v -10 0 -10
+v 10 0 -10
+v 10 0 10
+v -10 0 10
 
 f 1 2 3 4
 )OBJ";
@@ -169,7 +175,7 @@ f 1 2 3 4
 		item.indexBuffer  = planeMesh->GetIndexBuffer()->buffer();
 		item.indexCount   = planeMesh->GetGPUIndexCount();
 		item.indexType    = vk::IndexType::eUint32;
-		// Identity: plane geometry is already in world space (y=0, spans ±5 in XZ).
+		// Identity: plane geometry is already in world space (y=0, spans ±10 in XZ).
 		item.pushConstants.model        = glm::mat4(1.0f);
 		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
@@ -177,18 +183,32 @@ f 1 2 3 4
 	}
 
 	// ===================================================================
-	//  3. Point light at (0, 3, 0) — above the cube, casting shadows
+	//  3. Point light at (0, 6, 0) — above the cube, casting shadows
 	//     downward onto the plane.
 	// ===================================================================
 
 	{
 		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->o_name = "SimpleShadowLight";
-		light->SetPosition(glm::vec3(0.0f, 3.0f, 0.0f));
+		light->SetPosition(glm::vec3(0.0f, 6.0f, 0.0f));
 		res.scene->UseLight(light);
 	}
 
-	NEURUS_LOG("[LoadSimpleShadow] Built 2 meshes (cube + plane) + 1 point light — "
+	// ===================================================================
+	//  4. Camera between plane (y=0) and cube (y=3), facing the plane.
+	//     75deg FOV at y=2 covers +/-1.534 at plane -- full +/-1.2 shadow
+	//     captured with 28% margin for extra no-shadow region.
+	// ===================================================================
+
+	{
+		auto cam = std::make_shared<Camera>(256.0f, 256.0f, 75.0f, 0.1f, 100.0f);
+		cam->o_name = "SimpleShadowCamera";
+		cam->SetCamPos(glm::vec3(0.0f, 2.0f, 0.001f));  // 0.001 Z avoids degenerate lookAt (up anti-parallel to forward)
+		cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+		res.scene->UseCamera(cam);
+	}
+
+	NEURUS_LOG("[LoadSimpleShadow] Built 2 meshes (cube + plane) + 1 point light + 1 camera — "
 	           << res.renderItems.size() << " render items");
 
 	return res;
