@@ -9,6 +9,7 @@
 #include "RenderContext.h"
 #include "../Image.h"
 #include "../DescriptorManager.h"
+#include "../buffers/BufferLayout.h"
 #include "../buffers/UniformBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -31,6 +32,7 @@ class ShadowDepthPass : public Pass
 {
 public:
 	static constexpr uint32_t kDefaultResolution = 1024;
+	static constexpr uint32_t kShadowFaceCount = 6;
 
 	ShadowDepthPass(const vk::raii::Device& device,
 	                const vk::raii::PhysicalDevice& physicalDevice,

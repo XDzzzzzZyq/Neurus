@@ -1,19 +1,19 @@
 /**
  * @file test_shadow_cubemap.cpp
  * @brief GPU test: renders cube+plane scene into ShadowDepthPass cubemap,
- *        reads back face 3 (-Y) raw float depth data, and verifies every
+ *        reads back raw float depth data for all 6 faces, and verifies every
  *        pixel against mathematically-computed expected depth values.
  *
  * Mathematical verification:
  *   - Cube unit at [-0.5, +0.5]^3, plane at y=0 spanning [-5,5] in XZ
- *   - Point light at (0, 3, 0), farPlane=25.0
+ *   - Point light at (0, 3, 0), farPlane from Light::point_shadow_far
  *   - Depth = dist(lightPos, worldPos) / farPlane written by fragment shader
- *   - For each pixel (px,py), ray-cast from light to determine expected depth
+ *   - For each pixel (px,py) on each face, ray-cast from light to determine expected depth
  *   - Compare pixel-by-pixel with tolerance +/-3/255 (~0.01176)
  *
- * Reference image regression (appended after mathematical verification):
- *   - First run: generates reference PNG → GTEST_SKIP
- *   - Second run: compares pixel-by-pixel with ±2 tolerance → PASS
+ * Reference image regression:
+ *   - First run: generates reference PNGs for all 6 faces -> GTEST_SKIP
+ *   - Second run: compares pixel-by-pixel with +/-2 tolerance -> PASS
  */
 
 #include <gtest/gtest.h>
@@ -22,27 +22,17 @@
 #include "shared/TestSimpleShadow.h"
 
 #include "render/passes/ShadowDepthPass.h"
-#include "render/passes/GeometryPass.h"    // for GeometryRenderItem definition
+#include "render/passes/GeometryPass.h"
 #include "render/RenderContext.h"
 #include "render/Image.h"
 #include "render/Barrier.h"
-#include "render/PipelineBuilder.h"
-#include "render/DescriptorManager.h"
-#include "render/shaders/ShaderModule.h"
-#include "render/buffers/BufferLayout.h"
 
 #include "shared/TestReferenceImage.h"
 
-#include "shadow_depth.vert.h"
-#include "depth_to_color.frag.h"
-
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
-#include <fstream>
 #include <iostream>
 #include <memory>
 #include <vector>
@@ -82,8 +72,7 @@ class ShadowCubemapTest : public VulkanTestShared
 {
 protected:
 	static constexpr uint32_t kRes        = 256;
-	static constexpr float    kFarPlane   = 25.0f;
-	static constexpr uint32_t kFaceIndex  = 3;  // -Y face
+	// farPlane sourced from Light::point_shadow_far at verification time
 	static constexpr float    kTolerance  = 3.0f / 255.0f;  // +/-3 U8 steps in [0,1] range
 
 	void SetUp() override
@@ -93,76 +82,10 @@ protected:
 
 		auto& pd = PhysicalDevice();
 
-		// --- Enable multiview for AllFacesDepth single-pass cubemap rendering ---
-		//
-		// VK_KHR_multiview is core since Vulkan 1.1. We must explicitly enable it
-		// in the VkPhysicalDeviceVulkan11Features pNext chain, otherwise viewMask
-		// must be 0 (validation: VUID-VkRenderingInfo-viewMask-06099).
-		//
-		// Strategy: create a new Device with multiview enabled BEFORE destroying
-		// the old one. If creation fails (unlikely on any Vulkan 1.1+ GPU) the
-		// original device is still intact.
-		{
-			vk::PhysicalDeviceVulkan11Features vk11Features{};
-			vk11Features.multiview = VK_TRUE;
-
-			float prio = 1.0f;
-			vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
-			vk::PhysicalDeviceFeatures features;
-			vk::DeviceCreateInfo devCI({}, qCI, {}, {}, &features);
-			devCI.pNext = &vk11Features;
-
-			std::unique_ptr<vk::raii::Device> newDevice;
-			try
-			{
-				newDevice = std::make_unique<vk::raii::Device>(pd, devCI);
-			}
-			catch (const std::exception& e)
-			{
-				std::cerr << "[ShadowCubemapTest] Multiview not supported: "
-				          << e.what() << std::endl;
-				m_multiviewAvailable = false;
-			}
-
-			if (newDevice)
-			{
-				m_multiviewAvailable = true;
-
-				// Swap: destroy old, use new
-				m_device->waitIdle();
-				m_commandBuffers = vk::raii::CommandBuffers(nullptr);
-				m_commandPool.reset();
-				m_device.reset();
-
-				m_device = std::move(newDevice);
-				m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
-
-				// Re-create command pool + buffers with the new device
-				vk::CommandPoolCreateInfo poolCI(
-					vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
-					m_graphicsQueueFamily);
-				m_commandPool = std::make_unique<vk::raii::CommandPool>(*m_device, poolCI);
-
-				vk::CommandBufferAllocateInfo allocInfo(
-					*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
-				m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
-			}
-		}
-
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes, kFarPlane);
-
-		m_shadowDepthPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
+			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes);
 
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
-
-		if (m_multiviewAvailable)
-		{
-			m_multiviewDepthPass = std::make_unique<ShadowDepthPass>(
-				*m_device, pd, m_queue, m_graphicsQueueFamily,
-				kRes, kFarPlane, ShadowMode::Multiview);
-			m_multiviewDepthPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
-		}
 	}
 
 	void TearDown() override
@@ -170,33 +93,15 @@ protected:
 		VulkanTestShared::TearDown();
 	}
 
-	/**
-	 * @brief Computes the mathematically-expected depth value for pixel (px,py)
-	 *        on cubemap face 3 (-Y), given a point light at lightPos.
-	 *
-	 * The fragment shader writes: gl_FragDepth = dist(lightPos, fragWorldPos) / farPlane.
-	 *
-	 * For face 3 (-Y), the view matrix is:
-	 *   proj * lookAt(p, p+(0,-1,0), (0,0,-1))
-	 * so the camera looks down in world -Y, with right = world +X, up = world -Z.
-	 *
-	 * Ray in world space from light: P(t) = lightPos + t * normalize(sx, -1, -sy), t>0
-	 * where sx, sy in [-1, 1] are the NDC coordinates of the pixel centre.
-	 *
-	 * Intersections tested in order:
-	 *   1. Cube AABB [-0.5, 0.5]^3 via slab method
-	 *   2. Plane y=0 bounded to [-5, 5] in XZ
-	 *   3. Background (no hit) -> depth = 1.0 (clear value)
-	 *
-	 * @return Expected depth = t / farPlane where t is distance to first hit.
-	 */
+	// --- Face direction and pixel categorization helpers ---
 
 	/**
 	 * @brief Computes world-space direction from light for pixel (sx,sy) on cubemap face.
 	 *
-	 * Mathematically derived from the lookAt matrices in ShadowDepthPass::updateUBO.
-	 * For each face, sx,sy in [-1,1] are NDC coordinates; the returned direction
-	 * is the normalized world-space vector from the light through that pixel.
+	 * Mathematically derived from the lookAt matrices used to compute cubemap
+	 * view-projection matrices. For each face, sx,sy in [-1,1] are NDC coordinates;
+	 * the returned direction is the normalized world-space vector from the light
+	 * through that pixel.
 	 */
 	static glm::vec3 FaceDirection(uint32_t faceIdx, float sx, float sy)
 	{
@@ -283,12 +188,7 @@ protected:
 		return u8Data;
 	}
 
-	static float ComputeExpectedDepth(uint32_t px, uint32_t py,
-	                                  const glm::vec3& lightPos,
-	                                  float farPlane, uint32_t res)
-	{
-		return ComputeExpectedDepth(3, px, py, lightPos, farPlane, res);
-	}
+	// --- Expected depth computation ---
 
 	/**
 	 * @brief Computes expected depth for a specific cubemap face.
@@ -364,345 +264,8 @@ protected:
 
 	// --- Render data ---
 	std::unique_ptr<ShadowDepthPass> m_shadowDepthPass;
-	std::unique_ptr<ShadowDepthPass> m_multiviewDepthPass;
-	bool m_multiviewAvailable = false;
 	std::unique_ptr<RenderCache> m_renderCache;
 };
-
-// ===========================================================================
-// Cubemap Depth Verification Test
-// ===========================================================================
-
-TEST_F(ShadowCubemapTest, Face3Depth)
-{
-	if (!m_hasVulkan)
-	{
-		GTEST_SKIP() << "No Vulkan-capable GPU found.";
-	}
-
-	auto& pd = PhysicalDevice();
-
-	// -------------------------------------------------------------------
-	// Step 1: Build scene geometry (cube + plane via Scene/Mesh/Light)
-	// Scene owns all GPU resources and must outlive the render items.
-	// -------------------------------------------------------------------
-
-	auto shadowRes = neurus::test::LoadSimpleShadow(
-		*m_device, pd, m_queue, m_graphicsQueueFamily);
-
-	const auto& renderItems = shadowRes.renderItems;
-	ASSERT_EQ(renderItems.size(), 2u) << "Expected 2 meshes (cube + plane)";
-
-	// -------------------------------------------------------------------
-	// Step 2: Record shadow depth pass into cubemap
-	// -------------------------------------------------------------------
-	{
-		auto& cmd = BeginCmd();
-		RenderContext ctx{};
-		ctx.renderExtent = vk::Extent2D(kRes, kRes);
-		ctx.renderItems  = &renderItems;
-		ctx.lightUID     = shadowRes.scene->light_list.begin()->first;
-		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
-		EndSubmitWait(cmd);
-	}
-
-	// After Record(), cubemap is in eShaderReadOnlyOptimal layout
-
-	// -------------------------------------------------------------------
-	// Step 3: Create a temporary 2D RGBA32F color image for face 3 depth
-	//         (color attachment avoids depth-aspect copy issues on this GPU)
-	// -------------------------------------------------------------------
-	Image tempColor(*m_device, pd,
-		vk::Extent2D(kRes, kRes),
-		vk::Format::eR32G32B32A32Sfloat,
-		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferSrc,
-		1u, Image::ImageType::e2D,
-		"TempColorForReadback");
-
-	// Transition to COLOR_ATTACHMENT_OPTIMAL
-	{
-		auto& cmd = BeginCmd();
-		Barrier::Transition(*cmd, tempColor, ImageState::ColorAttachment);
-		EndSubmitWait(cmd);
-	}
-
-	// -------------------------------------------------------------------
-	// Step 3b: Use ShadowDepthPass's built-in 2D depth map for depth testing.
-	//          Without a real depth attachment, depth testing is disabled and
-	//          the last rendered item (plane) always overwrites earlier items
-	//          (cube). With a real depth attachment, the cube (depth ~0.10)
-	//          correctly occludes the plane (depth ~0.12) at cube-covered pixels.
-	// -------------------------------------------------------------------
-	m_shadowDepthPass->createDepthmap(*m_device, pd);
-	auto& depthImage = m_shadowDepthPass->Depthmap();
-	auto& depthView  = m_shadowDepthPass->Depthmap().ImageViewHandle();
-
-	// Transition to DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-	{
-		auto& cmd = BeginCmd();
-		Barrier::Transition(*cmd, depthImage, ImageState::DepthAttachment);
-		EndSubmitWait(cmd);
-	}
-
-	// -------------------------------------------------------------------
-	// Step 4: Reuse ShadowDepthPass's UBO — update face 3 VP matrix
-	// -------------------------------------------------------------------
-	{
-		const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
-		const float kNearPlane = 0.1f;
-		const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f, kNearPlane, kFarPlane);
-
-		auto& ubo = m_shadowDepthPass->GetUBO();
-		ShadowDepthPass::LightUBO data{};
-		data.faceVP[3] = proj * glm::lookAt(lightPos,
-			lightPos + glm::vec3(0, -1, 0), glm::vec3(0, 0, -1));
-		data.lpx = lightPos.x; data.lpy = lightPos.y; data.lpz = lightPos.z;
-		data.farPlane = kFarPlane;
-
-		void* ptr = ubo.Map();
-		std::memcpy(ptr, &data, sizeof(data));
-		ubo.Unmap();
-	}
-
-	// -------------------------------------------------------------------
-	// Step 5: Reuse pass's descriptor layout + set
-	// -------------------------------------------------------------------
-	const auto& lightLayout = m_shadowDepthPass->GetLightLayout();
-	vk::DescriptorSet lightSetHandle = m_shadowDepthPass->GetLightSetHandle();
-
-	// -------------------------------------------------------------------
-	// Step 6: Create graphics pipeline (depth_to_color.frag outputs depth to color)
-	// -------------------------------------------------------------------
-	auto vertModule = ShaderModule::FromEmbedded(*m_device,
-		shadow_depth_vert_spv, sizeof(shadow_depth_vert_spv));
-	auto fragModule = ShaderModule::FromEmbedded(*m_device,
-		depth_to_color_frag_spv, sizeof(depth_to_color_frag_spv));
-
-	BufferLayout vtxLayout;
-	vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);   // inPosition
-	vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // inNormal (unused)
-	vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // inUV (unused)
-
-	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstants))
-	};
-
-	std::vector<vk::DescriptorSetLayout> dslayouts = { *lightLayout.layout() };
-
-	PipelineBuilder builder;
-	auto face3Pipeline = builder
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(vtxLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLess)
-		.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
-			VK_FALSE,  // blendEnable
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-			vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA))
-		.SetColorFormats({vk::Format::eR32G32B32A32Sfloat})
-		.SetDepthFormat(vk::Format::eD32Sfloat)
-		.SetDescriptorSetLayouts(dslayouts)
-		.SetPushConstantRanges(pushRanges)
-		.BuildGraphicsPipeline(*m_device);
-
-	vk::PipelineLayoutCreateInfo plCI({}, dslayouts, pushRanges);
-	vk::raii::PipelineLayout face3Layout(*m_device, plCI);
-
-	// -------------------------------------------------------------------
-	// Step 7: Render face 3 geometry into 2D color image
-	// -------------------------------------------------------------------
-	{
-		auto& cmd = BeginCmd();
-
-		const vk::Viewport viewport(0.f, 0.f,
-			static_cast<float>(kRes), static_cast<float>(kRes), 0.f, 1.f);
-		const vk::Rect2D scissor({0, 0}, {kRes, kRes});
-		cmd.setViewport(0, viewport);
-		cmd.setScissor(0, scissor);
-
-		const vk::ClearValue colorClear = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 0.f});
-		const vk::ClearValue depthClear = vk::ClearDepthStencilValue(1.0f, 0);
-
-		vk::RenderingAttachmentInfo colorAtt(
-			tempColor.ImageViewHandle(),
-			vk::ImageLayout::eColorAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			colorClear);
-
-		vk::RenderingAttachmentInfo depthAtt(
-			*depthView,
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			depthClear);
-
-		vk::RenderingInfo renderInfo(
-			{}, {{0, 0}, {kRes, kRes}},
-			1, 0, colorAtt, &depthAtt, nullptr);
-
-		cmd.beginRendering(renderInfo);
-
-		cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *face3Pipeline);
-		cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			face3Layout, 0, {lightSetHandle}, {});
-
-		// Push faceIndex = 3 at offset sizeof(mat4) = 64
-		const int32_t faceIdx = 3;
-		cmd.pushConstants<int32_t>(face3Layout,
-			vk::ShaderStageFlagBits::eVertex,
-			sizeof(glm::mat4), faceIdx);
-
-		for (const auto& item : renderItems)
-		{
-			cmd.pushConstants<glm::mat4>(face3Layout,
-				vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
-			cmd.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-			cmd.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-			cmd.drawIndexed(item.indexCount, 1, 0, 0, 0);
-		}
-
-		cmd.endRendering();
-
-		EndSubmitWait(cmd);
-	}
-
-	// -------------------------------------------------------------------
-	// Step 8: Read back color image via ReadImageData (float values)
-	// -------------------------------------------------------------------
-	auto imgData = tempColor.ReadImageData(*m_device, pd, m_queue, m_graphicsQueueFamily);
-	const float* rgbaFloats = reinterpret_cast<const float*>(imgData.GetPixelData().data());
-	std::vector<float> depthData(kRes * kRes);
-	for (uint32_t i = 0; i < kRes * kRes; ++i)
-		depthData[i] = rgbaFloats[i * 4];  // R channel = depth
-
-	// --- Debug: first 32 raw bytes + first 8 depth values ---
-	{
-		const uint8_t* rawBytes = imgData.GetPixelData().data();
-		std::cout << "Raw first 32 bytes (hex): ";
-		for (int i = 0; i < 32; ++i)
-			std::cout << std::hex << static_cast<int>(rawBytes[i]) << " ";
-		std::cout << std::dec << std::endl;
-
-		std::cout << "First 8 depths: ";
-		for (int i = 0; i < 8; ++i)
-			std::cout << depthData[i] << " ";
-		std::cout << std::endl;
-
-		float minVal = depthData[0], maxVal = depthData[0];
-		int zeroCount = 0, oneCount = 0;
-		for (const float v : depthData)
-		{
-			minVal = std::min(minVal, v);
-			maxVal = std::max(maxVal, v);
-			if (v == 0.0f) zeroCount++;
-			if (v >= 0.999f && v <= 1.001f) oneCount++;
-		}
-		std::cout << "Depth range: min=" << minVal << " max=" << maxVal
-		          << " zeros=" << zeroCount << " ones(approx)=" << oneCount
-		          << " total=" << depthData.size() << std::endl;
-	}
-
-	// -------------------------------------------------------------------
-	// Step 9: Pixel-by-pixel verification
-	// -------------------------------------------------------------------
-	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
-
-	int cubePixels  = 0;
-	int planePixels = 0;
-	int bgPixels    = 0;
-	int badPixels   = 0;
-
-	for (uint32_t py = 0; py < kRes; ++py)
-	{
-		for (uint32_t px = 0; px < kRes; ++px)
-		{
-			const float actual   = depthData[py * kRes + px];
-			const float expected = ComputeExpectedDepth(px, py, lightPos, kFarPlane, kRes);
-
-			// Categorize pixel
-			const float sx = (2.0f * static_cast<float>(px) + 1.0f) / static_cast<float>(kRes) - 1.0f;
-			const float sy = (2.0f * static_cast<float>(py) + 1.0f) / static_cast<float>(kRes) - 1.0f;
-			const glm::vec3 dir = glm::normalize(FaceDirection(3, sx, sy));
-			auto cat = CategorizePixel(dir, lightPos);
-
-			if (cat == PixelCategory::Cube)       cubePixels++;
-			else if (cat == PixelCategory::Plane)  planePixels++;
-			else                                   bgPixels++;
-
-			// Compare actual vs expected
-			const float diff = std::abs(actual - expected);
-			if (diff > kTolerance)
-			{
-				badPixels++;
-				if (badPixels <= 10)
-				{
-					const char* catStr = (cat == PixelCategory::Cube) ? "cube"
-					                   : (cat == PixelCategory::Plane) ? "plane" : "bg";
-					std::cout << "BAD PIXEL (" << px << "," << py
-					          << "): actual=" << actual
-					          << " expected=" << expected
-					          << " diff=" << diff
-					          << " category=" << catStr
-					          << std::endl;
-				}
-			}
-		}
-	}
-
-	std::cout << "ShadowCubemapDepthVerify: "
-	          << "Cube pixels: " << cubePixels
-	          << ", Plane pixels: " << planePixels
-	          << ", BG pixels: " << bgPixels
-	          << ", Bad pixels: " << badPixels
-	          << " (tolerance=" << kTolerance << ")"
-	          << std::endl;
-
-	// Convert depth to u8 for reference image regression
-	std::vector<uint8_t> u8Data = DepthToU8(depthData);
-
-	// -------------------------------------------------------------------
-	// Reference image regression
-	// -------------------------------------------------------------------
-	{
-		const std::string refPath = std::string(neurus::test::kReferenceDir) + "shadow/CubemapDepth_Face3.png";
-		const std::string tmpPath = refPath + ".tmp";
-
-		// Save captured depth as PNG (reuse u8Data)
-		ImageData img(u8Data.data(), kRes, kRes, vk::Format::eR8Unorm);
-		const bool captured = img.SavePNG(tmpPath);
-		ASSERT_TRUE(captured) << "Failed to capture depth map for reference";
-
-		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
-		if (refResult < 0)
-			GTEST_SKIP() << "Reference image generated. Re-run the test to compare.";
-		EXPECT_EQ(refResult, 0)
-			<< refResult << " pixel(s) differ in cubemap depth (threshold: 2 per channel).";
-	}
-
-	// Sanity checks
-	EXPECT_GT(cubePixels, 50)
-		<< "Cube should cover at least 50 pixels on -Y face";
-	EXPECT_GT(planePixels, 1000)
-		<< "Plane should cover most non-cube pixels";
-
-	// Less than 5% of pixels should differ
-	EXPECT_LT(badPixels, 1)
-		<< badPixels << " pixels exceed tolerance " << kTolerance;
-}
 
 // ===========================================================================
 // All Faces Cubemap Depth Verification Test
@@ -713,10 +276,6 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
-	}
-	if (!m_multiviewAvailable)
-	{
-		GTEST_SKIP() << "Multiview not available on this device.";
 	}
 
 	auto& pd = PhysicalDevice();
@@ -749,14 +308,12 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 3: Ensure pass UBO reflects the scene's light position
+	// Step 3: Light position is read from ctx.scene->light_list at Record() time.
 	// -------------------------------------------------------------------
 	const glm::vec3 lightPos = shadowRes.scene->light_list.begin()->second->GetPosition();
-	m_multiviewDepthPass->SetLightPosition(lightPos);
 
 	// -------------------------------------------------------------------
-	// Step 4: Render all 6 faces in ONE pass via multiview (colour+depth)
-	//         The pass handles viewport, scissor, pipeline, descriptors.
+	// Step 4: Render all 6 faces into depth cubemap + optional colour output.
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
@@ -765,9 +322,9 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		ctx.renderExtent = vk::Extent2D(kRes, kRes);
 		ctx.renderItems  = &renderItems;
 		ctx.lightUID     = shadowRes.scene->light_list.begin()->first;
-		ctx.optionalColorView   = verifyCube.ArrayView();  // implicit VkImageView
+		ctx.optionalColorView   = verifyCube.ArrayView();
 		ctx.optionalColorFormat = vk::Format::eR32G32B32A32Sfloat;
-		m_multiviewDepthPass->Record(*cmd, *m_renderCache, ctx);
+		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 
 		// Transition colour cubemap for readback (must happen after rendering)
 		vk::ImageSubresourceRange range(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
@@ -786,7 +343,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	{
 		NEURUS_LOG("[AllFacesDepth] Reading back face " << face);
 
-		// 8a. Copy face layer → staging buffer
+		// 5a. Copy face layer -> staging buffer
 		vk::BufferCreateInfo stagingCI({}, bufSize, vk::BufferUsageFlagBits::eTransferDst);
 		vk::raii::Buffer stagingBuf(*m_device, stagingCI);
 
@@ -816,7 +373,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			EndSubmitWait(cmd);
 		}
 
-		// 8b. Map and extract depth data (R channel of float RGBA)
+		// 5b. Map and extract depth data (R channel of float RGBA)
 		void* mapped = stagingMem.mapMemory(0, bufSize);
 		std::vector<float> depthData(kRes * kRes);
 		{
@@ -844,7 +401,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 
 		stagingMem.unmapMemory();
 
-		// 8c. Pixel-by-pixel mathematical verification
+		// 5c. Pixel-by-pixel mathematical verification
 		int cubePixels  = 0;
 		int planePixels = 0;
 		int bgPixels    = 0;
@@ -856,7 +413,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			{
 				const float actual   = depthData[py * kRes + px];
 				const float expected =
-					ComputeExpectedDepth(face, px, py, lightPos, kFarPlane, kRes);
+					ComputeExpectedDepth(face, px, py, lightPos, Light::point_shadow_far, kRes);
 
 				// Categorize pixel
 				const float sxV = (2.f * static_cast<float>(px) + 1.f) / static_cast<float>(kRes) - 1.f;
@@ -912,7 +469,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			EXPECT_GT(bgPixels, 0)     << "Face +Y: all pixels should be background";
 		}
 
-		// 8d. Reference image regression
+		// 5d. Reference image regression
 		{
 			const std::string refPath =
 				std::string(neurus::test::kReferenceDir)

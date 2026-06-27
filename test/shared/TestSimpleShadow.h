@@ -10,7 +10,7 @@
  * Usage:
  * @code
  *   auto scene = LoadSimpleShadow(device, pd, queue, qfi);
- *   m_shadowPass->SetLightPosition(glm::vec3(0.0f, 3.0f, 0.0f));
+ *   // Light position is read from ctx.scene->light_list at Record() time.
  *   m_shadowPass->Record(cmd, ctx);  // uses scene.renderItems internally
  * @endcode
  *

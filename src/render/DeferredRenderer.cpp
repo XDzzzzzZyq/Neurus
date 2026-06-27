@@ -128,8 +128,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto shadowDepth = std::make_unique<ShadowDepthPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			ShadowDepthPass::kDefaultResolution,
-			ShadowDepthPass::kDefaultFarPlane);
+			ShadowDepthPass::kDefaultResolution);
 		m_shadowDepthPass = shadowDepth.get();
 		m_passes.push_back(std::move(shadowDepth));
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
@@ -213,8 +212,6 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 			if (!light) continue;
 			if (light->light_type == LightType::POINTLIGHT && light->use_shadow)
 			{
-				const glm::vec3 lightPos = light->GetPosition();
-				m_shadowDepthPass->SetLightPosition(lightPos);
 				m_activeShadowLightUID = id;
 				break;  // Only first shadow-casting point light for MVP
 			}
