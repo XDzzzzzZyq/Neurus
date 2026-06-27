@@ -239,11 +239,6 @@ void ShadowDepthPass::updateUBO(const glm::vec3& lightPos, float farPlane)
 	ubo.lpx = p.x; ubo.lpy = p.y; ubo.lpz = p.z;
 	ubo.farPlane = farPlane;
 
-	NEURUS_LOG("[ShadowDepthPass] UBO: farPlane=" << farPlane
-	           << " nearPlane=" << kNearPlane
-	           << " lightPos=(" << p.x << "," << p.y << "," << p.z << ")"
-	           << " sizeof=" << sizeof(LightUBO));
-
 	m_ubo->Upload(ubo);
 }
 
