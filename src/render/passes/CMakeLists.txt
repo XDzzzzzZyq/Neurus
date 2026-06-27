@@ -12,6 +12,8 @@ add_library(neurus_render_passes STATIC
 	Pass.cpp
 	ShadowDepthPass.h
 	ShadowDepthPass.cpp
+	ShadowIntensityPass.h
+	ShadowIntensityPass.cpp
 	SSAOPass.h
 	SSAOPass.cpp
 	SyncObjects.h

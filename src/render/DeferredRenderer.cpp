@@ -16,6 +16,7 @@
 #include "Screenshot.h"
 #include "passes/SSAOPass.h"
 #include "passes/ShadowDepthPass.h"
+#include "passes/ShadowIntensityPass.h"
 #include "Swapchain.h"
 #include "passes/SyncObjects.h"
 #include "buffers/GPUBuffer.h"
@@ -36,6 +37,7 @@
 #include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
 #include "c2e.comp.h"
+#include "shadow_eval.comp.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -132,6 +134,18 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		m_shadowDepthPass = shadowDepth.get();
 		m_passes.push_back(std::move(shadowDepth));
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
+	}
+
+	// --- 8b. Create shadow intensity pass (per-pixel shadow evaluation from cubemap) ---
+	{
+		auto shadowIntensity = std::make_unique<ShadowIntensityPass>(
+			device, physicalDevice,
+			kMaxFramesInFlight,
+			graphicsQueue, queueFamilyIndex,
+			shadow_eval_comp_spv, sizeof(shadow_eval_comp_spv));
+		m_shadowIntensityPass = shadowIntensity.get();
+		m_passes.push_back(std::move(shadowIntensity));
+		NEURUS_LOG("[DeferredRenderer] ShadowIntensityPass created");
 	}
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
@@ -594,10 +608,11 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---
 	m_shadowDepthPass->Record(cmdBuf, *m_renderCache, ctx);
 
+	// --- Phase 1c: ShadowIntensityPass → per-pixel shadow evaluation from cubemap ---
+	m_shadowIntensityPass->Record(cmdBuf, *m_renderCache, ctx);
+
 	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
 	m_ssaoPass->Record(cmdBuf, *m_renderCache, ctx);
-
-	// Shadow evaluation — to be re-implemented
 
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
 	m_lightingPass->Record(cmdBuf, *m_renderCache, ctx);

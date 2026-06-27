@@ -110,9 +110,22 @@ public:
 	Image& GetShadowIntensity(int lightUID, vk::Extent2D extent);
 
 	/**
+	 * @brief Returns (or lazily creates) a colour-format shadow cubemap for a light.
+	 *
+	 * The cubemap is a screen-res R32G32B32A32_SFLOAT with eColorAttachment | eSampled | eTransferSrc
+	 * usage. ShadowDepthPass renders depth encoded as colour here for GPU compatibility where
+	 * the depth-only Multiview pipeline does not render correctly.
+	 *
+	 * @param lightUID Unique identifier of the point light (int).
+	 * @param extent   Image dimensions for the cubemap (matches shadow map resolution).
+	 * @return Non-owning reference to the colour cubemap Image.
+	 */
+	Image& GetShadowColorMap(int lightUID, vk::Extent2D extent);
+
+	/**
 	 * @brief Removes all per-light shadow resources for the given light.
 	 *
-	 * Erases entries from both m_shadowMaps and m_shadowIntensities.
+	 * Erases entries from m_shadowMaps, m_shadowColorMaps, and m_shadowIntensities.
 	 * Safe to call for lights that have no resources yet.
 	 *
 	 * @param lightUID Unique identifier of the point light (int).
@@ -179,6 +192,7 @@ private:
 	// --- Per-light lazy resources (key = light UID as int) ---
 	std::unordered_map<int, Image> m_shadowMaps;
 	std::unordered_map<int, Image> m_shadowIntensities;
+	std::unordered_map<int, Image> m_shadowColorMaps;
 };
 
 /**

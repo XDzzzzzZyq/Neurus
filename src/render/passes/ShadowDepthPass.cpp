@@ -288,18 +288,17 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	if (mode == ShadowMode::Multiview)
 	{
 		// --- Multiview: render all 6 faces in a single pass ---
+		// Always colour+depth on this GPU - the depth-only pipeline is unreliable
 
-		const bool hasColor = (ctx.optionalColorView &&
-		                       ctx.optionalColorFormat != vk::Format::eUndefined);
-
-		const auto& pipeline       = hasColor ? m_multiviewColorPipeline       : m_multiviewPipeline;
-		const auto& pipelineLayout = hasColor ? m_multiviewColorPipelineLayout : m_multiviewPipelineLayout;
+		const auto& pipeline       = m_multiviewColorPipeline;
+		const auto& pipelineLayout = m_multiviewColorPipelineLayout;
 
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 		                          pipelineLayout, 0,
 		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
 
+		// --- Depth attachment ---
 		vk::RenderingAttachmentInfo depthAtt(
 			cache.GetShadowMap(ctx.lightUID).ArrayView(),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
@@ -309,31 +308,25 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			vk::AttachmentStoreOp::eStore,
 			vk::ClearDepthStencilValue(1.0f, 0));
 
-		if (hasColor)
-		{
-			vk::RenderingAttachmentInfo colorAtt(
-				ctx.optionalColorView,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eClear,
-				vk::AttachmentStoreOp::eStore,
-				vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
+		// --- Colour attachment: external view or RenderCache colour cubemap ---
+		vk::ImageView colorView = ctx.optionalColorView
+			? ctx.optionalColorView
+			: cache.GetShadowColorMap(ctx.lightUID, {m_resolution, m_resolution}).ArrayView();
 
-			vk::RenderingInfo renderInfo(
-				{}, {{0, 0}, {m_resolution, m_resolution}},
-				1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
+		vk::RenderingAttachmentInfo colorAtt(
+			colorView,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ResolveModeFlagBits::eNone, nullptr,
+			vk::ImageLayout::eUndefined,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
 
-			cmdBuf.beginRendering(renderInfo);
-		}
-		else
-		{
-			vk::RenderingInfo renderInfo(
-				{}, {{0, 0}, {m_resolution, m_resolution}},
-				1u, 0x3Fu, {}, &depthAtt, nullptr);
+		vk::RenderingInfo renderInfo(
+			{}, {{0, 0}, {m_resolution, m_resolution}},
+			1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
 
-			cmdBuf.beginRendering(renderInfo);
-		}
+		cmdBuf.beginRendering(renderInfo);
 
 		if (ctx.renderItems)
 		{

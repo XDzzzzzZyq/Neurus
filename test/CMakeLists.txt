@@ -31,6 +31,7 @@ add_executable(neurus_test
 	render/test_screenshot.cpp
 	render/test_scene_wiring.cpp
 	render/test_shadow_cubemap.cpp
+	render/test_shadow_intensity.cpp
 	editor/test_camera_controller.cpp
 	editor/test_input.cpp
 	editor/test_event_bus.cpp

@@ -117,10 +117,34 @@ Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D ex
 	return insertedIt->second;
 }
 
+Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D extent)
+{
+	auto it = m_shadowColorMaps.find(lightUID);
+	if (it != m_shadowColorMaps.end())
+	{
+		return it->second;
+	}
+
+	Image colorCube(*m_device,
+	                *m_physicalDevice,
+	                extent,
+	                vk::Format::eR32G32B32A32Sfloat,
+	                vk::ImageUsageFlagBits::eColorAttachment |
+	                    vk::ImageUsageFlagBits::eSampled |
+	                    vk::ImageUsageFlagBits::eTransferSrc,
+	                1,                           // mipLevels
+	                Image::ImageType::eCube,
+	                "ShadowColorCubemap_Light"); // debug name
+
+	const auto [insertedIt, _] = m_shadowColorMaps.emplace(lightUID, std::move(colorCube));
+	return insertedIt->second;
+}
+
 void RenderCache::RemoveLight(const int lightUID)
 {
 	m_shadowMaps.erase(lightUID);
 	m_shadowIntensities.erase(lightUID);
+	m_shadowColorMaps.erase(lightUID);
 }
 
 bool RenderCache::HasAttachment(const AttachmentName name) const
@@ -136,12 +160,14 @@ void RenderCache::Clean()
 {
 	m_attachments.clear();
 	m_shadowMaps.clear();
+	m_shadowColorMaps.clear();
 	m_shadowIntensities.clear();
 }
 
 void RenderCache::CleanScreenSpace()
 {
 	m_attachments.clear();
+	m_shadowColorMaps.clear();
 	m_shadowIntensities.clear();
 	// m_shadowMaps preserved — shadow cubemaps survive resize
 }
