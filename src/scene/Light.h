@@ -108,7 +108,7 @@ public:
 	static constexpr float point_shadow_near = 0.1f;
 
 	/** @brief Far plane for point light shadow map. */
-	static constexpr float point_shadow_far = 100.0f;
+	static constexpr float point_shadow_far = 10.0f; ///< @note Hardcoded to 10.0 per ShadowDepthPass contract.
 
 	/** @brief Blur kernel size for soft point shadows. */
 	static constexpr float point_blur_range = 0.02f;
