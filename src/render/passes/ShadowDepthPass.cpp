@@ -69,6 +69,8 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 
 	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 	createSingleFacePipeline(device);
+	createMultiviewPipeline(device);
+	createMultiviewColorPipeline(device);
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " UBOsize=" << sizeof(LightUBO));
@@ -261,7 +263,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		? Light::point_shadow_far
 		: Light::sun_shadow_far;
 
-	const ShadowMode mode = ShadowMode::SingleFace;
+	const ShadowMode mode = (lightPtr->light_type == LightType::POINTLIGHT) ? ShadowMode::Multiview : ShadowMode::SingleFace;
 
 	updateUBO(lightPos, farPlane);
 
