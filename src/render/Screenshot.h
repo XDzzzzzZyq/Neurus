@@ -85,6 +85,26 @@ public:
 	                              bool remapSigned = false);
 
 	/**
+	 * @brief Captures a single layer of an Image array to a PNG file.
+	 *
+	 * Uses Image::ReadImageData() with Image::Layer(layerIndex) subresource
+	 * range to read back a single array layer.  Handles layout transitions
+	 * and delegates to ImageData::SavePNG() for output.
+	 *
+	 * @param layerIndex 0-based layer index within the array image.
+	 * @param remapSigned Passed to ImageData for signed remap.
+	 * @return true on success.
+	 */
+	static bool CaptureImageLayer(const vk::raii::Device& device,
+	                              const vk::raii::PhysicalDevice& physicalDevice,
+	                              vk::Queue queue,
+	                              uint32_t queueFamilyIndex,
+	                              Image& vulkanImage,
+	                              uint32_t layerIndex,
+	                              const std::string& path,
+	                              bool remapSigned = false);
+
+	/**
 	 * @brief Captures all G‑Buffer and post‑FX attachments to timestamped PNGs.
 	 *
 	 * Iterates Position, Normal, Albedo, MetallicRoughness, HDRColor,

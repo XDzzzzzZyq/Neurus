@@ -738,9 +738,41 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 		                                          "screenshots/gbuffer");
 	}
 
-	// Also export shadow cubemap as equirectangular PNG
-	// Note: shadow export requires scene context, not available in batch capture.
-	// Use ExportShadowDepthEquirect() directly with a scene reference for shadow dumps.
+	// --- Export shadow cubemaps as equirectangular PNGs ---
+	{
+		const auto shadowUIDs = m_renderCache->GetShadowMapUIDs();
+		for (int lightUID : shadowUIDs)
+		{
+			const std::string result = ExportShadowDepthEquirect(
+				lightUID, "screenshots/shadow_cubemap");
+			if (!result.empty())
+			{
+				++count;
+			}
+		}
+	}
+
+	// --- Export shadow intensity array layers ---
+	{
+		Image* intensityArray = m_renderCache->GetShadowIntensityArray();
+		if (intensityArray)
+		{
+			const vk::Extent2D extent = m_swapchain->extent();
+			const auto shadowUIDs = m_renderCache->GetShadowMapUIDs();
+			for (int lightUID : shadowUIDs)
+			{
+				const uint32_t layer = m_renderCache->GetShadowIntensityLayerIndex(lightUID);
+				const std::string path = Screenshot::timestampedFilename(
+					"screenshots/shadow_intensity_Light" + std::to_string(lightUID), ".png");
+				if (Screenshot::CaptureImageLayer(m_device, m_physicalDevice,
+				                                   m_graphicsQueue, m_queueFamilyIndex,
+				                                   *intensityArray, layer, path))
+				{
+					++count;
+				}
+			}
+		}
+	}
 
 	return count;
 }
@@ -749,29 +781,14 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 // C2E — Shadow cubemap → Equirectangular export
 // ===========================================================================
 
-std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filenamePrefix,
-                                                          const Scene* scene)
+std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
+                                                          const std::string& filenamePrefix)
 {
-	// Find first shadow-casting point light from scene
-	const Light* shadowLight = nullptr;
-	if (scene)
-	{
-		for (const auto& [uid, light] : scene->light_list)
-		{
-			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
-			{
-				shadowLight = light.get();
-				break;
-			}
-		}
-	}
-
-	if (!m_shadowDepthPass || !shadowLight)
+	if (!m_shadowDepthPass || !m_renderCache)
 	{
 		return {};
 	}
 
-	const int32_t lightUID = shadowLight->GetObjectID();
 	auto& cubemap = m_renderCache->GetShadowMap(lightUID);
 	const uint32_t cubeRes = m_shadowDepthPass->Resolution();
 	const uint32_t equiWidth = cubeRes * 2;
@@ -844,7 +861,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 		auto& cmd = cmdBufs[0];
 		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		// Transition cubemap → SHADER_READ_ONLY (if not already)
+		// Transition cubemap → SHADER_READ_ONLY
 		{
 			Barrier::Transition(*cmd, cubemap, ImageState::ColorShaderRead);
 		}
@@ -877,32 +894,29 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 	}
 
 	// --- 6. Read back equirect as grayscale PNG ---
-	//     The C2E output is rgba32f; we read only the R channel (depth value).
 	auto equirectData = equirectImage.ReadImageData(
 		m_device, m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex);
 
 	if (!equirectData.IsValid())
 	{
-		NEURUS_ERR("[ExportShadowDepthEquirect] Readback failed");
+		NEURUS_ERR("[ExportShadowDepthEquirect] Readback failed for lightUID=" << lightUID);
 		return {};
 	}
 
 	const auto& rawPixelData = equirectData.GetPixelData();
-	// Convert rgba32f → grayscale uint8
 	const size_t pixelCount = static_cast<size_t>(equiWidth) * equiHeight;
 	std::vector<uint8_t> grayPixels(pixelCount);
 
 	for (size_t i = 0; i < pixelCount; ++i)
 	{
-		// Each pixel is 4 × float = 16 bytes; the R channel is at byte offset 0
 		float r;
 		std::memcpy(&r, &rawPixelData[i * 16], sizeof(float));
-		// Clamp to [0, 1] and convert to uint8
 		r = std::max(0.0f, std::min(1.0f, r));
 		grayPixels[i] = static_cast<uint8_t>(r * 255.0f + 0.5f);
 	}
 
-	const std::string path = Screenshot::timestampedFilename(filenamePrefix, ".png");
+	const std::string path = Screenshot::timestampedFilename(
+		filenamePrefix + "_Light" + std::to_string(lightUID), ".png");
 
 	ImageData grayImg(grayPixels.data(), equiWidth, equiHeight, vk::Format::eR8Unorm);
 	const bool saved = grayImg.SavePNG(path);

@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace neurus {
 
@@ -124,6 +125,14 @@ public:
 	uint32_t GetShadowIntensityLayer(int lightUID, vk::Extent2D extent);
 
 	/**
+	 * @brief Returns the shadow intensity layer index for a light (lookup only, no allocation).
+	 *
+	 * @param lightUID Unique identifier of the point light (int).
+	 * @return Layer index, or 0 if not found.
+	 */
+	uint32_t GetShadowIntensityLayerIndex(int lightUID) const;
+
+	/**
 	 * @brief Returns (or lazily creates) a colour-format shadow cubemap for a light.
 	 *
 	 * The cubemap is a screen-res R32G32B32A32_SFLOAT with eColorAttachment | eSampled | eTransferSrc
@@ -135,6 +144,22 @@ public:
 	 * @return Non-owning reference to the colour cubemap Image.
 	 */
 	Image& GetShadowColorMap(int lightUID, vk::Extent2D extent);
+
+	/**
+	 * @brief Returns all light UIDs that currently have shadow cubemaps.
+	 *
+	 * Iterates m_shadowMaps keys.  Returns an empty vector if no shadow maps exist.
+	 *
+	 * @return Vector of light UID integers.
+	 */
+	std::vector<int> GetShadowMapUIDs() const;
+
+	/**
+	 * @brief Returns the shadow intensity array image, or nullptr if not yet created.
+	 *
+	 * @return Non-owning pointer, or nullptr.
+	 */
+	Image* GetShadowIntensityArray() const;
 
 	/**
 	 * @brief Removes all per-light shadow resources for the given light.

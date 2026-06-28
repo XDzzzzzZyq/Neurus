@@ -229,6 +229,39 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 }
 
 // ===========================================================================
+// CaptureImageLayer
+// ===========================================================================
+
+bool Screenshot::CaptureImageLayer(const vk::raii::Device& device,
+                                    const vk::raii::PhysicalDevice& physicalDevice,
+                                    vk::Queue queue,
+                                    uint32_t queueFamilyIndex,
+                                    Image& vulkanImage,
+                                    uint32_t layerIndex,
+                                    const std::string& path,
+                                    bool remapSigned)
+{
+	if (ImageData::PixelByteSize(vulkanImage.Format()) == 0)
+	{
+		return false;
+	}
+
+	// Read back the specified layer using the Layer() subresource range.
+	// ReadImageData handles layout transition, copy-to-buffer, submit, and wait.
+	const auto layerRange = vulkanImage.Layer(layerIndex);
+	auto imageData = vulkanImage.ReadImageData(
+		device, physicalDevice, queue, queueFamilyIndex, &layerRange);
+
+	if (!imageData.IsValid())
+	{
+		NEURUS_ERR("[Screenshot] CaptureImageLayer: readback failed for layer " << layerIndex);
+		return false;
+	}
+
+	return imageData.SavePNG(path, remapSigned);
+}
+
+// ===========================================================================
 // CaptureAllAttachments
 // ===========================================================================
 

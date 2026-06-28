@@ -190,11 +190,11 @@ public:
 	 * Creates a temporary rgba32f equirect image, dispatches c2e.comp,
 	 * reads back the depth channel as grayscale, and writes a PNG.
 	 *
+	 * @param lightUID       The light UID whose shadow cubemap to export.
 	 * @param filenamePrefix Prefix for the output PNG filename.
 	 * @return The output file path on success, empty string on failure.
 	 */
-	std::string ExportShadowDepthEquirect(const std::string& filenamePrefix,
-	                                         const Scene* scene = nullptr);
+	std::string ExportShadowDepthEquirect(int lightUID, const std::string& filenamePrefix);
 
 private:
 	/**

@@ -172,6 +172,28 @@ Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D ext
 	return insertedIt->second;
 }
 
+std::vector<int> RenderCache::GetShadowMapUIDs() const
+{
+	std::vector<int> uids;
+	uids.reserve(m_shadowMaps.size());
+	for (const auto& [uid, _] : m_shadowMaps)
+	{
+		uids.push_back(uid);
+	}
+	return uids;
+}
+
+Image* RenderCache::GetShadowIntensityArray() const
+{
+	return m_shadowIntensityArray.get();
+}
+
+uint32_t RenderCache::GetShadowIntensityLayerIndex(const int lightUID) const
+{
+	const auto it = m_shadowIntensityLayerIndex.find(lightUID);
+	return (it != m_shadowIntensityLayerIndex.end()) ? it->second : 0;
+}
+
 void RenderCache::RemoveLight(const int lightUID)
 {
 	m_shadowMaps.erase(lightUID);
