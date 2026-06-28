@@ -51,6 +51,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 using namespace neurus;
@@ -171,18 +172,35 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 		*m_renderCache, renderExtent, *this);
 
 	// -------------------------------------------------------------------
-	// Step 4: Upload light SSBO to LightingPass
+	// Step 4: Build shadow index map and upload lights to LightingPass
 	// -------------------------------------------------------------------
-	m_lightingPass->UploadLights(*shadowRes.scene);
+	// Collect shadow-casting POINTLIGHT UIDs, sort for deterministic ordering
+	{
+		std::vector<int32_t> shadowUIDs;
+		for (const auto& [id, light] : shadowRes.scene->light_list)
+		{
+			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
+				shadowUIDs.push_back(id);
+		}
+		std::sort(shadowUIDs.begin(), shadowUIDs.end());
+
+		std::unordered_map<int32_t, int> shadowIndexMap;
+		for (size_t i = 0; i < shadowUIDs.size(); ++i)
+			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
+
+		m_lightingPass->UploadLights(*shadowRes.scene, &shadowIndexMap);
+	}
 
 	// -------------------------------------------------------------------
 	// Step 5: Record all passes in a single command buffer
-	//         Order matches DeferredRenderer: Geometry → ShadowDepth → ShadowIntensity → Lighting
+	//         Order: ShadowDepth (independent) → Geometry (writes G-Buffer)
+	//                → ShadowIntensity (reads Position + cubemap)
+	//                → Lighting (reads G-Buffer + shadow intensity)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
 		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);
@@ -264,12 +282,26 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	VulkanTestShared::TransitionGbufferToColorAttachment(
 		*m_renderCache, renderExtent, *this);
 
-	m_lightingPass->UploadLights(*shadowRes.scene);
+	{
+		std::vector<int32_t> shadowUIDs;
+		for (const auto& [id, light] : shadowRes.scene->light_list)
+		{
+			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
+				shadowUIDs.push_back(id);
+		}
+		std::sort(shadowUIDs.begin(), shadowUIDs.end());
+
+		std::unordered_map<int32_t, int> shadowIndexMap;
+		for (size_t i = 0; i < shadowUIDs.size(); ++i)
+			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
+
+		m_lightingPass->UploadLights(*shadowRes.scene, &shadowIndexMap);
+	}
 
 	{
 		auto& cmd = BeginCmd();
-		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
 		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);

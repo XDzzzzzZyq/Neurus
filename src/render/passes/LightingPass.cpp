@@ -117,6 +117,71 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 		NEURUS_LOG("[LightingPass] Created fallback IBL cubemaps (4×4 black)");
 	}
 
+	// --- Create dummy shadow intensity image (1×1 black R8) for unused array layers ---
+	//     Writing binding 9 as a sampler2DArray requires MAX_SHADOW_LIGHTS valid
+	//     image descriptors.  Lights that don't cast shadows (or layers beyond
+	//     the shadow-casting light count) use this dummy black image.
+	{
+		vk::Extent2D dummyExtent{1, 1};
+		const vk::ImageUsageFlags dummyUsage =
+			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
+
+		m_dummyShadowImage = std::make_unique<Image>(
+			*m_device, *m_physicalDevice, dummyExtent,
+			vk::Format::eR8Unorm,
+			dummyUsage, /*mipLevels=*/1,
+			Image::ImageType::e2D,
+			"Lighting_DummyShadow");
+
+		// Transition UNDEFINED → TransferDst → clear (black) → ColorShaderRead
+		{
+			vk::CommandPoolCreateInfo poolCI(
+				vk::CommandPoolCreateFlagBits::eTransient,
+				m_queueFamilyIndex);
+			vk::raii::CommandPool cmdPool(*m_device, poolCI);
+
+			vk::CommandBufferAllocateInfo allocInfo(
+				*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+			vk::raii::CommandBuffers cmdBufs(*m_device, allocInfo);
+
+			cmdBufs[0].begin(vk::CommandBufferBeginInfo(
+				vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+			Barrier::Transition(*cmdBufs[0], *m_dummyShadowImage, ImageState::TransferDst);
+
+			vk::ClearColorValue clearBlack(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f});
+			cmdBufs[0].clearColorImage(*m_dummyShadowImage->ImageHandle(),
+			                           vk::ImageLayout::eTransferDstOptimal,
+			                           clearBlack,
+			                           vk::ImageSubresourceRange(
+			                               vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
+
+			Barrier::Transition(*cmdBufs[0], *m_dummyShadowImage, ImageState::ColorShaderRead);
+
+			cmdBufs[0].end();
+
+			vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+			m_graphicsQueue.submit(submitInfo);
+			m_graphicsQueue.waitIdle();
+		}
+
+		// Sampler: nearest filtering, clamp-to-edge (1x1 — any filter works)
+		{
+			vk::SamplerCreateInfo samplerCI(
+				{}, vk::Filter::eNearest, vk::Filter::eNearest,
+				vk::SamplerMipmapMode::eNearest,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				vk::SamplerAddressMode::eClampToEdge,
+				0.0f, VK_FALSE, 0.0f, VK_FALSE,
+				vk::CompareOp::eAlways, 0.0f, 0.0f,
+				vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+			m_dummyShadowSampler = vk::raii::Sampler(*m_device, samplerCI);
+		}
+
+		NEURUS_LOG("[LightingPass] Created dummy R8 shadow image (1×1 black)");
+	}
+
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
 	{
@@ -171,6 +236,17 @@ void LightingPass::UploadLights(const Scene& scene,
 		}
 
 		gpuLights.push_back(gpu);
+	}
+
+	// Build reverse mapping: shadowMapIndex → lightUID
+	// Used by WriteDescriptors to find the shadow intensity image for each array layer.
+	m_shadowIndexToUID.clear();
+	if (shadowIndexMap)
+	{
+		for (const auto& [uid, shadowIdx] : *shadowIndexMap)
+		{
+			m_shadowIndexToUID[static_cast<int32_t>(shadowIdx)] = uid;
+		}
 	}
 
 	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
@@ -248,10 +324,11 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.AddBinding(8,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
-		// Shadow intensity (combined image sampler)
+		// Shadow array (sampler2DArray, MAX_SHADOW_LIGHTS layers)
 		.AddBinding(9,
 		            vk::DescriptorType::eCombinedImageSampler,
-		            vk::ShaderStageFlagBits::eCompute)
+		            vk::ShaderStageFlagBits::eCompute,
+		            LightingPass::MAX_SHADOW_LIGHTS)
 		.Build(device);
 }
 
@@ -349,18 +426,50 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 
-	// --- Write shadow intensity (binding 9) ---
+	// --- Write shadow intensity array (binding 9, sampler2DArray) ---
+	//     Populates MAX_SHADOW_LIGHTS array elements.  Active shadow lights
+	//     map to their shadowMapIndex layer; unused layers use the dummy
+	//     1×1 black R8 image to keep the descriptor valid.
 	{
-		const auto& shadowAtt = cache.GetShadowIntensity(m_currentLightUID, extent);
+		std::array<vk::DescriptorImageInfo, MAX_SHADOW_LIGHTS> shadowInfos;
 
-		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,                              // sampler
-			*shadowAtt.ImageViewHandle(),            // imageView
-			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
+		for (uint32_t layer = 0; layer < MAX_SHADOW_LIGHTS; ++layer)
+		{
+			const auto uidIt = m_shadowIndexToUID.find(static_cast<int32_t>(layer));
+
+			if (uidIt != m_shadowIndexToUID.end())
+			{
+				// Active shadow-casting light — use its shadow intensity image
+				auto& intensityImg = cache.GetShadowIntensity(uidIt->second, extent);
+				shadowInfos[layer] = vk::DescriptorImageInfo(
+					*m_sampler,
+					*intensityImg.ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+			}
+			else
+			{
+				// Unused layer — use dummy 1×1 black image
+				shadowInfos[layer] = vk::DescriptorImageInfo(
+					*m_dummyShadowSampler,
+					*m_dummyShadowImage->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+			}
+		}
+
+		// Write array descriptor via raw Vulkan API (DescriptorSet::WriteImage
+		// only supports single-image writes).
+		vk::WriteDescriptorSet writeDesc(
+			m_descriptorSets[setIndex].handle(),  // dstSet (vk::DescriptorSet)
+			9,                                    // dstBinding
+			0,                                    // dstArrayElement
+			MAX_SHADOW_LIGHTS,                    // descriptorCount
+			vk::DescriptorType::eCombinedImageSampler,
+			shadowInfos.data(),                   // pImageInfo
+			nullptr,                              // pBufferInfo
+			nullptr                               // pTexelBufferView
 		);
 
-		dstSet.WriteImage(9, imageInfo,
-		                  vk::DescriptorType::eCombinedImageSampler);
+		m_device->updateDescriptorSets(writeDesc, nullptr);
 	}
 }
 
@@ -377,21 +486,6 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const uint32_t frameIndex = ctx.frameIndex;
 
 	// --- 1. Write descriptor set for this frame slot ---
-	// Find first shadow-casting point light for shadow intensity binding
-	{
-		m_currentLightUID = -1;
-		if (ctx.scene)
-		{
-			for (const auto& [uid, light] : ctx.scene->light_list)
-			{
-				if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
-				{
-					m_currentLightUID = uid;
-					break;
-				}
-			}
-		}
-	}
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
 	// --- 1b. Write IBL cubemap descriptors (bindings 7-8) from scene Environment or fallback ---
@@ -500,20 +594,32 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 		Barrier::Transition(cmdBuf, ssao, ImageState::ColorShaderRead);
 
-		// ShadowIntensity: if never written (Undefined), clear to 0.0 (no shadow), then ShaderRead
-		auto& shadowAtt = cache.GetShadowIntensity(m_currentLightUID, renderExtent);
-		if (shadowAtt.State() == ImageState::Undefined)
+		// ShadowIntensity: transition all shadow-casting lights' intensity images
+		// to ColorShaderRead.  If an image has never been written (Undefined),
+		// clear it to black first as a safety net (ShadowIntensityPass should
+		// have already written to it, but be defensive).
+		if (ctx.scene)
 		{
-			Barrier::Transition(cmdBuf, shadowAtt, ImageState::TransferDst);
+			for (const auto& [uid, light] : ctx.scene->light_list)
+			{
+				if (!light || light->light_type != LightType::POINTLIGHT || !light->use_shadow)
+					continue;
 
-			vk::ClearColorValue clearBlack(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f});
-			cmdBuf.clearColorImage(*shadowAtt.ImageHandle(),
-			                       vk::ImageLayout::eTransferDstOptimal,
-			                       clearBlack,
-			                       vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
-			                                                  0, 1, 0, 1));
+				auto& shadowAtt = cache.GetShadowIntensity(uid, renderExtent);
+				if (shadowAtt.State() == ImageState::Undefined)
+				{
+					Barrier::Transition(cmdBuf, shadowAtt, ImageState::TransferDst);
+
+					vk::ClearColorValue clearBlack(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f});
+					cmdBuf.clearColorImage(*shadowAtt.ImageHandle(),
+					                       vk::ImageLayout::eTransferDstOptimal,
+					                       clearBlack,
+					                       vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor,
+					                                                  0, 1, 0, 1));
+				}
+				Barrier::Transition(cmdBuf, shadowAtt, ImageState::ColorShaderRead);
+			}
 		}
-		Barrier::Transition(cmdBuf, shadowAtt, ImageState::ColorShaderRead);
 	}
 
 	// --- 3. Bind compute pipeline ---

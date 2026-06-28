@@ -29,7 +29,7 @@ layout(binding = 7) uniform samplerCube U_Irradiance;
 layout(binding = 8) uniform samplerCube U_Prefiltered;
 
 // --- Shadow intensity (R8: 1.0 = fully shadowed, 0.0 = fully lit) ---
-layout(binding = 9) uniform sampler2D U_Shadow;
+layout(binding = 9) uniform sampler2DArray U_ShadowArray;
 
 // --- Point light SSBO (std140) ---
 struct PointLight
@@ -187,11 +187,17 @@ void main()
 
 	// --- Accumulate lighting ---
 	vec3 Lo = vec3(0.0);
-	float shadow = texture(U_Shadow, uv).r;  // 1.0 = shadowed, 0.0 = lit
 
 	for (int i = 0; i < lightCount; ++i)
 	{
 		PointLight light = lights[i];
+
+		// Per-light shadow: sample shadow array only if this light casts shadows
+		float shadow = 0.0;
+		if (light.shadowMapIndex >= 0)
+		{
+			shadow = texture(U_ShadowArray, vec3(uv, float(light.shadowMapIndex))).r;
+		}
 
 		vec3 toLight  = light.pos - worldPos;
 		float dist    = length(toLight);
