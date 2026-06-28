@@ -206,6 +206,52 @@
                                     "y": 1.0,
                                     "z": 1.0
                                 },
+                                "light_radius": 0.05,
+                                "spot_cutoff": 0.9,
+                                "spot_outer_cutoff": 0.8,
+                                "area_ratio": 1.0
+                            }
+                        }
+                    }
+                },
+                {
+                    "key": 7,
+                    "value": {
+                        "polymorphic_id": 1073741824,
+                        "ptr_wrapper": {
+                            "id": 2147483654,
+                            "data": {
+                                "value0": {
+                                    "o_name": "",
+                                    "o_type": 2,
+                                    "is_viewport": true,
+                                    "is_rendered": true
+                                },
+                                "transform": {
+                                    "m_position": {
+                                        "x": -3.0,
+                                        "y": 3.0,
+                                        "z": 3.0
+                                    },
+                                    "m_rotation": {
+                                        "x": 0.0,
+                                        "y": 0.0,
+                                        "z": 0.0
+                                    },
+                                    "m_scale": {
+                                        "x": 1.0,
+                                        "y": 1.0,
+                                        "z": 1.0
+                                    }
+                                },
+                                "use_shadow": true,
+                                "light_type": 0,
+                                "light_power": 10.0,
+                                "light_color": {
+                                    "x": 1.0,
+                                    "y": 1.0,
+                                    "z": 1.0
+                                },
                                 "light_radius": 0.05000000074505806,
                                 "spot_cutoff": 0.8999999761581421,
                                 "spot_outer_cutoff": 0.800000011920929,

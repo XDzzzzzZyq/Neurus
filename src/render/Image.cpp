@@ -20,12 +20,14 @@ Image::Image(const vk::raii::Device& device,
              const vk::ImageUsageFlags usage,
              const uint32_t mipLevels,
              const ImageType imageType,
-             const char* debugName)
+             const char* debugName,
+             const bool arrayView)
 	: m_extent(extent)
 	, m_format(format)
 	, m_usage(usage)
 	, m_mipLevels(mipLevels)
 	, m_imageType(imageType)
+	, m_arrayView(arrayView)
 {
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
@@ -193,7 +195,7 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 		break;
 	case ImageType::e2D:
 	default:
-		viewType = vk::ImageViewType::e2D;
+		viewType = m_arrayView ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
 		aspect = vk::ImageAspectFlagBits::eColor;
 		break;
 	}

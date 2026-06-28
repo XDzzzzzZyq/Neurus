@@ -135,13 +135,13 @@
     "semantic_hash": "e150294705324a8ecec6e3f3820f5f2e"
   },
   "src/render/DeferredRenderer.cpp": {
-    "mtime": 1782557286.1874225,
-    "ast_hash": "7af4e8a045ca292f9b296824ac772666",
+    "mtime": 1782573806.108479,
+    "ast_hash": "1d02c47284e41596b0d5ae4a06c81dc5",
     "semantic_hash": ""
   },
   "src/render/DeferredRenderer.h": {
-    "mtime": 1782557235.6312222,
-    "ast_hash": "305db04e2ec9343f0a61fa86a69251ad",
+    "mtime": 1782573811.965509,
+    "ast_hash": "8d8d6b92bcd3ac20868783ed4c02dc1c",
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.cpp": {
@@ -495,13 +495,13 @@
     "semantic_hash": "a73f0ddb003757ee3de82e67315362ed"
   },
   "src/render/passes/LightingPass.cpp": {
-    "mtime": 1782561182.6045225,
-    "ast_hash": "b4cc0b6ecf6617dd873f434090021bd0",
+    "mtime": 1782609954.2014341,
+    "ast_hash": "df12ef4d94c0be4c41a691ebbb71abae",
     "semantic_hash": ""
   },
   "src/render/passes/LightingPass.h": {
-    "mtime": 1782561169.3660812,
-    "ast_hash": "2fe1df5abc8658190edc6aba03ec34a1",
+    "mtime": 1782609811.8028803,
+    "ast_hash": "04d7cdab9c12cac763b568a4fb27b072",
     "semantic_hash": ""
   },
   "src/render/passes/Pass.h": {
@@ -520,8 +520,8 @@
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.cpp": {
-    "mtime": 1782563778.6363156,
-    "ast_hash": "51c1a8fc27f60b2b135544c6f0be74bc",
+    "mtime": 1782573828.606841,
+    "ast_hash": "86ba621c211f2f114c2708a5996b4091",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.h": {
@@ -640,8 +640,8 @@
     "semantic_hash": ""
   },
   "src/render/RenderContext.h": {
-    "mtime": 1782563777.552309,
-    "ast_hash": "a3cfe38cc47eb367e6682ba84a39ab9b",
+    "mtime": 1782573739.500295,
+    "ast_hash": "728826a59e9c8fa51695d1fc467be594",
     "semantic_hash": ""
   },
   "src/scene/Material.cpp": {
@@ -660,13 +660,13 @@
     "semantic_hash": ""
   },
   "src/render/passes/ShadowIntensityPass.cpp": {
-    "mtime": 1782562667.0952039,
-    "ast_hash": "73af78d90570af9bb9be0220ce97ece4",
+    "mtime": 1782573839.643865,
+    "ast_hash": "44459a2c121f1ee8d9e8b2caa75fa39b",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowIntensityPass.h": {
-    "mtime": 1782556434.1809402,
-    "ast_hash": "0e2e59352efd8990d9b172d769951eef",
+    "mtime": 1782573906.8009613,
+    "ast_hash": "ad6f7a97fb455d721a2ed863835683d6",
     "semantic_hash": ""
   }
 }

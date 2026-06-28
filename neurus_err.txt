@@ -1,0 +1,1 @@
+[Vulkan Validation] Layer VK_LAYER_OBS_HOOK uses API version 1.3 which is older than the application specified API version of 1.4. May cause issues.

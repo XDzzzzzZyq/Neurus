@@ -114,7 +114,8 @@ Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D ex
 	                    vk::ImageUsageFlagBits::eTransferDst,
 	                1,                         // mipLevels
 	                Image::ImageType::e2D,
-	                debugName.c_str());  // debug name
+	                debugName.c_str(),         // debug name
+	                /*arrayView=*/true);
 
 	const auto [insertedIt, _] = m_shadowIntensities.emplace(lightUID, std::move(intensity));
 	return insertedIt->second;

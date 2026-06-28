@@ -131,7 +131,8 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			vk::Format::eR8Unorm,
 			dummyUsage, /*mipLevels=*/1,
 			Image::ImageType::e2D,
-			"Lighting_DummyShadow");
+			"Lighting_DummyShadow",
+			/*arrayView=*/true);
 
 		// Transition UNDEFINED → TransferDst → clear (black) → ColorShaderRead
 		{

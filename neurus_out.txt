@@ -1,0 +1,914 @@
+[LoadObjFromString:493] [MeshData] parsed 'Grid1' - 2362 verts, 3984 indices, center=(0.472614, 0.00112599, 1.34281)
+[LoadObj:344] [MeshData] loaded 'Grid1' from D:/Projects/Neurus/build/debug/Debug/res//obj/shadow/grid1.obj - 2362 verts, 3984 indices
+[LoadObjFromString:493] [MeshData] parsed 'Grid2' - 2418 verts, 3984 indices, center=(0.912567, 0.538399, 1.80732)
+[LoadObj:344] [MeshData] loaded 'Grid2' from D:/Projects/Neurus/build/debug/Debug/res//obj/shadow/grid2.obj - 2418 verts, 3984 indices
+[LoadObjFromString:493] [MeshData] parsed 'Ground' - 24 verts, 36 indices, center=(0, 0, -0.105)
+[LoadObj:344] [MeshData] loaded 'Ground' from D:/Projects/Neurus/build/debug/Debug/res//obj/shadow/ground.obj - 24 verts, 36 indices
+[LoadProject:174] [Application] Loaded project: D:/Projects/Neurus/build/debug/Debug/res/shadow.neurus.json
+[Image:77] [Image] 1024x1024 mips=11 type=2D format=R8G8B8A8Srgb usage={ TransferSrc | TransferDst | Sampled } handle=0x20000000002
+[createBuffer:107] [Buffer] size=4194304 usage={ TransferSrc } memProps={ HostVisible | HostCoherent }
+[createBuffer:107] [Buffer] size=75584 usage={ TransferDst | VertexBuffer } memProps={ DeviceLocal } name='VBO_Grid1'
+[createBuffer:107] [Buffer] size=75584 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='VBO_Grid1_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=75584
+[Unmap:107] [GPUBuffer::Unmap] 75584 bytes transferred to GPU
+[VertexBuffer:46] [VertexBuffer] 2362 verts, stride=32, size=75584 bytes name='VBO_Grid1'
+[createBuffer:107] [Buffer] size=15936 usage={ TransferDst | IndexBuffer } memProps={ DeviceLocal } name='IBO_Grid1'
+[createBuffer:107] [Buffer] size=15936 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='IBO_Grid1_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=15936
+[Unmap:107] [GPUBuffer::Unmap] 15936 bytes transferred to GPU
+[IndexBuffer:43] [IndexBuffer] 3984 indices, size=15936 bytes name='IBO_Grid1'
+[UploadToGPU:91] [Mesh] Uploaded mesh 3 ('Grid1') vertices=2362 indices=3984
+[createBuffer:107] [Buffer] size=77376 usage={ TransferDst | VertexBuffer } memProps={ DeviceLocal } name='VBO_Grid2'
+[createBuffer:107] [Buffer] size=77376 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='VBO_Grid2_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=77376
+[Unmap:107] [GPUBuffer::Unmap] 77376 bytes transferred to GPU
+[VertexBuffer:46] [VertexBuffer] 2418 verts, stride=32, size=77376 bytes name='VBO_Grid2'
+[createBuffer:107] [Buffer] size=15936 usage={ TransferDst | IndexBuffer } memProps={ DeviceLocal } name='IBO_Grid2'
+[createBuffer:107] [Buffer] size=15936 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='IBO_Grid2_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=15936
+[Unmap:107] [GPUBuffer::Unmap] 15936 bytes transferred to GPU
+[IndexBuffer:43] [IndexBuffer] 3984 indices, size=15936 bytes name='IBO_Grid2'
+[UploadToGPU:91] [Mesh] Uploaded mesh 4 ('Grid2') vertices=2418 indices=3984
+[createBuffer:107] [Buffer] size=768 usage={ TransferDst | VertexBuffer } memProps={ DeviceLocal } name='VBO_Ground'
+[createBuffer:107] [Buffer] size=768 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='VBO_Ground_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=768
+[Unmap:107] [GPUBuffer::Unmap] 768 bytes transferred to GPU
+[VertexBuffer:46] [VertexBuffer] 24 verts, stride=32, size=768 bytes name='VBO_Ground'
+[createBuffer:107] [Buffer] size=144 usage={ TransferDst | IndexBuffer } memProps={ DeviceLocal } name='IBO_Ground'
+[createBuffer:107] [Buffer] size=144 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='IBO_Ground_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=144
+[Unmap:107] [GPUBuffer::Unmap] 144 bytes transferred to GPU
+[IndexBuffer:43] [IndexBuffer] 36 indices, size=144 bytes name='IBO_Ground'
+[UploadToGPU:91] [Mesh] Uploaded mesh 5 ('Ground') vertices=24 indices=36
+[Swapchain:69] [Swapchain] 1200x900 format=B8G8R8A8Srgb present=MailbValidation Error: [ VUID-VkShaderModuleCreateInfo-pCode-08740 ] | MessageID = 0x6e224e9
+vkCreateShaderModule(): SPIR-V Capability MultiView was declared, but one of the following requirements is required (VkPhysicalDeviceVulkan11Features::multiview).
+The Vulkan spec states: If pCode is a pointer to SPIR-V code, and pCode declares any of the capabilities listed in the SPIR-V Environment appendix, one of the corresponding requirements must be satisfied (https://docs.vulkan.org/spec/latest/chapters/shaders.html#VUID-VkShaderModuleCreateInfo-pCode-08740)
+
+Validation Error: [ VUID-VkShaderModuleCreateInfo-pCode-08740 ] | MessageID = 0x6e224e9
+vkCreateShaderModule(): SPIR-V Capability MultiView was declared, but one of the following requirements is required (VkPhysicalDeviceVulkan11Features::multiview).
+The Vulkan spec states: If pCode is a pointer to SPIR-V code, and pCode declares any of the capabilities listed in the SPIR-V Environment appendix, one of the corresponding requirements must be satisfied (https://docs.vulkan.org/spec/latest/chapters/shaders.html#VUID-VkShaderModuleCreateInfo-pCode-08740)
+
+ox images=3 usage={ TransferDst | ColorAttachment }
+[createBuffer:107] [Buffer] size=128 usage={ UniformBuffer } memProps={ HostVisible | HostCoherent } name='CameraUBO'
+[GeometryPass:71] [GeometryPass] vertSize=2596 fragSize=1068 colorAttachments=4 depthAttachments=1 vertexStride=32
+[LightingPass:50] [LightingPass] compSize=14524 numSets=2 qfi=0
+[Image:77] [Image] 4x4 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferDst | Sampled } handle=0x410000000041 name='Lighting_IrradianceFallback'
+[Image:77] [Image] 4x4 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferDst | Sampled } handle=0x4b000000004b name='Lighting_PrefilteredFallback'
+[LightingPass:117] [LightingPass] Created fallback IBL cubemaps (4×4 black)
+[Image:77] [Image] 1x1 mips=1 type=2D format=R8Unorm usage={ TransferDst | Sampled } handle=0x570000000057 name='Lighting_DummyShadow'
+[LightingPass:183] [LightingPass] Created dummy R8 shadow image (1×1 black)
+[SSAOPass:92] [SSAOPass] compSize=8492 numSets=2 kernelLength=16 qfi=0
+[GenerateKernel:160] [SSAOPass] Generated 16 hemisphere kernel samples
+[createBuffer:107] [Buffer] size=400 usage={ UniformBuffer } memProps={ HostVisible | HostCoherent } name='SSAOParamsUBO'
+[SSAOPass:108] [SSAOPass] Created params UBO (400 bytes, 16 kernel samples)
+[GenerateNoise:184] [SSAOPass] Generated 256 noise rotation entries
+[createBuffer:107] [Buffer] size=4096 usage={ TransferDst | UniformBuffer } memProps={ DeviceLocal } name='SSAONoiseUBO'
+[createBuffer:107] [Buffer] size=4096 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='SSAONoiseUBO_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=4096
+[Unmap:107] [GPUBuffer::Unmap] 4096 bytes transferred to GPU
+[SSAOPass:124] [SSAOPass] Created noise UBO (4096 bytes, 256 entries)
+[IBLPass:59] [IBLPass] irradianceSize=6432 specularSize=7156 qfi=0
+[DeferredRenderer:128] [DeferredRenderer] IBLPass created
+[createBuffer:107] [Buffer] size=400 usage={ UniformBuffer } memProps={ HostVisible | HostCoherent } name='ShadowDepthUBO'
+[createMultiviewPipeline:173] [ShadowDepthPass] Multiview pipeline created
+[createMultiviewColorPipeline:221] [ShadowDepthPass] Multiview colour+depth pipeline created
+[ShadowDepthPass:76] [ShadowDepthPass] resolution=1024 UBOsize=400
+[DeferredRenderer:138] [DeferredRenderer] ShadowDepthPass created
+[ShadowIntensityPass:43] [ShadowIntensityPass] compSize=3212 numSets=2 farPlane=10 bias=0.0005
+[DeferredRenderer:150] [DeferredRenderer] ShadowIntensityPass created
+[DeferredRenderer:183] [DeferredRenderer] CmdBuf[0] handle=0x23580a0a8d0 name='DeferredRenderer::FrameCmd[0]'
+[DeferredRenderer:183] [DeferredRenderer] CmdBuf[1] handle=0x23580a0e0d0 name='DeferredRenderer::FrameCmd[1]'
+[DeferredRenderer:183] [DeferredRenderer] CmdBuf[2] handle=0x23580a118d0 name='DeferredRenderer::FrameCmd[2]'
+[DeferredRenderer:200] [DeferredRenderer] 1200x900 swapchainImages=3 transferDst=yes
+[createBuffer:107] [Buffer] size=128 usage={ TransferDst | StorageBuffer } memProps={ DeviceLocal } name='LightSSBO'
+[createBuffer:107] [Buffer] size=128 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='LightSSBO_Staging'
+[GPUBuffer:37] [GPUBuffer::Map] created staging buffer, size=128
+[Unmap:107] [GPUBuffer::Unmap] 128 bytes transferred to GPU
+[UploadLights:274] [LightingPass] Uploaded 2 point lights (128 bytes)
+[OnIBLLoad:313] [Editor] No environment in scene — IBL disabled (black background)
+[Initialize:124] [Editor] Initialized
+[InitEditor:260] [Application] Editor initialized, IBL handled by Editor
+[Run:118] [Application] Entering event loop
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Position" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0x9d000000009d name='Position'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Normal" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0xa000000000a0 name='Normal'
+[GetAttachmeValidation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+    [2] VkImageView 0xd600000000d6[ShadowIntensity_Light_4_View]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+    [2] VkImageView 0xd900000000d9[ShadowIntensity_Light_7_View]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPipelineBarrier2-commandBuffer-recording ] | MessageID = 0xe51ba291
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdPipelineBarrier2(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/synchronization.html#VUID-vkCmdPipelineBarrier2-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+
+Validation Error: [ VUID-vkCmdDrawIndexed-viewMask-06178 ] | MessageID = 0xee5c90f5
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdDrawIndexed(): Currently bound pipeline VkPipeline 0x870000000087 viewMask (0x0) must be equal to VkRenderingInfo::viewMask (0x3f).
+The Vulkan spec states: If the current render pass instance was begun with vkCmdBeginRendering, the bound graphics pipeline must have been created with a VkPipelineRenderingCreateInfo::viewMask equal to VkRenderingInfo::viewMask (https://docs.vulkan.org/spec/latest/chapters/drawing.html#VUID-vkCmdDrawIndexed-viewMask-06178)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkPipeline 0x870000000087
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+    [2] VkImageView 0x10f000000010f[ShadowIntensity_Light_4_View]
+
+nt:51] [RenderCache] Lazily creating attachment "Albedo" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R8G8B8A8Srgb usage={ TransferSrc | Sampled | ColorAttachment } handle=0xa300000000a3 name='Albedo'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "MetallicRoughness" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R8G8B8A8Unorm usage={ TransferSrc | Sampled | ColorAttachment } handle=0xa600000000a6 name='MetallicRoughness'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Depth" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=DepthStencil format=D32Sfloat usage={ TransferSrc | Sampled | DepthStencilAttachment } handle=0xa900000000a9 name='Depth'
+[Image:77] [Image] 1024x1024 mips=1 type=Cube format=D32Sfloat usage={ TransferSrc | Sampled | DepthStencilAttachment } handle=0xac00000000ac name='ShadowDepthCubemap_Light_4'
+[Image:77] [Image] 1024x1024 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0xb600000000b6 name='ShadowColorCubemap_Light_4'
+[Image:77] [Image] 1024x1024 mips=1 type=Cube format=D32Sfloat usage={ TransferSrc | Sampled | DepthStencilAttachment } handle=0xc000000000c0 name='ShadowDepthCubemap_Light_7'
+[Image:77] [Image] 1024x1024 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0xca00000000ca name='ShadowColorCubemap_Light_7'
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R8Unorm usage={ TransferSrc | TransferDst | Sampled | Storage } handle=0xd400000000d4 name='ShadowIntensity_Light_4'
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R8Unorm usage={ TransferSrc | TransferDst | Sampled | Storage } handle=0xd700000000d7 name='ShadowIntensity_Light_7'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "SSAO" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R8Unorm usage={ TransferSrc | Sampled | Storage | ColorAttachment } handle=0xda00000000da name='SSAO'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "HDRColor" at 1200x900
+[Image:77] [Image] 1200x900 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | Storage | ColorAttachment } handle=0xdd00000000dd name='HDRColor'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Position" at 1493x908
+[Image:77] [Image] 1493x908 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0xea00000000ea name='Position'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Normal" at 1493x908
+[Image:77] [Image] 1493x908 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0xed00000000ed name='Normal'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Albedo" at 1493x908
+[Image:77] [Image] 1493x908 mips=1 type=2D format=R8G8B8A8Srgb usage={ TransferSrc | Sampled | ColorAttachment } handle=0xf000000000f0 name='Albedo'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "MetallicRoughness" at 1493x908
+[Image:77] [Image] 1493x908 mips=1 type=2D format=R8G8B8A8Unorm usage={ TransferSrc | Sampled | ColorAttachment } handle=0xf300000000f3 name='MetallicRoughness'
+[GetAttachment:51] [RenderCache] Lazily creating attachment "Depth" at 1493x908
+[Image:77] [Image] 1493x908 mips=1 type=DepthStencil format=D32Sfloat usage={ TransferSrc | Sampled | DepthStencilAttachment } handle=0xf600000000f6 name='Depth'
+[Image:77] [Image] 1024x1024 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0xf900000000f9 name='ShadowColorCubemap_Light_4'
+[Image:77] [Image] 1024x1024 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0x1030000000103 name='ShadowColorCubemap_Light_7'
+[Image:77] [Image] 1493x908 mips=1 type=2D format=R8Unorm usage={ TransferSrc | TransferDst | Sampled | Storage } handle=0x10d000000010d name='ShadowIntensity_Light_4'
+[Image:77] [Image] 1493x908 mips=1 type=2D format=R8Unorm usage={ TransferSrc | TransferDst | Sampled | Storage } handle=0x11000000001Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+    [2] VkImageView 0x1120000000112[ShadowIntensity_Light_7_View]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+    [2] VkImageView 0x10f000000010f[ShadowIntensity_Light_4_View]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+    [2] VkImageView 0x1120000000112[ShadowIntensity_Light_7_View]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+    [2] VkImageView 0x10f000000010f[ShadowIntensity_Light_4_View]
+
+Validation Error: [ VUID-vkCmdBindDescriptorSets-commandBuffer-recording ] | MessageID = 0xc6a2ced4
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdBindDescriptorSets(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdBindDescriptorSets-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdPushConstants-commandBuffer-recording ] | MessageID = 0x6e6ee899
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdPushConstants(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/descriptorsets.html#VUID-vkCmdPushConstants-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-commandBuffer-recording ] | MessageID = 0x532b383f
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdDispatch(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+    [2] VkImageView 0x1120000000112[ShadowIntensity_Light_7_View]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+
+Validation Error: [ VUID-VkRenderingInfo-multiview-06127 ] | MessageID = 0x6c6c169f
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdBeginRendering(): pRenderingInfo->viewMask is 0x3f (non-zero) but the multiview feature is not enabled.
+The Vulkan spec states: If the multiview feature is not enabled, viewMask must be 0 (https://docs.vulkan.org/spec/latest/chapters/renderpass.html#VUID-VkRenderingInfo-multiview-06127)
+Objects: 1
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+    [2] VkImageView 0x10f000000010f[ShadowIntensity_Light_4_View]
+
+Validation Error: [ VUID-vkCmdDispatch-viewType-07752 ] | MessageID = 0x6174abc7
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdDispatch(): the storage image descriptor [VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1], Set 0, Binding 2, Index 0, variable "outputShadow"] VkImageViewType is VK_IMAGE_VIEW_TYPE_2D_ARRAY but the OpTypeImage has (Dim = 2D) and (Arrayed = 0).
+Either fix in shader or update the VkImageViewType to VK_IMAGE_VIEW_TYPE_2D.
+The Vulkan spec states: If a VkImageView is accessed as a result of this command, then the image view's viewType must match the Dim operand of the OpTypeImage as described in Compatibility Between SPIR-V Image Dimensions and Vulkan ImageView Types (https://docs.vulkan.org/spec/latest/chapters/dispatch.html#VUID-vkCmdDispatch-viewType-07752)
+Objects: 3
+    [0] VkPipeline 0x900000000090
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+    [2] VkImageView 0x1120000000112[ShadowIntensity_Light_7_View]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBindPipeline-commandBuffer-recording ] | MessageID = 0xea39881b
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdBindPipeline(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/pipelines.html#VUID-vkCmdBindPipeline-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0a8d0[DeferredRenderer::FrameCmd[0]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a0e0d0[DeferredRenderer::FrameCmd[1]]
+    [1] VkDescriptorSet 0x8d000000008d[ShadowIntensityPass_Set1]
+
+Validation Error: [ VUID-vkCmdBlitImage-commandBuffer-recording ] | MessageID = 0x6714756d
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkCmdBlitImage(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/copies.html#VUID-vkCmdBlitImage-commandBuffer-recording)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+
+Validation Error: [ VUID-vkEndCommandBuffer-commandBuffer-00059 ] | MessageID = 0xdf9fb6be
+(Warning - This VUID has now been reported 10 times, which is the duplicate_message_limit value, this will be the last time reporting it).
+vkEndCommandBuffer(): was called in VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]] which is now in an invalid state (instead of recording state) because the following objects bound to the command buffer were invalidated
+ VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0] was destroyed or updated without UPDATE_AFTER_BIND
+The Vulkan spec states: commandBuffer must be in the recording state (https://docs.vulkan.org/spec/latest/chapters/cmdbuffers.html#VUID-vkEndCommandBuffer-commandBuffer-00059)
+Objects: 2
+    [0] VkCommandBuffer 0x23580a118d0[DeferredRenderer::FrameCmd[2]]
+    [1] VkDescriptorSet 0x8c000000008c[ShadowIntensityPass_Set0]
+

@@ -74,6 +74,9 @@ public:
 	 * @param mipLevels      Number of mip levels (1 = no mip chain).
 	 * @param imageType      Image type (2D, Cube, Depth/Stencil).
 	 * @param debugName      Optional debug name for the image.
+	 * @param arrayView      If true and imageType is e2D, creates the ImageView
+	 *                       as VK_IMAGE_VIEW_TYPE_2D_ARRAY (layerCount=1).
+	 *                       Required when binding this image to a sampler2DArray.
 	 */
 	Image(const vk::raii::Device& device,
 	      const vk::raii::PhysicalDevice& physicalDevice,
@@ -82,7 +85,8 @@ public:
 	      vk::ImageUsageFlags usage,
 	      uint32_t mipLevels = 1,
 	      ImageType imageType = ImageType::e2D,
-	      const char* debugName = nullptr);
+	      const char* debugName = nullptr,
+	      bool arrayView = false);
 
 	/**
 	 * @brief Creates a GPU image from CPU-side ImageData (loads from file and uploads).
@@ -265,6 +269,9 @@ private:
 	uint32_t m_mipLevels = 1;
 	uint32_t m_arrayLayers = 1;
 	ImageType m_imageType = ImageType::e2D;
+
+	// --- If true, e2D images get a VK_IMAGE_VIEW_TYPE_2D_ARRAY view (for sampler2DArray) ---
+	bool m_arrayView = false;
 
 	// --- State tracking ---
 	ImageState m_state = ImageState::Undefined;
