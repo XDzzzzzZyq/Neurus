@@ -10,7 +10,7 @@
 #include "../Image.h"
 #include "../DescriptorManager.h"
 #include "../buffers/BufferLayout.h"
-#include "../buffers/UniformBuffer.h"
+#include "../buffers/GPUBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
@@ -26,6 +26,26 @@ class ShadowDepthPass : public Pass
 public:
 	static constexpr uint32_t kDefaultResolution = 1024;
 	static constexpr uint32_t kShadowFaceCount = 6;
+
+	// Fixed far plane for the static projection matrix (must be >> any light's farPlane
+	// to avoid clipping; the actual depth normalisation uses the per-light farPlane push
+	// constant through gl_FragDepth override).
+	static constexpr float kStaticFarPlane = 1000.0f;
+
+	// 6 mat4 face view-projection matrices → 384 bytes in std430
+	static constexpr vk::DeviceSize kFaceVPSize = kShadowFaceCount * sizeof(glm::mat4);
+
+	// Push constant layout (80 bytes total):
+	//   offset 0:  vec3 lightWorldPos  (12 bytes)
+	//   offset 12: float farPlane       (4 bytes)
+	//   offset 16: mat4  model          (64 bytes)
+	static constexpr vk::DeviceSize kLightPushSize = 16;   // lightWorldPos + farPlane
+	static constexpr vk::DeviceSize kModelPushOffset = 16; // model starts here
+	static constexpr vk::DeviceSize kTotalPushSize = 80;   // 16 + 64
+
+	struct LightPushData { float lpx, lpy, lpz; float farPlane; };
+	static_assert(sizeof(LightPushData) == kLightPushSize,
+	              "LightPushData must be exactly 16 bytes");
 
 	ShadowDepthPass(const vk::raii::Device& device,
 	                const vk::raii::PhysicalDevice& physicalDevice,
@@ -43,40 +63,27 @@ public:
 
 	// --- Accessors ---
 	uint32_t Resolution() const { return m_resolution; }
-	const DescriptorSetLayout& GetLightLayout() const { return m_layout; }
-	vk::DescriptorSet GetLightSetHandle() const { return m_set->handle(); }
-
-	// Must match std140 layout in shadow shaders:
-	//   mat4 faceViewProj[6];  // 384 bytes (offset 0)
-	//   vec3 lightWorldPos;    //  12 bytes (offset 384)
-	//   float farPlane;        //   4 bytes (offset 396)
-	// Total: 400 bytes
-	struct LightUBO { glm::mat4 faceVP[6]; float lpx, lpy, lpz; float farPlane; };
-	static_assert(sizeof(LightUBO) == 400,
-	              "LightUBO size must match std140 layout");
-
-	UniformBuffer<LightUBO>& GetUBO() { return *m_ubo; }
 
 private:
-	static DescriptorSetLayout CreateLightLayout(const vk::raii::Device& device);
+	static DescriptorSetLayout CreateSSBOLayout(const vk::raii::Device& device);
 
-	void createUniforms(const vk::raii::Device& device,
-	                    const vk::raii::PhysicalDevice& physicalDevice,
-	                    vk::Queue queue, uint32_t qfi);
+	void createSSBOResources(const vk::raii::Device& device,
+	                         const vk::raii::PhysicalDevice& physicalDevice,
+	                         vk::Queue queue, uint32_t qfi);
 	void createPipeline(const vk::raii::Device& device);
-	void updateUBO(const glm::vec3& lightPos, float farPlane);
 
 	// --- Parameters ---
 	uint32_t m_resolution;
 
 	// --- GPU resources ---
-	std::unique_ptr<UniformBuffer<LightUBO>> m_ubo;
-	DescriptorSetLayout m_layout;
-	DescriptorPool m_pool;
-	std::unique_ptr<DescriptorSet> m_set;
+	// Static SSBO with 6 face VP matrices (computed once from origin; never changes)
+	std::unique_ptr<GPUBuffer> m_faceVPs;
+	DescriptorSetLayout m_ssboLayout;
+	DescriptorPool m_ssboPool;
+	std::unique_ptr<DescriptorSet> m_ssboSet;
 	BufferLayout m_vtxLayout;
 
-	// Depth+colour pipeline (uses depth_to_color.frag for RGBA32F depth encoding in multiview)
+	// Graphics pipeline (multiview depth+colour)
 	vk::raii::PipelineLayout m_pipelineLayout = nullptr;
 	vk::raii::Pipeline m_pipeline = nullptr;
 };

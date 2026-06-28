@@ -1,11 +1,23 @@
 /**
  * @file ShadowDepthPass.cpp
  * @brief Point-light shadow depth cubemap pass implementation.
+ *
+ * Changed from host-visible UBO to SSBO + push constants to fix the
+ * GPU-synchronisation bug where UpdateUBO() was called for each light in
+ * a single command buffer, but the GPU only saw the last write because
+ * command execution is deferred.
+ *
+ * Now:
+ *   - 6 static face view-projection matrices live in a device-local SSBO
+ *     (computed once from origin with a fixed far plane).
+ *   - Per-light data (lightWorldPos + farPlane) is pushed via push constants
+ *     (offset 0, 16 bytes).
+ *   - Per-draw model matrix is pushed via push constants (offset 16, 64 bytes).
  */
 
 #include "passes/ShadowDepthPass.h"
 #include "passes/GeometryPass.h"       // for GeometryRenderItem
-#include "RenderCache.h"         // for GetShadowMap
+#include "RenderCache.h"               // for GetShadowMap
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"
@@ -30,13 +42,43 @@ namespace {
 } // anon
 
 // ===========================================================================
-// Descriptor set layout
+// Static helpers — 6 cubemap face view-projection matrices from origin
 // ===========================================================================
 
-DescriptorSetLayout ShadowDepthPass::CreateLightLayout(const vk::raii::Device& device)
+namespace {
+
+/**
+ * @brief Computes 6 view-projection matrices for a cubemap from 0,0,0
+ *        with the given projection matrix.
+ *
+ * These are equivalent to:
+ *   proj * lookAt(origin, origin + faceDir, faceUp)
+ * and are combined with a per-light position offset in the vertex shader
+ * via `worldPos - lightWorldPos`.
+ */
+std::array<glm::mat4, 6> MakeFaceVPs(const glm::mat4& proj)
+{
+	// Six cubemap face directions (+X, -X, +Y, -Y, +Z, -Z) with matching up vectors
+	return {{
+		proj * glm::lookAt(glm::vec3(0.0f), glm::vec3( 1, 0, 0), glm::vec3( 0,-1, 0)),  // +X
+		proj * glm::lookAt(glm::vec3(0.0f), glm::vec3(-1, 0, 0), glm::vec3( 0,-1, 0)),  // -X
+		proj * glm::lookAt(glm::vec3(0.0f), glm::vec3( 0, 1, 0), glm::vec3( 0, 0, 1)),  // +Y
+		proj * glm::lookAt(glm::vec3(0.0f), glm::vec3( 0,-1, 0), glm::vec3( 0, 0,-1)),  // -Y
+		proj * glm::lookAt(glm::vec3(0.0f), glm::vec3( 0, 0, 1), glm::vec3( 0,-1, 0)),  // +Z
+		proj * glm::lookAt(glm::vec3(0.0f), glm::vec3( 0, 0,-1), glm::vec3( 0,-1, 0)),  // -Z
+	}};
+}
+
+} // anon
+
+// ===========================================================================
+// Descriptor set layout (SSBO for face VP matrices)
+// ===========================================================================
+
+DescriptorSetLayout ShadowDepthPass::CreateSSBOLayout(const vk::raii::Device& device)
 {
 	return BuildLayout()
-		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
+		.AddBinding(0, vk::DescriptorType::eStorageBuffer,
 		            vk::ShaderStageFlagBits::eVertex |
 		                vk::ShaderStageFlagBits::eFragment)
 		.Build(device);
@@ -62,31 +104,48 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	m_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
 	m_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
-	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
+	createSSBOResources(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 	createPipeline(device);
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
-	           << " UBOsize=" << sizeof(LightUBO));
+	           << " faceVPSize=" << kFaceVPSize
+	           << " staticFarPlane=" << kStaticFarPlane);
 }
 
 // ===========================================================================
-// createUniforms — UBO, descriptor pool & set
+// createSSBOResources — SSBO, descriptor pool & set
 // ===========================================================================
 
-void ShadowDepthPass::createUniforms(const vk::raii::Device& device,
-                                      const vk::raii::PhysicalDevice& physicalDevice,
-                                      vk::Queue queue, uint32_t qfi)
+void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
+                                           const vk::raii::PhysicalDevice& physicalDevice,
+                                           vk::Queue queue, uint32_t qfi)
 {
-	m_ubo = std::make_unique<UniformBuffer<LightUBO>>(
-		device, physicalDevice, "ShadowDepthUBO");
+	// --- Compute static face VP matrices once ---
+	const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
+	                                        kNearPlane, kStaticFarPlane);
+	const auto faceVPs = MakeFaceVPs(proj);
 
-	m_layout = CreateLightLayout(device);
-	m_pool = DescriptorPool(device, 1, DescriptorPool::CalculatePoolSizes({&m_layout}, 1));
-	m_set = std::make_unique<DescriptorSet>(std::move(m_pool.Allocate(m_layout, 1).front()));
-	m_set->WriteBuffer(0, m_ubo->GetDescriptorInfo(), vk::DescriptorType::eUniformBuffer);
+	// --- Upload to device-local storage buffer ---
+	m_faceVPs = std::make_unique<GPUBuffer>(
+		device, physicalDevice, queue, qfi,
+		kFaceVPSize,
+		vk::BufferUsageFlagBits::eStorageBuffer,
+		"ShadowDepthFaceVPs");
+	m_faceVPs->Upload(faceVPs.data(), kFaceVPSize);
+
+	// --- Descriptor layout, pool, and set ---
+	m_ssboLayout = CreateSSBOLayout(device);
+	m_ssboPool = DescriptorPool(device, 1,
+	                            DescriptorPool::CalculatePoolSizes({&m_ssboLayout}, 1));
+	m_ssboSet = std::make_unique<DescriptorSet>(
+		std::move(m_ssboPool.Allocate(m_ssboLayout, 1).front()));
+	m_ssboSet->WriteBuffer(0, m_faceVPs->GetDescriptorInfo(),
+	                       vk::DescriptorType::eStorageBuffer);
 #ifdef _DEBUG
-	m_set->SetDebugName("ShadowDepth_LightSet");
+	m_ssboSet->SetDebugName("ShadowDepth_FaceVPSSBO");
 #endif
+
+	NEURUS_LOG("[ShadowDepthPass] SSBO with 6 faceVP matrices uploaded");
 }
 
 // ===========================================================================
@@ -100,11 +159,15 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 	auto fragModule = ShaderModule::FromEmbedded(device,
 		depth_to_color_frag_spv, sizeof(depth_to_color_frag_spv));
 
+	// Push constant range: 80 bytes (lightPos+farPlane at offset 0, model at offset 16)
+	// Accessible by both vertex (full struct) and fragment (light data only).
 	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4))
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex |
+		                      vk::ShaderStageFlagBits::eFragment,
+		                      0, kTotalPushSize)
 	};
 
-	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
+	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_ssboLayout.layout() };
 
 	PipelineBuilder builder;
 	m_pipeline = builder
@@ -136,30 +199,7 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
 	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
 
-	NEURUS_LOG("[ShadowDepthPass] Pipeline created");
-}
-
-// ===========================================================================
-// UBO update
-// ===========================================================================
-
-void ShadowDepthPass::updateUBO(const glm::vec3& lightPos, float farPlane)
-{
-	const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
-	                                        kNearPlane, farPlane);
-	const glm::vec3& p = lightPos;
-
-	LightUBO ubo{};
-	ubo.faceVP[0] = proj * glm::lookAt(p, p + glm::vec3( 1, 0, 0), glm::vec3( 0,-1, 0));
-	ubo.faceVP[1] = proj * glm::lookAt(p, p + glm::vec3(-1, 0, 0), glm::vec3( 0,-1, 0));
-	ubo.faceVP[2] = proj * glm::lookAt(p, p + glm::vec3( 0, 1, 0), glm::vec3( 0, 0, 1));
-	ubo.faceVP[3] = proj * glm::lookAt(p, p + glm::vec3( 0,-1, 0), glm::vec3( 0, 0,-1));
-	ubo.faceVP[4] = proj * glm::lookAt(p, p + glm::vec3( 0, 0, 1), glm::vec3( 0,-1, 0));
-	ubo.faceVP[5] = proj * glm::lookAt(p, p + glm::vec3( 0, 0,-1), glm::vec3( 0,-1, 0));
-	ubo.lpx = p.x; ubo.lpy = p.y; ubo.lpz = p.z;
-	ubo.farPlane = farPlane;
-
-	m_ubo->Upload(ubo);
+	NEURUS_LOG("[ShadowDepthPass] Pipeline created (SSBO + push-constant based)");
 }
 
 // ===========================================================================
@@ -170,18 +210,6 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 {
 	// Guard: skip if no scene
 	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return; }
-
-	{
-		int shadowCount = 0;
-		for (const auto& [uid, lightPtr] : ctx.scene->light_list)
-		{
-			if (lightPtr && lightPtr->use_shadow)
-			{
-				auto pos = lightPtr->GetPosition();
-				shadowCount++;
-			}
-		}
-	}
 
 	const vk::Viewport viewport(0.f, 0.f,
 	                            static_cast<float>(m_resolution),
@@ -202,7 +230,19 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		// Only handle POINTLIGHT with shadow cubemaps; skip other types
 		if (lightPtr->light_type != LightType::POINTLIGHT) continue;
 
-		updateUBO(lightPos, farPlane);
+		// --- Push per-light data (lightWorldPos + farPlane, offset 0, 16 bytes) ---
+		{
+			LightPushData lp = {};
+			lp.lpx = lightPos.x;
+			lp.lpy = lightPos.y;
+			lp.lpz = lightPos.z;
+			lp.farPlane = farPlane;
+
+			cmdBuf.pushConstants<LightPushData>(m_pipelineLayout,
+			    vk::ShaderStageFlagBits::eVertex |
+			    vk::ShaderStageFlagBits::eFragment,
+			    0, lp);
+		}
 
 		cmdBuf.setViewport(0, viewport);
 		cmdBuf.setScissor(0, scissor);
@@ -217,7 +257,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 		                          m_pipelineLayout, 0,
-		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+		                          vk::ArrayProxy<const vk::DescriptorSet>(m_ssboSet->handle()), {});
 
 		// --- Transition colour cubemap to ColorAttachment for rendering ---
 		{
@@ -257,8 +297,12 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		{
 			for (const auto& item : *ctx.renderItems)
 			{
+				// Push model matrix at offset 16 (light data at offset 0
+				// persists from the per-light push above).
 				cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
-				    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
+				    vk::ShaderStageFlagBits::eVertex |
+				    vk::ShaderStageFlagBits::eFragment,
+				    kModelPushOffset, item.pushConstants.model);
 				cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
 				cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
 				cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);

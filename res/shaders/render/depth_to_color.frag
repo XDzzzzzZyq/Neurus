@@ -3,17 +3,18 @@
 // Depth to color pass - writes linear depth to color output for readback.
 // Used by test_shadow_cubemap_depth_verify.cpp when depth-aspect
 // vkCmdCopyImageToBuffer is not functional on this GPU.
+//
+// lightWorldPos and farPlane come from push constants (per-light).
 // ---------------------------------------------------------------------------
 
 layout(location = 0) in vec3 fragWorldPos;
 
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 0) uniform LightData
+layout(push_constant) uniform PushConstants
 {
-	mat4 faceViewProj[6];
-	vec3 lightWorldPos;
-	float farPlane;
+	layout(offset = 0)  vec3 lightWorldPos;
+	layout(offset = 12) float farPlane;
 };
 
 void main()
