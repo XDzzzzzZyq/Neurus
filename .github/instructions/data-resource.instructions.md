@@ -106,7 +106,7 @@ All image layout transitions go through `Barrier::Transition()`.
 - Texture class combining image + sampler + descriptor
 - Barrier for centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - DescriptorManager with per-frame descriptor pool rotation
-- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`) and per-light shadow cubemap management (`GetShadowMap(lightUID)`)
+- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow cubemap management (`GetShadowMap(lightUID)`), and a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`)
 
 ## Future Enhancements
 

@@ -112,7 +112,7 @@ Renderer Layer owns:
   VkSwapchainKHR (consumes UI's VkSurfaceKHR)
   VkPipeline + VkPipelineLayout
   VkCommandPool + VkCommandBuffers
-   RenderCache (cross-frame mutable resource pool, lazy GetAttachment / GetShadowMap)
+   RenderCache (cross-frame mutable resource pool, lazy GetAttachment / GetShadowMap / GetShadowIntensityArray)
    All framebuffer attachments (via RenderCache, dynamic rendering)
 
    Also through src/render/ abstractions:

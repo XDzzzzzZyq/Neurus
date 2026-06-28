@@ -139,7 +139,10 @@ GeometryPass (G-Buffer MRT: Position, Normal, Albedo, MetallicRoughness, Depth)
 SSAOPass (compute: reads G-Buffer, writes AO to R8 attachment)
     │
     ▼
-LightingPass (compute: reads G-Buffer + AO + shadow map, writes HDRColor)
+ShadowIntensityPass (compute: per-light shadow eval from cubemap → layered 2D_ARRAY)
+    │
+    ▼
+LightingPass (compute: reads G-Buffer + AO + shadow array, writes HDRColor)
     │
     ▼
 IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
@@ -183,6 +186,9 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 All screen-space attachments (Position, Normal, Albedo, MetallicRoughness, Depth, HDRColor,
 SSAO) are created lazily via `RenderCache::GetAttachment(name, extent)` on first use.
 Per-light shadow cubemaps are managed via `RenderCache::GetShadowMap(lightUID)`.
+The shadow intensity array (R8_UNORM, layered 2D_ARRAY) is created via
+`RenderCache::GetShadowIntensityArray(extent)` with per-light layer indices
+assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
 
 | Attachment | Format | Clear Value | Purpose |
 |---|---|---|---|
@@ -195,6 +201,7 @@ Per-light shadow cubemaps are managed via `RenderCache::GetShadowMap(lightUID)`.
 | SSAO | R8_UNORM | 0 (no occlusion) | Screen-space ambient occlusion |
 | SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
 | ShadowMap | D32_SFLOAT | 1.0 | Per-light cubemap depth (RenderCache-owned) |
+| ShadowIntensity | R8_UNORM | 0 (no shadow) | Layered 2D_ARRAY, one layer per shadow-casting light (RenderCache-owned) |
 
 ## Future Evolution
 
