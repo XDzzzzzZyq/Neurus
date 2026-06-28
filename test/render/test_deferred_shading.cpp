@@ -193,8 +193,8 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 		const AttachmentName name = kReferenceAttachments[i];
 		const bool isNormal = (name == AttachmentName::Normal);
 
-		const std::string refPath = std::string(neurus::test::kReferenceDir)
-			+ "deferred/" + AttachmentNameToString(name) + ".png";
+		const std::string refPath = neurus::test::ReferencePath::Make(
+			std::string("deferred/") + AttachmentNameToString(name) + ".png");
 		const std::string tmpPath = refPath + ".tmp";
 
 		Image& attachment = m_renderCache->GetAttachment(name, {kRenderWidth, kRenderHeight});

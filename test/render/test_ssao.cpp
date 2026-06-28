@@ -144,7 +144,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	// Step 4: Capture SSAO attachment & compare with reference
 	// -------------------------------------------------------------------
-	const std::string refPath = std::string(neurus::test::kReferenceDir) + "ssao/SSAO.png";
+	const std::string refPath = neurus::test::ReferencePath::Make("ssao/SSAO.png");
 	const std::string tmpPath = refPath + ".tmp";
 
 	Image& ssaoAttachment = m_renderCache->GetAttachment(AttachmentName::SSAO, {kRenderWidth, kRenderHeight});

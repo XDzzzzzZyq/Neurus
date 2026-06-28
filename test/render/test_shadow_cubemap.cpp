@@ -489,8 +489,8 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		// 5d. Reference image regression
 		{
 			const std::string refPath =
-				std::string(neurus::test::kReferenceDir)
-				+ "shadow/CubemapDepth_Face" + std::to_string(face) + ".png";
+				neurus::test::ReferencePath::Make(
+					"shadow/CubemapDepth_Face" + std::to_string(face) + ".png");
 			const std::string tmpPath = refPath + ".tmp";
 
 			std::vector<uint8_t> u8Data = DepthToU8(depthData);

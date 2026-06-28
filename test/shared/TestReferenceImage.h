@@ -2,7 +2,7 @@
  * @file TestReferenceImage.h
  * @brief Shared reference-image regression test utilities.
  *
- * Provides kReferenceDir, ComparePixels, and CheckReferenceOrGenerate
+ * Provides ReferencePath, ComparePixels, and CheckReferenceOrGenerate
  * for the first-run-generates / second-run-compares pattern used by
  * GPU reference-image regression tests.
  */
@@ -19,14 +19,18 @@
 namespace neurus {
 namespace test {
 
-/// @brief Path to reference images, relative from build/debug/test/
-static const char* kReferenceDir = "../../../test/render/reference/";
-
-/// @brief Convenience helper: concatenates kReferenceDir with a suffix.
-static std::string ReferencePath(const std::string& suffix)
+/// @brief Encapsulates the reference image base directory and path construction.
+struct ReferencePath
 {
-	return std::string(kReferenceDir) + suffix;
-}
+	/// @brief Path to reference images, relative from build/debug/test/
+	static constexpr const char* kReferenceDir = "../../../test/render/reference/";
+
+	/// @brief Build a full reference path by concatenating the base dir with a relative suffix.
+	static std::string Make(const std::string& relative)
+	{
+		return std::string(kReferenceDir) + relative;
+	}
+};
 
 /**
  * @brief Compare two RGBA8 images pixel-by-pixel.

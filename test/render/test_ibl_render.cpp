@@ -307,7 +307,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	// Step 9: Capture HDRColor & compare with reference
 	// -------------------------------------------------------------------
-	const std::string refPath = std::string(neurus::test::kReferenceDir) + "ibl/ibl_render.png";
+	const std::string refPath = neurus::test::ReferencePath::Make("ibl/ibl_render.png");
 	const std::string tmpPath = refPath + ".tmp";
 
 	Image& hdrColor = m_renderCache->GetAttachment(AttachmentName::HDRColor, {kRenderWidth, kRenderHeight});

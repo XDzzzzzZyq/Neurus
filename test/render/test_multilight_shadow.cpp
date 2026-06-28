@@ -210,7 +210,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	// Step 6: Capture HDRColor attachment as PNG
 	// -------------------------------------------------------------------
 	const std::string refPath =
-		std::string(neurus::test::kReferenceDir) + "multilight/TwoLights_HDRColor.png";
+		neurus::test::ReferencePath::Make("multilight/TwoLights_HDRColor.png");
 	const std::string tmpPath = refPath + ".tmp";
 
 	Image& hdrAttachment = m_renderCache->GetAttachment(
@@ -569,7 +569,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 
 		// --- Save to temporary PNG ---
 		ImageData imgData(pixelData.data(), kRenderWidth, kRenderHeight, vk::Format::eR8Unorm);
-		const std::string refPath = neurus::test::ReferencePath(
+		const std::string refPath = neurus::test::ReferencePath::Make(
 			"multilight/ShadowIntensity_Light_" + std::to_string(li) + ".png");
 		const std::string tmpPath = refPath + ".tmp";
 		const bool saved = imgData.SavePNG(tmpPath);

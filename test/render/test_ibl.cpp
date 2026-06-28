@@ -396,7 +396,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsHDR_ProducesValidFiles)
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
 
-	const std::string outDir = std::string(neurus::test::kReferenceDir) + "ibl/";
+	const std::string outDir = neurus::test::ReferencePath::Make("ibl/");
 	std::filesystem::create_directories(std::filesystem::path(outDir + "faces.hdr"));
 
 	for (int face = 0; face < 6; ++face)
@@ -429,7 +429,7 @@ TEST_F(IBLConversionTest, SaveHDRFloatImage_ProducesValidHDRFile)
 {
 	auto pixels = GenerateEquirectGradient(64, 32);
 
-	const std::string hdrPath = std::string(neurus::test::kReferenceDir) + "ibl/test_gradient.hdr";
+	const std::string hdrPath = neurus::test::ReferencePath::Make("ibl/test_gradient.hdr");
 	std::filesystem::create_directories(std::filesystem::path(hdrPath).parent_path());
 
 	ImageData gradientImg(pixels.data(), 64, 32, vk::Format::eR32G32B32A32Sfloat);
@@ -479,7 +479,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
 
-	const std::string outDir = std::string(neurus::test::kReferenceDir) + "ibl/";
+	const std::string outDir = neurus::test::ReferencePath::Make("ibl/");
 	std::filesystem::create_directories(std::filesystem::path(outDir + "faces.png"));
 
 	for (int face = 0; face < 6; ++face)

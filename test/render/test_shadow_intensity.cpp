@@ -268,7 +268,7 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	// -------------------------------------------------------------------
 	{
 		const std::string refPath =
-			std::string(neurus::test::kReferenceDir) + "shadow_intensity/ShadowIntensity.png";
+			neurus::test::ReferencePath::Make("shadow_intensity/ShadowIntensity.png");
 		ImageData img(u8ShadowData.data(), kRes, kRes, vk::Format::eR8Unorm);
 		ASSERT_TRUE(img.SavePNG(refPath + ".tmp")) << "Failed to save shadow intensity PNG";
 		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
