@@ -53,6 +53,12 @@ public:
 	const DescriptorSetLayout& GetLightLayout() const { return m_layout; }
 	vk::DescriptorSet GetLightSetHandle() const { return m_set->handle(); }
 
+	/// Force shadow mode; defaults to SingleFace for production (no multiview
+	/// feature on Qt-created devices).  Tests may set to Multiview when the
+	/// feature is enabled on their device.
+	void SetShadowMode(ShadowMode mode) { m_shadowMode = mode; }
+	ShadowMode GetShadowMode() const { return m_shadowMode; }
+
 	// Must match std140 layout in shadow shaders:
 	//   mat4 faceViewProj[6];  // 384 bytes (offset 0)
 	//   vec3 lightWorldPos;    //  12 bytes (offset 384)
@@ -77,6 +83,7 @@ private:
 
 	// --- Parameters ---
 	uint32_t m_resolution;
+	ShadowMode m_shadowMode = ShadowMode::SingleFace;
 
 	// --- GPU resources ---
 	std::unique_ptr<UniformBuffer<LightUBO>> m_ubo;

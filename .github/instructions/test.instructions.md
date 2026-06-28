@@ -6,90 +6,6 @@ Neurus uses **Google Test** for both GPU-dependent and non-GPU unit tests.
 GPU tests require a Vulkan 1.4-capable device and are excluded from CI;
 non-GPU tests (editor layer, events) run on every CI push.
 
-## Test Organization
-
-```
-test/
-├── CMakeLists.txt              # Test build configuration
-├── shared/                     # Shared test infrastructure
-│   ├── test_main.cpp               # Google Test main() entry point
-│   ├── TestVulkanShared.h          # GPU test fixture base class + static helpers
-│   ├── TestVulkanShared.cpp        # Bootstrap: Instance → Device → Queue → CommandPool
-│   ├── TestReferenceImage.h        # Reference-image comparison utilities
-│   ├── TestCornellBox.h            # Cornell box scene builder
-│   └── TestSimpleShadow.h          # Shadow test scene builder
-├── editor/                     # Non-GPU tests (run in CI)
-│   ├── test_event_bus.cpp          # Qt UIEvents singleton tests
-│   ├── test_event_bus_typed.cpp    # Typed EventQueue tests (+ expanded event tests)
-│   ├── test_context.cpp            # EditorContext tests (consolidated)
-│   ├── test_input.cpp              # Input state tests
-│   ├── test_camera_controller.cpp  # Event-driven MMB camera controls
-│   ├── test_selection.cpp          # Selection manager tests
-│   └── test_scene_status.cpp       # Scene status tracking tests
-├── asset/                      # Asset layer tests
-│   ├── test_imagedata.cpp          # ImageData loading and decoding
-│   └── test_meshdata.cpp           # MeshData OBJ parsing
-├── scene/                      # Scene layer tests
-│   ├── test_camera.cpp             # Camera transforms and projection
-│   ├── test_debug.cpp              # Debug visualization helpers
-│   ├── test_light.cpp              # Light data structures
-│   ├── test_mesh.cpp               # Mesh data and GPU upload
-│   ├── test_scene.cpp              # Scene graph (consolidated)
-│   ├── test_scene_integration.cpp  # Scene + renderer integration
-│   ├── test_sprite.cpp             # Sprite/overlay tests
-│   ├── test_transform.cpp          # Transform hierarchy tests
-│   └── test_uid.cpp                # Unique ID generation tests
-├── project/                    # Project serialization tests
-│   ├── test_default_project.cpp    # Default project creation
-│   └── test_project_roundtrip.cpp  # Project save/load round-trip
-├── render/                     # GPU tests (excluded from CI)
-│   ├── test_attachments.cpp
-│   ├── test_buffers.cpp
-│   ├── test_commandbuffer.cpp
-│   ├── test_compute_pipeline.cpp
-│   ├── test_deferred_shading.cpp   # Reference-image regression test
-│   ├── test_descriptor.cpp
-│   ├── test_gbuffer.cpp
-│   ├── test_ibl.cpp
-│   ├── test_ibl_render.cpp
-│   ├── test_image.cpp
-│   ├── test_lighting.cpp
-│   ├── test_material.cpp
-│   ├── test_mesh.cpp
-│   ├── test_model_render.cpp
-│   ├── test_pipeline.cpp
-│   ├── test_renderpass.cpp
-│   ├── test_scene_wiring.cpp       # Overrides SetUp for swapchain
-│   ├── test_screenshot.cpp
-│   ├── test_shader_module.cpp
-│   ├── test_shadow_cubemap.cpp
-│   ├── test_ssao.cpp
-│   ├── test_syncobjects.cpp
-│   ├── test_texture.cpp
-│   ├── test_vulkan_buffer.cpp
-│   ├── test_vulkan_context.cpp
-│   ├── reference/                  # Reference images for regression tests
-│   │   ├── deferred/               # Deferred-pass reference PNGs
-│   │   │   ├── Position.png
-│   │   │   ├── Normal.png
-│   │   │   ├── Albedo.png
-│   │   │   ├── MetallicRoughness.png
-│   │   │   └── HDRColor.png
-│   │   ├── ibl/                    # IBL reference images
-│   │   │   ├── ibl_render.png
-│   │   │   └── test_gradient.hdr
-│   │   ├── shadow/                 # Shadow cubemap reference images
-│   │   │   ├── CubemapDepth_Face0.png
-│   │   │   ├── CubemapDepth_Face1.png
-│   │   │   ├── CubemapDepth_Face2.png
-│   │   │   ├── CubemapDepth_Face3.png
-│   │   │   ├── CubemapDepth_Face4.png
-│   │   │   └── CubemapDepth_Face5.png
-│   │   └── ssao/                   # SSAO reference image
-│   │       └── SSAO.png
-│   └── render/                     # (CMake-source-directory for render tests)
-```
-
 ## Test Fixture Hierarchy
 
 ### VulkanTestShared (base class for ALL GPU tests)
@@ -287,7 +203,7 @@ cd build/debug && ctest -R DeferredShading
 cd build/debug && ctest -R DeferredShading
 ```
 
-**Always verify references with Python** before committing:
+**(IMPORTANT) Always verify references with Python** before committing:
 
 ```python
 from PIL import Image

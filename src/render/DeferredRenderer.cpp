@@ -597,7 +597,8 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 {
 	const vk::Extent2D extent = m_swapchain->extent();
 
-	// --- Begin command buffer ---
+	// --- Reset command buffer (ensures it's not in a bad state) then begin ---
+	cmdBuf.reset();
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBuf.begin(beginInfo);
 

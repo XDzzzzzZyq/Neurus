@@ -125,6 +125,10 @@ private:
 	// --- Push constant values ---
 	float m_bias = 0.0005f; ///< Depth bias for shadow acne prevention
 
+	/// Two descriptor sets per in-flight frame slot so the per-light loop
+	/// can alternate between them without updating a currently-bound set.
+	static constexpr uint32_t kSetsPerFrameSlot = 2;
+
 	// --- Current light UID (set before WriteDescriptors) ---
 	int32_t m_currentLightUID = -1;
 };

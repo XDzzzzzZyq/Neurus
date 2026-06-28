@@ -74,9 +74,11 @@ public:
 	 * @param mipLevels      Number of mip levels (1 = no mip chain).
 	 * @param imageType      Image type (2D, Cube, Depth/Stencil).
 	 * @param debugName      Optional debug name for the image.
-	 * @param arrayView      If true and imageType is e2D, creates the ImageView
-	 *                       as VK_IMAGE_VIEW_TYPE_2D_ARRAY (layerCount=1).
-	 *                       Required when binding this image to a sampler2DArray.
+	 * @param arrayView      If true and imageType is e2D, additionally creates
+	 *                       a VK_IMAGE_VIEW_TYPE_2D_ARRAY view (accessible via
+	 *                       ImageViewArrayHandle()).  The primary ImageViewHandle()
+	 *                       always returns a 2D view.  Use ImageViewArrayHandle()
+	 *                       when binding this image to a sampler2DArray shader.
 	 */
 	Image(const vk::raii::Device& device,
 	      const vk::raii::PhysicalDevice& physicalDevice,
@@ -166,8 +168,21 @@ public:
 	/** @brief Underlying vk::raii::Image handle. */
 	const vk::raii::Image& ImageHandle() const { return m_image; }
 
-	/** @brief Underlying vk::raii::ImageView handle (default view). */
+	/** @brief Underlying vk::raii::ImageView handle (default view, always 2D for e2D images). */
 	const vk::raii::ImageView& ImageViewHandle() const { return m_imageView; }
+
+	/**
+	 * @brief Underlying vk::raii::ImageView handle for 2D_ARRAY access.
+	 *
+	 * Valid only when the image was created with arrayView=true for e2D images,
+	 * or for eCube images (returns the multiview 2D_ARRAY view).  For e2D images
+	 * without arrayView=true, returns the same as ImageViewHandle() (2D view).
+	 *
+	 * @note Required by LightingPass binding 9 (sampler2DArray) for shadow
+	 *       intensity images, and by ShadowDepthPass for multiview cubemap
+	 *       rendering (ArrayView(), same thing).
+	 */
+	const vk::raii::ImageView& ImageViewArrayHandle() const;
 
 	/**
 	 * @brief Per-layer 2D view for rendering to a specific cubemap face.
@@ -261,6 +276,10 @@ private:
 	// --- Cube-only views ---
 	std::vector<vk::raii::ImageView> m_faceViews;
 	vk::raii::ImageView m_multiviewView = nullptr;
+
+	// --- 2D_ARRAY view (created when arrayView=true on e2D images) ---
+	vk::raii::ImageView m_arrayImageView = nullptr;
+	bool m_hasArrayView = false;
 
 	// --- Metadata ---
 	vk::Extent2D m_extent{};

@@ -195,7 +195,10 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 		break;
 	case ImageType::e2D:
 	default:
-		viewType = m_arrayView ? vk::ImageViewType::e2DArray : vk::ImageViewType::e2D;
+		// Default view always 2D (needed by ShadowIntensityPass binding 2: image2D).
+		// When arrayView=true, additionally create a 2D_ARRAY view (needed by
+		// LightingPass binding 9: sampler2DArray).
+		viewType = vk::ImageViewType::e2D;
 		aspect = vk::ImageAspectFlagBits::eColor;
 		break;
 	}
@@ -220,7 +223,34 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 
 	m_imageView = vk::raii::ImageView(device, viewCI);
 
-	// --- Set debug name on image view in Debug builds ---
+	// --- If arrayView requested, create an additional 2D_ARRAY view ---
+	if (m_imageType == ImageType::e2D && m_arrayView)
+	{
+		const vk::ImageViewCreateInfo arrayViewCI(
+			{},
+			*m_image,
+			vk::ImageViewType::e2DArray,
+			m_format,
+			components,
+			subresourceRange);
+		m_arrayImageView = vk::raii::ImageView(device, arrayViewCI);
+		m_hasArrayView = true;
+
+#ifdef _DEBUG
+		if (debugName && *debugName)
+		{
+			std::string arrayViewName(debugName);
+			arrayViewName += "_ArrayView";
+			vk::DebugUtilsObjectNameInfoEXT nameInfo(
+				vk::ObjectType::eImageView,
+				reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_arrayImageView)),
+				arrayViewName.c_str());
+			device.setDebugUtilsObjectNameEXT(nameInfo);
+		}
+#endif
+	}
+
+	// --- Set debug name on primary image view in Debug builds ---
 #ifdef _DEBUG
 	if (debugName && *debugName)
 	{
@@ -529,6 +559,19 @@ uint32_t Image::FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
 	}
 
 	throw std::runtime_error("Image: failed to find suitable memory type.");
+}
+
+// ---------------------------------------------------------------------------
+// ImageViewArrayHandle
+// ---------------------------------------------------------------------------
+
+const vk::raii::ImageView& Image::ImageViewArrayHandle() const
+{
+	if (m_hasArrayView)
+	{
+		return m_arrayImageView;
+	}
+	return m_imageView;
 }
 
 // ---------------------------------------------------------------------------

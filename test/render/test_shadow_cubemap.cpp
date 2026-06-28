@@ -60,6 +60,7 @@ protected:
 
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes);
+		m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
 
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 	}

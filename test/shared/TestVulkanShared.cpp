@@ -78,8 +78,13 @@ void VulkanTestShared::SetUp()
 		float prio = 1.0f;
 		vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
 
+		// Enable multiview for shadow cubemap rendering tests
+		// (single-pass 6-face cubemap via VK_KHR_multiview).
+		vk::PhysicalDeviceMultiviewFeatures multiviewFeature;
+		multiviewFeature.multiview = VK_TRUE;
 		vk::PhysicalDeviceDynamicRenderingFeatures dynRendering;
 		dynRendering.dynamicRendering = VK_TRUE;
+		dynRendering.pNext = &multiviewFeature;
 		vk::PhysicalDeviceSynchronization2Features sync2;
 		sync2.synchronization2 = VK_TRUE;
 		sync2.pNext = &dynRendering;

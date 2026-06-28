@@ -34,7 +34,12 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
                                          const uint32_t* compSpv,
                                          size_t compSize)
 	: ComputePass(device, physicalDevice,
-	              ShadowIntensityPass::CreateDescriptorSetLayout(device), numSets)
+	              // Allocate 2× descriptor sets per in-flight frame so that
+	              // the per-light loop can alternate between two sets without
+	              // ever updating a currently-bound descriptor set (which would
+	              // invalidate the command buffer — see VUID 00059 et al.).
+	              ShadowIntensityPass::CreateDescriptorSetLayout(device),
+	              numSets * kSetsPerFrameSlot)
 	, m_pipeline(CreatePipeline(device, compSpv, compSize))
 {
 	NEURUS_LOG("[ShadowIntensityPass] compSize=" << compSize
@@ -43,7 +48,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	           << " bias=" << m_bias);
 
 #ifdef _DEBUG
-	for (uint32_t i = 0; i < numSets; ++i)
+	for (uint32_t i = 0; i < numSets * kSetsPerFrameSlot; ++i)
 	{
 		const std::string dsName = "ShadowIntensityPass_Set" + std::to_string(i);
 		m_descriptorSets[i].SetDebugName(dsName.c_str());
@@ -164,7 +169,24 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	// --- Early out: no scene ---
 	if (!ctx.scene)
 	{
+		NEURUS_LOG("[ShadowIntensityPass] No scene, skipping");
 		return;
+	}
+
+	NEURUS_LOG("[ShadowIntensityPass] Record called, scene lights=" << ctx.scene->light_list.size());
+	{
+		int shadowCount = 0;
+		for (const auto& [uid, light] : ctx.scene->light_list)
+		{
+			if (light && light->use_shadow)
+			{
+				auto pos = light->GetPosition();
+				NEURUS_LOG("[ShadowIntensityPass]   shadow light uid=" << uid
+					<< " pos=" << pos.x << "," << pos.y << "," << pos.z);
+				shadowCount++;
+			}
+		}
+		NEURUS_LOG("[ShadowIntensityPass] Found " << shadowCount << " shadow-casting lights");
 	}
 
 	// --- 1. Transition G-Buffer Position to ColorShaderRead (once for all lights) ---
@@ -177,6 +199,11 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
 
 	// --- 3. Dispatch shadow evaluation for each shadow-casting light ---
+	//     Alternates between two descriptor sets per frame slot so that updating
+	//     the descriptor for light N never touches the set that is still bound
+	//     from light N-1.  Without this alternation, updating a bound descriptor
+	//     set invalidates the command buffer (VUID-00059 chain).
+	uint32_t lightIndex = 0;
 	for (const auto& [uid, light] : ctx.scene->light_list)
 	{
 		// Skip non-shadow-casting lights
@@ -196,14 +223,17 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ShaderWrite);
 		}
 
-		// --- Write descriptor set for this frame slot ---
-		WriteDescriptors(frameIndex, renderExtent, cache);
+		// --- Select descriptor set: alternate between 2 sets per frame slot ---
+		const uint32_t setIdx = frameIndex * kSetsPerFrameSlot + (lightIndex % kSetsPerFrameSlot);
+
+		// --- Write descriptor set ---
+		WriteDescriptors(setIdx, renderExtent, cache);
 
 		// --- Bind descriptor set ---
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
 		                          *m_pipelineBuilder->pipelineLayout(),
 		                          0,
-		                          {m_descriptorSets[frameIndex].handle()},
+		                          {m_descriptorSets[setIdx].handle()},
 		                          {});
 
 		// --- Push constants ---
@@ -240,6 +270,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			auto& shadowIntensity = cache.GetShadowIntensity(uid, renderExtent);
 			Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ColorShaderRead);
 		}
+
+		++lightIndex;
 	}
 }
 

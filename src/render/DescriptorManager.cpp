@@ -96,8 +96,19 @@ DescriptorSetLayout::DescriptorSetLayout(
 	flagsInfo.bindingCount = static_cast<uint32_t>(bindingFlags.size());
 	flagsInfo.pBindingFlags = bindingFlags.data();
 
-	vk::DescriptorSetLayoutCreateInfo createInfo(
-		vk::DescriptorSetLayoutCreateFlags{}, bindings);
+	// If any binding uses UPDATE_AFTER_BIND, the layout itself must be
+	// created with UPDATE_AFTER_BIND_POOL (VUID-03000).
+	vk::DescriptorSetLayoutCreateFlags layoutFlags;
+	for (auto f : bindingFlags)
+	{
+		if (f & vk::DescriptorBindingFlagBits::eUpdateAfterBind)
+		{
+			layoutFlags |= vk::DescriptorSetLayoutCreateFlagBits::eUpdateAfterBindPool;
+			break;
+		}
+	}
+
+	vk::DescriptorSetLayoutCreateInfo createInfo(layoutFlags, bindings);
 	createInfo.pNext = &flagsInfo;
 
 	m_layout = vk::raii::DescriptorSetLayout(device, createInfo);

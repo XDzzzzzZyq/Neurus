@@ -105,13 +105,18 @@ Follow Karpathy Guidelines. For each task:
 
 1. Think and plan. System design should be highly decoupled and elegant.
 2. Implement. Do not hide errors, expose them directly. Use debug printing and
-   logging. Wire every feature immediately into the renderer and program.
-3. Test and Verify. Do not just run unit tests -- **always launch `Neurus.exe`** to check:
-   - Terminal output for validation errors (`VUID-...`), crashes, or unexpected log messages
-   - Visual correctness in the rendered viewport (use screenshots for analysis)
-   - Runtime behavior: resize the window, interact with the viewport, verify no deadlocks or freezes.
-   Most importantly, the design of test should be comprehensive (mathematical verification, reference image test, etc.), forming a logic chain that proves the correctness of each component.
-4. Before committing, keep ALL relevant documents and guidances (`.github/instructions/*.md`) updated.
+   logging. Wire every feature **IMMEDIATELY** into the renderer and program.
+3. Test and Verify. 
+   - The design of test should be comprehensive (mathematical verification, reference image test, etc.), forming a logic chain that proves the correctness of each component.
+      - Reference image must be verified externally through python: The generated reference is not empty (transparent), purely black or write, or any unreasonable result. Do not cheat yourself.
+   - Do not just run unit tests -- **always launch `Neurus.exe`** to check:
+      - Terminal output for validation errors (`VUID-...`), crashes, or unexpected log messages
+      - Visual correctness in the rendered viewport (use screenshots for analysis)
+      - Runtime behavior: resize the window, interact with the viewport, verify no deadlocks or freezes.
+   - Do not move to the next stage if the test failed
+   
+4. Before committing, keep ALL relevant documents and guidances (`.github/instructions/*.md`) updated. No validation error, no unreasonable reference image, all tests passed.
+5. Commit. Follow the current commit format. Moreover, in the description, add "No validation error, no unreasonable reference image, all tests passed."
 
 After each development phase, stop and wait for user verification.
 

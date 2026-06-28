@@ -251,7 +251,23 @@ void ShadowDepthPass::updateUBO(const glm::vec3& lightPos, float farPlane)
 void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	// Guard: skip if no scene
-	if (!ctx.scene) { return; }
+	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return; }
+
+	NEURUS_LOG("[ShadowDepthPass] Record called, scene lights=" << ctx.scene->light_list.size());
+	{
+		int shadowCount = 0;
+		for (const auto& [uid, lightPtr] : ctx.scene->light_list)
+		{
+			if (lightPtr && lightPtr->use_shadow)
+			{
+				auto pos = lightPtr->GetPosition();
+				NEURUS_LOG("[ShadowDepthPass]   shadow light uid=" << uid
+					<< " pos=" << pos.x << "," << pos.y << "," << pos.z);
+				shadowCount++;
+			}
+		}
+		NEURUS_LOG("[ShadowDepthPass] Found " << shadowCount << " shadow-casting lights");
+	}
 
 	const vk::Viewport viewport(0.f, 0.f,
 	                            static_cast<float>(m_resolution),
@@ -270,7 +286,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			: Light::sun_shadow_far;
 
 		const ShadowMode mode = (lightPtr->light_type == LightType::POINTLIGHT)
-			? ShadowMode::Multiview : ShadowMode::SingleFace;
+			? m_shadowMode : ShadowMode::SingleFace;
 
 		updateUBO(lightPos, farPlane);
 

@@ -185,37 +185,44 @@ f 1 4 3 2
 	}
 
 	// ===================================================================
-	//  3. N point lights at y=6, all shadow-casting, power=10, color=white.
+	//  3. N point lights at y=5.5, all shadow-casting, power=50, color=white.
 	//
-	//     Default 2 lights: A at (0, 6, 0), B at (-6, 6, 0).
-	//     For other counts: distributed evenly in a circle of radius 6
-	//     at y=6 so every light has a distinct shadow direction.
+	//     Default 2 lights: A at (1, 5.5, 1), B at (-1, 5.5, -1).
+	//     Lights are high enough for visible shadows yet close enough that
+	//     the 1/PI BRDF factor doesn't wash out contrast.  Power=50 with
+	//     ambient=0.03 gives ~17∶1 lit∶shadow ratio.
+	//     For other counts: distributed evenly in a circle of radius 5.5
+	//     at y=5.5 so every light has a distinct shadow direction.
 	// ===================================================================
 
 	for (int i = 0; i < numLights; ++i)
 	{
-		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
+		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 50.0f, glm::vec3(1.0f));
 		light->o_name = "MultiShadowLight_" + std::to_string(i);
 
 		glm::vec3 pos;
 		if (numLights == 2)
 		{
 			// Exact positions for the default 2-light case.
+			// Placed at y=5.5 with opposite (±1, ∓1) offsets so shadows
+			// fall at ~(±1.2, 0, ∓1.2) on the plane — within the
+			// camera's ±1.5 viewport at 75° FOV from y=2.
 			pos = (i == 0)
-				? glm::vec3(0.0f, 6.0f, 0.0f)
-				: glm::vec3(-6.0f, 6.0f, 0.0f);
+				? glm::vec3(1.0f, 5.5f, 1.0f)
+				: glm::vec3(-1.0f, 5.5f, -1.0f);
 		}
 		else
 		{
-			// Distribute evenly on a circle at y=6, radius 6.
-			const float radius = 6.0f;
+			// Distribute evenly on a circle at y=5.5, radius 5.5.
+			const float radius = 5.5f;
 			const float angle = glm::radians(
 				static_cast<float>(i) * 360.0f / static_cast<float>(numLights));
-			pos = glm::vec3(radius * sin(angle), 6.0f, radius * cos(angle));
+			pos = glm::vec3(radius * sin(angle), 5.5f, radius * cos(angle));
 		}
 
 		light->SetPosition(pos);
-		light->SetPower(10.0f);
+		light->SetPower(50.0f);
+		light->SetRadius(0.5f);  // 0.5 radius for soft penumbra edges
 		light->SetColor(glm::vec3(1.0f));
 		light->SetShadow(true);
 
