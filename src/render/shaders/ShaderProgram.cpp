@@ -109,6 +109,13 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 
 	m_pipeline = std::make_unique<vk::raii::Pipeline>(device, nullptr, pipelineCreateInfo);
 
+#ifdef _DEBUG
+	device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
+		vk::ObjectType::ePipeline,
+		reinterpret_cast<uint64_t>(static_cast<VkPipeline>(**m_pipeline)),
+		"ShaderProgram::TriangleMVP"));
+#endif
+
 	NEURUS_LOG("[ShaderProgram] extent=" << extent.width << "x" << extent.height
 	          << " vertSize=" << vertSize
 	          << " fragSize=" << fragSize

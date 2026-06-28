@@ -35,8 +35,7 @@ Image::Image(const vk::raii::Device& device,
 
 	if (m_imageType == ImageType::eCube)
 	{
-		createFaceViews(device);
-		createMultiviewView(device);
+		createArrayView(device);
 	}
 
 	// --- Set debug name in Debug builds ---
@@ -578,39 +577,19 @@ const vk::raii::ImageView& Image::ImageViewArrayHandle() const
 // Cube-only views
 // ---------------------------------------------------------------------------
 
-const vk::raii::ImageView& Image::FaceView(uint32_t faceIdx) const
-{
-	return m_faceViews[faceIdx];
-}
-
 const vk::raii::ImageView& Image::ArrayView() const
 {
-	return m_multiviewView;
+	return m_cubeArrayView;
 }
 
-void Image::createFaceViews(const vk::raii::Device& device)
-{
-	const auto aspect = AspectFromFormat(m_format);
-	m_faceViews.clear();
-	m_faceViews.reserve(6);
-	for (uint32_t f = 0; f < 6; ++f)
-	{
-		vk::ImageViewCreateInfo ci({}, *m_image,
-			vk::ImageViewType::e2D, m_format,
-			vk::ComponentMapping(),
-			vk::ImageSubresourceRange(aspect, 0, 1, f, 1));
-		m_faceViews.emplace_back(device, ci);
-	}
-}
-
-void Image::createMultiviewView(const vk::raii::Device& device)
+void Image::createArrayView(const vk::raii::Device& device)
 {
 	const auto aspect = AspectFromFormat(m_format);
 	vk::ImageViewCreateInfo ci({}, *m_image,
 		vk::ImageViewType::e2DArray, m_format,
 		vk::ComponentMapping(),
 		vk::ImageSubresourceRange(aspect, 0, 1, 0, 6));
-	m_multiviewView = vk::raii::ImageView(device, ci);
+	m_cubeArrayView = vk::raii::ImageView(device, ci);
 }
 
 // ---------------------------------------------------------------------------

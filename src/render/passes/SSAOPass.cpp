@@ -236,6 +236,7 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
 
 	// --- Build compute pipeline ---
 	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+		.SetDebugName("SSAOPass")
 		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();

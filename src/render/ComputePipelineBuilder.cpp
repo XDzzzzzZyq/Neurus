@@ -62,7 +62,29 @@ vk::raii::Pipeline ComputePipelineBuilder::BuildComputePipeline()
 		*m_pipelineLayout  // layout
 	);
 
-	return vk::raii::Pipeline(m_device, nullptr, computeCreateInfo);
+	auto pipeline = vk::raii::Pipeline(m_device, nullptr, computeCreateInfo);
+
+#ifdef _DEBUG
+	if (!m_debugName.empty())
+	{
+		m_device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
+			vk::ObjectType::ePipeline,
+			reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*pipeline)),
+			m_debugName.c_str()));
+	}
+#endif
+
+	return pipeline;
+}
+
+// ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+ComputePipelineBuilder& ComputePipelineBuilder::SetDebugName(const char* name)
+{
+	m_debugName = name ? name : "";
+	return *this;
 }
 
 } // namespace neurus

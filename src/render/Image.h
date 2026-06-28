@@ -185,13 +185,6 @@ public:
 	const vk::raii::ImageView& ImageViewArrayHandle() const;
 
 	/**
-	 * @brief Per-layer 2D view for rendering to a specific cubemap face.
-	 * @param faceIdx Face index in [0,5].
-	 * @note Valid only for ImageType::eCube.
-	 */
-	const vk::raii::ImageView& FaceView(uint32_t faceIdx) const;
-
-	/**
 	 * @brief 2D_ARRAY view covering all 6 layers for multiview rendering.
 	 * @note Valid only for ImageType::eCube.
 	 */
@@ -242,8 +235,7 @@ private:
 	void allocateAndBindMemory(const vk::raii::Device& device,
 	                           const vk::raii::PhysicalDevice& physicalDevice);
 	void createImageView(const vk::raii::Device& device, const char* debugName);
-	void createFaceViews(const vk::raii::Device& device);
-	void createMultiviewView(const vk::raii::Device& device);
+	void createArrayView(const vk::raii::Device& device);
 
 	/**
 	 * @brief Uploads ImageData to this GPU image via staging buffer.
@@ -274,8 +266,7 @@ private:
 	vk::raii::ImageView m_imageView = nullptr;
 
 	// --- Cube-only views ---
-	std::vector<vk::raii::ImageView> m_faceViews;
-	vk::raii::ImageView m_multiviewView = nullptr;
+	vk::raii::ImageView m_cubeArrayView = nullptr;
 
 	// --- 2D_ARRAY view (created when arrayView=true on e2D images) ---
 	vk::raii::ImageView m_arrayImageView = nullptr;

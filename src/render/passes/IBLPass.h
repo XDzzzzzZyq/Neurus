@@ -126,7 +126,8 @@ private:
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
 	                                  const uint32_t* compSpv,
 	                                  size_t compSize,
-	                                  std::unique_ptr<ComputePipelineBuilder>& outBuilder);
+	                                  std::unique_ptr<ComputePipelineBuilder>& outBuilder,
+	                                  const char* debugName);
 
 	void WriteDescriptors(const Image& equirectImage,
 	                      const vk::raii::Sampler& equirectSampler,

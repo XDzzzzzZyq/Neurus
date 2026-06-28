@@ -90,6 +90,21 @@ public:
 	 */
 	vk::raii::Pipeline BuildComputePipeline();
 
+	// -----------------------------------------------------------------------
+	// Debug
+	// -----------------------------------------------------------------------
+
+	/**
+	 * @brief Sets a debug name for the pipeline (applied inside BuildComputePipeline).
+	 *
+	 * The name is assigned to the VkPipeline object via
+	 * vkSetDebugUtilsObjectNameEXT in Debug builds.
+	 *
+	 * @param name  Human-readable debug name (e.g. "SSAOPass").
+	 * @return *this for chaining.
+	 */
+	ComputePipelineBuilder& SetDebugName(const char* name);
+
 	/**
 	 * @brief Returns the most recently created pipeline layout.
 	 *
@@ -116,6 +131,9 @@ private:
 
 	// Owned pipeline layout - created in BuildComputePipeline()
 	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
+
+	// --- Debug ---
+	std::string m_debugName;
 };
 
 } // namespace neurus

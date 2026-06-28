@@ -83,6 +83,12 @@ PipelineBuilder& PipelineBuilder::SetInputAssembly(
 // Rasterization
 // ---------------------------------------------------------------------------
 
+PipelineBuilder& PipelineBuilder::SetViewMask(uint32_t viewMask)
+{
+	m_viewMask = viewMask;
+	return *this;
+}
+
 PipelineBuilder& PipelineBuilder::SetRasterization(
 	vk::PolygonMode polygonMode,
 	vk::CullModeFlags cullMode,
@@ -258,6 +264,16 @@ PipelineBuilder& PipelineBuilder::SetStencilFormat(vk::Format format)
 }
 
 // ---------------------------------------------------------------------------
+// Debug
+// ---------------------------------------------------------------------------
+
+PipelineBuilder& PipelineBuilder::SetDebugName(const char* name)
+{
+	m_debugName = name ? name : "";
+	return *this;
+}
+
+// ---------------------------------------------------------------------------
 // BuildGraphicsPipeline
 // ---------------------------------------------------------------------------
 
@@ -310,7 +326,7 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 
 	// --- Dynamic rendering pipeline create info ---
 	vk::PipelineRenderingCreateInfo renderingCreateInfo(
-		{},
+		m_viewMask,
 		m_colorFormats,
 		m_depthFormat.value_or(vk::Format::eUndefined),
 		m_stencilFormat.value_or(vk::Format::eUndefined));
@@ -342,7 +358,19 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 		-1,            // No base pipeline index
 		&renderingCreateInfo);
 
-	return vk::raii::Pipeline(device, nullptr, pipelineCreateInfo);
+	auto pipeline = vk::raii::Pipeline(device, nullptr, pipelineCreateInfo);
+
+#ifdef _DEBUG
+	if (!m_debugName.empty())
+	{
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
+			vk::ObjectType::ePipeline,
+			reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*pipeline)),
+			m_debugName.c_str()));
+	}
+#endif
+
+	return pipeline;
 }
 
 } // namespace neurus

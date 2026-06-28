@@ -13,7 +13,6 @@
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
-#include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
 #include "shadow_depth_multiview.vert.h"
 #include "depth_to_color.frag.h"
@@ -56,10 +55,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	, m_resolution(resolution)
 	, m_pipelineLayout(nullptr)
 	, m_pipeline(nullptr)
-	, m_multiviewPipelineLayout(nullptr)
-	, m_multiviewPipeline(nullptr)
-	, m_multiviewColorPipelineLayout(nullptr)
-	, m_multiviewColorPipeline(nullptr)
 {
 	m_device = &device;
 
@@ -68,9 +63,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	m_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
 	createUniforms(device, physicalDevice, graphicsQueue, queueFamilyIndex);
-	createSingleFacePipeline(device);
-	createMultiviewPipeline(device);
-	createMultiviewColorPipeline(device);
+	createPipeline(device);
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " UBOsize=" << sizeof(LightUBO));
@@ -97,87 +90,10 @@ void ShadowDepthPass::createUniforms(const vk::raii::Device& device,
 }
 
 // ===========================================================================
-// createSingleFacePipeline — graphics pipeline + layout (6 face passes)
+// createPipeline — multiview colour+depth pipeline (all 6 faces in single pass)
 // ===========================================================================
 
-void ShadowDepthPass::createSingleFacePipeline(const vk::raii::Device& device)
-{
-	auto vertModule = ShaderModule::FromEmbedded(device, shadow_depth_vert_spv, sizeof(shadow_depth_vert_spv));
-	auto fragModule = ShaderModule::FromEmbedded(device, shadow_depth_frag_spv, sizeof(shadow_depth_frag_spv));
-
-	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(PushConstants))
-	};
-
-	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
-
-	PipelineBuilder builder;
-	m_pipeline = builder
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(m_vtxLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLess)
-		.SetColorFormats({})
-		.SetDepthFormat(kDepthFmt)
-		.SetDescriptorSetLayouts(dslayouts)
-		.SetPushConstantRanges(pushRanges)
-		.BuildGraphicsPipeline(device);
-
-	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
-	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-}
-
-// ===========================================================================
-// createMultiviewPipeline — graphics pipeline + layout (single pass, viewMask)
-// ===========================================================================
-
-void ShadowDepthPass::createMultiviewPipeline(const vk::raii::Device& device)
-{
-	auto vertModule = ShaderModule::FromEmbedded(device,
-		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
-	auto fragModule = ShaderModule::FromEmbedded(device,
-		shadow_depth_frag_spv, sizeof(shadow_depth_frag_spv));
-
-	// Push constant: mat4 model only (64 bytes), no faceIndex needed
-	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex, 0, sizeof(glm::mat4))
-	};
-
-	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
-
-	PipelineBuilder builder;
-	m_multiviewPipeline = builder
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(m_vtxLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLess)
-		.SetColorFormats({})
-		.SetDepthFormat(kDepthFmt)
-		.SetDescriptorSetLayouts(dslayouts)
-		.SetPushConstantRanges(pushRanges)
-		.BuildGraphicsPipeline(device);
-
-	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
-	m_multiviewPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-
-	NEURUS_LOG("[ShadowDepthPass] Multiview pipeline created");
-}
-
-// ===========================================================================
-// createMultiviewColorPipeline — colour+depth pipeline for verification
-// ===========================================================================
-
-void ShadowDepthPass::createMultiviewColorPipeline(const vk::raii::Device& device)
+void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 {
 	auto vertModule = ShaderModule::FromEmbedded(device,
 		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
@@ -191,11 +107,13 @@ void ShadowDepthPass::createMultiviewColorPipeline(const vk::raii::Device& devic
 	std::vector<vk::DescriptorSetLayout> dslayouts = { *m_layout.layout() };
 
 	PipelineBuilder builder;
-	m_multiviewColorPipeline = builder
+	m_pipeline = builder
+		.SetDebugName("ShadowDepthPass::Multiview")
 		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
 		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput(m_vtxLayout)
 		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+		.SetViewMask(0x3f)  // 6 faces of cubemap
 		.SetRasterization(vk::PolygonMode::eFill,
 		                  vk::CullModeFlagBits::eNone,
 		                  vk::FrontFace::eClockwise)
@@ -216,9 +134,9 @@ void ShadowDepthPass::createMultiviewColorPipeline(const vk::raii::Device& devic
 		.BuildGraphicsPipeline(device);
 
 	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
-	m_multiviewColorPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
+	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
 
-	NEURUS_LOG("[ShadowDepthPass] Multiview colour+depth pipeline created");
+	NEURUS_LOG("[ShadowDepthPass] Pipeline created");
 }
 
 // ===========================================================================
@@ -281,8 +199,8 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			? Light::point_shadow_far
 			: Light::sun_shadow_far;
 
-		const ShadowMode mode = (lightPtr->light_type == LightType::POINTLIGHT)
-			? m_shadowMode : ShadowMode::SingleFace;
+		// Only handle POINTLIGHT with shadow cubemaps; skip other types
+		if (lightPtr->light_type != LightType::POINTLIGHT) continue;
 
 		updateUBO(lightPos, farPlane);
 
@@ -295,121 +213,64 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
 		}
 
-		if (mode == ShadowMode::Multiview)
+		// --- Render all 6 faces in a single multiview pass ---
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
+		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+		                          m_pipelineLayout, 0,
+		                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+
+		// --- Transition colour cubemap to ColorAttachment for rendering ---
 		{
-			// --- Multiview: render all 6 faces in a single pass ---
-			// Always colour+depth on this GPU - the depth-only pipeline is unreliable
+			auto& colorCube = cache.GetShadowColorMap(uid, {m_resolution, m_resolution});
+			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
+		}
 
-			const auto& pipeline       = m_multiviewColorPipeline;
-			const auto& pipelineLayout = m_multiviewColorPipelineLayout;
+		// --- Depth attachment ---
+		vk::RenderingAttachmentInfo depthAtt(
+			cache.GetShadowMap(uid).ArrayView(),
+			vk::ImageLayout::eDepthStencilAttachmentOptimal,
+			vk::ResolveModeFlagBits::eNone, nullptr,
+			vk::ImageLayout::eUndefined,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			vk::ClearDepthStencilValue(1.0f, 0));
 
-			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline);
-			cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			                          pipelineLayout, 0,
-			                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
+		// --- Colour attachment: RenderCache colour cubemap ---
+		vk::ImageView colorView = cache.GetShadowColorMap(uid, {m_resolution, m_resolution}).ArrayView();
 
-			// --- Transition colour cubemap to ColorAttachment for rendering ---
+		vk::RenderingAttachmentInfo colorAtt(
+			colorView,
+			vk::ImageLayout::eColorAttachmentOptimal,
+			vk::ResolveModeFlagBits::eNone, nullptr,
+			vk::ImageLayout::eUndefined,
+			vk::AttachmentLoadOp::eClear,
+			vk::AttachmentStoreOp::eStore,
+			vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
+
+		vk::RenderingInfo renderInfo(
+			{}, {{0, 0}, {m_resolution, m_resolution}},
+			1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
+
+		cmdBuf.beginRendering(renderInfo);
+
+		if (ctx.renderItems)
+		{
+			for (const auto& item : *ctx.renderItems)
 			{
-				auto& colorCube = cache.GetShadowColorMap(uid, {m_resolution, m_resolution});
-				Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
-			}
-
-			// --- Depth attachment ---
-			vk::RenderingAttachmentInfo depthAtt(
-				cache.GetShadowMap(uid).ArrayView(),
-				vk::ImageLayout::eDepthStencilAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eClear,
-				vk::AttachmentStoreOp::eStore,
-				vk::ClearDepthStencilValue(1.0f, 0));
-
-			// --- Colour attachment: RenderCache colour cubemap ---
-			vk::ImageView colorView = cache.GetShadowColorMap(uid, {m_resolution, m_resolution}).ArrayView();
-
-			vk::RenderingAttachmentInfo colorAtt(
-				colorView,
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eClear,
-				vk::AttachmentStoreOp::eStore,
-				vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
-
-			vk::RenderingInfo renderInfo(
-				{}, {{0, 0}, {m_resolution, m_resolution}},
-				1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
-
-			cmdBuf.beginRendering(renderInfo);
-
-			if (ctx.renderItems)
-			{
-				for (const auto& item : *ctx.renderItems)
-				{
-					cmdBuf.pushConstants<glm::mat4>(pipelineLayout,
-					    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
-					cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-					cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-					cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
-				}
-			}
-
-			cmdBuf.endRendering();
-
-			// Transition colour cubemap to ColorShaderRead for sampling in subsequent passes
-			{
-				auto& colorCube = cache.GetShadowColorMap(uid, {m_resolution, m_resolution});
-				Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
+				cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
+				    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
+				cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
+				cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
+				cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
 			}
 		}
-		else
+
+		cmdBuf.endRendering();
+
+		// Transition colour cubemap to ColorShaderRead for sampling in subsequent passes
 		{
-			// --- SingleFace: 6 sequential passes, one per cubemap face ---
-
-			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
-			cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-			                          m_pipelineLayout, 0,
-			                          vk::ArrayProxy<const vk::DescriptorSet>(m_set->handle()), {});
-
-			const vk::ClearValue clearValue = vk::ClearDepthStencilValue(1.0f, 0);
-
-			for (uint32_t face = 0; face < kShadowFaceCount; ++face)
-			{
-				vk::RenderingAttachmentInfo depthAtt(
-					*(cache.GetShadowMap(uid).FaceView(face)),
-					vk::ImageLayout::eDepthStencilAttachmentOptimal,
-					vk::ResolveModeFlagBits::eNone, nullptr,
-					vk::ImageLayout::eUndefined,
-					vk::AttachmentLoadOp::eClear,
-					vk::AttachmentStoreOp::eStore,
-					clearValue);
-
-				vk::RenderingInfo renderInfo(
-					{}, {{0, 0}, {m_resolution, m_resolution}},
-					1, 0, {}, &depthAtt, nullptr);
-
-				cmdBuf.beginRendering(renderInfo);
-
-				// Push face index at offset 64 (after model)
-				const int32_t faceIdx = static_cast<int32_t>(face);
-				cmdBuf.pushConstants<int32_t>(m_pipelineLayout,
-				                              vk::ShaderStageFlagBits::eVertex,
-				                              sizeof(glm::mat4), faceIdx);
-
-				if (ctx.renderItems)
-				{
-					for (const auto& item : *ctx.renderItems)
-					{
-						cmdBuf.pushConstants<glm::mat4>(m_pipelineLayout,
-						    vk::ShaderStageFlagBits::eVertex, 0, item.pushConstants.model);
-						cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-						cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-						cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
-					}
-				}
-
-				cmdBuf.endRendering();
-			}
+			auto& colorCube = cache.GetShadowColorMap(uid, {m_resolution, m_resolution});
+			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
 		}
 
 		// Transition cubemap to DepthShaderRead for sampling in subsequent passes

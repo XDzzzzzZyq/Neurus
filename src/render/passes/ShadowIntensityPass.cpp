@@ -101,6 +101,7 @@ vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& d
 
 	// --- Build compute pipeline ---
 	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+		.SetDebugName("ShadowIntensityPass")
 		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();

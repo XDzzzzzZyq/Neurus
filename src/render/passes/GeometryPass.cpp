@@ -130,6 +130,7 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
 	// --- Build pipeline via PipelineBuilder ---
 	PipelineBuilder builder;
 	auto pipeline = builder
+		.SetDebugName("GeometryPass::G-Buffer")
 		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
 		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput(m_vertexLayout)

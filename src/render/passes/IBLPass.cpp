@@ -49,10 +49,12 @@ IBLPass::IBLPass(const vk::raii::Device& device,
 	// --- Pipeline builders (must outlive pipelines) ---
 	, m_irradiancePipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 	, m_irradiancePipeline(CreatePipeline(device, irradianceSpv, irradianceSize,
-	                                       m_irradiancePipelineBuilder))
+	                                       m_irradiancePipelineBuilder,
+	                                       "IBLPass::Irradiance"))
 	, m_specularPipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 	, m_specularPipeline(CreatePipeline(device, specularSpv, specularSize,
-	                                     m_specularPipelineBuilder))
+	                                     m_specularPipelineBuilder,
+	                                     "IBLPass::Specular"))
 {
 	NEURUS_LOG("[IBLPass] irradianceSize=" << irradianceSize
 	           << " specularSize=" << specularSize
@@ -295,7 +297,8 @@ vk::raii::Sampler IBLPass::CreateEquirectSampler(const vk::raii::Device& device)
 vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
                                             const uint32_t* compSpv,
                                             size_t compSize,
-                                            std::unique_ptr<ComputePipelineBuilder>& outBuilder)
+                                            std::unique_ptr<ComputePipelineBuilder>& outBuilder,
+                                            const char* debugName)
 {
 	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
 
@@ -307,6 +310,7 @@ vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
 		sizeof(IBLPushConstants));
 
 	return outBuilder->SetShaderStage(compModule, "main")
+		.SetDebugName(debugName)
 		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();

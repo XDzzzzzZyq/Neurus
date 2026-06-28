@@ -352,6 +352,7 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 
 	// --- Build compute pipeline ---
 	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+		.SetDebugName("LightingPass")
 		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();

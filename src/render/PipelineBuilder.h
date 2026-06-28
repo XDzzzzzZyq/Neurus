@@ -3,6 +3,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace neurus {
@@ -110,6 +111,12 @@ public:
 	// -----------------------------------------------------------------------
 	// Rasterization
 	// -----------------------------------------------------------------------
+	/**
+	 * @brief Sets the view mask for multiview rendering.
+	 * 
+	 * @param viewMask  Bitmask of views to render to (e.g., 0 for single view, 0x3f for cubemap views).
+	 */
+	PipelineBuilder& SetViewMask(uint32_t viewMask);
 
 	/**
 	 * @brief Configures the rasterization state.
@@ -284,6 +291,21 @@ public:
 	PipelineBuilder& SetStencilFormat(vk::Format format);
 
 	// -----------------------------------------------------------------------
+	// Debug
+	// -----------------------------------------------------------------------
+
+	/**
+	 * @brief Sets a debug name for the pipeline (applied inside BuildGraphicsPipeline).
+	 *
+	 * The name is assigned to the VkPipeline object via
+	 * vkSetDebugUtilsObjectNameEXT in Debug builds.
+	 *
+	 * @param name  Human-readable debug name (e.g. "GeometryPass::G-Buffer").
+	 * @return *this for chaining.
+	 */
+	PipelineBuilder& SetDebugName(const char* name);
+
+	// -----------------------------------------------------------------------
 	// Build
 	// -----------------------------------------------------------------------
 
@@ -354,6 +376,11 @@ private:
 	std::vector<vk::Format> m_colorFormats;
 	std::optional<vk::Format> m_depthFormat;
 	std::optional<vk::Format> m_stencilFormat;
+
+	uint32_t m_viewMask = 0;
+
+	// --- Debug ---
+	std::string m_debugName;
 };
 
 } // namespace neurus

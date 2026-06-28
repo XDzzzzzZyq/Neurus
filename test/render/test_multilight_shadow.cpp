@@ -94,8 +94,6 @@ protected:
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			ShadowDepthPass::kDefaultResolution);
-		m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
-
 		// --- Shadow intensity pass (1 set = single-frame recording) ---
 		m_shadowIntensityPass = std::make_unique<ShadowIntensityPass>(
 			*m_device, pd, 1u,
@@ -330,10 +328,6 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
-
-	// Use Multiview mode to isolate the UBO-overwrite bug from the SingleFace
-	// cubemap rendering issue (SingleFace produces all-ones on this GPU).
-	m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
 
 	auto& pd = PhysicalDevice();
 	const vk::Extent2D renderExtent(kRenderWidth, kRenderHeight);

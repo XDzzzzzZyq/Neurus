@@ -34,7 +34,6 @@
 #include "ssao.comp.h"
 #include "irradiance_conv.comp.h"
 #include "importance_samp.comp.h"
-#include "shadow_depth.vert.h"
 #include "shadow_depth.frag.h"
 #include "c2e.comp.h"
 #include "shadow_eval.comp.h"
@@ -135,7 +134,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 			ShadowDepthPass::kDefaultResolution);
 		m_shadowDepthPass = shadowDepth.get();
 		m_passes.push_back(std::move(shadowDepth));
-		m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
 	}
 
@@ -829,6 +827,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const std::string& filen
 
 	ComputePipelineBuilder c2eBuilder(m_device);
 	c2eBuilder.SetShaderStage(std::move(compModule), "main");
+	c2eBuilder.SetDebugName("DeferredRenderer::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 
 	auto c2ePipeline = c2eBuilder.BuildComputePipeline();
