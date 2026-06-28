@@ -57,16 +57,13 @@ class Scene;
 struct alignas(16) PointLightGpu
 {
 	float colorR, colorG, colorB;   ///< RGB colour (linear)
-	float _pad0;                     ///< std140 padding after vec3
-	float posX, posY, posZ;         ///< World-space position
-	float _pad1;                     ///< std140 padding after vec3
 	float power;                     ///< Luminous intensity
+	float posX, posY, posZ;         ///< World-space position
 	float radius;                    ///< Physical radius
-	float _pad2[2];                  ///< std140 padding
 	int32_t shadowMapIndex = -1;     ///< Index into shadow maps array; -1 = no shadow
-	float _pad3 = 0.0f;              ///< Padding to 64 bytes (16-byte aligned struct)
+	float _pad3[3];                 ///< Padding to 48 bytes (16-byte aligned struct)
 };
-static_assert(sizeof(PointLightGpu) == 64, "PointLightGpu must be 64 bytes (std140)");
+static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std140)");
 
 /**
  * @brief Push constants for the PBR lighting compute shader.

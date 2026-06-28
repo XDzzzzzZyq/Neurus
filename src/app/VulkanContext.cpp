@@ -90,8 +90,11 @@ void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 	float prio = 1.0f;
 	vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
 
+	vk::PhysicalDeviceMultiviewFeatures multiviewFeature;
+	multiviewFeature.multiview = VK_TRUE;
 	vk::PhysicalDeviceDynamicRenderingFeatures dynRendering;
 	dynRendering.dynamicRendering = VK_TRUE;
+	dynRendering.pNext = &multiviewFeature;
 	vk::PhysicalDeviceSynchronization2Features sync2;
 	sync2.synchronization2 = VK_TRUE;
 	sync2.pNext = &dynRendering;

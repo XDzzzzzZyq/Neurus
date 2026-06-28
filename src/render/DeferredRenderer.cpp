@@ -135,6 +135,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 			ShadowDepthPass::kDefaultResolution);
 		m_shadowDepthPass = shadowDepth.get();
 		m_passes.push_back(std::move(shadowDepth));
+		m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
 	}
 

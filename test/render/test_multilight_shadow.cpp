@@ -48,6 +48,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <cstring>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -93,6 +94,7 @@ protected:
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			ShadowDepthPass::kDefaultResolution);
+		m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
 
 		// --- Shadow intensity pass (1 set = single-frame recording) ---
 		m_shadowIntensityPass = std::make_unique<ShadowIntensityPass>(
@@ -137,7 +139,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 		*m_device, pd, m_queue, m_graphicsQueueFamily);
 	const auto& renderItems = shadowRes.renderItems;
 	ASSERT_EQ(renderItems.size(), 2u) << "Expected cube + plane (2 render items)";
-	ASSERT_EQ(shadowRes.lightUIDs.size(), 2u) << "Expected 2 shadow-casting lights";
+	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
 
 	// Get the camera from the scene
 	ASSERT_FALSE(shadowRes.scene->cam_list.empty()) << "Scene must have a camera";
@@ -311,4 +313,317 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	// Validation layer errors are printed to stderr by the debug callback
 	// and will appear in ctest --output-on-failure output.
 	SUCCEED();
+}
+
+// ===========================================================================
+// ShadowIntensityReadback — verify per-light shadow intensity data
+// ===========================================================================
+
+/**
+ * @brief Reads back every ShadowIntensity image and verifies non-trivial data.
+ *
+ * Uses the same manual staging-buffer readback pattern established in
+ * test_shadow_intensity.cpp.  Validates that shadow intensity images
+ * contain both shadowed (==1.0) and lit (==0.0) pixels — an all-zero
+ * or all-one result indicates a broken shadow evaluation path.
+ */
+TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
+{
+	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
+
+	// Use Multiview mode to isolate the UBO-overwrite bug from the SingleFace
+	// cubemap rendering issue (SingleFace produces all-ones on this GPU).
+	m_shadowDepthPass->SetShadowMode(ShadowMode::Multiview);
+
+	auto& pd = PhysicalDevice();
+	const vk::Extent2D renderExtent(kRenderWidth, kRenderHeight);
+	// -------------------------------------------------------------------
+	// Load scene
+	// -------------------------------------------------------------------
+	auto shadowRes = neurus::test::LoadMultiShadow(
+		*m_device, pd, m_queue, m_graphicsQueueFamily, 3 /*numLights*/);
+	ASSERT_FALSE(shadowRes.scene->cam_list.empty());
+	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
+
+	const auto& camera = shadowRes.scene->cam_list.begin()->second;
+	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
+
+	// -------------------------------------------------------------------
+	// Build context
+	// -------------------------------------------------------------------
+	RenderContext ctx{};
+	ctx.renderExtent = renderExtent;
+	ctx.viewProj     = camUBO.viewProj;
+	ctx.view         = camUBO.view;
+	ctx.cameraPos    = camera->GetPosition();
+	ctx.invProjView  = glm::inverse(camUBO.viewProj);
+	ctx.renderItems  = &shadowRes.renderItems;
+	ctx.scene        = shadowRes.scene.get();
+
+	// -------------------------------------------------------------------
+	// Transition G-Buffer
+	// -------------------------------------------------------------------
+	VulkanTestShared::TransitionGbufferToColorAttachment(
+		*m_renderCache, renderExtent, *this);
+
+	// -------------------------------------------------------------------
+	// Run ONLY ShadowDepth → Geometry → ShadowIntensity (NO LightingPass)
+	// to isolate whether LightingPass corrupts shadow intensity data.
+	// -------------------------------------------------------------------
+	{
+		auto& cmd = BeginCmd();
+		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
+		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
+		// NO LightingPass here — pure isolation test
+		EndSubmitWait(cmd);
+	}
+
+	// -------------------------------------------------------------------
+	// Read back every shadow intensity image
+	// -------------------------------------------------------------------
+	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRenderWidth) * kRenderHeight;
+	const size_t pixelCount = kRenderWidth * kRenderHeight;
+
+	for (int lightUID : shadowRes.lightUIDs)
+	{
+		auto& intensityImage = m_renderCache->GetShadowIntensity(lightUID, renderExtent);
+		std::vector<uint8_t> u8Data(pixelCount);
+
+		{
+			auto& cmd = BeginCmd();
+			Barrier::Transition(*cmd, intensityImage, ImageState::TransferSrc);
+
+			vk::raii::Buffer stagingBuf(*m_device,
+				vk::BufferCreateInfo({}, bufSize, vk::BufferUsageFlagBits::eTransferDst));
+			auto memReqs = stagingBuf.getMemoryRequirements();
+			uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+			ASSERT_LT(memType, UINT32_MAX) << "No host-visible memory type for staging buffer";
+			vk::raii::DeviceMemory stagingMem(*m_device, vk::MemoryAllocateInfo(memReqs.size, memType));
+			stagingBuf.bindMemory(*stagingMem, 0);
+
+			vk::BufferImageCopy copy{};
+			copy.imageSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+			copy.imageExtent = vk::Extent3D(kRenderWidth, kRenderHeight, 1);
+			cmd.copyImageToBuffer(*intensityImage.ImageHandle(),
+			                      vk::ImageLayout::eTransferSrcOptimal, *stagingBuf, copy);
+			EndSubmitWait(cmd);
+
+			void* mapped = stagingMem.mapMemory(0, bufSize);
+			std::memcpy(u8Data.data(), mapped, bufSize);
+			stagingMem.unmapMemory();
+		}
+
+		// --- Count non-zero (shadowed) and zero (lit) pixels ---
+		int shadowed = 0, lit = 0;
+		uint8_t maxVal = 0;
+		for (size_t i = 0; i < pixelCount; ++i)
+		{
+			if (u8Data[i] > 0) { ++shadowed; if (u8Data[i] > maxVal) maxVal = u8Data[i]; }
+			else ++lit;
+		}
+
+		std::cout << "[ShadowIntensityReadback] Light " << lightUID
+		          << ": shadowed=" << shadowed << " lit=" << lit
+		          << " max=" << static_cast<int>(maxVal)
+		          << " total=" << pixelCount << std::endl;
+
+		// --- Assertions ---
+		// At minimum we expect some pixels to be shadowed (the cube casts shadow
+		// on the plane) and some to be lit (the plane outside the shadow).
+		// The exact counts depend on geometry but zero shadowed pixels is always wrong.
+		EXPECT_GT(shadowed, 0)
+			<< "Light " << lightUID << " shadow intensity is ALL ZERO — "
+			<< "shadow evaluation pass may be broken (G-Buffer Position, cubemap depth, or dispatch)";
+		EXPECT_GT(lit, 0)
+			<< "Light " << lightUID << " shadow intensity is ALL ONE — "
+			<< "unlikely, check bias/farPlane parameters";
+	}
+
+	SUCCEED();
+}
+
+// ===========================================================================
+// ShadowIntensityPerLight_ReferenceImage — per-light shadow intensity regression
+// ===========================================================================
+
+/**
+ * @brief Captures per-light ShadowIntensity images as PNGs and verifies
+ *        they are not all-black nor all-white.
+ *
+ * Runs the full deferred+PBR pipeline (ShadowDepth → Geometry →
+ * ShadowIntensity → Lighting) with 2 lights, then reads back each
+ * light's ShadowIntensity (R8_UNORM) attachment through a staging
+ * buffer.  Saves the captured data as a reference PNG and uses the
+ * first-run-generates / second-run-compares pattern.  Additionally
+ * asserts that each intensity map contains both lit (0) and shadowed
+ * (>0) pixels.
+ */
+TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
+{
+	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
+
+	auto& pd = PhysicalDevice();
+	const vk::Extent2D renderExtent(kRenderWidth, kRenderHeight);
+
+	// -------------------------------------------------------------------
+	// Load scene (2 lights by default)
+	// -------------------------------------------------------------------
+	auto shadowRes = neurus::test::LoadMultiShadow(
+		*m_device, pd, m_queue, m_graphicsQueueFamily);
+	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
+
+	const auto& camera = shadowRes.scene->cam_list.begin()->second;
+	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
+
+	// -------------------------------------------------------------------
+	// Build context
+	// -------------------------------------------------------------------
+	RenderContext ctx{};
+	ctx.renderExtent = renderExtent;
+	ctx.viewProj     = camUBO.viewProj;
+	ctx.view         = camUBO.view;
+	ctx.cameraPos    = camera->GetPosition();
+	ctx.invProjView  = glm::inverse(camUBO.viewProj);
+	ctx.renderItems  = &shadowRes.renderItems;
+	ctx.scene        = shadowRes.scene.get();
+
+	// -------------------------------------------------------------------
+	// Transition G-Buffer
+	// -------------------------------------------------------------------
+	VulkanTestShared::TransitionGbufferToColorAttachment(
+		*m_renderCache, renderExtent, *this);
+
+	// -------------------------------------------------------------------
+	// Upload lights
+	// -------------------------------------------------------------------
+	{
+		std::vector<int32_t> shadowUIDs;
+		for (const auto& [id, light] : shadowRes.scene->light_list)
+		{
+			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
+				shadowUIDs.push_back(id);
+		}
+		std::sort(shadowUIDs.begin(), shadowUIDs.end());
+
+		std::unordered_map<int32_t, int> shadowIndexMap;
+		for (size_t i = 0; i < shadowUIDs.size(); ++i)
+			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
+
+		m_lightingPass->UploadLights(*shadowRes.scene, &shadowIndexMap);
+	}
+
+	// -------------------------------------------------------------------
+	// Run full pipeline (ShadowDepth → Geometry → ShadowIntensity → Lighting)
+	// -------------------------------------------------------------------
+	{
+		auto& cmd = BeginCmd();
+		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
+		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
+		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
+		EndSubmitWait(cmd);
+	}
+
+	// -------------------------------------------------------------------
+	// Read back each shadow intensity image to U8 (R8_UNORM = 1 byte/px)
+	// -------------------------------------------------------------------
+	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRenderWidth) * kRenderHeight;
+	const size_t pixelCount = kRenderWidth * kRenderHeight;
+
+	bool anyGenerated = false;
+	bool allValid = true;
+
+	for (size_t li = 0; li < shadowRes.lightUIDs.size(); ++li)
+	{
+		int lightUID = shadowRes.lightUIDs[li];
+		auto& intensityImage = m_renderCache->GetShadowIntensity(lightUID, renderExtent);
+		std::vector<uint8_t> pixelData(pixelCount);
+
+		// --- Manual staging-buffer readback ---
+		{
+			auto& cmd = BeginCmd();
+			Barrier::Transition(*cmd, intensityImage, ImageState::TransferSrc);
+
+			vk::raii::Buffer stagingBuf(*m_device,
+				vk::BufferCreateInfo({}, bufSize, vk::BufferUsageFlagBits::eTransferDst));
+			auto memReqs = stagingBuf.getMemoryRequirements();
+			uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
+				vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+			ASSERT_LT(memType, UINT32_MAX) << "No host-visible memory for staging buffer";
+			vk::raii::DeviceMemory stagingMem(*m_device, vk::MemoryAllocateInfo(memReqs.size, memType));
+			stagingBuf.bindMemory(*stagingMem, 0);
+
+			vk::BufferImageCopy copy{};
+			copy.imageSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+			copy.imageExtent = vk::Extent3D(kRenderWidth, kRenderHeight, 1);
+			cmd.copyImageToBuffer(*intensityImage.ImageHandle(),
+			                      vk::ImageLayout::eTransferSrcOptimal, *stagingBuf, copy);
+			EndSubmitWait(cmd);
+
+			void* mapped = stagingMem.mapMemory(0, bufSize);
+			std::memcpy(pixelData.data(), mapped, bufSize);
+			stagingMem.unmapMemory();
+		}
+
+		// --- Save to temporary PNG ---
+		ImageData imgData(pixelData.data(), kRenderWidth, kRenderHeight, vk::Format::eR8Unorm);
+		const std::string refPath = neurus::test::ReferencePath(
+			"multilight/ShadowIntensity_Light_" + std::to_string(li) + ".png");
+		const std::string tmpPath = refPath + ".tmp";
+		const bool saved = imgData.SavePNG(tmpPath);
+		ASSERT_TRUE(saved) << "Failed to save ShadowIntensity PNG for light " << li;
+
+		// --- Reference image regression ---
+		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+
+		if (refResult < 0)
+		{
+			// First run — reference generated
+			if (refResult == -1)
+				anyGenerated = true;
+			else
+			{
+				allValid = false;
+				ADD_FAILURE() << "Failed to load reference image for light " << li;
+			}
+		}
+		else if (refResult > 0)
+		{
+			allValid = false;
+			ADD_FAILURE() << refResult
+				<< " pixel(s) differ from reference for light " << li << " (tol=±2)";
+		}
+
+		// --- Verify content is not all-black nor all-white ---
+		size_t nonBlack = 0, nonWhite = 0;
+		for (size_t p = 0; p < pixelCount; ++p)
+		{
+			if (pixelData[p] > 0) ++nonBlack;
+			if (pixelData[p] < 255) ++nonWhite;
+		}
+
+		std::cout << "[ShadowIntensityPerLight] Light " << li
+		          << " (UID=" << lightUID << ")"
+		          << ": nonBlack=" << nonBlack << " nonWhite=" << nonWhite
+		          << " total=" << pixelCount << std::endl;
+
+		ASSERT_GT(nonBlack, 0)
+			<< "Shadow intensity for light " << li << " is all-black";
+		ASSERT_GT(nonWhite, 0)
+			<< "Shadow intensity for light " << li << " is all-white";
+	}
+
+	if (anyGenerated)
+	{
+		GTEST_SKIP() << "Reference images generated.  Re-run the test to compare.";
+	}
+
+	if (!allValid)
+	{
+		FAIL() << "One or more reference image comparisons failed.  See details above.";
+	}
 }

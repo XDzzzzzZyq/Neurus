@@ -253,7 +253,6 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	// Guard: skip if no scene
 	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return; }
 
-	NEURUS_LOG("[ShadowDepthPass] Record called, scene lights=" << ctx.scene->light_list.size());
 	{
 		int shadowCount = 0;
 		for (const auto& [uid, lightPtr] : ctx.scene->light_list)
@@ -261,12 +260,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			if (lightPtr && lightPtr->use_shadow)
 			{
 				auto pos = lightPtr->GetPosition();
-				NEURUS_LOG("[ShadowDepthPass]   shadow light uid=" << uid
-					<< " pos=" << pos.x << "," << pos.y << "," << pos.z);
 				shadowCount++;
 			}
 		}
-		NEURUS_LOG("[ShadowDepthPass] Found " << shadowCount << " shadow-casting lights");
 	}
 
 	const vk::Viewport viewport(0.f, 0.f,

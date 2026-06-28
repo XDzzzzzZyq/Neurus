@@ -211,12 +211,12 @@ TEST_F(LightingPassTest, Constructor_CreatesValidPipeline)
 }
 
 // ---------------------------------------------------------------------------
-// 2. PointLightGpu - size matches shader expectation (std140, 64 bytes)
+// 2. PointLightGpu - size matches shader expectation (std140, 48 bytes)
 // ---------------------------------------------------------------------------
 
-TEST_F(LightingPassTest, PointLightGpu_SizeIs64Bytes)
+TEST_F(LightingPassTest, PointLightGpu_SizeIs48Bytes)
 {
-	EXPECT_EQ(sizeof(PointLightGpu), 64u);
+	EXPECT_EQ(sizeof(PointLightGpu), 48u);
 }
 
 // ---------------------------------------------------------------------------

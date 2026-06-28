@@ -173,7 +173,6 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		return;
 	}
 
-	NEURUS_LOG("[ShadowIntensityPass] Record called, scene lights=" << ctx.scene->light_list.size());
 	{
 		int shadowCount = 0;
 		for (const auto& [uid, light] : ctx.scene->light_list)
@@ -181,12 +180,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			if (light && light->use_shadow)
 			{
 				auto pos = light->GetPosition();
-				NEURUS_LOG("[ShadowIntensityPass]   shadow light uid=" << uid
-					<< " pos=" << pos.x << "," << pos.y << "," << pos.z);
 				shadowCount++;
 			}
 		}
-		NEURUS_LOG("[ShadowIntensityPass] Found " << shadowCount << " shadow-casting lights");
 	}
 
 	// --- 1. Transition G-Buffer Position to ColorShaderRead (once for all lights) ---

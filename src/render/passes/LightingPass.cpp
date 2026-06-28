@@ -363,8 +363,6 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 
 void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
-	NEURUS_LOG("[LightingPass] WriteDescriptors called, extent=" << extent.width << "x" << extent.height);
-
 	DescriptorSet& dstSet = m_descriptorSets[setIndex];
 
 	const std::array<AttachmentName, 4> gBufferInputs = {
@@ -473,16 +471,6 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		);
 
 		m_device->updateDescriptorSets(writeDesc, nullptr);
-
-		NEURUS_LOG("[LightingPass] Shadow array descriptor written - " << MAX_SHADOW_LIGHTS << " layers");
-		for (uint32_t layer = 0; layer < MAX_SHADOW_LIGHTS; ++layer) {
-		    const auto uidIt = m_shadowIndexToUID.find(static_cast<int32_t>(layer));
-		    if (uidIt != m_shadowIndexToUID.end()) {
-		        NEURUS_LOG("[LightingPass]   layer[" << layer << "] -> lightUID=" << uidIt->second << " (active)");
-		    } else {
-		        NEURUS_LOG("[LightingPass]   layer[" << layer << "] -> dummy (unused)");
-		    }
-		}
 	}
 }
 

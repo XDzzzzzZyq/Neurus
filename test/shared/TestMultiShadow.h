@@ -3,7 +3,7 @@
  * @brief Header-only parametrized cube-on-plane scene builder with N point lights.
  *
  * Provides LoadMultiShadow() which procedurally generates a unit cube
- * (centered at origin, positioned at (0,3,0) via SetPosition) and a large
+ * (centered at origin, positioned at (0,0,0)) and a large
  * ground plane (y=0, [-10,10] in XZ), with N shadow-casting point lights.
  *
  * Usage:
@@ -58,16 +58,15 @@ struct MultiShadowResources
  *
  * Generates:
  *   - A unit cube (12 triangles, 8 vertices, 36 indices) centred at origin
- *     covering [-0.5, +0.5]^3, positioned at (0,3,0) via SetPosition.
+ *     covering [-0.5, +0.5]^3, positioned at (0,0,0) (resting on the plane).
  *   - A ground-plane quad (2 triangles, 4 vertices, 6 indices) at y=0,
  *     spanning [-10,10] in XZ, facing +Y.
  *
- * The plane uses identity; the cube's model matrix shifts it to (0, 3, 0).
- * Lights are placed at y=6.  With the default count of 2, the two lights
- * are at (0, 6, 0) and (-6, 6, 0).  For other counts the lights are
- * distributed evenly in a circle of radius 6 around the cube.
+ * The cube and plane both use identity model matrices (cube geometry at origin,
+ * plane geometry at y=0).  Lights are placed on a circle of radius 2 at y=2.
+ * For other counts they are distributed evenly at angles 0°, 360°/N, etc.
  *
- * All lights have power=10, color=white, and shadow=true.
+ * All lights have power=3, color=white, and shadow=true.
  *
  * @note All buffers use device-local memory.  A staging upload is performed
  *       synchronously on the provided graphics queue via Mesh::UploadToGPU().
@@ -76,7 +75,7 @@ struct MultiShadowResources
  * @param physicalDevice   Physical device (for memory properties).
  * @param graphicsQueue    Graphics queue for staging uploads.
  * @param queueFamilyIndex Queue family index for GPUBuffer creation.
- * @param numLights        Number of shadow-casting point lights (default: 2).
+ * @param numLights        Number of shadow-casting point lights (default: 3).
  * @return Fully populated MultiShadowResources with scene, renderItems,
  *         and lightUIDs.
  */
@@ -85,7 +84,7 @@ inline MultiShadowResources LoadMultiShadow(
 	const vk::raii::PhysicalDevice& physicalDevice,
 	vk::Queue graphicsQueue,
 	uint32_t queueFamilyIndex,
-	int numLights = 2)
+	int numLights = 3)
 {
 	MultiShadowResources res;
 	res.scene = std::make_shared<Scene>();
@@ -126,7 +125,7 @@ f 2 6 7 3
 		cubeMesh->o_name = "MultiShadowCube";
 		cubeMesh->o_mesh = cubeMeshData;
 		cubeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
-		cubeMesh->SetPosition(glm::vec3(0.0f, 3.0f, 0.0f));  // raise cube above plane
+		cubeMesh->SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));  // cube rests on plane
 
 		res.scene->UseMesh(cubeMesh);
 
@@ -135,7 +134,7 @@ f 2 6 7 3
 		item.indexBuffer  = cubeMesh->GetIndexBuffer()->buffer();
 		item.indexCount   = cubeMesh->GetGPUIndexCount();
 		item.indexType    = vk::IndexType::eUint32;
-		// Cube pushed to (0, 3, 0) via model matrix; geometry at origin.
+		// Cube identity transform; geometry at origin resting on plane.
 		item.pushConstants.model        = cubeMesh->GetModelMatrix();
 		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
@@ -185,43 +184,29 @@ f 1 4 3 2
 	}
 
 	// ===================================================================
-	//  3. N point lights at y=5.5, all shadow-casting, power=50, color=white.
+	//  3. N point lights on a circle at y=2, radius r=2, all shadow-casting,
+	//     power=3, color=white.
 	//
-	//     Default 2 lights: A at (1, 5.5, 1), B at (-1, 5.5, -1).
-	//     Lights are high enough for visible shadows yet close enough that
-	//     the 1/PI BRDF factor doesn't wash out contrast.  Power=50 with
-	//     ambient=0.03 gives ~17∶1 lit∶shadow ratio.
-	//     For other counts: distributed evenly in a circle of radius 5.5
-	//     at y=5.5 so every light has a distinct shadow direction.
+	//     Lights are placed above the cube (at y=2 vs cube at y=0) so shadows
+	//     project downward onto the plane.  With the default count of 3 the
+	//     lights are at (±2, 2, 0).  For other counts they are distributed
+	//     evenly around the circle.  Camera at (0, 3, 1) provides a good
+	//     view of the cube + plane + shadows.
 	// ===================================================================
 
 	for (int i = 0; i < numLights; ++i)
 	{
-		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 50.0f, glm::vec3(1.0f));
+		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 3.0f, glm::vec3(1.0f));
 		light->o_name = "MultiShadowLight_" + std::to_string(i);
 
-		glm::vec3 pos;
-		if (numLights == 2)
-		{
-			// Exact positions for the default 2-light case.
-			// Placed at y=5.5 with opposite (±1, ∓1) offsets so shadows
-			// fall at ~(±1.2, 0, ∓1.2) on the plane — within the
-			// camera's ±1.5 viewport at 75° FOV from y=2.
-			pos = (i == 0)
-				? glm::vec3(1.0f, 5.5f, 1.0f)
-				: glm::vec3(-1.0f, 5.5f, -1.0f);
-		}
-		else
-		{
-			// Distribute evenly on a circle at y=5.5, radius 5.5.
-			const float radius = 5.5f;
-			const float angle = glm::radians(
-				static_cast<float>(i) * 360.0f / static_cast<float>(numLights));
-			pos = glm::vec3(radius * sin(angle), 5.5f, radius * cos(angle));
-		}
+		// Distribute evenly on a circle at y=2, radius 2.
+		const float radius = 2.0f;
+		const float angle = glm::radians(
+			static_cast<float>(i) * 360.0f / static_cast<float>(numLights));
+		glm::vec3 pos(radius * cos(angle), 2.0f, radius * sin(angle));
 
 		light->SetPosition(pos);
-		light->SetPower(50.0f);
+		light->SetPower(3.0f);
 		light->SetRadius(0.5f);  // 0.5 radius for soft penumbra edges
 		light->SetColor(glm::vec3(1.0f));
 		light->SetShadow(true);
@@ -231,15 +216,14 @@ f 1 4 3 2
 	}
 
 	// ===================================================================
-	//  4. Camera between plane (y=0) and cube (y=3), facing the plane.
-	//     75deg FOV at y=2 covers +/-1.534 at plane -- full +/-1.2 shadow
-	//     captured with 28% margin for extra no-shadow region.
+	//  4. Camera at (0, 3, 1) looking at origin — provides a clear view
+	//     of the cube(shadow caster) and the plane below with shadows.
 	// ===================================================================
 
 	{
 		auto cam = std::make_shared<Camera>(256.0f, 256.0f, 75.0f, 0.1f, 100.0f);
 		cam->o_name = "MultiShadowCamera";
-		cam->SetCamPos(glm::vec3(0.0f, 2.0f, 0.001f));  // 0.001 Z avoids degenerate lookAt
+		cam->SetCamPos(glm::vec3(0.0f, 3.0f, 1.0f));  // 0.001 Z avoids degenerate lookAt
 		cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		res.scene->UseCamera(cam);
 	}
