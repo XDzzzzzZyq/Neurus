@@ -56,7 +56,8 @@ public:
 	{
 		e2D,            ///< Standard 2D image, arrayLayers = 1
 		eCube,          ///< Cubemap: arrayLayers = 6, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT
-		eDepthStencil   ///< Depth / stencil attachment; aspect determined by format
+		eDepthStencil,  ///< Depth / stencil attachment; aspect determined by format
+		eArray          ///< 2D array image; arrayLayers from constructor parameter, view = 2D_ARRAY
 	};
 
 	/**
@@ -79,6 +80,7 @@ public:
 	 *                       ImageViewArrayHandle()).  The primary ImageViewHandle()
 	 *                       always returns a 2D view.  Use ImageViewArrayHandle()
 	 *                       when binding this image to a sampler2DArray shader.
+	 * @param arrayLayers    Number of array layers (used when imageType = eArray).
 	 */
 	Image(const vk::raii::Device& device,
 	      const vk::raii::PhysicalDevice& physicalDevice,
@@ -88,7 +90,8 @@ public:
 	      uint32_t mipLevels = 1,
 	      ImageType imageType = ImageType::e2D,
 	      const char* debugName = nullptr,
-	      bool arrayView = false);
+	      bool arrayView = false,
+	      uint32_t arrayLayers = 1);
 
 	/**
 	 * @brief Creates a GPU image from CPU-side ImageData (loads from file and uploads).
@@ -282,6 +285,9 @@ private:
 
 	// --- If true, e2D images get a VK_IMAGE_VIEW_TYPE_2D_ARRAY view (for sampler2DArray) ---
 	bool m_arrayView = false;
+
+	// --- User-specified array layer count (0/1 = default from ImageType) ---
+	uint32_t m_userArrayLayers = 0;
 
 	// --- State tracking ---
 	ImageState m_state = ImageState::Undefined;

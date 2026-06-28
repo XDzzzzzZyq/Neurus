@@ -21,13 +21,15 @@ Image::Image(const vk::raii::Device& device,
              const uint32_t mipLevels,
              const ImageType imageType,
              const char* debugName,
-             const bool arrayView)
+             const bool arrayView,
+             const uint32_t arrayLayers)
 	: m_extent(extent)
 	, m_format(format)
 	, m_usage(usage)
 	, m_mipLevels(mipLevels)
 	, m_imageType(imageType)
 	, m_arrayView(arrayView)
+	, m_userArrayLayers(arrayLayers)
 {
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
@@ -130,6 +132,10 @@ void Image::createImage(const vk::raii::Device& device,
 		m_arrayLayers = 1;
 		createFlags = {};
 		break;
+	case ImageType::eArray:
+		m_arrayLayers = m_userArrayLayers;
+		createFlags = {};
+		break;
 	case ImageType::e2D:
 	default:
 		m_arrayLayers = 1;
@@ -191,6 +197,10 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 	case ImageType::eDepthStencil:
 		viewType = vk::ImageViewType::e2D;
 		aspect = AspectFromFormat(m_format);
+		break;
+	case ImageType::eArray:
+		viewType = vk::ImageViewType::e2DArray;
+		aspect = vk::ImageAspectFlagBits::eColor;
 		break;
 	case ImageType::e2D:
 	default:

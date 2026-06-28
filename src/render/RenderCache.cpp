@@ -2,6 +2,7 @@
 
 #include "Log.h"
 
+#include <cassert>
 #include <stdexcept>
 
 namespace neurus {
@@ -95,30 +96,56 @@ Image& RenderCache::GetShadowMap(const int lightUID)
 	return insertedIt->second;
 }
 
-Image& RenderCache::GetShadowIntensity(const int lightUID, const vk::Extent2D extent)
+Image& RenderCache::GetShadowIntensityArray(const vk::Extent2D extent)
 {
-	auto it = m_shadowIntensities.find(lightUID);
-	if (it != m_shadowIntensities.end())
+	if (m_shadowIntensityArray)
+	{
+		return *m_shadowIntensityArray;
+	}
+
+	NEURUS_LOG("[RenderCache] Lazily creating shadow intensity array at "
+	           << extent.width << "x" << extent.height
+	           << " with " << MAX_SHADOW_LAYERS << " layers");
+
+	m_shadowIntensityArray = std::make_unique<Image>(
+		*m_device,
+		*m_physicalDevice,
+		extent,
+		vk::Format::eR8Unorm,
+		vk::ImageUsageFlagBits::eStorage |
+			vk::ImageUsageFlagBits::eSampled |
+			vk::ImageUsageFlagBits::eTransferSrc |
+			vk::ImageUsageFlagBits::eTransferDst,
+		1,                              // mipLevels
+		Image::ImageType::eArray,
+		"ShadowIntensityArray",         // debug name
+		false,                          // arrayView
+		MAX_SHADOW_LAYERS);             // arrayLayers
+
+	return *m_shadowIntensityArray;
+}
+
+uint32_t RenderCache::GetShadowIntensityLayer(const int lightUID, const vk::Extent2D /*extent*/)
+{
+	auto it = m_shadowIntensityLayerIndex.find(lightUID);
+	if (it != m_shadowIntensityLayerIndex.end())
 	{
 		return it->second;
 	}
 
-	const std::string debugName = "ShadowIntensity_Light_" + std::to_string(lightUID);
-	Image intensity(*m_device,
-	                *m_physicalDevice,
-	                extent,
-	                vk::Format::eR8Unorm,
-	                vk::ImageUsageFlagBits::eStorage |
-	                    vk::ImageUsageFlagBits::eSampled |
-	                    vk::ImageUsageFlagBits::eTransferSrc |
-	                    vk::ImageUsageFlagBits::eTransferDst,
-	                1,                         // mipLevels
-	                Image::ImageType::e2D,
-	                debugName.c_str(),         // debug name
-	                /*arrayView=*/true);
+	const uint32_t layer = static_cast<uint32_t>(m_shadowIntensityLayerIndex.size());
+	if (layer >= MAX_SHADOW_LAYERS)
+	{
+		NEURUS_ERR("[RenderCache] Shadow intensity layer overflow: lightUID="
+		           << lightUID << " exceeds MAX_SHADOW_LAYERS=" << MAX_SHADOW_LAYERS);
+		assert(false && "MAX_SHADOW_LAYERS exceeded");
+		return 0;
+	}
 
-	const auto [insertedIt, _] = m_shadowIntensities.emplace(lightUID, std::move(intensity));
-	return insertedIt->second;
+	m_shadowIntensityLayerIndex[lightUID] = layer;
+	NEURUS_LOG("[RenderCache] Allocated shadow intensity layer " << layer
+	           << " for lightUID=" << lightUID);
+	return layer;
 }
 
 Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D extent)
@@ -148,7 +175,7 @@ Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D ext
 void RenderCache::RemoveLight(const int lightUID)
 {
 	m_shadowMaps.erase(lightUID);
-	m_shadowIntensities.erase(lightUID);
+	m_shadowIntensityLayerIndex.erase(lightUID);
 	m_shadowColorMaps.erase(lightUID);
 }
 
@@ -166,14 +193,16 @@ void RenderCache::Clean()
 	m_attachments.clear();
 	m_shadowMaps.clear();
 	m_shadowColorMaps.clear();
-	m_shadowIntensities.clear();
+	m_shadowIntensityArray.reset();
+	m_shadowIntensityLayerIndex.clear();
 }
 
 void RenderCache::CleanScreenSpace()
 {
 	m_attachments.clear();
 	m_shadowColorMaps.clear();
-	m_shadowIntensities.clear();
+	m_shadowIntensityArray.reset();
+	m_shadowIntensityLayerIndex.clear();
 	// m_shadowMaps preserved — shadow cubemaps survive resize
 }
 

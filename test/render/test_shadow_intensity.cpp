@@ -193,14 +193,15 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 4: Read back R8 shadow intensity
+	// Step 4: Read back R8 shadow intensity from the layered array
 	// -------------------------------------------------------------------
-	auto& intensityImage = m_renderCache->GetShadowIntensity(lightUID, renderExtent);
+	auto& intensityArray = m_renderCache->GetShadowIntensityArray(renderExtent);
+	const uint32_t layer = m_renderCache->GetShadowIntensityLayer(lightUID, renderExtent);
 	const vk::DeviceSize bufSize = static_cast<vk::DeviceSize>(kRes) * kRes;
 	std::vector<uint8_t> u8ShadowData(kRes * kRes);
 	{
 		auto& cmd = BeginCmd();
-		Barrier::Transition(*cmd, intensityImage, ImageState::TransferSrc);
+		Barrier::Transition(*cmd, intensityArray, ImageState::TransferSrc);
 		vk::raii::Buffer stagingBuf(*m_device,
 			vk::BufferCreateInfo({}, bufSize, vk::BufferUsageFlagBits::eTransferDst));
 		auto memReqs = stagingBuf.getMemoryRequirements();
@@ -209,9 +210,9 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 		vk::raii::DeviceMemory stagingMem(*m_device, vk::MemoryAllocateInfo(memReqs.size, memType));
 		stagingBuf.bindMemory(*stagingMem, 0);
 		vk::BufferImageCopy copy{};
-		copy.imageSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
+		copy.imageSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, layer, 1);
 		copy.imageExtent = vk::Extent3D(kRes, kRes, 1);
-		cmd.copyImageToBuffer(*intensityImage.ImageHandle(),
+		cmd.copyImageToBuffer(*intensityArray.ImageHandle(),
 		                      vk::ImageLayout::eTransferSrcOptimal, *stagingBuf, copy);
 		EndSubmitWait(cmd);
 		void* mapped = stagingMem.mapMemory(0, bufSize);

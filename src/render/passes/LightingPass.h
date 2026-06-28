@@ -197,9 +197,8 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
-private:
 	/**
-	 * @brief Creates the descriptor set layout (9 bindings).
+	 * @brief Creates the descriptor set layout (10 bindings).
 	 *
 	 * Bindings:
 	 *   0: gPosition           (combined image sampler)
@@ -211,8 +210,11 @@ private:
 	 *   6: U_AO                 (combined image sampler, SSAO occlusion)
 	 *   7: U_Irradiance         (combined image sampler, diffuse IBL cubemap)
 	 *   8: U_Prefiltered        (combined image sampler, specular IBL cubemap)
+	 *   9: U_ShadowArray        (combined image sampler, sampler2DArray)
 	 */
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
+
+private:
 
 	/**
 	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
@@ -246,15 +248,5 @@ private:
 	std::unique_ptr<Image> m_fallbackIrradianceCube;
 	std::unique_ptr<Image> m_fallbackPrefilteredCube;
 	vk::raii::Sampler m_fallbackCubeSampler = nullptr;
-
-	// --- Shadow index to light UID mapping (populated by UploadLights) ---
-	// Maps shadowMapIndex (0..MAX_SHADOW_LIGHTS-1) → light UID for WriteDescriptors.
-	std::unordered_map<int32_t, int32_t> m_shadowIndexToUID;
-
-	// --- Dummy 1x1 black R8 image for unused shadow array layers ---
-	// Prevents VUID-WriteDescriptorSet-EnsuresAllImagesBound when a layer
-	// in the sampler2DArray has no corresponding shadow-casting light.
-	std::unique_ptr<Image> m_dummyShadowImage;
-	vk::raii::Sampler m_dummyShadowSampler = nullptr;
 };
 } // namespace neurus

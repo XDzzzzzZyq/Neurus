@@ -89,15 +89,16 @@ vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& d
 	// --- Create compute shader module from embedded SPIR-V ---
 	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
 
-	// --- Push constant range (lightWorldPos.xyz + farPlane + bias = 20 bytes) ---
+	// --- Push constant range (lightWorldPos + farPlane + bias + layerIndex = 24 bytes) ---
 	// Matches shadow_eval.comp push constant layout:
-	//   vec3 lightWorldPos (12 bytes)
-	//   float farPlane      (4 bytes)
-	//   float bias          (4 bytes)
+	//   vec3  lightWorldPos (12 bytes)
+	//   float farPlane       (4 bytes)
+	//   float bias           (4 bytes)
+	//   int   layerIndex     (4 bytes)
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute,
 		0,
-		5 * sizeof(float));   // 20 bytes
+		6 * sizeof(float));   // 24 bytes
 
 	// --- Build compute pipeline ---
 	return m_pipelineBuilder->SetShaderStage(compModule, "main")
@@ -143,13 +144,13 @@ void ShadowIntensityPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D exten
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 
-	// --- Binding 2: Shadow intensity output (storage image, R8) ---
+	// --- Binding 2: Shadow intensity output (storage image, R8, 2D_ARRAY) ---
 	{
-		auto& shadowIntensity = cache.GetShadowIntensity(m_currentLightUID, extent);
+		auto& shadowIntensity = cache.GetShadowIntensityArray(extent);
 
 		vk::DescriptorImageInfo imageInfo(
 			nullptr,                               // sampler (not used for storage images)
-			*shadowIntensity.ImageViewHandle(),    // imageView
+			*shadowIntensity.ImageViewHandle(),    // imageView (2D_ARRAY)
 			vk::ImageLayout::eGeneral              // imageLayout
 		);
 
@@ -192,10 +193,16 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		Barrier::Transition(cmdBuf, posAtt, ImageState::ColorShaderRead);
 	}
 
-	// --- 2. Bind compute pipeline (once for all lights) ---
+	// --- 2. Transition the shadow intensity array to ShaderWrite (once) ---
+	{
+		auto& shadowArray = cache.GetShadowIntensityArray(renderExtent);
+		Barrier::Transition(cmdBuf, shadowArray, ImageState::ShaderWrite);
+	}
+
+	// --- 3. Bind compute pipeline (once for all lights) ---
 	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
 
-	// --- 3. Dispatch shadow evaluation for each shadow-casting light ---
+	// --- 4. Dispatch shadow evaluation for each shadow-casting light ---
 	//     Alternates between two descriptor sets per frame slot so that updating
 	//     the descriptor for light N never touches the set that is still bound
 	//     from light N-1.  Without this alternation, updating a bound descriptor
@@ -212,12 +219,6 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		{
 			auto& shadowCube = cache.GetShadowMap(uid);
 			Barrier::Transition(cmdBuf, shadowCube, ImageState::DepthShaderRead);
-		}
-
-		// --- Transition ShadowIntensity to ShaderWrite ---
-		{
-			auto& shadowIntensity = cache.GetShadowIntensity(uid, renderExtent);
-			Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ShaderWrite);
 		}
 
 		// --- Select descriptor set: alternate between 2 sets per frame slot ---
@@ -240,15 +241,19 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 				float lightPosX, lightPosY, lightPosZ;
 				float farPlane;
 				float bias;
+				int32_t layerIndex;
 			};
 
 			const auto& pos = light->GetPosition();
+			const uint32_t layer = cache.GetShadowIntensityLayer(uid, renderExtent);
+
 			ShadowEvalPushConstants pc = {};
-			pc.lightPosX = pos.x;
-			pc.lightPosY = pos.y;
-			pc.lightPosZ = pos.z;
-			pc.farPlane  = Light::point_shadow_far;
-			pc.bias      = m_bias;
+			pc.lightPosX  = pos.x;
+			pc.lightPosY  = pos.y;
+			pc.lightPosZ  = pos.z;
+			pc.farPlane   = Light::point_shadow_far;
+			pc.bias       = m_bias;
+			pc.layerIndex = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
 				*m_pipelineBuilder->pipelineLayout(),
@@ -262,13 +267,13 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
-		// --- Transition ShadowIntensity output: General → ColorShaderRead for lighting pass ---
-		{
-			auto& shadowIntensity = cache.GetShadowIntensity(uid, renderExtent);
-			Barrier::Transition(cmdBuf, shadowIntensity, ImageState::ColorShaderRead);
-		}
-
 		++lightIndex;
+	}
+
+	// --- 5. Transition shadow intensity array: General → ColorShaderRead for lighting pass ---
+	{
+		auto& shadowArray = cache.GetShadowIntensityArray(renderExtent);
+		Barrier::Transition(cmdBuf, shadowArray, ImageState::ColorShaderRead);
 	}
 }
 

@@ -4,13 +4,13 @@
 //
 // For each pixel, reads the world-space position from the G-Buffer, computes
 // the direction to the point light, samples the shadow depth cubemap, and
-// outputs a per-pixel shadow intensity.
+// outputs a per-pixel shadow intensity to a layer of a 2D_ARRAY image.
 //
 // Shadow intensity convention (per spec):
 //   1.0 = fully shadowed
 //   0.0 = fully lit
 //
-// Dispatch: ceil(width/16), ceil(height/16), 1
+// Dispatch: ceil(width/16), ceil(height/16), 1 per light
 // ---------------------------------------------------------------------------
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -21,22 +21,23 @@ layout(binding = 0) uniform sampler2D gPosition;
 // --- Shadow depth cubemap (sampled as non-compare; .r = linear depth) ---
 layout(binding = 1) uniform samplerCube u_ShadowCube;
 
-// --- Output: R8 shadow intensity ---
-layout(r8, binding = 2) uniform writeonly image2D outputShadow;
+// --- Output: R8 shadow intensity (2D_ARRAY, one layer per light) ---
+layout(r8, binding = 2) uniform writeonly image2DArray outputShadow;
 
 // --- Push constants ---
 layout(push_constant) uniform PushConstants
 {
 	vec3 lightWorldPos;     // offset 0,  12 bytes
-	float farPlane;         // offset 12,  4 bytes
-	float bias;             // offset 16,  4 bytes
+	float farPlane;         // offset 12, 4 bytes
+	float bias;             // offset 16, 4 bytes
+	int   layerIndex;       // offset 20, 4 bytes
 };
-// Total: 20 bytes (padded by hardware to 32-byte minimum on most GPUs)
+// Total: 24 bytes
 
 void main()
 {
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 imgSize     = imageSize(outputShadow);
+	ivec2 imgSize     = imageSize(outputShadow).xy;
 
 	if (pixelCoord.x >= imgSize.x || pixelCoord.y >= imgSize.y)
 	{
@@ -51,7 +52,7 @@ void main()
 	// Background pixel (no geometry) — treat as fully lit
 	if (posSample.w < 0.5)
 	{
-		imageStore(outputShadow, pixelCoord, vec4(0.0));
+		imageStore(outputShadow, ivec3(pixelCoord, layerIndex), vec4(0.0));
 		return;
 	}
 
@@ -74,5 +75,5 @@ void main()
 	// 1.0 = fully shadowed (current depth beyond occluder), 0.0 = lit
 	float shadow = (currentDepth - bias > closestDepth) ? 1.0 : 0.0;
 
-	imageStore(outputShadow, pixelCoord, vec4(shadow));
+	imageStore(outputShadow, ivec3(pixelCoord, layerIndex), vec4(shadow));
 }

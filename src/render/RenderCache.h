@@ -84,6 +84,9 @@ public:
 
 	// --- Per-light shadow resources (lazily created) ---
 
+	/// Maximum number of shadow-casting lights (array layers in the intensity image).
+	static constexpr uint32_t MAX_SHADOW_LAYERS = 4;
+
 	/**
 	 * @brief Returns (or lazily creates) the shadow depth cubemap for a light.
 	 *
@@ -96,17 +99,29 @@ public:
 	Image& GetShadowMap(int lightUID);
 
 	/**
-	 * @brief Returns (or lazily creates) the shadow intensity map for a light.
+	 * @brief Returns (or lazily creates) the shadow intensity image array.
 	 *
-	 * The map is a screen-space R8_UNORM image with eStorage | eSampled | eTransferSrc
-	 * usage.  Created on first access for the given lightUID.  Resolution is provided
-	 * by the caller and should match the current render extent.
+	 * A single 2D_ARRAY image (R8_UNORM, MAX_SHADOW_LAYERS layers) shared
+	 * by all shadow-casting point lights.  Each light gets a unique layer
+	 * index via GetShadowIntensityLayer().
+	 *
+	 * @param extent Image dimensions (should match the current render extent).
+	 * @return Non-owning reference to the layered intensity Image.
+	 */
+	Image& GetShadowIntensityArray(vk::Extent2D extent);
+
+	/**
+	 * @brief Returns (or allocates) the layer index for a light's shadow intensity.
+	 *
+	 * On first call for a lightUID, allocates the next available layer (0, 1, 2…).
+	 * The array must have been created first via GetShadowIntensityArray().
+	 * Asserts if MAX_SHADOW_LAYERS is exceeded.
 	 *
 	 * @param lightUID Unique identifier of the point light (int).
-	 * @param extent   Image dimensions for the intensity map (should match render extent).
-	 * @return Non-owning reference to the shadow intensity Image.
+	 * @param extent   Image dimensions (must match GetShadowIntensityArray's extent).
+	 * @return Layer index (0 … MAX_SHADOW_LAYERS-1).
 	 */
-	Image& GetShadowIntensity(int lightUID, vk::Extent2D extent);
+	uint32_t GetShadowIntensityLayer(int lightUID, vk::Extent2D extent);
 
 	/**
 	 * @brief Returns (or lazily creates) a colour-format shadow cubemap for a light.
@@ -124,7 +139,8 @@ public:
 	/**
 	 * @brief Removes all per-light shadow resources for the given light.
 	 *
-	 * Erases entries from m_shadowMaps, m_shadowColorMaps, and m_shadowIntensities.
+	 * Erases entries from m_shadowMaps, m_shadowColorMaps,
+	 * and recycles the intensity layer index.
 	 * Safe to call for lights that have no resources yet.
 	 *
 	 * @param lightUID Unique identifier of the point light (int).
@@ -190,7 +206,8 @@ private:
 
 	// --- Per-light lazy resources (key = light UID as int) ---
 	std::unordered_map<int, Image> m_shadowMaps;
-	std::unordered_map<int, Image> m_shadowIntensities;
+	std::unique_ptr<Image> m_shadowIntensityArray;
+	std::unordered_map<int, uint32_t> m_shadowIntensityLayerIndex;
 	std::unordered_map<int, Image> m_shadowColorMaps;
 };
 
