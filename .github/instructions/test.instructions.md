@@ -622,8 +622,12 @@ is NOT acceptable -- skip none of these steps.
    - Runtime behaviour: resize the window, interact with the viewport,
      verify no deadlocks or freezes.
 
-5. **No stubs, TODOs, or placeholders remain**
-   - No `// TODO`, `// FIXME`, `// STUB`, or placeholder comments
-     left behind in the changed files.
-   - No hardcoded magic numbers without documentation.
-   - No commented-out code blocks unless explicitly justified.
+ 5. **No stubs, TODOs, or placeholders remain**
+    - No `// TODO`, `// FIXME`, `// STUB`, or placeholder comments
+      left behind in the changed files.
+    - No hardcoded magic numbers without documentation.
+    - No commented-out code blocks unless explicitly justified.
+
+6. **Feature workflow** — For new rendering features, follow the full
+    pattern in `.github/instructions/development.instructions.md` (4-wave
+    implementation, per-wave verification, common bug fixes).

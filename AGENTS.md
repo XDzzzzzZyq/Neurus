@@ -99,6 +99,20 @@ UI headers. UI must not include Renderer headers (only surface handle).
 
 ---
 
+## Feature Development
+
+For implementing any new rendering feature (light type, pass, effect), follow
+the proven pattern documented in [development.instructions.md](.github/instructions/development.instructions.md).
+This workflow was established through deferred PBR, SSAO, multi-light shadows,
+and sun light implementations, and encodes the common pitfalls and verification
+steps.
+
+Key rules:
+- Plan by tracing the closest existing feature
+- Break into 4 waves: Foundation → Core → Integration → Tests/Docs
+- Verify EVERY wave: build, ctest, VUID check, Python PIL for references
+- Never commit until user approves
+
 ## Development Guidelines
 
 Follow Karpathy Guidelines. For each task:
