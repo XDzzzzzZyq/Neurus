@@ -155,6 +155,119 @@ origin gives distance ≈ 5.2; moving it to `(2,2,2)` gives distance ≈ 3.5.
 scene is visible. A camera at `(0,2,5)` looking at origin sees the sphere
 from above-front; the visible hemisphere has negative world-space z.
 
+## Sun Shadow Test Patterns
+
+### Depth Math Validation (test_sun_shadow_depth.cpp)
+
+Follows the `test_shadow_cubemap.cpp` depth validation pattern for orthographic
+projection. Key differences from point light cubemap tests:
+
+- **Projection**: Orthographic (`glm::ortho()`) with configurable frustum planes.
+  No perspective division needed; depth is linear in world-space z.
+- **Depth range**: NDC Z in `[0, 1]` (Vulkan convention). Requires
+  `GLM_FORCE_DEPTH_ZERO_TO_ONE` to be defined before GLM includes.
+- **No distance/farPlane division**: Unlike cubemap depth which computes
+  `gl_FragCoord.z = distance / farPlane`, orthographic depth from
+  `glm::ortho()` maps world-space z directly to NDC [0,1] via the
+  projection matrix. No manual depth normalization is required in the
+  vertex shader.
+- **Push constant**: `SunShadowPushConstants` struct carries `mat4 lightViewProj`
+  (view × projection matrix). View matrix is `glm::lookAt()` from light
+  position/direction; projection is `glm::ortho()`.
+- **Shadow map**: 2D `VK_FORMAT_D32_SFLOAT`, 2048×2048 resolution, accessed
+  via `RenderCache::GetShadowMap(lightUID, LightType::SUNLIGHT)`.
+
+**Test pattern**: Place occluder geometry (e.g. a quad at z=-1.0) between the
+light and a receiver plane (z=-3.0). Compute expected depth value at the
+occluder's pixel using the orthographic projection formula. The fragment
+shader writes `gl_FragCoord.z` (NDC depth). Read back the shadow map depth
+buffer, verify that occluder pixels have the expected depth and background
+pixels have the clear value (1.0).
+
+### Sun Shadow Intensity Eval (test_sun_shadow_intensity.cpp)
+
+Validates that `SunShadowIntensityEval` compute shader correctly samples
+a `sampler2DShadow` and writes per-pixel shadow intensity to the
+`ShadowIntensity` layered array.
+
+- **Descriptor binding**: `sampler2DShadow` at binding 0, storage image
+  (`image2D`, `r8`) at binding 1. Separate descriptor set layout from
+  the point light cubemap pipeline within `ShadowIntensityPass`.
+- **PCF sampling**: Percentage-closer filtering with UV offset kernel.
+  Supports `HARD`, `SOFT_PCF_16`, and `SOFT_PCF_64` shadow modes.
+- **Shadow comparison**: Uses `texture(sampler2DShadow, ...)` with
+  orthographic depth, no cubemap-specific direction logic.
+- **Output**: Single `R8_UNORM` value per pixel written to the light's
+  assigned layer in the `ShadowIntensity` 2D array.
+
+**Test pattern**: Render occluder geometry into a 2D orthographic shadow map
+via `SunShadowDepthPass`. Then run `SunShadowIntensityEval` compute shader
+over a full-screen quad. Read back the shadow intensity layer and verify:
+- Pixels behind the occluder have intensity > 0 (shadowed).
+- Pixels not behind the occluder have intensity = 0 (lit).
+- Intensity values are within [0, 1] range (R8_UNORM).
+
+### Extended Deferred Test (test_deferred_shading.cpp)
+
+The deferred shading integration test includes a sun light alongside point
+lights. Additional attachments/checks:
+
+- **Sun light SSBO**: `SunLightGpu` struct at LightingPass binding 6, with
+  `direction`, `color`, `intensity`, and shadow parameters.
+- **Shadow intensity layer**: Verify the sun light's assigned layer in the
+  `ShadowIntensity` array is populated correctly.
+- **HDRColor**: Should show visible sun light contribution (directional
+  lighting with shadow attenuation on the lit side).
+
+### Mandatory Verification Steps
+
+**Python PIL verification (REQUIRED before committing any reference images)**:
+
+Every reference image must be verified with Python before commit. This is not
+optional:
+
+```python
+from PIL import Image
+from collections import Counter
+
+for name in ["Position", "Normal", "Albedo", "MetallicRoughness", "HDRColor"]:
+    img = Image.open(f"test/render/reference/deferred/{name}.png")
+    pixels = list(img.getdata())
+    unique = Counter(pixels)
+    non_black = sum(1 for p in pixels if p != (0, 0, 0, 0) and p != (0, 0, 0, 255))
+
+    print(f"{name}: {len(unique)} unique colors, {non_black} non-black pixels")
+
+    # Fail if only 1 unique value (uniform output = broken rendering)
+    if len(unique) <= 1:
+        raise ValueError(f"{name}: UNIFORM OUTPUT - lighting or geometry likely broken")
+
+    # Fail if zero non-black pixels for geometry passes
+    if name in ("Position", "Normal", "Albedo") and non_black == 0:
+        raise ValueError(f"{name}: ALL BLACK - geometry not rendered")
+```
+
+**VUID check (REQUIRED before committing any GPU test or renderer change)**:
+
+Run the test executable and verify zero `VUID-` violations in output:
+
+```bash
+# Run the affected test suite
+./build/debug/Debug/neurus_test.exe --gtest_filter="SunShadow*:DeferredShading*" 2>&1 > test_output.txt
+
+# Verify zero VUID violations
+grep -c "VUID-" test_output.txt
+# Expected: 0
+
+# Also check the main application
+$output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3
+if ($output -match "VUID-") { Write-Host "VALIDATION ERROR DETECTED" }
+```
+
+Never skip this check. Validation errors that go unnoticed in the IDE's debug
+output window will still crash the application on other machines or driver
+versions.
+
 ## Reference-Image Regression Testing
 
 ### Pattern (first-run → second-run comparison)

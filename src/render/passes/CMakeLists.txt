@@ -31,3 +31,6 @@ target_link_libraries(neurus_render_passes PUBLIC
 target_include_directories(neurus_render_passes PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)
 target_include_directories(neurus_render_passes PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../..)
 target_include_directories(neurus_render_passes PRIVATE ${CMAKE_BINARY_DIR}/generated/shaders)
+
+# GLM_FORCE_DEPTH_ZERO_TO_ONE: glm::ortho/perspective() produce Vulkan [0,1] depth range
+target_compile_definitions(neurus_render_passes PRIVATE GLM_FORCE_DEPTH_ZERO_TO_ONE)

@@ -1,16 +1,25 @@
 /**
  * @file TestMultiShadow.h
- * @brief Header-only parametrized cube-on-plane scene builder with N point lights.
+ * @brief Header-only parametrized cube-on-plane scene builder with N lights.
  *
  * Provides LoadMultiShadow() which procedurally generates a unit cube
  * (centered at origin, positioned at (0,0,0)) and a large
- * ground plane (y=0, [-10,10] in XZ), with N shadow-casting point lights.
+ * ground plane (y=0, [-10,10] in XZ), with N shadow-casting lights.
  *
  * Usage:
  * @code
- *   auto res = LoadMultiShadow(device, pd, queue, qfi);        // 2 lights (default)
- *   auto res = LoadMultiShadow(device, pd, queue, qfi, 4);     // 4 lights
+ *   auto res = LoadMultiShadow(device, pd, queue, qfi);                  // 3 point lights (default)
+ *   auto res = LoadMultiShadow(device, pd, queue, qfi, 4);               // 4 point lights
+ *   auto res = LoadMultiShadow(device, pd, queue, qfi, 3, LightType::SUNLIGHT); // 3 sun lights
  * @endcode
+ *
+ * Light placement:
+ *   - POINTLIGHT (default): N point lights on a ring (y=2, radius=2),
+ *     each casting shadows downward onto the plane.
+ *   - SUNLIGHT: N directional lights placed on the same ring, each
+ *     rotated to point toward the cube centre (origin).  The rotation
+ *     maps the default forward direction (0,0,-1) to the vector from
+ *     the ring position toward origin.
  *
  * Geometry is 100% procedural via OBJ strings -- no OBJ files needed.
  */
@@ -54,7 +63,7 @@ struct MultiShadowResources
 };
 
 /**
- * @brief Builds the multi-shadow test scene procedurally with N point lights.
+ * @brief Builds the multi-shadow test scene procedurally with N lights.
  *
  * Generates:
  *   - A unit cube (12 triangles, 8 vertices, 36 indices) centred at origin
@@ -63,10 +72,16 @@ struct MultiShadowResources
  *     spanning [-10,10] in XZ, facing +Y.
  *
  * The cube and plane both use identity model matrices (cube geometry at origin,
- * plane geometry at y=0).  Lights are placed on a circle of radius 2 at y=2.
- * For other counts they are distributed evenly at angles 0°, 360°/N, etc.
+ * plane geometry at y=0).
  *
- * All lights have power=3, color=white, and shadow=true.
+ * Lights: for POINTLIGHT (default), lights are placed on a circle of radius 2
+ * at y=2.  For SUNLIGHT, lights are also placed on the circle at the same
+ * positions but configured as directional sun lights whose forward direction
+ * points toward the cube centre (origin).
+ *
+ * For both types, lights are distributed evenly around the circle at angles
+ * 0deg, 360deg/N, etc.  All lights have power=5, colour=white, and
+ * shadow=true.
  *
  * @note All buffers use device-local memory.  A staging upload is performed
  *       synchronously on the provided graphics queue via Mesh::UploadToGPU().
@@ -75,7 +90,8 @@ struct MultiShadowResources
  * @param physicalDevice   Physical device (for memory properties).
  * @param graphicsQueue    Graphics queue for staging uploads.
  * @param queueFamilyIndex Queue family index for GPUBuffer creation.
- * @param numLights        Number of shadow-casting point lights (default: 3).
+ * @param numLights        Number of shadow-casting lights (default: 3).
+ * @param lightType        Type of lights to create (default: POINTLIGHT).
  * @return Fully populated MultiShadowResources with scene, renderItems,
  *         and lightUIDs.
  */
@@ -84,7 +100,8 @@ inline MultiShadowResources LoadMultiShadow(
 	const vk::raii::PhysicalDevice& physicalDevice,
 	vk::Queue graphicsQueue,
 	uint32_t queueFamilyIndex,
-	int numLights = 3)
+	int numLights = 3,
+	LightType lightType = LightType::POINTLIGHT)
 {
 	MultiShadowResources res;
 	res.scene = std::make_shared<Scene>();
@@ -184,35 +201,60 @@ f 1 4 3 2
 	}
 
 	// ===================================================================
-	//  3. N point lights on a circle at y=2, radius r=2, all shadow-casting,
-	//     power=3, color=white.
+	//  3. N lights on a circle at y=2, radius r=2, all shadow-casting,
+	//     power=5, colour=white.
 	//
-	//     Lights are placed above the cube (at y=2 vs cube at y=0) so shadows
-	//     project downward onto the plane.  With the default count of 3 the
-	//     lights are at (±2, 2, 0).  For other counts they are distributed
-	//     evenly around the circle.  Camera at (0, 3, 1) provides a good
-	//     view of the cube + plane + shadows.
+	//     POINTLIGHT: lights are above the cube (at y=2 vs cube at y=0)
+	//       so shadows project downward onto the plane.
+	//     SUNLIGHT: directional lights whose forward direction points
+	//       from the ring position toward the cube centre (origin).
+	//
+	//     Lights are distributed evenly around the circle at angles
+	//     0deg, 360deg/N, etc.  Camera at (0, 3, 0.001) provides a
+	//     good view of the cube + plane + shadows.
 	// ===================================================================
 
 	for (int i = 0; i < numLights; ++i)
 	{
-		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 3.0f, glm::vec3(1.0f));
-		light->o_name = "MultiShadowLight_" + std::to_string(i);
-
-		// Distribute evenly on a circle at y=2, radius 2.
 		const float radius = 2.0f;
 		const float angle = glm::radians(
 			static_cast<float>(i) * 360.0f / static_cast<float>(numLights));
 		glm::vec3 pos(radius * cos(angle), 2.0f, radius * sin(angle));
 
-		light->SetPosition(pos);
-		light->SetPower(3.0f);
-		light->SetRadius(0.5f);  // 0.5 radius for soft penumbra edges
-		light->SetColor(glm::vec3(1.0f));
-		light->SetShadow(true);
+		if (lightType == LightType::SUNLIGHT)
+		{
+			// Directional light pointing from ring position toward origin.
+			// Compute Euler angles (pitch, yaw, 0) that rotate the default
+			// forward (0,0,-1) to the direction from pos toward origin.
+			const glm::vec3 dir = glm::normalize(glm::vec3(0.0f) - pos);
+			const float pitchRad = asin(dir.y);
+			const float yawRad   = atan2(-dir.x, -dir.z);
 
-		res.scene->UseLight(light);
-		res.lightUIDs.push_back(light->GetObjectID());
+			auto light = std::make_shared<Light>(LightType::SUNLIGHT, 5.0f, glm::vec3(1.0f));
+			light->o_name    = "MultiShadowSunLight_" + std::to_string(i);
+			light->SetRotation(glm::vec3(
+				glm::degrees(pitchRad),
+				glm::degrees(yawRad),
+				0.0f));
+			light->SetShadow(true);
+
+			res.scene->UseLight(light);
+			res.lightUIDs.push_back(light->GetObjectID());
+		}
+		else
+		{
+			auto light = std::make_shared<Light>(LightType::POINTLIGHT, 5.0f, glm::vec3(1.0f));
+			light->o_name = "MultiShadowLight_" + std::to_string(i);
+
+			light->SetPosition(pos);
+			light->SetPower(3.0f);  // keep existing default for point lights
+			light->SetRadius(0.5f);
+			light->SetColor(glm::vec3(1.0f));
+			light->SetShadow(true);
+
+			res.scene->UseLight(light);
+			res.lightUIDs.push_back(light->GetObjectID());
+		}
 	}
 
 	// ===================================================================
@@ -229,7 +271,9 @@ f 1 4 3 2
 	}
 
 	NEURUS_LOG("[LoadMultiShadow] Built 2 meshes (cube + plane) + "
-	           << numLights << " point lights + 1 camera -- "
+	           << numLights
+	           << (lightType == LightType::SUNLIGHT ? " sun" : " point")
+	           << " lights + 1 camera -- "
 	           << res.renderItems.size() << " render items");
 
 	return res;

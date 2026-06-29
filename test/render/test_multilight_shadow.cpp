@@ -625,3 +625,141 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 		FAIL() << "One or more reference image comparisons failed.  See details above.";
 	}
 }
+
+// ===========================================================================
+// SunLights_HDRColorReference — full deferred pipeline with sun shadows
+// ===========================================================================
+
+/**
+ * @brief Renders a cube-on-plane scene with 3 sun lights through the full
+ *        deferred pipeline and validates HDRColor output via reference image
+ *        regression at "deferred/SunMultiShadow_HDRColor.png".
+ *
+ * Uses TestMultiShadow with LightType::SUNLIGHT to generate a ring of
+ * directional sun lights pointing toward the cube centre.  The full pipeline
+ * (ShadowDepth → Geometry → ShadowIntensity → Lighting) runs and the final
+ * HDRColor attachment is captured for regression testing.
+ */
+TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
+{
+	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
+
+	auto& pd = PhysicalDevice();
+	const vk::Extent2D renderExtent(kRenderWidth, kRenderHeight);
+
+	// -------------------------------------------------------------------
+	// Step 1: Load multi-shadow scene with SUNLIGHT (3 lights)
+	// -------------------------------------------------------------------
+	auto shadowRes = neurus::test::LoadMultiShadow(
+		*m_device, pd, m_queue, m_graphicsQueueFamily,
+		3, LightType::SUNLIGHT);
+	const auto& renderItems = shadowRes.renderItems;
+	ASSERT_EQ(renderItems.size(), 2u) << "Expected cube + plane (2 render items)";
+	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 sun lights";
+
+	// Verify all lights are SUNLIGHT
+	for (int uid : shadowRes.lightUIDs)
+	{
+		const auto& light = shadowRes.scene->light_list.at(uid);
+		ASSERT_EQ(light->light_type, LightType::SUNLIGHT)
+			<< "Light " << uid << " should be SUNLIGHT";
+		ASSERT_TRUE(light->use_shadow)
+			<< "Light " << uid << " should cast shadows";
+	}
+
+	// Get the camera from the scene
+	ASSERT_FALSE(shadowRes.scene->cam_list.empty()) << "Scene must have a camera";
+	const auto& camera = shadowRes.scene->cam_list.begin()->second;
+
+	// Update camera aspect ratio to match render extent
+	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
+	const glm::vec3 cameraPos = camera->GetPosition();
+
+	NEURUS_LOG("[SunMultiShadowHDR] Camera@("
+	           << cameraPos.x << "," << cameraPos.y << "," << cameraPos.z << ")"
+	           << " sunLights=" << shadowRes.lightUIDs.size());
+
+	// -------------------------------------------------------------------
+	// Step 2: Build RenderContext
+	// -------------------------------------------------------------------
+	RenderContext ctx{};
+	ctx.renderExtent = renderExtent;
+	ctx.frameIndex   = 0;
+	ctx.viewProj     = camUBO.viewProj;
+	ctx.view         = camUBO.view;
+	ctx.cameraPos    = cameraPos;
+	ctx.invProjView  = glm::inverse(camUBO.viewProj);
+	ctx.renderItems  = &renderItems;
+	ctx.scene        = shadowRes.scene.get();
+
+	// -------------------------------------------------------------------
+	// Step 3: Transition G-Buffer to renderable layouts
+	// -------------------------------------------------------------------
+	VulkanTestShared::TransitionGbufferToColorAttachment(
+		*m_renderCache, renderExtent, *this);
+
+	// -------------------------------------------------------------------
+	// Step 4: Build shadow index map (SUNLIGHT) and upload lights
+	// -------------------------------------------------------------------
+	{
+		std::vector<int32_t> shadowUIDs;
+		for (const auto& [id, light] : shadowRes.scene->light_list)
+		{
+			if (light && light->light_type == LightType::SUNLIGHT && light->use_shadow)
+				shadowUIDs.push_back(id);
+		}
+		std::sort(shadowUIDs.begin(), shadowUIDs.end());
+
+		std::unordered_map<int32_t, int> shadowIndexMap;
+		for (size_t i = 0; i < shadowUIDs.size(); ++i)
+			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
+
+		m_lightingPass->UploadSunLights(*shadowRes.scene, &shadowIndexMap);
+	}
+
+	// -------------------------------------------------------------------
+	// Step 5: Record all passes in a single command buffer
+	// -------------------------------------------------------------------
+	{
+		auto& cmd = BeginCmd();
+		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
+		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
+		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
+		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
+		EndSubmitWait(cmd);
+	}
+
+	// -------------------------------------------------------------------
+	// Step 6: Capture HDRColor attachment as PNG
+	// -------------------------------------------------------------------
+	const std::string refPath =
+		neurus::test::ReferencePath::Make("deferred/SunMultiShadow_HDRColor.png");
+	const std::string tmpPath = refPath + ".tmp";
+
+	Image& hdrAttachment = m_renderCache->GetAttachment(
+		AttachmentName::HDRColor, renderExtent);
+
+	const bool captured = Screenshot::CaptureAttachment(
+		*m_device, pd, m_queue, m_graphicsQueueFamily,
+		hdrAttachment, tmpPath, /*remapSigned=*/false);
+
+	ASSERT_TRUE(captured) << "Failed to capture HDRColor attachment to " << tmpPath;
+
+	// -------------------------------------------------------------------
+	// Step 7: Reference image regression
+	// -------------------------------------------------------------------
+	const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+
+	if (refResult < 0)
+	{
+		if (refResult == -1)
+			GTEST_SKIP() << "Reference image generated.  Re-run the test to compare.";
+		else
+			FAIL() << "Failed to load reference image for SunMultiShadow_HDRColor";
+	}
+	else
+	{
+		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=±2)";
+	}
+}

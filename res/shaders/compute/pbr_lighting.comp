@@ -22,14 +22,14 @@ layout(binding = 3) uniform sampler2D gMetallicRoughness;
 layout(rgba16f, binding = 4) uniform writeonly image2D outputImage;
 
 // --- SSAO input (combined image sampler) ---
-layout(binding = 6) uniform sampler2D U_AO;
+layout(binding = 7) uniform sampler2D U_AO;
 
 // --- IBL cubemap samplers (optional – valid even when IBL disabled) ---
-layout(binding = 7) uniform samplerCube U_Irradiance;
-layout(binding = 8) uniform samplerCube U_Prefiltered;
+layout(binding = 8) uniform samplerCube U_Irradiance;
+layout(binding = 9) uniform samplerCube U_Prefiltered;
 
 // --- Shadow intensity (R8: 1.0 = fully shadowed, 0.0 = fully lit) ---
-layout(binding = 9) uniform sampler2DArray U_ShadowArray;
+layout(binding = 10) uniform sampler2DArray U_ShadowArray;
 
 // --- Point light SSBO (std140) ---
 struct PointLight
@@ -46,6 +46,27 @@ struct PointLight
 	float _pad2;		// Do not use float[3] for padding; std140 requires 16-byte alignment for vec3, so we use 4 floats instead.
 }; // struct size 48 (std140, 16-byte aligned)
 
+// --- Sun (directional) light struct (std140) ---
+// Layout matches C++ SunLightGpu: 48 bytes, 16-byte aligned.
+// direction: world-space direction FROM the light (in shader: L = normalize(-direction))
+// shadowMapIndex: layer index in U_ShadowArray (sampler2DArray), -1 = no shadow cast
+struct SunLight
+{
+	vec3 direction;      // offset 0,  size 12 (std140 vec3 → 16-byte aligned stride)
+	float power;         // offset 12, size 4
+
+	vec3 color;          // offset 16, size 12 (std140 vec3 → 16-byte aligned stride)
+	int shadowMapIndex;  // offset 28, size 4 — index into shadow map array; -1 == no shadow
+
+	float _pad0;         // offset 32, size 4 — explicit padding to align struct
+	float _pad1;         // offset 36, size 4 — explicit padding to align struct
+}; // struct size 48 (std140, 16-byte aligned — implicit 8-byte pad at offsets 40-47)
+
+layout(std140, binding = 6) buffer SunLightBuffer
+{
+	SunLight sunLights[];
+};
+
 layout(std140, binding = 5) buffer LightBuffer
 {
 	PointLight lights[];
@@ -54,14 +75,17 @@ layout(std140, binding = 5) buffer LightBuffer
 // --- Push constants ---
 layout(push_constant) uniform PushConstants
 {
-	int lightCount;    // offset 0
-	vec4 cameraPos;    // offset 16 (vec4 = 16-byte aligned)
-	mat4 view;         // offset 32 (mat4 = 64 bytes)
-	int iblEnabled;    // offset 96 (0 = IBL disabled, 1 = enabled)
-	                  // implicit padding to align mat4 at 16 bytes (offset 112)
-	mat4 invProjView;  // offset 112 – inverse(proj * view), for skybox ray
+	int lightCount;       // offset 0
+	int sunLightCount;    // offset 4
+	float _pad0;          // offset 8 – padding before vec4
+	float _pad1;          // offset 12 – padding before vec4
+	vec4 cameraPos;       // offset 16 (vec4 = 16-byte aligned)
+	mat4 view;            // offset 32 (mat4 = 64 bytes)
+	int iblEnabled;       // offset 96 (0 = IBL disabled, 1 = enabled)
+	                     // implicit padding to align mat4 at 16 bytes (offset 112)
+	mat4 invProjView;     // offset 112 – inverse(proj * view), for skybox ray
 };
-// Total: 176 bytes
+// Total: 176 bytes (unchanged — sunLightCount reuses existing padding slot)
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -237,6 +261,52 @@ void main()
 
 		// --- Diffuse ---
 		vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
+
+		// --- Accumulate ---
+		Lo += (kD * albedo / PI + specular) * radiance;
+	}
+
+	// --- Sun (directional) light loop ---
+	// Directional lights have uniform attenuation (no inverse-square falloff).
+	// Direction is stored as world-space direction FROM the light;
+	// compute L = normalize(-direction) to get the direction TO the light for BRDF.
+	for (int j = 0; j < sunLightCount; ++j)
+	{
+		SunLight sun = sunLights[j];
+
+		vec3 L = normalize(-sun.direction);
+		float NdotL = max(dot(normalWS, L), 0.0);
+		if (NdotL <= 0.0)
+		{
+			continue;
+		}
+
+		// --- Half-vector for specular ---
+		vec3 H = normalize(L + V);
+		float NdotH = max(dot(normalWS, H), 0.0);
+		float HdotV = max(dot(H, V), 0.0);
+
+		// --- Cook-Torrance BRDF (same as point lights) ---
+		float D = DistributionGGX(NdotH, roughness2);
+		float G = GeometrySmith(NdotV, NdotL, k);
+		vec3 F = FresnelSchlick(HdotV, F0);
+
+		vec3 numerator    = D * G * F;
+		float denominator = 4.0 * NdotV * NdotL + 0.0001;
+		vec3 specular     = numerator / denominator;
+
+		vec3 kD = (vec3(1.0) - F) * (1.0 - metallic);
+
+		// --- Radiance: uniform attenuation (no distance falloff) ---
+		vec3 radiance = sun.power * sun.color * NdotL;
+
+		// --- Shadow evaluation from 2D array (same array as point lights) ---
+		float shadow = 0.0;
+		if (sun.shadowMapIndex >= 0)
+		{
+			shadow = texture(U_ShadowArray, vec3(uv, float(sun.shadowMapIndex))).r;
+		}
+		radiance *= (1.0 - shadow);
 
 		// --- Accumulate ---
 		Lo += (kD * albedo / PI + specular) * radiance;

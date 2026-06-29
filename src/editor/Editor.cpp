@@ -102,6 +102,10 @@ void Editor::Initialize(Scene& scene)
 	QObject::connect(&uiEvents, &neurus::UIEvents::lightAddRequested,
 		[this]() { OnLightAdd(); });
 
+	// Handle sun light add (Edit -> Add -> Sun Light)
+	QObject::connect(&uiEvents, &neurus::UIEvents::sunLightAddRequested,
+		[this]() { OnSunLightAdd(); });
+
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
 
@@ -291,6 +295,27 @@ void Editor::OnLightAdd()
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to add light: " << e.what());
+	}
+}
+
+void Editor::OnSunLightAdd()
+{
+	try {
+		auto light = std::make_shared<neurus::Light>(
+			neurus::SUNLIGHT, 5.0f, glm::vec3(1.0f, 0.95f, 0.8f));
+		light->SetPosition(glm::vec3(0.0f, 10.0f, 0.0f));
+		light->SetRotation(glm::vec3(0.6f, 0.0f, 0.0f));
+		light->use_shadow = true;
+		m_project->GetScene().UseLight(light);
+		if (m_renderer)
+		{
+			m_renderer->UploadLights(m_project->GetScene());
+		}
+		m_project->MarkDirty();
+		NEURUS_LOG("[Editor] Added sun light at (0, 10, 0)");
+	}
+	catch (const std::exception& e) {
+		NEURUS_ERR("Failed to add sun light: " << e.what());
 	}
 }
 

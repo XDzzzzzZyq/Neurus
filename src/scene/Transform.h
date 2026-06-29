@@ -204,6 +204,17 @@ public:
 	}
 
 	/**
+	 * @brief Computes the local-space forward direction vector.
+	 *
+	 * Rotates the forward vector (0,0,-1) by the current Euler rotation
+	 * (pitch/yaw/roll). Returns a normalized direction vector.
+	 * When no rotation is applied, returns (0,0,-1).
+	 *
+	 * @return Normalized forward direction vector.
+	 */
+	glm::vec3 GetDirection() const;
+
+	/**
 	 * @brief Computes the normal matrix for transforming surface normals.
 	 *
 	 * The normal matrix is the inverse transpose of the upper-left 3x3

@@ -66,11 +66,33 @@ struct alignas(16) PointLightGpu
 static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std140)");
 
 /**
+ * @brief Sun (directional) light data uploaded to the GPU SSBO.
+ *
+ * Layout matches the GLSL SunLight struct (std140, 48 bytes per element):
+ *   vec3 direction (offset 0,  padded to 16)
+ *   float power    (offset 12)
+ *   vec3 color     (offset 16, padded to 16)
+ *   int32_t shadowMapIndex (offset 28)
+ *   float _pad     (offset 32)
+ *   Total: 48 bytes (16-byte aligned struct).
+ */
+struct alignas(16) SunLightGpu
+{
+	float directionX, directionY, directionZ; ///< Light direction (world-space)
+	float power;                               ///< Luminous intensity
+	float colorR, colorG, colorB;              ///< RGB colour (linear)
+	int32_t shadowMapIndex = -1;               ///< Index into shadow maps array; -1 = no shadow
+	float _pad[4];                             ///< Padding to 48 bytes (16-byte aligned struct)
+};
+static_assert(sizeof(SunLightGpu) == 48, "SunLightGpu must be 48 bytes (std140)");
+
+/**
  * @brief Push constants for the PBR lighting compute shader.
  *
  * Layout (matches GLSL push_constant block with std430 alignment):
  *   int  lightCount    offset 0   (4 bytes)
- *          padding     offset 4   (12 bytes)
+ *   int  sunLightCount offset 4   (4 bytes — reuses former padding slot)
+ *          padding     offset 8   (8 bytes)
  *   vec4 cameraPos     offset 16  (16 bytes)
  *   mat4 view          offset 32  (64 bytes)
  *   int  iblEnabled    offset 96  (4 bytes)
@@ -81,7 +103,8 @@ static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std1
 struct LightingPushConstants
 {
 	int32_t  lightCount;            ///< Number of active point lights in SSBO
-	float    _pad0[3];              ///< Padding to align cameraPos at offset 16
+	int32_t  sunLightCount;         ///< Number of active sun (directional) lights in SSBO
+	float    _pad0[2];              ///< Padding to align cameraPos at offset 16
 	float    camX, camY, camZ;      ///< Camera world-space position
 	float    _pad1;                 ///< Padding (vec4 → 16 bytes)
 	float    view[16];              ///< View matrix (for normal transform VS→WS)
@@ -177,6 +200,40 @@ public:
 	 */
 	uint32_t GetLightCount() const;
 
+	// --- Sun (directional) light SSBO management ---
+
+	/**
+	 * @brief Converts scene sun lights to SunLightGpu and uploads as SSBO.
+	 *
+	 * Iterates scene.light_list, filters to SUNLIGHT type, converts
+	 * each Light to a SunLightGpu struct (std140, 48 bytes), and
+	 * uploads the array as a device-local storage buffer.
+	 *
+	 * If the scene has no sun lights, the SSBO is released,
+	 * the descriptor binding uses PARTIALLY_BOUND (no update when null),
+	 * and GetSunLightCount() returns 0.
+	 *
+	 * @param scene           Scene containing the light list.
+	 * @param shadowIndexMap  Optional map from light UID → shadow map index.
+	 *                        If non-null, each SunLightGpu's shadowMapIndex
+	 *                        is set from the lookup; otherwise remains -1.
+	 */
+	void UploadSunLights(const Scene& scene,
+	                     const std::unordered_map<int32_t, int>* shadowIndexMap = nullptr);
+
+	/**
+	 * @brief Returns the sun light SSBO or nullptr when no sun lights are present.
+	 *
+	 * @return Non-owning pointer to GPUBuffer, or nullptr.
+	 */
+	const GPUBuffer* GetSunLightSSBO() const;
+
+	/**
+	 * @brief Returns the number of sun lights in the SSBO.
+	 * @return Sun light count (0 if no sun lights uploaded).
+	 */
+	uint32_t GetSunLightCount() const;
+
 	// -------------------------------------------------------------------
 	// Recording
 	// -------------------------------------------------------------------
@@ -243,6 +300,8 @@ private:
 	// --- Owned light SSBO ---
 	std::unique_ptr<GPUBuffer> m_lightSSBO;
 	uint32_t m_lightCount = 0;
+	std::unique_ptr<GPUBuffer> m_sunLightSSBO;
+	uint32_t m_sunLightCount = 0;
 
 	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---
 	std::unique_ptr<Image> m_fallbackIrradianceCube;

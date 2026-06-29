@@ -26,6 +26,7 @@
 #include "ComputePipelineBuilder.h"
 #include "DescriptorManager.h"
 #include "asset/ImageData.h"
+#include "scene/Light.h"
 
 // Generated SPIR-V shader headers
 #include "gbuffer.vert.h"
@@ -213,8 +214,10 @@ DeferredRenderer::~DeferredRenderer()
 
 void DeferredRenderer::UploadLights(const Scene& scene)
 {
-	// --- Collect ALL shadow-casting point light UIDs (sorted for deterministic index) ---
-	std::vector<int32_t> shadowUIDs;
+	// --- Collect shadow-casting point light UIDs (allocated first, indices 0..N-1) ---
+	std::vector<int32_t> pointShadowUIDs;
+	// --- Collect shadow-casting sun light UIDs (allocated after point lights, indices N..N+M-1) ---
+	std::vector<int32_t> sunShadowUIDs;
 
 	if (m_shadowDepthPass)
 	{
@@ -223,25 +226,41 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 			if (!light) continue;
 			if (light->light_type == LightType::POINTLIGHT && light->use_shadow)
 			{
-				shadowUIDs.push_back(id);
+				pointShadowUIDs.push_back(id);
+			}
+			else if (light->light_type == LightType::SUNLIGHT && light->use_shadow)
+			{
+				sunShadowUIDs.push_back(id);
 			}
 		}
 	}
 
-	// Sort for deterministic shadowMapIndex assignment (0,1,2...)
-	std::sort(shadowUIDs.begin(), shadowUIDs.end());
+	// Sort each group for deterministic shadowMapIndex assignment
+	std::sort(pointShadowUIDs.begin(), pointShadowUIDs.end());
+	std::sort(sunShadowUIDs.begin(), sunShadowUIDs.end());
 
-	// --- Build shadow index map: light UID → 0,1,2... ---
+	// --- Build combined shadow index map: point lights first, sun lights second ---
+	// MAX_SHADOW_LIGHTS=4 is shared between point and sun; point lights get priority
+	constexpr int kMaxShadowLayers = 4;
 	std::unordered_map<int32_t, int> uidToShadowIndex;
-	for (size_t i = 0; i < shadowUIDs.size(); ++i)
+
+	int nextIndex = 0;
+	for (const auto uid : pointShadowUIDs)
 	{
-		uidToShadowIndex[shadowUIDs[i]] = static_cast<int>(i);
+		if (nextIndex >= kMaxShadowLayers) break;
+		uidToShadowIndex[uid] = nextIndex++;
+	}
+	for (const auto uid : sunShadowUIDs)
+	{
+		if (nextIndex >= kMaxShadowLayers) break;
+		uidToShadowIndex[uid] = nextIndex++;
 	}
 
 	// --- Upload lights to GPU, assigning shadowMapIndex per light ---
 	if (m_lightingPass)
 	{
 		m_lightingPass->UploadLights(scene, &uidToShadowIndex);
+		m_lightingPass->UploadSunLights(scene, &uidToShadowIndex);
 	}
 }
 
@@ -789,7 +808,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
 		return {};
 	}
 
-	auto& cubemap = m_renderCache->GetShadowMap(lightUID);
+	auto& cubemap = m_renderCache->GetShadowMap(lightUID, LightType::POINTLIGHT);
 	const uint32_t cubeRes = m_shadowDepthPass->Resolution();
 	const uint32_t equiWidth = cubeRes * 2;
 	const uint32_t equiHeight = cubeRes;

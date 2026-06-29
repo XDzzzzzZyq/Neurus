@@ -107,6 +107,9 @@ signals:
 	/** @brief Emitted when a new light should be added to the scene (Edit → Add → Light). */
 	void lightAddRequested();
 
+	/** @brief Emitted when a new sun light should be added to the scene (Edit → Add → Sun Light). */
+	void sunLightAddRequested();
+
 public:
 	/**
 	 * @brief Convenience method to emit screenshotRequested from any layer.
@@ -132,6 +135,7 @@ public:
 
 	void requestCameraAdd() { emit cameraAddRequested(); }
 	void requestLightAdd() { emit lightAddRequested(); }
+	void requestSunLightAdd() { emit sunLightAddRequested(); }
 
 private:
 	UIEvents() = default;

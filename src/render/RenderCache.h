@@ -11,6 +11,9 @@
 
 namespace neurus {
 
+// Forward declaration — LightType enum is defined in scene/Light.h
+enum LightType : int;
+
 /**
  * @brief Named attachment identifiers for G-Buffer and post-FX framebuffer attachments.
  */
@@ -89,15 +92,19 @@ public:
 	static constexpr uint32_t MAX_SHADOW_LAYERS = 4;
 
 	/**
-	 * @brief Returns (or lazily creates) the shadow depth cubemap for a light.
+	 * @brief Returns (or lazily creates) the shadow depth image for a light.
 	 *
-	 * The cubemap is 1024x1024 D32_SFLOAT with eDepthStencilAttachment | eSampled
-	 * usage.  Created on first access for the given lightUID.
+	 * Point lights (default) get a 1024x1024 D32_SFLOAT cubemap with
+	 * eDepthStencilAttachment | eSampled | eTransferSrc usage.
+	 * Sun lights get a 2048x2048 D32_SFLOAT 2D image with
+	 * eDepthStencilAttachment | eSampled usage.
+	 * Created on first access for the given lightUID.
 	 *
-	 * @param lightUID Unique identifier of the point light (int).
-	 * @return Non-owning reference to the shadow cubemap Image.
+	 * @param lightUID Unique identifier of the light (int).
+	 * @param type     Light type (defaults to POINTLIGHT for backward compatibility).
+	 * @return Non-owning reference to the shadow depth Image.
 	 */
-	Image& GetShadowMap(int lightUID);
+	Image& GetShadowMap(int lightUID, LightType type);
 
 	/**
 	 * @brief Returns (or lazily creates) the shadow intensity image array.

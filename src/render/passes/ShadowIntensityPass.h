@@ -1,21 +1,23 @@
 /**
  * @file ShadowIntensityPass.h
- * @brief Per-pixel point-light shadow intensity compute pass.
+ * @brief Per-pixel shadow intensity compute pass for point and sun lights.
  *
- * Reads the G-Buffer world-space position and the point light's shadow
- * depth cubemap, computes per-pixel hard-shadow intensity (1.0 = fully
- * shadowed, 0.0 = fully lit), and writes the result to the ShadowIntensity
- * attachment (R8_UNORM) for consumption by the lighting pass.
+ * Reads the G-Buffer world-space position and the light's shadow depth
+ * map (cubemap for point lights, 2D for sun lights), computes per-pixel
+ * hard-shadow intensity (1.0 = fully shadowed, 0.0 = fully lit), and
+ * writes the result to the ShadowIntensity attachment (R8_UNORM) for
+ * consumption by the lighting pass.
  *
  * Architecture:
  * - Inherits from ComputePass for shared infrastructure (sampler, descriptor
  *   pool/sets, barrier transitions, dispatch logic).
- * - Owns the compute pipeline.
- * - Borrows RenderCache for G-Buffer Position, shadow cubemap, and shadow
+ * - Owns TWO compute pipelines: one for point-light cubemap evaluation
+ *   (shadow_eval.comp), one for sun-light 2D evaluation (sun_shadow_eval.comp).
+ * - Borrows RenderCache for G-Buffer Position, shadow maps, and shadow
  *   intensity output attachment.
  *
- * @note Hard shadow only (no PCF). Maps point light depth cubemap samples
- *       directly to binary shadow decisions via depth comparison.
+ * @note Hard shadow only (no PCF). Maps depth samples directly to binary
+ *       shadow decisions via depth comparison.
  */
 
 #pragma once
@@ -71,15 +73,23 @@ public:
 	/**
 	 * @brief Records the shadow intensity compute dispatch into a command buffer.
 	 *
+	 *   For point lights (cubemap path):
 	 *   1. Stores the current light UID from ctx.
 	 *   2. Writes descriptors for this frame slot.
 	 *   3. Transitions G-Buffer Position to ColorShaderRead.
 	 *   4. Transitions the shadow cubemap to DepthShaderRead.
 	 *   5. Transitions ShadowIntensity to ShaderWrite.
 	 *   6. Looks up the light world position from ctx.scene->light_list.
-	 *   7. Binds pipeline, descriptor set, push constants.
+	 *   7. Binds cubemap pipeline, descriptor set, push constants (24 bytes).
 	 *   8. Dispatches ceil(width/16) x ceil(height/16) x 1 thread groups.
-	 *   9. Transitions ShadowIntensity to ColorShaderRead for lighting pass.
+	 *
+	 *   For sun lights (2D path, after the point-light loop):
+	 *   1. Transitions the sun shadow 2D map to DepthShaderRead.
+	 *   2. Writes sun descriptor set (sampler2D at binding 1).
+	 *   3. Binds sun pipeline, sun descriptor set, push constants (80 bytes: mat4 lightViewProj + bias + layerIndex + C++ padding).
+	 *   4. Dispatches ceil(width/16) x ceil(height/16) x 1 thread groups.
+	 *
+	 *   Finally transitions ShadowIntensity to ColorShaderRead for lighting pass.
 	 *
 	 * Early-returns when ctx.scene is nullptr (no scene).
 	 *
@@ -113,14 +123,66 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
+	 * @brief Creates the point-light cubemap compute pipeline via ComputePipelineBuilder.
 	 */
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
 	                                  const uint32_t* compSpv,
 	                                  size_t compSize);
 
-	// --- Pipeline ---
+	// -------------------------------------------------------------------
+	// Sun (directional) shadow evaluation — second descriptor set + pipeline
+	// -------------------------------------------------------------------
+
+	/**
+	 * @brief Creates the sun-light descriptor set layout (3 bindings, same
+	 *        types as cubemap but for sampler2D at binding 1).
+	 *
+	 * Bindings:
+	 *   0: gPosition       (combined image sampler)
+	 *   1: u_SunShadowMap   (combined image sampler, 2D)
+	 *   2: outputShadow    (storage image, R8)
+	 */
+	static DescriptorSetLayout CreateSunDescriptorSetLayout(const vk::raii::Device& device);
+
+	/**
+	 * @brief Creates the sun-light compute pipeline (sun_shadow_eval.comp SPIR-V).
+	 *
+	 * Push constant range: 80 bytes — matches sizeof(SunShadowEvalPushConstants)
+	 * (72B GLSL layout + 8B C++ alignment padding after mat4).
+	 */
+	vk::raii::Pipeline CreateSunPipeline(const vk::raii::Device& device,
+	                                     const uint32_t* compSpv,
+	                                     size_t compSize);
+
+	/**
+	 * @brief Creates a clamp-to-border sampler for sun shadow map reads.
+	 *
+	 * Border colour = opaque black (0,0,0,0) so out-of-bounds UV
+	 * samples return 0.0 depth → unshadowed.
+	 */
+	static vk::raii::Sampler CreateSunShadowSampler(const vk::raii::Device& device,
+	                                                const vk::raii::PhysicalDevice& physicalDevice);
+
+	/**
+	 * @brief Writes sun descriptors (gPosition + 2D shadow map + output)
+	 *        into the specified sun descriptor set.
+	 *
+	 * @param setIndex  Index into m_sunDescSets (0 … numSets-1).
+	 * @param extent    Render extent for attachment lookup.
+	 * @param cache     Render cache for shadow map / output access.
+	 */
+	void WriteSunDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache);
+
+	// --- Point-light cubemap pipeline ---
 	vk::raii::Pipeline m_pipeline;
+
+	// --- Sun-light 2D pipeline ---
+	DescriptorSetLayout m_sunDescSetLayout;                       ///< Sun descriptor set layout (sampler2D at binding 1)
+	vk::raii::Pipeline  m_sunPipeline = nullptr;                  ///< Sun compute pipeline (sun_shadow_eval.comp)
+	std::unique_ptr<ComputePipelineBuilder> m_sunPipelineBuilder; ///< Builder owning the sun pipeline layout
+	vk::raii::Sampler   m_sunShadowSampler = nullptr;             ///< Sampler for sun shadow map (clamp-to-border, black)
+	DescriptorPool      m_sunDescPool;                            ///< Descriptor pool for sun descriptor sets
+	std::vector<DescriptorSet> m_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)
 
 	// --- Push constant values ---
 	float m_bias = 0.0005f; ///< Depth bias for shadow acne prevention

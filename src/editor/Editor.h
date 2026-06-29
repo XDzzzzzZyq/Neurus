@@ -84,6 +84,7 @@ private:
 	void OnMeshImport(const QString& path);
 	void OnCameraAdd();
 	void OnLightAdd();
+	void OnSunLightAdd();
 	void OnScreenshotRequested();
 	void OnScreenshotAllRequested();
 	void OnIBLLoad();

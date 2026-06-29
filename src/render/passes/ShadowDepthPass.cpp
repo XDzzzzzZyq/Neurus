@@ -1,6 +1,6 @@
 /**
  * @file ShadowDepthPass.cpp
- * @brief Point-light shadow depth cubemap pass implementation.
+ * @brief Point-light shadow depth cubemap pass and sun-light orthographic shadow pass.
  *
  * Changed from host-visible UBO to SSBO + push constants to fix the
  * GPU-synchronisation bug where UpdateUBO() was called for each light in
@@ -13,6 +13,11 @@
  *   - Per-light data (lightWorldPos + farPlane) is pushed via push constants
  *     (offset 0, 16 bytes).
  *   - Per-draw model matrix is pushed via push constants (offset 16, 64 bytes).
+ *
+ * Sun Light Pipeline (non-multiview depth-only):
+ *   - Push constant: mat4 lightViewProj (64 bytes).
+ *   - No SSBO, no descriptor sets.
+ *   - Orthographic projection centered on camera target, aligned with sun direction.
  */
 
 #include "passes/ShadowDepthPass.h"
@@ -28,6 +33,9 @@
 #include "shadow_depth.frag.h"
 #include "shadow_depth_multiview.vert.h"
 #include "depth_to_color.frag.h"
+
+#include "sun_shadow_depth.vert.h"
+#include "sun_shadow_depth.frag.h"
 
 #include "Log.h"
 
@@ -99,6 +107,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	, m_pipeline(nullptr)
 {
 	m_device = &device;
+	m_physicalDevice = &physicalDevice;
 
 	m_vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
 	m_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
@@ -106,6 +115,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 
 	createSSBOResources(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 	createPipeline(device);
+	createSunPipeline(device);
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " faceVPSize=" << kFaceVPSize
@@ -203,6 +213,47 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 }
 
 // ===========================================================================
+// createSunPipeline — non-multiview depth-only pipeline (mat4 lightViewProj push)
+// ===========================================================================
+
+void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
+{
+	auto vertModule = ShaderModule::FromEmbedded(device,
+		sun_shadow_depth_vert_spv, sizeof(sun_shadow_depth_vert_spv));
+	auto fragModule = ShaderModule::FromEmbedded(device,
+		sun_shadow_depth_frag_spv, sizeof(sun_shadow_depth_frag_spv));
+
+	// Push constant range: 64 bytes (mat4 lightViewProj)
+	std::vector<vk::PushConstantRange> pushRanges = {
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
+		                      0, sizeof(glm::mat4))
+	};
+
+	PipelineBuilder builder;
+	m_sunPipeline = builder
+		.SetDebugName("ShadowDepthPass::Sun")
+		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.SetVertexInput(m_vtxLayout)
+		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+		// No SetViewMask — single view (non-multiview)
+		.SetRasterization(vk::PolygonMode::eFill,
+		                  vk::CullModeFlagBits::eNone,
+		                  vk::FrontFace::eClockwise)
+		.SetMultisampling()
+		.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
+		// No color attachments — depth-only
+		.SetDepthFormat(kDepthFmt)
+		.SetPushConstantRanges(pushRanges)
+		.BuildGraphicsPipeline(device);
+
+	vk::PipelineLayoutCreateInfo layoutCI({}, {}, pushRanges);
+	m_sunPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
+
+	NEURUS_LOG("[ShadowDepthPass] Sun pipeline created (depth-only, push-constant mat4 lightViewProj)");
+}
+
+// ===========================================================================
 // Record
 // ===========================================================================
 
@@ -249,7 +300,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// Transition cubemap to depth attachment layout (all faces/layers)
 		{
-			auto& cubemap = cache.GetShadowMap(uid);
+			auto& cubemap = cache.GetShadowMap(uid, LightType::POINTLIGHT);
 			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
 		}
 
@@ -267,7 +318,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// --- Depth attachment ---
 		vk::RenderingAttachmentInfo depthAtt(
-			cache.GetShadowMap(uid).ArrayView(),
+			cache.GetShadowMap(uid, LightType::POINTLIGHT).ArrayView(),
 			vk::ImageLayout::eDepthStencilAttachmentOptimal,
 			vk::ResolveModeFlagBits::eNone, nullptr,
 			vk::ImageLayout::eUndefined,
@@ -319,8 +370,103 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// Transition cubemap to DepthShaderRead for sampling in subsequent passes
 		{
-			auto& cubemap = cache.GetShadowMap(uid);
+			auto& cubemap = cache.GetShadowMap(uid, LightType::POINTLIGHT);
 			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
+		}
+	}
+
+	// =========================================================================
+	// Sun light pass — orthographic depth-only (non-multiview)
+	// =========================================================================
+
+	{
+		const vk::Viewport sunViewport(0.f, 0.f,
+		                               static_cast<float>(kSunResolution),
+		                               static_cast<float>(kSunResolution),
+		                               0.f, 1.f);
+		const vk::Rect2D sunScissor({0, 0}, {kSunResolution, kSunResolution});
+
+		// Get camera target for shadow ortho center
+		const Camera* activeCam = ctx.scene->GetActiveCamera();
+		const glm::vec3 center = activeCam ? activeCam->cam_tar : glm::vec3(0.0f);
+
+		const float field = Light::sun_shadow_field;
+		const float nearPlane = Light::sun_shadow_near;
+		const float farPlane = Light::sun_shadow_far;
+		const glm::mat4 orthoProj = glm::ortho(-field, field, -field, field,
+		                                       nearPlane, farPlane);
+
+		constexpr glm::vec3 kWorldUp(0.0f, 1.0f, 0.0f);
+		constexpr glm::vec3 kAltUp(1.0f, 0.0f, 0.0f);
+
+		for (const auto& [uid, lightPtr] : ctx.scene->light_list)
+		{
+			if (!lightPtr) continue;
+			if (lightPtr->light_type != LightType::SUNLIGHT) continue;
+			if (!lightPtr->use_shadow) continue;
+
+			// --- Compute sun direction (local forward vector) ---
+			const glm::vec3 sunDir = glm::normalize(lightPtr->GetDirection());
+			const glm::vec3 eye = center - sunDir * farPlane;
+
+			// --- Degenerate up-vector check ---
+			const glm::vec3 up = (glm::abs(glm::dot(sunDir, kWorldUp)) > 0.999f)
+				? kAltUp : kWorldUp;
+
+			// --- Orthographic light view-projection ---
+			const glm::mat4 lightView = glm::lookAt(eye, center, up);
+			const glm::mat4 lightViewProj = orthoProj * lightView;
+
+			// --- Push lightViewProj (64 bytes, offset 0) ---
+			cmdBuf.pushConstants<glm::mat4>(m_sunPipelineLayout,
+			                                vk::ShaderStageFlagBits::eVertex,
+			                                0, lightViewProj);
+
+			// --- Transition sun shadow map to DepthAttachment ---
+			auto& sunImage = cache.GetShadowMap(uid, LightType::SUNLIGHT);
+			Barrier::Transition(cmdBuf, sunImage, ImageState::DepthAttachment);
+
+			// --- Depth attachment (2D, not cubemap) ---
+			vk::RenderingAttachmentInfo depthAtt(
+				sunImage.ImageViewHandle(),
+				vk::ImageLayout::eDepthStencilAttachmentOptimal,
+				vk::ResolveModeFlagBits::eNone, nullptr,
+				vk::ImageLayout::eUndefined,
+				vk::AttachmentLoadOp::eClear,
+				vk::AttachmentStoreOp::eStore,
+				vk::ClearDepthStencilValue(1.0f, 0));
+
+			// Depth-only dynamic rendering (layerCount=1 required when viewMask=0)
+			vk::RenderingInfo renderInfo(
+				{}, {{0, 0}, {kSunResolution, kSunResolution}},
+				1u, 0u, nullptr, &depthAtt, nullptr);
+
+			cmdBuf.setViewport(0, sunViewport);
+			cmdBuf.setScissor(0, sunScissor);
+			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_sunPipeline);
+
+			cmdBuf.beginRendering(renderInfo);
+
+			if (ctx.renderItems)
+			{
+				for (const auto& item : *ctx.renderItems)
+				{
+					const glm::mat4 mvp = lightViewProj * item.pushConstants.model;
+
+					cmdBuf.pushConstants<glm::mat4>(m_sunPipelineLayout,
+					    vk::ShaderStageFlagBits::eVertex,
+					    0, mvp);
+
+					cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
+					cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
+					cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+				}
+			}
+
+			cmdBuf.endRendering();
+
+			// Transition sun shadow map to DepthShaderRead for sampling
+			Barrier::Transition(cmdBuf, sunImage, ImageState::DepthShaderRead);
 		}
 	}
 }

@@ -28,6 +28,7 @@
 #include "render/Barrier.h"
 
 #include "shared/TestReferenceImage.h"
+#include "scene/Light.h"
 
 #include <glm/glm.hpp>
 
@@ -297,7 +298,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	// Step 4: Read back the actual depth cubemap (D32_SFLOAT)
 	// -------------------------------------------------------------------
 	{
-		auto& shadowCubemap = m_renderCache->GetShadowMap(lightUID);
+		auto& shadowCubemap = m_renderCache->GetShadowMap(lightUID, LightType::POINTLIGHT);
 		std::cout << "\n=== Depth Cubemap Readback (D32_SFLOAT) ===\n";
 
 		for (uint32_t face = 0; face < 6; ++face)

@@ -207,8 +207,10 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 		// Default view always 2D (needed by ShadowIntensityPass binding 2: image2D).
 		// When arrayView=true, additionally create a 2D_ARRAY view (needed by
 		// LightingPass binding 9: sampler2DArray).
+		// Aspect derived from format so depth-only formats (D32) get the correct
+		// eDepth aspect, while color formats get eColor.
 		viewType = vk::ImageViewType::e2D;
-		aspect = vk::ImageAspectFlagBits::eColor;
+		aspect = AspectFromFormat(m_format);
 		break;
 	}
 

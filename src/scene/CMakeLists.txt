@@ -19,6 +19,7 @@
 	UID.h
 	UID.cpp
 	Transform.h
+	Transform.cpp
 	Light.h
 	Light.cpp
 	Sprite.h

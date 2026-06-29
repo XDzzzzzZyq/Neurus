@@ -146,9 +146,16 @@ void NeurusMainWindow::CreateMenus()
 		neurus::UIEvents::instance().requestCameraAdd();
 	});
 
-	auto* lightAction = addMenu->addAction("&Light");
-	connect(lightAction, &QAction::triggered, []() {
+	auto* lightSubmenu = addMenu->addMenu("&Light");
+
+	auto* pointLightAction = lightSubmenu->addAction("&Point Light");
+	connect(pointLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestLightAdd();
+	});
+
+	auto* sunLightAction = lightSubmenu->addAction("&Sun Light");
+	connect(sunLightAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestSunLightAdd();
 	});
 
 	auto* toolsMenu = menuBar()->addMenu("&Tools");

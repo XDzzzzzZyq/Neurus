@@ -1,6 +1,7 @@
 #include "RenderCache.h"
 
 #include "Log.h"
+#include "scene/Light.h"
 
 #include <cassert>
 #include <stdexcept>
@@ -70,7 +71,7 @@ const Image& RenderCache::GetAttachment(const AttachmentName name) const
 // Per-light shadow resources (lazy creation)
 // ---------------------------------------------------------------------------
 
-Image& RenderCache::GetShadowMap(const int lightUID)
+Image& RenderCache::GetShadowMap(const int lightUID, const LightType type)
 {
 	auto it = m_shadowMaps.find(lightUID);
 	if (it != m_shadowMaps.end())
@@ -78,6 +79,27 @@ Image& RenderCache::GetShadowMap(const int lightUID)
 		return it->second;
 	}
 
+	if (type == LightType::SUNLIGHT)
+	{
+		constexpr vk::Extent2D kSunShadowRes{2048, 2048};
+		const std::string debugName = "SunShadowDepth_Light_" + std::to_string(lightUID);
+
+		Image sunShadow(*m_device,
+		                *m_physicalDevice,
+		                kSunShadowRes,
+		                vk::Format::eD32Sfloat,
+		                vk::ImageUsageFlagBits::eDepthStencilAttachment |
+		                    vk::ImageUsageFlagBits::eSampled |
+		                    vk::ImageUsageFlagBits::eTransferSrc,
+		                1,                           // mipLevels
+		                Image::ImageType::e2D,
+		                debugName.c_str()); // debug name
+
+		const auto [insertedIt, _] = m_shadowMaps.emplace(lightUID, std::move(sunShadow));
+		return insertedIt->second;
+	}
+
+	// Default: point light cubemap
 	constexpr vk::Extent2D kShadowRes{1024, 1024};
 	const std::string debugName = "ShadowDepthCubemap_Light_" + std::to_string(lightUID);
 

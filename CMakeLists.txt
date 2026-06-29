@@ -70,6 +70,10 @@ endif()
 
 # ---------------------------------------------------------------------------
 # Shader Compilation (GLSL → SPIR-V → C header)
+#
+# Shaders are auto-discovered via GLOB_RECURSE in CompileShaders.cmake.
+# Place new .vert / .frag / .comp files anywhere under res/shaders/ and
+# they will be compiled to SPIR-V + C header at configure time.
 # ---------------------------------------------------------------------------
 include(cmake/CompileShaders.cmake)
 

@@ -130,7 +130,9 @@ The triangle MVP implements a minimal but correct rendering path:
 ## Current Render Pipeline
 
 ```
-ShadowDepthPass (per-light cubemap depth → RenderCache via GetShadowMap)
+ShadowDepthPass (per-light depth → RenderCache via GetShadowMap(uid, lightType))
+    ├── Point light: cubemap geometry pass (6 faces, multiview)
+    └── Sun light:   2D orthographic geometry pass (2048×2048, single view)
     │
     ▼
 GeometryPass (G-Buffer MRT: Position, Normal, Albedo, MetallicRoughness, Depth)
@@ -139,10 +141,15 @@ GeometryPass (G-Buffer MRT: Position, Normal, Albedo, MetallicRoughness, Depth)
 SSAOPass (compute: reads G-Buffer, writes AO to R8 attachment)
     │
     ▼
-ShadowIntensityPass (compute: per-light shadow eval from cubemap → layered 2D_ARRAY)
+ShadowIntensityPass (compute: per-light shadow eval → layered R8_UNORM 2D_ARRAY)
+    ├── Point light: samplerCube depth comparison, PCF via cubemap sampling
+    └── Sun light:   sampler2D depth comparison, ortho PCF, NDC Z in [0,1]
     │
     ▼
-LightingPass (compute: reads G-Buffer + AO + shadow array, writes HDRColor)
+LightingPass (compute: reads G-Buffer + AO + shadow intensity array, dual SSBO,
+              writes HDRColor)
+    ├── Binding 5: PointLight SSBO
+    └── Binding 6: SunLight SSBO
     │
     ▼
 IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
@@ -181,11 +188,22 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Lighting**: Ambient term multiplied by `(1.0 - ao)` so occluded areas receive less ambient light
 - **Radius**: Default 0.15 (appropriate for [-1, 1] scene scale)
 
+### Sun Shadow Convention
+- **Projection**: Orthographic (`glm::ortho()`) with configurable left/right/bottom/top planes and near/far planes
+- **Depth range**: NDC Z in `[0, 1]` (Vulkan convention, requires `GLM_FORCE_DEPTH_ZERO_TO_ONE`)
+- **Push constant**: `SunShadowPushConstants` carries `mat4 lightViewProj` (view × projection)
+- **Shadow map resolution**: 2048×2048, `VK_FORMAT_D32_SFLOAT`
+- **PCF**: Percentage-closer filtering via `sampler2DShadow` with UV offset kernel, ortho depth comparison
+- **Shadow intensity**: Written to per-light layer in `ShadowIntensity` 2D array via `SunShadowIntensityEval` compute shader
+- **Shadow mode**: Supports `HARD`, `SOFT_PCF_16`, `SOFT_PCF_64` modes matching point light shadow pipeline
+
 ### Attachment Formats
 
 All screen-space attachments (Position, Normal, Albedo, MetallicRoughness, Depth, HDRColor,
 SSAO) are created lazily via `RenderCache::GetAttachment(name, extent)` on first use.
-Per-light shadow cubemaps are managed via `RenderCache::GetShadowMap(lightUID)`.
+Per-light shadow maps are managed via `RenderCache::GetShadowMap(lightUID, lightType)`:
+- `LightType::POINTLIGHT` → cubemap (6-layer 2D_ARRAY, D32_SFLOAT, 1024×1024 per face)
+- `LightType::SUNLIGHT` → 2D orthographic (D32_SFLOAT, 2048×2048)
 The shadow intensity array (R8_UNORM, layered 2D_ARRAY) is created via
 `RenderCache::GetShadowIntensityArray(extent)` with per-light layer indices
 assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
@@ -200,7 +218,7 @@ assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
 | HDRColor | R16G16B16A16_SFLOAT | (0,0,0,0) | Lighting output |
 | SSAO | R8_UNORM | 0 (no occlusion) | Screen-space ambient occlusion |
 | SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
-| ShadowMap | D32_SFLOAT | 1.0 | Per-light cubemap depth (RenderCache-owned) |
+| ShadowMap | D32_SFLOAT | 1.0 | Per-light shadow depth (RenderCache-owned). Cubemap (6-layer 2D_ARRAY, 1024×1024) for point lights; 2D (2048×2048) for sun lights |
 | ShadowIntensity | R8_UNORM | 0 (no shadow) | Layered 2D_ARRAY, one layer per shadow-casting light (RenderCache-owned) |
 
 ## Future Evolution

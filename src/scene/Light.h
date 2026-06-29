@@ -96,13 +96,13 @@ public:
 	// -----------------------------------------------------------------------
 
 	/** @brief Orthographic projection field size for sun shadows. */
-	static constexpr float sun_shadow_field = 50.0f;
+	static constexpr float sun_shadow_field = 2.5f;
 
 	/** @brief Near plane for sun shadow map. */
-	static constexpr float sun_shadow_near = -100.0f;
+	static constexpr float sun_shadow_near = -10.0f;
 
 	/** @brief Far plane for sun shadow map. */
-	static constexpr float sun_shadow_far = 100.0f;
+	static constexpr float sun_shadow_far = 10.0f;
 
 	/** @brief Near plane for point light shadow map. */
 	static constexpr float point_shadow_near = 0.1f;

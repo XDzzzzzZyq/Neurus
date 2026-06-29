@@ -207,6 +207,80 @@ uint32_t LightingPass::GetLightCount() const
 	return m_lightCount;
 }
 
+void LightingPass::UploadSunLights(const Scene& scene,
+                                   const std::unordered_map<int32_t, int>* shadowIndexMap)
+{
+	// Collect only sun (directional) lights
+	std::vector<SunLightGpu> gpuLights;
+	gpuLights.reserve(scene.light_list.size());
+
+	for (const auto& [id, light] : scene.light_list)
+	{
+		if (light->light_type != LightType::SUNLIGHT)
+		{
+			continue;
+		}
+
+		SunLightGpu gpu = {};
+		const auto& dir = light->GetDirection();
+
+		// Direction (world-space forward vector from Transform3D rotation)
+		gpu.directionX = dir.x;
+		gpu.directionY = dir.y;
+		gpu.directionZ = dir.z;
+
+		// Color (linear RGB)
+		gpu.colorR = light->light_color.r;
+		gpu.colorG = light->light_color.g;
+		gpu.colorB = light->light_color.b;
+
+		// Power
+		gpu.power = light->light_power;
+
+		// Shadow map index lookup
+		if (shadowIndexMap)
+		{
+			const auto it = shadowIndexMap->find(id);
+			gpu.shadowMapIndex = (it != shadowIndexMap->end()) ? it->second : -1;
+		}
+
+		gpuLights.push_back(gpu);
+	}
+
+	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
+	m_sunLightCount = newCount;
+
+	if (newCount == 0)
+	{
+		m_sunLightSSBO.reset();
+		NEURUS_LOG("[LightingPass] No sun lights in scene - SunLight SSBO released (PARTIALLY_BOUND)");
+		return;
+	}
+
+	// Create or re-create the SSBO
+	const vk::DeviceSize bufferSize = newCount * sizeof(SunLightGpu);
+
+	m_sunLightSSBO = std::make_unique<GPUBuffer>(
+		*m_device, *m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
+		bufferSize,
+		vk::BufferUsageFlagBits::eStorageBuffer,
+		"SunLightSSBO");
+	m_sunLightSSBO->Upload(gpuLights.data(), bufferSize);
+
+	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " sun lights"
+	           << " (" << bufferSize << " bytes)");
+}
+
+const GPUBuffer* LightingPass::GetSunLightSSBO() const
+{
+	return m_sunLightSSBO ? m_sunLightSSBO.get() : nullptr;
+}
+
+uint32_t LightingPass::GetSunLightCount() const
+{
+	return m_sunLightCount;
+}
+
 // ---------------------------------------------------------------------------
 // Descriptor set layout
 // ---------------------------------------------------------------------------
@@ -236,20 +310,25 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		                     vk::DescriptorType::eStorageBuffer,
 		                     vk::ShaderStageFlagBits::eCompute,
 		                     vk::DescriptorBindingFlagBits::ePartiallyBound)
+		// SunLight SSBO (PARTIALLY_BOUND - valid to skip update when no sun lights)
+		.AddBindingWithFlags(6,
+		                     vk::DescriptorType::eStorageBuffer,
+		                     vk::ShaderStageFlagBits::eCompute,
+		                     vk::DescriptorBindingFlagBits::ePartiallyBound)
 		// SSAO occlusion input (combined image sampler)
-		.AddBinding(6,
-		            vk::DescriptorType::eCombinedImageSampler,
-		            vk::ShaderStageFlagBits::eCompute)
-		// IBL diffuse irradiance cubemap (combined image sampler)
 		.AddBinding(7,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
-		// IBL specular prefiltered cubemap (combined image sampler)
+		// IBL diffuse irradiance cubemap (combined image sampler)
 		.AddBinding(8,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
-		// Shadow array (sampler2DArray, single layered image)
+		// IBL specular prefiltered cubemap (combined image sampler)
 		.AddBinding(9,
+		            vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		// Shadow array (sampler2DArray, single layered image)
+		.AddBinding(10,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
 		.Build(device);
@@ -270,7 +349,7 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute,
 		0,
-		sizeof(LightingPushConstants));  // 100 bytes
+		sizeof(LightingPushConstants));  // 176 bytes
 
 	// --- Build compute pipeline ---
 	return m_pipelineBuilder->SetShaderStage(compModule, "main")
@@ -336,6 +415,17 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		// guarantees the shader never accesses binding 5.
 	}
 
+	// --- Write sun light SSBO (skipped when no sun lights, PARTIALLY_BOUND) ---
+	{
+		if (m_sunLightSSBO)
+		{
+			dstSet.WriteBuffer(6, GetSunLightSSBO()->GetDescriptorInfo(),
+			                   vk::DescriptorType::eStorageBuffer);
+		}
+		// When m_sunLightSSBO is nullptr, PARTIALLY_BOUND makes this safe
+		// because sunLightCount=0 guarantees the shader never accesses binding 6.
+	}
+
 	// --- Write SSAO attachment (combined image sampler) ---
 	{
 		const auto& ssao = cache.GetAttachment(AttachmentName::SSAO, extent);
@@ -346,11 +436,11 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 		);
 
-		dstSet.WriteImage(6, imageInfo,
+		dstSet.WriteImage(7, imageInfo,
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 
-	// --- Write shadow intensity array (binding 9, sampler2DArray) ---
+	// --- Write shadow intensity array (binding 10, sampler2DArray) ---
 	//     Single layered image — no per-layer dummy images needed.
 	{
 		auto& shadowArray = cache.GetShadowIntensityArray(extent);
@@ -360,7 +450,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 			*shadowArray.ImageViewHandle(),           // 2D_ARRAY view
 			vk::ImageLayout::eShaderReadOnlyOptimal);
 
-		dstSet.WriteImage(9, imageInfo,
+		dstSet.WriteImage(10, imageInfo,
 		                  vk::DescriptorType::eCombinedImageSampler);
 	}
 }
@@ -380,7 +470,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
-	// --- 1b. Write IBL cubemap descriptors (bindings 7-8) from scene Environment or fallback ---
+	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from scene Environment or fallback ---
 	{
 		DescriptorSet& dstSet = m_descriptorSets[frameIndex];
 		const bool hasEnv = (ctx.scene != nullptr && !ctx.scene->env_list.empty());
@@ -397,7 +487,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					*diffuseTex->GetSampler(),
 					*diffuseTex->GetImage()->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(7, irrInfo,
+				dstSet.WriteImage(8, irrInfo,
 				                  vk::DescriptorType::eCombinedImageSampler);
 			}
 			else
@@ -407,7 +497,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					*m_fallbackCubeSampler,
 					*m_fallbackIrradianceCube->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(7, fbInfo,
+				dstSet.WriteImage(8, fbInfo,
 				                  vk::DescriptorType::eCombinedImageSampler);
 			}
 
@@ -417,7 +507,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					*specularTex->GetSampler(),
 					*specularTex->GetImage()->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(8, specInfo,
+				dstSet.WriteImage(9, specInfo,
 				                  vk::DescriptorType::eCombinedImageSampler);
 			}
 			else
@@ -427,7 +517,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					*m_fallbackCubeSampler,
 					*m_fallbackPrefilteredCube->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(8, fbInfo,
+				dstSet.WriteImage(9, fbInfo,
 				                  vk::DescriptorType::eCombinedImageSampler);
 			}
 		}
@@ -438,14 +528,14 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 				*m_fallbackCubeSampler,
 				*m_fallbackIrradianceCube->ImageViewHandle(),
 				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(7, fbIrradInfo,
+			dstSet.WriteImage(8, fbIrradInfo,
 			                  vk::DescriptorType::eCombinedImageSampler);
 
 			vk::DescriptorImageInfo fbSpecInfo(
 				*m_fallbackCubeSampler,
 				*m_fallbackPrefilteredCube->ImageViewHandle(),
 				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(8, fbSpecInfo,
+			dstSet.WriteImage(9, fbSpecInfo,
 			                  vk::DescriptorType::eCombinedImageSampler);
 		}
 	}
@@ -521,6 +611,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	{
 		LightingPushConstants pc = {};
 		pc.lightCount = static_cast<int32_t>(m_lightCount);
+		pc.sunLightCount = static_cast<int32_t>(m_sunLightCount);
 		pc.camX = cameraPos.x;
 		pc.camY = cameraPos.y;
 		pc.camZ = cameraPos.z;

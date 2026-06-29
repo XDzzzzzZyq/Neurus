@@ -1,6 +1,9 @@
 /**
  * @file ShadowDepthPass.h
- * @brief Point-light shadow depth cubemap pass.
+ * @brief Point-light shadow depth cubemap pass and sun-light orthographic shadow depth pass.
+ *
+ * Handles both point light cubemap shadow depth (multiview, SSBO) and
+ * sun light orthographic shadow depth (single-view, depth-only).
  */
 
 #pragma once
@@ -25,6 +28,7 @@ class ShadowDepthPass : public Pass
 {
 public:
 	static constexpr uint32_t kDefaultResolution = 1024;
+	static constexpr uint32_t kSunResolution = 2048;
 	static constexpr uint32_t kShadowFaceCount = 6;
 
 	// Fixed far plane for the static projection matrix (must be >> any light's farPlane
@@ -74,6 +78,7 @@ private:
 
 	// --- Parameters ---
 	uint32_t m_resolution;
+	const vk::raii::PhysicalDevice* m_physicalDevice = nullptr;
 
 	// --- GPU resources ---
 	// Static SSBO with 6 face VP matrices (computed once from origin; never changes)
@@ -86,6 +91,11 @@ private:
 	// Graphics pipeline (multiview depth+colour)
 	vk::raii::PipelineLayout m_pipelineLayout = nullptr;
 	vk::raii::Pipeline m_pipeline = nullptr;
+
+	// Sun light pipeline (non-multiview depth-only, push-constant mat4 lightViewProj)
+	vk::raii::PipelineLayout m_sunPipelineLayout = nullptr;
+	vk::raii::Pipeline m_sunPipeline = nullptr;
+	void createSunPipeline(const vk::raii::Device& device);
 };
 
 } // namespace neurus
