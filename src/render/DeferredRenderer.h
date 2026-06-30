@@ -217,11 +217,6 @@ private:
 	void recreateSwapchain();
 
 	/**
-	 * @brief Computes and returns camera UBO data for the current frame.
-	 */
-	CameraUBOData computeCameraData(vk::Extent2D extent, const Camera& camera) const;
-
-	/**
 	 * @brief Builds a GeometryRenderItem for the specified mesh from its GPU buffers.
 	 * @param mesh Mesh providing GPU vertex/index buffers via GetVertexBuffer/GetIndexBuffer.
 	 * @return GeometryRenderItem with buffers from mesh, or default item if mesh GPU buffers unavailable.

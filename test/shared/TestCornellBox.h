@@ -84,8 +84,8 @@ struct CornellBoxResources
  *   right_box    — white (1.0, 1.0, 1.0)
  *   light_up     — emissive white (used as geometry)
  *
- * Creates a default camera at (0, 1, 3) looking at origin and a single
- * point light at (-0.3, 0.8, 1.0) with warm white colour.
+ * Creates a default camera at (-2.5, 1, 0) looking at (0, 1, 0) and a single
+ * point light at (-0.3, 1.0, 0.8) with warm white colour (Z-up convention).
  *
  * @note All buffers use device-local memory. A staging upload is performed
  *       synchronously on the provided graphics queue.
@@ -207,14 +207,14 @@ inline CornellBoxResources LoadCornellBox(
 		static_cast<float>(256),  // width (placeholder, caller adjusts)
 		static_cast<float>(256),  // height
 		60.0f, 0.1f, 100.0f);
-	res.camera->SetCamPos(glm::vec3(-2.5f, 0.0f, 1.0f));
-	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 1.0f));
-	res.camera->SetRotation(glm::vec3(0.0f, 0.0f, -90.0f));
+	res.camera->SetCamPos(glm::vec3(-2.5f, 0.0f, 1.0f));  // Z-up: left side, cube mid-height Z=1
+	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 1.0f));   // looking into cube at mid-height
+	res.camera->SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));  // no explicit rotation, lookAt handles it
 
 	// --- Create a point light near the ceiling ---
 	res.light = std::make_shared<Light>(LightType::POINTLIGHT, 30.0f,
 	                                    glm::vec3(1.0f, 0.95f, 0.8f));
-	res.light->SetPosition(glm::vec3(-0.3f, 0.8f, 1.0f));
+	res.light->SetPosition(glm::vec3(-0.3f, 1.0f, 0.8f));  // Z-up: near ceiling
 
 	NEURUS_LOG("[LoadCornellBox] Loaded " << res.renderItems.size()
 	           << " meshes from " << basePath);

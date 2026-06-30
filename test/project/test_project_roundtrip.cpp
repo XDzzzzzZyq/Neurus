@@ -80,8 +80,8 @@ TEST(ProjectRoundtrip, CameraOnly)
 	camera->cam_pers = 60.0f;
 	camera->cam_near = 0.1f;
 	camera->cam_far = 100.0f;
-	camera->cam_tar = glm::vec3(0.0f, 1.0f, 0.0f);
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->cam_tar = glm::vec3(0.0f, 0.0f, 1.0f);
+	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	scene.UseCamera(camera);
 
 	project.Save(tmp.path);
@@ -96,8 +96,8 @@ TEST(ProjectRoundtrip, CameraOnly)
 	EXPECT_FLOAT_EQ(loadedCam->cam_pers, 60.0f);
 	EXPECT_FLOAT_EQ(loadedCam->cam_near, 0.1f);
 	EXPECT_FLOAT_EQ(loadedCam->cam_far, 100.0f);
-	EXPECT_EQ(loadedCam->cam_tar, glm::vec3(0.0f, 1.0f, 0.0f));
-	EXPECT_EQ(loadedCam->GetPosition(), glm::vec3(0.0f, 2.0f, 5.0f));
+	EXPECT_EQ(loadedCam->cam_tar, glm::vec3(0.0f, 0.0f, 1.0f));
+	EXPECT_EQ(loadedCam->GetPosition(), glm::vec3(0.0f, -5.0f, 2.0f));
 	EXPECT_EQ(loadedCam->o_type, ObjectID::GOType::GO_CAM);
 }
 
@@ -190,8 +190,8 @@ TEST(ProjectRoundtrip, FullScene)
 
 	// Camera
 	auto camera = std::make_shared<Camera>();
-	camera->SetCamPos(glm::vec3(0.0f, 3.0f, 10.0f));
-	camera->cam_tar = glm::vec3(0.0f, 1.0f, 0.0f);
+	camera->SetCamPos(glm::vec3(0.0f, 10.0f, 3.0f));
+	camera->cam_tar = glm::vec3(0.0f, 0.0f, 1.0f);
 	camera->cam_pers = 45.0f;
 	scene.UseCamera(camera);
 
@@ -202,7 +202,7 @@ TEST(ProjectRoundtrip, FullScene)
 
 	// Light
 	auto light = std::make_shared<Light>(POINTLIGHT, 20.0f, glm::vec3(0.2f, 0.5f, 1.0f));
-	light->SetPosition(glm::vec3(-2.0f, 5.0f, 0.0f));
+	light->SetPosition(glm::vec3(-2.0f, 0.0f, 5.0f));
 	light->SetRadius(0.1f);
 	scene.UseLight(light);
 
@@ -219,8 +219,8 @@ TEST(ProjectRoundtrip, FullScene)
 	// --- Camera validation ---
 	auto* loadedCam = loadedScene.cam_list.begin()->second.get();
 	ASSERT_NE(loadedCam, nullptr);
-	EXPECT_EQ(loadedCam->GetPosition(), glm::vec3(0.0f, 3.0f, 10.0f));
-	EXPECT_EQ(loadedCam->cam_tar, glm::vec3(0.0f, 1.0f, 0.0f));
+	EXPECT_EQ(loadedCam->GetPosition(), glm::vec3(0.0f, 10.0f, 3.0f));
+	EXPECT_EQ(loadedCam->cam_tar, glm::vec3(0.0f, 0.0f, 1.0f));
 	EXPECT_FLOAT_EQ(loadedCam->cam_pers, 45.0f);
 	EXPECT_EQ(loadedCam->o_type, ObjectID::GOType::GO_CAM);
 
@@ -238,6 +238,6 @@ TEST(ProjectRoundtrip, FullScene)
 	EXPECT_FLOAT_EQ(loadedLight->light_power, 20.0f);
 	EXPECT_EQ(loadedLight->light_color, glm::vec3(0.2f, 0.5f, 1.0f));
 	EXPECT_FLOAT_EQ(loadedLight->light_radius, 0.1f);
-	EXPECT_EQ(loadedLight->GetPosition(), glm::vec3(-2.0f, 5.0f, 0.0f));
+	EXPECT_EQ(loadedLight->GetPosition(), glm::vec3(-2.0f, 0.0f, 5.0f));
 	EXPECT_EQ(loadedLight->o_type, ObjectID::GOType::GO_LIGHT);
 }

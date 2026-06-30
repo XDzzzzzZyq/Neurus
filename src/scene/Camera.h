@@ -125,7 +125,7 @@ public:
 	 * @brief Computes the view matrix from camera position and target.
 	 *
 	 * Uses glm::lookAt with the camera position (from Transform3D),
-	 * the look-at target, and world up vector (0, 1, 0).
+	 * the look-at target, and world up vector (0, 0, 1) (Z-up).
 	 *
 	 * @return 4x4 view matrix.
 	 */
@@ -139,7 +139,7 @@ public:
 	 *
 	 * @return 4x4 projection matrix.
 	 */
-	glm::mat4 GetProjectionMatrix();
+	glm::mat4 GetProjectionMatrix() const;
 
 	/**
 	 * @brief Updates the viewport aspect ratio from width and height.
@@ -186,13 +186,6 @@ public:
 	 * @note Overrides ObjectID::GetTransform().
 	 */
 	void* GetTransform() override;
-
-private:
-	/** @brief Dirty flag indicating cached projection needs recomputation. */
-	bool m_frustumDirty = true;
-
-	/** @brief Cached projection matrix. */
-	glm::mat4 m_cachedProjection = glm::mat4(-1.0f);
 };
 
 } // namespace neurus

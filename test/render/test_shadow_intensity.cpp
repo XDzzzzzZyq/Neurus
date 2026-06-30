@@ -5,10 +5,10 @@
  *        against mathematically-computed expected shadow values.
  *
  * Mathematical verification:
- *   - Cube at [-0.5, 0.5] x [2.5, 3.5] x [-0.5, 0.5] (centre at (0,3,0))
- *   - Plane at y=0, spanning [-10, 10] in XZ
- *   - Point light at (0, 6, 0), farPlane = Light::point_shadow_far = 10.0
- *   - Camera at (0, 2, 0.001) looking at (0, 0, 0), FOV=75°, 256×256
+ *   - Cube at [-0.5, 0.5] x [-0.5, 0.5] x [2.5, 3.5] (centre at (0,0,3))
+ *   - Plane at z=0, spanning [-10, 10] in XY
+ *   - Point light at (0, 0, 6), farPlane = Light::point_shadow_far = 10.0
+ *   - Camera at (0, 0.001, 2) looking at (0, 0, 0), FOV=75°, 256×256
  *   - Unproject each pixel to world-space; intersect with plane; ray-AABB
  *     test to determine shadow = 1.0 (occluded) or 0.0 (lit).
  *   - Tolerance: ±2/255 for binary shadow values.
@@ -105,10 +105,10 @@ protected:
 		const glm::vec3 wn = glm::vec3(wn4) / wn4.w;
 		const glm::vec3 rd = glm::normalize(wn - cameraPos);
 
-		const float tP = -cameraPos.y / rd.y;
+		const float tP = -cameraPos.z / rd.z;
 		if (tP <= 0.0f) return 0.0f;
 		const glm::vec3 pHit = cameraPos + tP * rd;
-		if (std::abs(pHit.x) > 10.0f || std::abs(pHit.z) > 10.0f) return 0.0f;
+		if (std::abs(pHit.x) > 10.0f || std::abs(pHit.y) > 10.0f) return 0.0f;
 
 		const glm::vec3 tf = pHit - lightPos;
 		const float df = glm::length(tf);

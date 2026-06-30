@@ -69,29 +69,30 @@ TEST(Camera, NonCopyable)
 /**
  * @test GetViewMatrix changes with camera position.
  *
- * Camera at (0, 0, 5) looking at origin should produce a valid
+ * Camera at (0, -5, 0) looking at origin should produce a valid
  * view matrix where the translation component reflects the position.
+ * (Z-up convention: X=right, Y=forward, Z=up)
  */
 TEST(Camera, ViewMatrix_ChangesWithPosition)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	cam.SetCamPos(glm::vec3(0.0f, -5.0f, 0.0f));
 
 	glm::mat4 view = cam.GetViewMatrix();
 
-	// For camera at (0,0,5) looking at (0,0,0) with glm::lookAt:
-	// f = normalize(center - eye) = (0, 0, -1)
+	// For camera at (0,-5,0) looking at (0,0,0) with glm::lookAt(eye, target, up=(0,0,1)):
+	// f = normalize(center - eye) = (0, 1, 0)
 	// s = normalize(f x up) = (1, 0, 0)
-	// u = s x f = (0, 1, 0)
+	// u = s x f = (0, 0, 1)
 	// view[3] = (-dot(s,eye), -dot(u,eye), dot(f,eye), 1) = (0, 0, -5, 1)
-	// view[2] = (-f.x, -f.y, -f.z, 0) = (0, 0, 1, 0)
+	// view[2] = (s.z, u.z, -f.z, dot(f,eye)) = (0, 1, 0, -5)
 	EXPECT_NEAR(view[3][0], 0.0f, 1e-5f);
 	EXPECT_NEAR(view[3][1], 0.0f, 1e-5f);
 	EXPECT_NEAR(view[3][2], -5.0f, 1e-5f);
 
 	EXPECT_NEAR(view[2][0], 0.0f, 1e-5f);
-	EXPECT_NEAR(view[2][1], 0.0f, 1e-5f);
-	EXPECT_NEAR(view[2][2], 1.0f, 1e-5f);
+	EXPECT_NEAR(view[2][1], 1.0f, 1e-5f);
+	EXPECT_NEAR(view[2][2], 0.0f, 1e-5f);
 }
 
 /**
@@ -100,12 +101,12 @@ TEST(Camera, ViewMatrix_ChangesWithPosition)
 TEST(Camera, ViewMatrix_ChangesWithTarget)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	cam.SetCamPos(glm::vec3(0.0f, -5.0f, 0.0f));
 
 	glm::mat4 viewAtOrigin = cam.GetViewMatrix();
 
-	// Change target to (0, 5, 0) -- camera now looks up
-	cam.SetTarPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	// Change target to (0, 0, 5) -- camera now looks up (Z-up)
+	cam.SetTarPos(glm::vec3(0.0f, 0.0f, 5.0f));
 	glm::mat4 viewAtUp = cam.GetViewMatrix();
 
 	// Matrices must differ
@@ -120,10 +121,10 @@ TEST(Camera, ViewMatrix_Deterministic)
 	Camera camA;
 	Camera camB;
 
-	camA.SetCamPos(glm::vec3(10.0f, 5.0f, -3.0f));
+	camA.SetCamPos(glm::vec3(10.0f, -3.0f, 5.0f));
 	camA.SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	camB.SetCamPos(glm::vec3(10.0f, 5.0f, -3.0f));
+	camB.SetCamPos(glm::vec3(10.0f, -3.0f, 5.0f));
 	camB.SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	EXPECT_EQ(camA.GetViewMatrix(), camB.GetViewMatrix());
@@ -148,11 +149,11 @@ TEST(Camera, ProjectionMatrix_CorrectStructure)
 
 	glm::mat4 proj = cam.GetProjectionMatrix();
 
-	// Expected: f = 1 / tan(30°) = 1.7320508
+	// Expected: f = 1 / tan(30°) = 1.7320508; Y negated for Vulkan NDC
 	const float expectedF = 1.0f / std::tan(glm::radians(30.0f));
 
 	EXPECT_NEAR(proj[0][0], expectedF, 1e-5f);
-	EXPECT_NEAR(proj[1][1], expectedF, 1e-5f);
+	EXPECT_NEAR(proj[1][1], -expectedF, 1e-5f);   // negated for Vulkan Y-flip
 	EXPECT_FLOAT_EQ(proj[2][3], -1.0f);
 	EXPECT_FLOAT_EQ(proj[3][3], 0.0f);
 
@@ -240,10 +241,10 @@ TEST(Camera, ProjectionMatrix_InvalidatedByFOV)
 	cam.ChangeCamPersp(90.0f);
 	glm::mat4 recomputed = cam.GetProjectionMatrix();
 
-	// For 90° FOV: f = 1 / tan(45°) = 1.0
+	// For 90° FOV: f = 1 / tan(45°) = 1.0; Y negated for Vulkan NDC
 	const float expectedF = 1.0f / std::tan(glm::radians(45.0f));
 	EXPECT_NEAR(recomputed[0][0], expectedF, 1e-5f);
-	EXPECT_NEAR(recomputed[1][1], expectedF, 1e-5f);
+	EXPECT_NEAR(recomputed[1][1], -expectedF, 1e-5f);   // negated for Vulkan Y-flip
 }
 
 // -----------------------------------------------------------------------

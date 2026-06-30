@@ -86,14 +86,14 @@ void CameraController::OnCameraRotate(const CameraRotateEvent& e)
 
 	dir /= radius; // normalize
 
-	// Compute spherical coordinates (Y-up)
-	const float elevation = std::asin(dir.y);                     // [-PI/2, PI/2]
-	const float azimuth   = std::atan2(dir.x, dir.z);             // [-PI, PI]
+	// Compute spherical coordinates (Z-up)
+	const float elevation = std::asin(dir.z);                     // [-PI/2, PI/2]
+	const float azimuth   = std::atan2(dir.x, dir.y);             // [-PI, PI] — angle from +Y (forward)
 
 	// Apply mouse delta (inverted for natural drag feel)
 	// Speed = 1.0f (Editor scales deltas before enqueuing)
-	const float deltaAzimuth   = -e.mouse_delta_x * kOrbitSensitivity;
-	const float deltaElevation = -e.mouse_delta_y * kOrbitSensitivity;
+	const float deltaAzimuth   = e.mouse_delta_x * kOrbitSensitivity;
+	const float deltaElevation = e.mouse_delta_y * kOrbitSensitivity;
 
 	// Clamp elevation to avoid flipping at +/-89 degrees
 	constexpr float kMaxElevation = glm::radians(89.0f);
@@ -104,8 +104,8 @@ void CameraController::OnCameraRotate(const CameraRotateEvent& e)
 	const float cosPhi = std::cos(newElevation);
 	const glm::vec3 newDir(
 		cosPhi * std::sin(newAzimuth),
-		std::sin(newElevation),
-		cosPhi * std::cos(newAzimuth)
+		cosPhi * std::cos(newAzimuth),
+		std::sin(newElevation)
 	);
 
 	camera.SetCamPos(target + newDir * radius);
@@ -159,7 +159,7 @@ void CameraController::OnCameraSlide(const CameraSlideEvent& e)
 	forward = glm::normalize(forward);
 
 	// Right: cross(forward, world-up)
-	constexpr glm::vec3 kWorldUp(0.0f, 1.0f, 0.0f);
+	constexpr glm::vec3 kWorldUp(0.0f, 0.0f, 1.0f);
 	glm::vec3 right = glm::cross(forward, kWorldUp);
 
 	// Handle degenerate case: camera looking straight up/down
@@ -175,7 +175,7 @@ void CameraController::OnCameraSlide(const CameraSlideEvent& e)
 	// Compute translation: horizontal mouse = right, vertical mouse = up
 	// Speed = 1.0f (Editor scales deltas before enqueuing)
 	const glm::vec3 delta = e.mouse_delta_x * kPanSensitivity * right
-	                        - e.mouse_delta_y * kPanSensitivity * up;
+	                        + e.mouse_delta_y * kPanSensitivity * up;
 
 	camera.SetCamPos(pos + delta);
 	camera.SetTarPos(target + delta);

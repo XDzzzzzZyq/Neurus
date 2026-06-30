@@ -68,14 +68,19 @@ protected:
  * dirty flag, avoiding redundant matrix multiplications.
  *
  * Coordinate System:
- * - Right-handed coordinate system (OpenGL convention)
- * - Euler rotation order: pitch (X), yaw (Y), roll (Z)
+ * - Right-handed coordinate system, Z-up
+ * - X = right, Y = forward, Z = up
+ * - Euler rotation order: pitch (X), yaw (Z), roll (Y)
  * - Rotation angles stored in degrees, converted to radians at compute time
  *
  * Model Matrix Composition:
- * - Model = T(position) * Rx(pitch) * Ry(yaw) * Rz(roll) * S(scale)
- * - Applied to vertex v: T * (Rx * (Ry * (Rz * (S * v))))
- * - Order: scale, roll (Z), yaw (Y), pitch (X), translate
+ * - Model = T(position) * Rz(yaw) * Rx(pitch) * Ry(roll) * S(scale)
+ * - Applied to vertex v: T * (Rz * (Rx * (Ry * (S * v))))
+ * - Order: scale, roll (Y), pitch (X), yaw (Z), translate
+ *
+ * Forward Direction:
+ * - Local forward = +Y (0, 1, 0). GetDirection() rotates to world-space.
+ * - Up = +Z (0, 0, 1). Yaw rotates around Z.
  */
 class Transform3D : public Transform
 {
@@ -118,33 +123,21 @@ public:
 	 * @param pos New position in world space.
 	 * @note Marks the cached model matrix as dirty.
 	 */
-	void SetPosition(const glm::vec3& pos)
-	{
-		m_position = pos;
-		m_dirty = true;
-	}
+	void SetPosition(const glm::vec3& pos);
 
 	/**
 	 * @brief Sets the rotation as Euler angles.
-	 * @param degrees Rotation in degrees (pitch=X, yaw=Y, roll=Z).
+	 * @param degrees Rotation in degrees (pitch=X, yaw=Z, roll=Y).
 	 * @note Marks the cached model matrix as dirty.
 	 */
-	void SetRotation(const glm::vec3& degrees)
-	{
-		m_rotation = degrees;
-		m_dirty = true;
-	}
+	void SetRotation(const glm::vec3& degrees);
 
 	/**
 	 * @brief Sets the local scale.
 	 * @param scale Per-axis scale factors.
 	 * @note Marks the cached model matrix as dirty.
 	 */
-	void SetScale(const glm::vec3& scale)
-	{
-		m_scale = scale;
-		m_dirty = true;
-	}
+	void SetScale(const glm::vec3& scale);
 
 	// -----------------------------------------------------------------------
 	// Getters
@@ -158,7 +151,7 @@ public:
 
 	/**
 	 * @brief Returns the current rotation in degrees.
-	 * @return Const reference to the rotation vector (pitch, yaw, roll).
+	 * @return Const reference to the rotation vector (pitch=X, yaw=Z, roll=Y).
 	 */
 	const glm::vec3& GetRotation() const { return m_rotation; }
 
@@ -176,39 +169,19 @@ public:
 	 * @brief Computes and returns the model matrix (TRS).
 	 *
 	 * Constructs the matrix as: Translate * Rotate * Scale.
-	 * Rotation is applied in XYZ order (pitch, yaw, roll).
+	 * Rotation is applied in ZXY order (yaw=Z, pitch=X, roll=Y).
 	 * Result is cached until a component changes (dirty flag).
 	 *
 	 * @return 4x4 model matrix.
 	 */
-	glm::mat4 GetModelMatrix() const
-	{
-		if (!m_dirty)
-		{
-			return m_cachedMatrix;
-		}
-
-		glm::mat4 mat{1.0f};
-		const glm::vec3 rad = glm::radians(m_rotation);
-
-		// TRS: Translate * Rotate * Scale
-		mat = glm::translate(mat, m_position);
-		mat = glm::rotate(mat, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
-		mat = glm::rotate(mat, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Yaw   (Y)
-		mat = glm::rotate(mat, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Roll  (Z)
-		mat = glm::scale(mat, m_scale);
-
-		m_cachedMatrix = mat;
-		m_dirty = false;
-		return m_cachedMatrix;
-	}
+	glm::mat4 GetModelMatrix() const;
 
 	/**
 	 * @brief Computes the local-space forward direction vector.
 	 *
-	 * Rotates the forward vector (0,0,-1) by the current Euler rotation
-	 * (pitch/yaw/roll). Returns a normalized direction vector.
-	 * When no rotation is applied, returns (0,0,-1).
+	 * Rotates the forward vector (0,1,0) by the current Euler rotation
+	 * (yaw=Z, pitch=X, roll=Y). Returns a normalized direction vector.
+	 * When no rotation is applied, returns (0,1,0) (+Y forward).
 	 *
 	 * @return Normalized forward direction vector.
 	 */
@@ -223,10 +196,7 @@ public:
 	 *
 	 * @return 3x3 normal matrix.
 	 */
-	glm::mat3 GetNormalMatrix() const
-	{
-		return glm::transpose(glm::inverse(glm::mat3(GetModelMatrix())));
-	}
+	glm::mat3 GetNormalMatrix() const;
 
 	/**
 	 * @brief Forces the cached model matrix to be recomputed on next access.
@@ -235,7 +205,7 @@ public:
 
 private:
 	glm::vec3 m_position{0.0f};    ///< World position.
-	glm::vec3 m_rotation{0.0f};    ///< Euler rotation in degrees (pitch, yaw, roll).
+	glm::vec3 m_rotation{0.0f};    ///< Euler rotation in degrees (pitch=X, yaw=Z, roll=Y).
 	glm::vec3 m_scale{1.0f};       ///< Per-axis scale.
 
 	mutable bool m_dirty{true};        ///< True if cached matrix needs recomputation.

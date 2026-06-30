@@ -97,7 +97,7 @@ void main()
 	// Guard against degenerate cross product (normal parallel to randVec)
 	if (length(cross(normalWS, randVec)) < 0.001)
 	{
-		tangent = normalize(cross(normalWS, vec3(0.0, 1.0, 0.0)));
+		tangent = normalize(cross(normalWS, vec3(0.0, 0.0, 1.0)));
 	}
 	vec3 bitangent = cross(normalWS, tangent);
 	mat3 TBN = mat3(tangent, bitangent, normalWS);

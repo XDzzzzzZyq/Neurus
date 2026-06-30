@@ -267,11 +267,11 @@ void Editor::OnCameraAdd()
 {
 	try {
 		auto camera = std::make_shared<neurus::Camera>();
-		camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+		camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 		m_project->GetScene().UseCamera(camera);
 		m_project->MarkDirty();
-		NEURUS_LOG("[Editor] Added camera at (0, 2, 5)");
+		NEURUS_LOG("[Editor] Added camera at (0, -5, 2)");
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to add camera: " << e.what());
@@ -303,8 +303,8 @@ void Editor::OnSunLightAdd()
 	try {
 		auto light = std::make_shared<neurus::Light>(
 			neurus::SUNLIGHT, 5.0f, glm::vec3(1.0f, 0.95f, 0.8f));
-		light->SetPosition(glm::vec3(0.0f, 10.0f, 0.0f));
-		light->SetRotation(glm::vec3(0.6f, 0.0f, 0.0f));
+		light->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
+		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->use_shadow = true;
 		m_project->GetScene().UseLight(light);
 		if (m_renderer)
@@ -312,7 +312,7 @@ void Editor::OnSunLightAdd()
 			m_renderer->UploadLights(m_project->GetScene());
 		}
 		m_project->MarkDirty();
-		NEURUS_LOG("[Editor] Added sun light at (0, 10, 0)");
+		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to add sun light: " << e.what());

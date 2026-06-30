@@ -219,12 +219,12 @@ protected:
 	}
 
 	/**
-	 * @brief Creates a Camera positioned at (0, 2, 5) looking at origin.
+	 * @brief Creates a Camera positioned at (0, -5, 2) looking at origin. (Z-up)
 	 */
 	std::shared_ptr<Camera> CreateDefaultCamera()
 	{
 		auto cam = std::make_shared<Camera>();
-		cam->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+		cam->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 		cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		cam->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
 		return cam;
@@ -322,7 +322,7 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 
 	// Light (so lighting pass has something to compute)
 	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 30.0f, glm::vec3(1.0f));
-	light->SetPosition(glm::vec3(2.0f, 5.0f, 2.0f));
+	light->SetPosition(glm::vec3(2.0f, 2.0f, 5.0f));
 	scene.UseLight(light);
 
 	// Upload lights to renderer

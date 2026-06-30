@@ -60,6 +60,7 @@ private:
 	std::unique_ptr<project::Project> LoadProject();
 	bool InitRenderer(const project::Project& project);
 	void InitEditor(std::unique_ptr<project::Project> project);
+	void ResizeViewport(int width, int height);
 	void WireSignals();
 	void StartRenderLoop();
 

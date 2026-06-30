@@ -195,7 +195,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	}
 
 	// -----------------------------------------------------------------------
-	// Step 4: Create Camera (position above, looking at origin)
+	// Step 4: Create Camera (position above-back, looking at origin — Z-up)
 	// -----------------------------------------------------------------------
 	auto camera = std::make_shared<Camera>(
 		800.0f, 600.0f,  // viewport size
@@ -203,7 +203,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		0.1f,             // near
 		100.0f);          // far
 
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	// -----------------------------------------------------------------------

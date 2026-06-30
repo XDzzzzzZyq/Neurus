@@ -227,13 +227,13 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	}
 
 	// -------------------------------------------------------------------
-	// Step 2: Create camera (pos (0, 2, 5), looking at origin)
+	// Step 2: Create camera (pos (0, -5, 2), looking at origin — Z-up)
 	// -------------------------------------------------------------------
 	auto camera = std::make_shared<Camera>(
 		static_cast<float>(kRenderWidth),
 		static_cast<float>(kRenderHeight),
 		60.0f, 0.1f, 100.0f);
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
@@ -365,7 +365,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		static_cast<float>(kRenderWidth),
 		static_cast<float>(kRenderHeight),
 		60.0f, 0.1f, 100.0f);
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 

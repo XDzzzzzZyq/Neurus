@@ -72,8 +72,8 @@ protected:
  * @test Orbit_MMB_Right_Drag_AzimuthIncreases
  *
  * Camera at (5,0,0), target at origin. MMB drag right (positive mouseDeltaX)
- * should rotate azimuth around world Y axis, producing a non-zero Z component.
- * Target remains unchanged.
+ * should rotate azimuth around world Z axis, producing a non-zero Y component
+ * (forward axis in Z-up convention). Target remains unchanged.
  */
 TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
 {
@@ -85,8 +85,8 @@ TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
 	EventQueue().enqueue(e);
 	EventQueue().Process();
 
-	// Camera Z should be non-zero (azimuth rotated right around target)
-	EXPECT_NE(m_camera->GetPosition().z, 0.0f);
+	// Camera Y should be non-zero (azimuth rotated right around target, forward axis)
+	EXPECT_NE(m_camera->GetPosition().y, 0.0f);
 	// Target unchanged
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
 }
@@ -96,21 +96,21 @@ TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
  *
  * Camera at (5,0,0), target at origin. MMB drag up (positive mouseDeltaY)
  * should decrease elevation (drag up = look down, natural 3D convention).
- * Camera Y position decreases. Target remains unchanged.
+ * Camera Z position decreases (elevation axis in Z-up). Target remains unchanged.
  */
 TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
 {
 	m_camera->SetCamPos(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
-	const float initialY = m_camera->GetPosition().y;
+	const float initialZ = m_camera->GetPosition().z;
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraRotateEvent e{m_camera.get(), 0.0f, 10.0f};
+	CameraRotateEvent e{m_camera.get(), 0.0f, -10.0f}; // deltaY negative = drag up = look down
 	EventQueue().enqueue(e);
 	EventQueue().Process();
 
-	// Elevation decreased (drag up = look down) 鈥?camera Y should be lower
-	EXPECT_LT(m_camera->GetPosition().y, initialY);
+	// Elevation decreased (drag up = look down) camera Z should be lower
+	EXPECT_LT(m_camera->GetPosition().z, initialZ);
 	// Target unchanged
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
 }
@@ -118,13 +118,13 @@ TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
 /**
  * @test Orbit_Clamp_Elevation_89_Degrees
  *
- * Camera at (0,5,0) looking straight down at origin. A large mouseDeltaY
- * should NOT flip the camera past the poles. Elevation is clamped to 卤89掳.
- * No crash, position values remain finite.
+ * Camera at (0,0,5) looking straight down at origin (Z-up convention).
+ * A large mouseDeltaY should NOT flip the camera past the poles.
+ * Elevation is clamped to 卤89掳. No crash, position values remain finite.
  */
 TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	CameraRotateEvent e{m_camera.get(), 0.0f, 1000.0f};
@@ -140,12 +140,12 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 	EXPECT_TRUE(std::isfinite(pos.y));
 	EXPECT_TRUE(std::isfinite(pos.z));
 
-	// Elevation from target should not exceed 卤89掳
+	// Elevation from target should not exceed 89 (Z-up: elevation = asin(dir.z))
 	const glm::vec3 dir = pos - m_camera->cam_tar;
 	const float radius = glm::length(dir);
 	if (radius > 1e-6f)
 	{
-		const float elevation = std::asin(dir.y / radius);
+		const float elevation = std::asin(dir.z / radius);
 		EXPECT_LE(std::abs(elevation), glm::radians(89.1f));
 	}
 }
@@ -157,12 +157,13 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 /**
  * @test Zoom_ScrollUp_Decreases_Distance
  *
- * Camera at (0,0,5), target at origin. Scroll up (positive scroll_dir)
- * should zoom in, decreasing the distance from camera to target.
+ * Camera at (0,5,0), target at origin (Z-up: +Y is forward).
+ * Scroll up (positive scroll_dir) should zoom in, decreasing the
+ * distance from camera to target.
  */
 TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -178,12 +179,13 @@ TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
 /**
  * @test Zoom_ScrollDown_Increases_Distance
  *
- * Camera at (0,0,5), target at origin. Scroll down (negative scroll_dir)
- * should zoom out, increasing the distance from camera to target.
+ * Camera at (0,5,0), target at origin (Z-up: +Y is forward).
+ * Scroll down (negative scroll_dir) should zoom out, increasing the
+ * distance from camera to target.
  */
 TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -199,12 +201,13 @@ TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
 /**
  * @test Zoom_Clamp_MinRadius
  *
- * Camera already at minimum distance (0.01) from target. Attempting to zoom
- * in further should not reduce distance below the minimum clamp. No crash.
+ * Camera already at minimum distance (0.01) from target along forward axis
+ * (Z-up: +Y is forward). Attempting to zoom in further should not reduce
+ * distance below the minimum clamp. No crash.
  */
 TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 0.01f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 0.01f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	CameraZoomEvent e{m_camera.get(), 1.0f}; // Try to zoom in more
@@ -225,24 +228,25 @@ TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
 /**
  * @test Dolly_CtrlMMB_MovesAlongForward
  *
- * Camera at (0,0,5), target at origin. Ctrl+MMB drag up (positive mouseDeltaY)
- * should move camera along the forward/view direction (Z axis). X unchanged.
+ * Camera at (0,5,0), target at origin (Z-up: +Y is forward).
+ * Ctrl+MMB drag up (positive mouseDeltaY) should move camera along
+ * the forward/view direction (Y axis). X unchanged.
  * Target stays fixed (dolly translates only camera, not target).
  */
 TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialX = m_camera->GetPosition().x;
-	const float initialZ = m_camera->GetPosition().z;
+	const float initialY = m_camera->GetPosition().y;
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
 	CameraPushEvent e{m_camera.get(), 0.0f, 10.0f};
 	EventQueue().enqueue(e);
 	EventQueue().Process();
 
-	// Camera moved along forward axis (Z changed)
-	EXPECT_NE(m_camera->GetPosition().z, initialZ);
+	// Camera moved along forward axis (Y changed)
+	EXPECT_NE(m_camera->GetPosition().y, initialY);
 	// X unchanged (movement is strictly along view direction)
 	EXPECT_FLOAT_EQ(m_camera->GetPosition().x, initialX);
 	// Target stays fixed
@@ -252,16 +256,16 @@ TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
 /**
  * @test Dolly_WithoutMMB_NoMovement
  *
- * No event enqueued 鈥?camera should not change.
+ * No event enqueued — camera should not change.
  */
 TEST_F(CameraControllerTest, Dolly_WithoutMMB_NoMovement)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	// No event 鈥?camera unchanged
+	// No event — camera unchanged
 	EventQueue().Process();
 
 	EXPECT_EQ(m_camera->GetPosition(), initialPos);
@@ -306,23 +310,23 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Right_MovesCameraAndTarget)
  * @test Pan_ShiftMMB_Up_MovesUp
  *
  * Camera at (5,0,0), target at origin. Shift+MMB drag up
- * (positive mouseDeltaY) should pan vertically, changing Y of
- * both camera and target.
+ * (positive mouseDeltaY) should pan vertically, changing Z of
+ * both camera and target (Z is up in Z-up convention).
  */
 TEST_F(CameraControllerTest, Pan_ShiftMMB_Up_MovesUp)
 {
 	m_camera->SetCamPos(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
-	const float initialY = m_camera->GetPosition().y;
-	const float initialTarY = m_camera->cam_tar.y;
+	const float initialZ = m_camera->GetPosition().z;
+	const float initialTarZ = m_camera->cam_tar.z;
 
 	CameraSlideEvent e{m_camera.get(), 0.0f, 10.0f};
 	EventQueue().enqueue(e);
 	EventQueue().Process();
 
-	// Vertical pan should change Y of both camera and target
-	EXPECT_NE(m_camera->GetPosition().y, initialY);
-	EXPECT_NE(m_camera->cam_tar.y, initialTarY);
+	// Vertical pan should change Z of both camera and target (Z-up)
+	EXPECT_NE(m_camera->GetPosition().z, initialZ);
+	EXPECT_NE(m_camera->cam_tar.z, initialTarZ);
 }
 
 // ===========================================================================
@@ -356,16 +360,16 @@ TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
 /**
  * @test Edge_NoInput_NoChange
  *
- * No events enqueued 鈥?camera should not change.
+ * No events enqueued — camera should not change.
  */
 TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
 {
-	m_camera->SetCamPos(glm::vec3(3.0f, 4.0f, 5.0f));
-	m_camera->SetTarPos(glm::vec3(1.0f, 2.0f, 3.0f));
+	m_camera->SetCamPos(glm::vec3(3.0f, 5.0f, 4.0f));
+	m_camera->SetTarPos(glm::vec3(1.0f, 3.0f, 2.0f));
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	// No events enqueued 鈥?camera unchanged
+	// No events enqueued — camera unchanged
 	EventQueue().Process();
 
 	EXPECT_EQ(m_camera->GetPosition(), initialPos);
@@ -381,17 +385,17 @@ TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
  */
 TEST_F(CameraControllerTest, Edge_ModifierConflict_CtrlWins)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	// Ctrl wins 鈫?CameraPushEvent (dolly), not CameraSlideEvent (pan)
+	// Ctrl wins → CameraPushEvent (dolly), not CameraSlideEvent (pan)
 	CameraPushEvent e{m_camera.get(), 0.0f, 10.0f};
 	EventQueue().enqueue(e);
 	EventQueue().Process();
 
-	// Ctrl wins 鈫?Dolly behavior: target should NOT move
+	// Ctrl wins → Dolly behavior: target should NOT move
 	EXPECT_EQ(m_camera->cam_tar, initialTar);
-	// Camera should have moved (dolly along forward)
-	EXPECT_NE(m_camera->GetPosition().z, 5.0f);
+	// Camera should have moved (dolly along forward, Y in Z-up)
+	EXPECT_NE(m_camera->GetPosition().y, 5.0f);
 }

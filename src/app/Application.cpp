@@ -109,8 +109,8 @@ int Application::Run()
 
 	// Wire scene to Property Editor for object property display
 	m_mainWindow->SetScene(&m_editor->GetScene());
-
 	m_mainWindow->show();
+	ResizeViewport(m_mainWindow->getViewportWidth(), m_mainWindow->getViewportHeight());
 
 	WireSignals();
 	StartRenderLoop();
@@ -247,6 +247,12 @@ bool Application::InitRenderer(const project::Project& project)
 	return true;
 }
 
+void Application::ResizeViewport(int width, int height)
+{
+	m_renderer->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+	m_editor->GetProject().GetScene().GetActiveCamera()->ChangeCamRatio(width, height);
+}
+
 // =========================================================================
 // InitEditor – editor with project ownership transfer
 // =========================================================================
@@ -286,12 +292,7 @@ void Application::WireSignals()
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
 	QObject::connect(m_mainWindow->getVulkanWidget(), &neurus::VulkanWidget::resized,
 	                 [this](int width, int height) {
-	                     if (m_renderer)
-	                     {
-	                         m_renderer->HandleResize(
-	                             static_cast<uint32_t>(width),
-	                             static_cast<uint32_t>(height));
-	                     }
+	                     ResizeViewport(width, height);
 	                 });
 
 	// TODO: decouple screenshot from DeferredRenderer, Isolate by Editor, Use EventBus as bridge.

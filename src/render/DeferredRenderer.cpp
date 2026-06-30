@@ -276,23 +276,6 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 }
 
 // ---------------------------------------------------------------------------
-// Camera data computation
-// ---------------------------------------------------------------------------
-
-CameraUBOData DeferredRenderer::computeCameraData(vk::Extent2D extent, const Camera& camera) const
-{
-	const float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
-
-	const glm::mat4 view = camera.GetViewMatrix();
-	const glm::mat4 proj = glm::perspective(glm::radians(camera.cam_pers), aspect, camera.cam_near, camera.cam_far);
-
-	CameraUBOData data;
-	data.viewProj = proj * view;
-	data.view = view;
-	return data;
-}
-
-// ---------------------------------------------------------------------------
 // Render item construction
 // ---------------------------------------------------------------------------
 
@@ -341,7 +324,7 @@ void DeferredRenderer::DrawFrame()
 {
 	// Fallback camera matching the old hardcoded defaults.
 	Camera fallbackCam;
-	fallbackCam.SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	fallbackCam.SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	fallbackCam.cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 
 	auto& fence = m_inFlightFences[m_currentFrame];
@@ -622,14 +605,13 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 
 	// --- Compute camera matrices for this frame ---
 	// --- Build per-frame render context (constructed once, passed to all passes) ---
-	const CameraUBOData cameraData = computeCameraData(extent, camera);
 	RenderContext ctx{};
 	ctx.renderExtent = extent;
 	ctx.frameIndex = m_currentFrame;
-	ctx.viewProj = cameraData.viewProj;
-	ctx.view = cameraData.view;
+	ctx.view = camera.GetViewMatrix();
+	ctx.viewProj = camera.GetProjectionMatrix() * ctx.view;
 	ctx.cameraPos = camera.GetPosition();
-	ctx.invProjView = glm::inverse(cameraData.viewProj);
+	ctx.invProjView = glm::inverse(ctx.viewProj);
 	ctx.renderItems = &renderItems;
 	ctx.scene = scene;
 

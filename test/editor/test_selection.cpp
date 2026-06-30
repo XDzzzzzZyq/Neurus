@@ -300,9 +300,9 @@ protected:
 		m_sel = std::make_unique<SelectionController>();
 		m_scene = std::make_unique<Scene>();
 
-		// Camera looking along -Z at origin
+		// Camera looking along +Y at origin (Z-up convention)
 		m_camera = std::make_shared<Camera>();
-		m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+		m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 		m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		m_camera->cam_w = 800.0f;
 		m_camera->cam_h = 600.0f;
@@ -349,14 +349,14 @@ TEST_F(SelectionControllerRaycastTest, MeshOffScreen_ClickMisses)
 	// The sphere test may still hit if the ray passes within radius 1.0 of (100,0,0)
 	// To ensure miss, place mesh far enough away
 	// Actually with a 1.0 radius sphere at (100,0,0), the ray from (0,0,5) to (0,0,0)
-	// has direction (0,0,-1) — it stays at x=0, so it misses the sphere at x=100
+	// has direction (0,1,0) — it stays at x=0, so it misses the sphere at x=100
 	EXPECT_EQ(hit, -1);
 }
 
 TEST_F(SelectionControllerRaycastTest, MultipleMeshes_ReturnsClosest)
 {
 	auto meshFar = std::make_shared<Mesh>();
-	meshFar->SetPosition(glm::vec3(0.0f, 0.0f, -3.0f)); // behind origin
+	meshFar->SetPosition(glm::vec3(0.0f, -3.0f, 0.0f)); // behind origin along -Y (Z-up)
 	int idFar = meshFar->GetObjectID();
 	m_scene->UseMesh(meshFar);
 
@@ -374,7 +374,7 @@ TEST_F(SelectionControllerRaycastTest, MultipleMeshes_ReturnsClosest)
 TEST_F(SelectionControllerRaycastTest, MeshBehindCamera_NotHit)
 {
 	auto mesh = std::make_shared<Mesh>();
-	mesh->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f)); // behind camera (camera at z=5, looking toward -z)
+	mesh->SetPosition(glm::vec3(0.0f, 10.0f, 0.0f)); // behind camera (camera at y=5, looking toward +Y)
 	int meshId = mesh->GetObjectID();
 	m_scene->UseMesh(mesh);
 
@@ -413,7 +413,7 @@ protected:
 		m_scene = std::make_unique<Scene>();
 
 		m_camera = std::make_shared<Camera>();
-		m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+		m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
 		m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		m_camera->cam_w = 800.0f;
 		m_camera->cam_h = 600.0f;

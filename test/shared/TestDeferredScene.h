@@ -16,7 +16,7 @@
  *
  * Scene layout:
  *   - Sphere at origin, scaled by 0.25
- *   - Camera at (0, 2, 5) looking at origin, 60° FOV
+ *   - Camera at (0, -5, 2) looking at origin, 60° FOV (Z-up: +Y=forward, +Z=up)
  *   - Point light at (2, 2, 2), power 10, radius 10, white
  *   - Material: metallic 0, roughness 0.5, albedo white
  */
@@ -66,7 +66,7 @@ struct DeferredSceneResources
  * roughness=0.5, albedo=white), uploads the mesh to GPU, and assembles a
  * GeometryRenderItem with 0.25x scale.
  *
- * Camera: position (0, 2, 5), target (0, 0, 0), 60° FOV.
+ * Camera: position (0, -5, 2), target (0, 0, 0), 60° FOV (Z-up: +Y=forward, +Z=up).
  * Light:  POINTLIGHT at (2, 2, 2), power 10, radius 10, colour white.
  *
  * @param device           Logical device.
@@ -125,9 +125,9 @@ inline DeferredSceneResources BuildDeferredScene(
 	item.pushConstants.model = glm::scale(glm::mat4(1.0f), glm::vec3(0.25f));
 	item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
-	// --- Create camera (pos 0,2,5, target origin, 60° FOV) ---
+	// --- Create camera (pos 0,-5,2, target origin, 60° FOV, Z-up) ---
 	res.camera = std::make_shared<Camera>(width, height, 60.0f, 0.1f, 100.0f);
-	res.camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	res.camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	// --- Create point light (pos 2,2,2, power 10, radius 10, white) ---

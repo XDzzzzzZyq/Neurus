@@ -4,7 +4,7 @@
  *
  * Provides LoadMultiShadow() which procedurally generates a unit cube
  * (centered at origin, positioned at (0,0,0)) and a large
- * ground plane (y=0, [-10,10] in XZ), with N shadow-casting lights.
+ * ground plane (z=0, [-10,10] in XY), with N shadow-casting lights.
  *
  * Usage:
  * @code
@@ -14,11 +14,11 @@
  * @endcode
  *
  * Light placement:
- *   - POINTLIGHT (default): N point lights on a ring (y=2, radius=2),
+ *   - POINTLIGHT (default): N point lights on a ring (z=2, radius=2),
  *     each casting shadows downward onto the plane.
  *   - SUNLIGHT: N directional lights placed on the same ring, each
  *     rotated to point toward the cube centre (origin).  The rotation
- *     maps the default forward direction (0,0,-1) to the vector from
+ *     maps the default forward direction (0,1,0) to the vector from
  *     the ring position toward origin.
  *
  * Geometry is 100% procedural via OBJ strings -- no OBJ files needed.
@@ -68,14 +68,14 @@ struct MultiShadowResources
  * Generates:
  *   - A unit cube (12 triangles, 8 vertices, 36 indices) centred at origin
  *     covering [-0.5, +0.5]^3, positioned at (0,0,0) (resting on the plane).
- *   - A ground-plane quad (2 triangles, 4 vertices, 6 indices) at y=0,
- *     spanning [-10,10] in XZ, facing +Y.
+ *   - A ground-plane quad (2 triangles, 4 vertices, 6 indices) at z=0,
+ *     spanning [-10,10] in XY, facing +Z.
  *
  * The cube and plane both use identity model matrices (cube geometry at origin,
- * plane geometry at y=0).
+ * plane geometry at z=0).
  *
  * Lights: for POINTLIGHT (default), lights are placed on a circle of radius 2
- * at y=2.  For SUNLIGHT, lights are also placed on the circle at the same
+ * at z=2.  For SUNLIGHT, lights are also placed on the circle at the same
  * positions but configured as directional sun lights whose forward direction
  * points toward the cube centre (origin).
  *
@@ -159,17 +159,17 @@ f 2 6 7 3
 	}
 
 	// ===================================================================
-	//  2. Plane: large quad at y=0, [-10,10] in XZ, facing +Y
+	//  2. Plane: large quad at z=0, [-10,10] in XY, facing +Z
 	//     4 vertices, 2 triangles (6 indices)
 	// ===================================================================
 
 	const char* kPlaneObj = R"OBJ(
-v -10 0 -10
-v 10 0 -10
-v 10 0 10
-v -10 0 10
+v -10 -10 0
+v 10 -10 0
+v 10 10 0
+v -10 10 0
 
-f 1 4 3 2
+f 1 2 3 4
 )OBJ";
 
 	{
@@ -193,7 +193,7 @@ f 1 4 3 2
 		item.indexBuffer  = planeMesh->GetIndexBuffer()->buffer();
 		item.indexCount   = planeMesh->GetGPUIndexCount();
 		item.indexType    = vk::IndexType::eUint32;
-		// Identity: plane geometry is already in world space (y=0, spans ±10 in XZ).
+		// Identity: plane geometry is already in world space (z=0, spans ±10 in XY).
 		item.pushConstants.model        = glm::mat4(1.0f);
 		item.pushConstants.normalMatrix = glm::mat4(1.0f);
 
@@ -201,17 +201,17 @@ f 1 4 3 2
 	}
 
 	// ===================================================================
-	//  3. N lights on a circle at y=2, radius r=2, all shadow-casting,
+	//  3. N lights on a circle at z=2, radius r=2, all shadow-casting,
 	//     power=5, colour=white.
 	//
-	//     POINTLIGHT: lights are above the cube (at y=2 vs cube at y=0)
+	//     POINTLIGHT: lights are above the cube (at z=2 vs cube at z=0)
 	//       so shadows project downward onto the plane.
 	//     SUNLIGHT: directional lights whose forward direction points
 	//       from the ring position toward the cube centre (origin).
 	//
 	//     Lights are distributed evenly around the circle at angles
-	//     0deg, 360deg/N, etc.  Camera at (0, 3, 0.001) provides a
-	//     good view of the cube + plane + shadows.
+	//     0deg, 360deg/N, etc.  Camera at (0, 1, 3) provides a
+	//     good view of the cube + plane + shadows (Z-up).
 	// ===================================================================
 
 	for (int i = 0; i < numLights; ++i)
@@ -219,25 +219,34 @@ f 1 4 3 2
 		const float radius = 2.0f;
 		const float angle = glm::radians(
 			static_cast<float>(i) * 360.0f / static_cast<float>(numLights));
-		glm::vec3 pos(radius * cos(angle), 2.0f, radius * sin(angle));
+		glm::vec3 pos(radius * cos(angle), radius * sin(angle), 2.0f);
 
 		if (lightType == LightType::SUNLIGHT)
 		{
 			// Directional light pointing from ring position toward origin.
 			// Compute Euler angles (pitch, yaw, 0) that rotate the default
-			// forward (0,0,-1) to the direction from pos toward origin.
+			// forward (0,1,0) to the direction from pos toward origin.
 			const glm::vec3 dir = glm::normalize(glm::vec3(0.0f) - pos);
-			const float pitchRad = asin(dir.y);
-			const float yawRad   = atan2(-dir.x, -dir.z);
+			const float pitchRad = asin(dir.z);
+			// yaw = atan2(-dir.x, dir.y) inverts GetDirection():
+			//   d.x = -cos(p) * sin(y)  →  sin(y) = -dir.x / cos(p)
+			//   d.y =  cos(p) * cos(y)  →  cos(y) =  dir.y / cos(p)
+			const float yawRad   = atan2(-dir.x, dir.y);
 
 			auto light = std::make_shared<Light>(LightType::SUNLIGHT, 5.0f, glm::vec3(1.0f));
 			light->o_name    = "MultiShadowSunLight_" + std::to_string(i);
+			light->SetPower(0.5f);
+			// m_rotation = (pitch=X, roll=Y, yaw=Z)
 			light->SetRotation(glm::vec3(
 				glm::degrees(pitchRad),
-				glm::degrees(yawRad),
-				0.0f));
+				0.0f,  // roll = 0
+				glm::degrees(yawRad)));
 			light->SetShadow(true);
 
+			NEURUS_LOG("[LoadMultiShadow] Sunlight " << i << " pos=" << pos.x << ", " << pos.y << ", " << pos.z << " pitch=" << glm::degrees(pitchRad) << " yaw=" << glm::degrees(yawRad));
+
+			const glm::vec3 updated_dir = light->GetDirection();
+			NEURUS_LOG("[LoadMultiShadow] Sunlight " << i << " origin dir=" << dir.x << ", " << dir.y << ", " << dir.z << " updated=" << updated_dir.x << ", " << updated_dir.y << ", " << updated_dir.z);
 			res.scene->UseLight(light);
 			res.lightUIDs.push_back(light->GetObjectID());
 		}
@@ -258,14 +267,14 @@ f 1 4 3 2
 	}
 
 	// ===================================================================
-	//  4. Camera at (0, 3, 1) looking at origin — provides a clear view
+	//  4. Camera at (0, 1, 3) looking at origin — provides a clear view
 	//     of the cube(shadow caster) and the plane below with shadows.
 	// ===================================================================
 
 	{
 		auto cam = std::make_shared<Camera>(256.0f, 256.0f, 75.0f, 0.1f, 100.0f);
 		cam->o_name = "MultiShadowCamera";
-		cam->SetCamPos(glm::vec3(0.0f, 3.0f, 1.0f));  // 0.001 Z avoids degenerate lookAt
+		cam->SetCamPos(glm::vec3(0.0f, 1.0f, 3.0f));  // looking down at origin from above (Z-up)
 		cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		res.scene->UseCamera(cam);
 	}

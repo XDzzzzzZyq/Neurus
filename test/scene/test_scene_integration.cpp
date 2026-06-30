@@ -273,11 +273,11 @@ TEST(SceneIntegrationTest, UpdateObjTransformsIteratesAll)
 	auto dPoints = std::make_shared<DebugPoints>();
 
 	// Set distinct positions
-	cam->SetPosition(glm::vec3(0.0f, 1.0f, 5.0f));
-	light->SetPosition(glm::vec3(2.0f, 3.0f, 0.0f));
-	mesh->SetPosition(glm::vec3(-1.0f, 0.0f, 2.0f));
+	cam->SetPosition(glm::vec3(0.0f, 5.0f, 1.0f));
+	light->SetPosition(glm::vec3(2.0f, 0.0f, 3.0f));
+	mesh->SetPosition(glm::vec3(-1.0f, 2.0f, 0.0f));
 	dLine->SetPosition(glm::vec3(10.0f, 0.0f, 0.0f));
-	dPoints->SetPosition(glm::vec3(0.0f, -5.0f, 0.0f));
+	dPoints->SetPosition(glm::vec3(0.0f, 0.0f, -5.0f));
 
 	scene.UseCamera(cam);
 	scene.UseLight(light);
@@ -312,16 +312,16 @@ TEST(SceneIntegrationTest, UpdateObjTransformsIteratesAll)
 
 	// Translation components should match set positions
 	EXPECT_FLOAT_EQ(camMat[3][0], 0.0f);
-	EXPECT_FLOAT_EQ(camMat[3][1], 1.0f);
-	EXPECT_FLOAT_EQ(camMat[3][2], 5.0f);
+	EXPECT_FLOAT_EQ(camMat[3][1], 5.0f);
+	EXPECT_FLOAT_EQ(camMat[3][2], 1.0f);
 
 	EXPECT_FLOAT_EQ(lightMat[3][0], 2.0f);
-	EXPECT_FLOAT_EQ(lightMat[3][1], 3.0f);
-	EXPECT_FLOAT_EQ(lightMat[3][2], 0.0f);
+	EXPECT_FLOAT_EQ(lightMat[3][1], 0.0f);
+	EXPECT_FLOAT_EQ(lightMat[3][2], 3.0f);
 
 	EXPECT_FLOAT_EQ(meshMat[3][0], -1.0f);
-	EXPECT_FLOAT_EQ(meshMat[3][1], 0.0f);
-	EXPECT_FLOAT_EQ(meshMat[3][2], 2.0f);
+	EXPECT_FLOAT_EQ(meshMat[3][1], 2.0f);
+	EXPECT_FLOAT_EQ(meshMat[3][2], 0.0f);
 }
 
 /**
@@ -359,7 +359,7 @@ TEST(SceneIntegrationTest, CameraPropertiesAfterRegistration)
 	Scene scene;
 
 	auto cam = std::make_shared<Camera>(1920.0f, 1080.0f, 45.0f, 0.05f, 500.0f);
-	cam->SetPosition(glm::vec3(0.0f, 2.0f, -10.0f));
+	cam->SetPosition(glm::vec3(0.0f, -10.0f, 2.0f));
 	cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	scene.UseCamera(cam);
@@ -373,7 +373,7 @@ TEST(SceneIntegrationTest, CameraPropertiesAfterRegistration)
 	EXPECT_FLOAT_EQ(found->cam_pers,  45.0f);
 	EXPECT_FLOAT_EQ(found->cam_near,  0.05f);
 	EXPECT_FLOAT_EQ(found->cam_far,   500.0f);
-	EXPECT_FLOAT_EQ(found->GetPosition().y, 2.0f);
+	EXPECT_FLOAT_EQ(found->GetPosition().y, -10.0f);
 	EXPECT_FLOAT_EQ(found->cam_tar.z, 0.0f);
 }
 
@@ -390,7 +390,7 @@ TEST(SceneIntegrationTest, LightPropertiesAfterRegistration)
 	Scene scene;
 
 	auto light = std::make_shared<Light>(LightType::SPOTLIGHT, 50.0f, glm::vec3(0.2f, 0.8f, 0.3f));
-	light->SetPosition(glm::vec3(5.0f, 10.0f, 0.0f));
+	light->SetPosition(glm::vec3(5.0f, 0.0f, 10.0f));
 	light->light_radius = 0.12f;
 	light->spot_cutoff  = 0.85f;
 

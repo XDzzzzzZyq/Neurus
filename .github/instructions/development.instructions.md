@@ -142,9 +142,10 @@ Bugs encountered during Sun Light implementation and their fixes:
 | Zero sun contribution | HDRColor = point lights only | `UploadSunLights()` never called; SSBO uninitialized | Trace call chain: `DeferredRenderer::Record()` → verify upload methods are called |
 | Uniform HDRColor | All pixels same value | Clear value or frustum range mismatch between test and production | Match ortho frustum dimensions across tests and scene setup |
 | Descriptor VUID violation | `VUID-vkCmdDispatch-viewType-*` | Wrong descriptor set bound for the active pipeline | Each light type needs its own descriptor set layout/update; trace set/pipeline pairing in `Record()` |
-| Build race condition | EXE locked by another process | Two agents building simultaneously; one hold file lock while other tries to write | Only one agent runs build + tests; all others compile-check only |
+| Build race condition | EXE locked by another process | Two agents building simultaneously; one holds file lock while other tries to write | Only one agent runs build + tests; all others compile-check only via `lsp_diagnostics` |
 | Depth range wrong | Shadow map depth values off by 2x | `glm::ortho()` defaults to OpenGL depth range [-1,1] | Define `GLM_FORCE_DEPTH_ZERO_TO_ONE` before any GLM include |
 | Shadow intensity all zero | No shadow on any pixel | `sampler2DShadow` comparison mode not enabled on sampler | Set `VK_COMPARE_OP_LESS_OR_EQUAL` in sampler create info |
+| Stale reference from wrong cwd | Reference images created at `D:\Projects\test\render\reference\` instead of `test/render/reference/` | Running test binary from `build/debug/` instead of `build/debug/test/` changes `../../../res/` path resolution | Always use `ctest` from `build/debug/`, or cd to `build/debug/test/` before running the test binary directly |
 
 ## Phase 5: Commit
 

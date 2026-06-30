@@ -1,8 +1,14 @@
 /**
  * @file Transform.cpp
- * @brief Implementation of Transform3D spatial query methods.
+ * @brief Implementation of Transform3D methods.
  *
- * Provides the direction vector computation from Euler angle rotation.
+ * Provides TRS matrix computation, direction vector calculation,
+ * and normal matrix derivation from Euler angle rotation.
+ *
+ * Coordinate System: Z-up, right-hand, +Y forward.
+ *   - X = right, Y = forward, Z = up
+ *   - Euler order: pitch (X), yaw (Z), roll (Y)
+ *   - Model matrix: T * Rz(yaw) * Rx(pitch) * Ry(roll) * S
  */
 
 #include "scene/Transform.h"
@@ -12,18 +18,76 @@
 
 namespace neurus {
 
+// -----------------------------------------------------------------------
+// Setters
+// -----------------------------------------------------------------------
+
+void Transform3D::SetPosition(const glm::vec3& pos)
+{
+	m_position = pos;
+	m_dirty = true;
+}
+
+void Transform3D::SetRotation(const glm::vec3& degrees)
+{
+	m_rotation = degrees;
+	m_dirty = true;
+}
+
+void Transform3D::SetScale(const glm::vec3& scale)
+{
+	m_scale = scale;
+	m_dirty = true;
+}
+
+// -----------------------------------------------------------------------
+// Matrix computation
+// -----------------------------------------------------------------------
+
+glm::mat4 Transform3D::GetModelMatrix() const
+{
+	if (!m_dirty)
+	{
+		return m_cachedMatrix;
+	}
+
+	glm::mat4 mat{1.0f};
+	const glm::vec3 rad = glm::radians(m_rotation);
+
+	// TRS: T * Rz(yaw) * Rx(pitch) * Ry(roll) * S
+	mat = glm::translate(mat, m_position);
+	mat = glm::rotate(mat, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Yaw   (Z = up)
+	mat = glm::rotate(mat, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
+	mat = glm::rotate(mat, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Roll  (Y = forward)
+	mat = glm::scale(mat, m_scale);
+
+	m_cachedMatrix = mat;
+	m_dirty = false;
+	return m_cachedMatrix;
+}
+
 glm::vec3 Transform3D::GetDirection() const
 {
-	// Build rotation matrix matching GetModelMatrix() order: Rx * Ry * Rz
+	// Build rotation matrix matching GetModelMatrix() order: Rz * Rx * Ry
 	const glm::vec3 rad = glm::radians(m_rotation);
 	glm::mat4 rot{1.0f};
+	rot = glm::rotate(rot, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Yaw   (Z = up)
 	rot = glm::rotate(rot, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
-	rot = glm::rotate(rot, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Yaw   (Y)
-	rot = glm::rotate(rot, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Roll  (Z)
+	rot = glm::rotate(rot, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Roll  (Y = forward)
 
-	// Local forward = (0, 0, -1), rotate by the 3x3 rotation part
-	const glm::vec3 forward = glm::vec3(rot * glm::vec4(0.0f, 0.0f, -1.0f, 0.0f));
+	// Local forward = +Y (0, 1, 0), rotate by the 3x3 rotation part
+	// Ry(roll) has no effect on (0,1,0) since it's axis-aligned.
+	// Effective: d = Rz(yaw) * Rx(pitch) * (0,1,0)
+	//   d.x = -cos(pitch) * sin(yaw)
+	//   d.y =  cos(pitch) * cos(yaw)
+	//   d.z =  sin(pitch)
+	const glm::vec3 forward = glm::vec3(rot * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f));
 	return glm::normalize(forward);
+}
+
+glm::mat3 Transform3D::GetNormalMatrix() const
+{
+	return glm::transpose(glm::inverse(glm::mat3(GetModelMatrix())));
 }
 
 } // namespace neurus

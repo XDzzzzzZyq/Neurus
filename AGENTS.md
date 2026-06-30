@@ -242,6 +242,57 @@ Neurus/
 
 ---
 
+## Coordinate System Convention (Z-up, +Y forward)
+
+The entire codebase uses a **Z-up, +Y forward, right-hand** coordinate system
+(Blender convention):
+
+- Up direction: `+Z` (positive Z is world-space up)
+- Forward direction: `+Y` (positive Y is forward/north)
+- Right direction: `+X`
+- Euler rotation storage: `m_rotation = (pitch=X, roll=Y, yaw=Z)`
+- Rotation multiplication order: `T * Rz(yaw) * Rx(pitch) * Ry(roll) * S`
+- `Transform::GetDirection()`: `d = Rz(yaw) · Rx(pitch) · Ry(roll) · (0,1,0)`
+  (rotates forward vector)
+- View space is **left-handed** (`GLM_FORCE_DEPTH_ZERO_TO_ONE`): `+Z` is forward
+  from camera, NDC Z range is `[0, 1]`.
+- Camera projection requires `proj[1][1] *= -1` to flip Y for Vulkan NDC
+  (NDC Y=-1 at top, Y=+1 at bottom).
+- `CameraController` spherical coordinates: elevation=`asin(dir.z)`,
+  azimuth=`atan2(dir.x, dir.y)` (angle from +Y forward axis).
+- Test helpers: `MakeTestCamera(w, h)` places camera at `(0,0,2)` with
+  up=`(0,0,1)`.
+
+**IMPORTANT**: OBJ files exported from Blender use Blender's native convention
+(Z-up, +Y forward) — do NOT edit .obj files.
+
+---
+
+## Subagent Build/Test Racing Prevention
+
+Multiple parallel subagents can race on `cmake --build` or launching
+`Neurus.exe`, causing file lock contention and false test failures.
+
+**Rules:**
+1. **Only the master agent runs `cmake --build build/debug`** for the final
+   verification. Subagents must NOT run builds or tests.
+2. **Only one agent runs `ctest` or `Neurus.exe` at a time.** The EXE/DLL
+   is locked by the first process; a second concurrent launch fails with
+   "Access denied" or "file in use".
+3. **Subagents may compile-check** individual files via `lsp_diagnostics`
+   but must NOT invoke the build system.
+4. **Never run `Neurus.exe` or the test binary from a subagent** — always
+   let the master agent handle it.
+
+**Test working directory**: CTest runs with `WorkingDirectory = build/debug/test/`.
+Running the test binary directly from `build/debug/` causes `../../../res/`
+path resolution to differ. Always use `ctest` from `build/debug/`, or if
+running the test binary directly, cd to `build/debug/test/` first. Running
+from the wrong directory can create stale reference images at incorrect
+paths (e.g. `D:\Projects\test\render\reference\`).
+
+---
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

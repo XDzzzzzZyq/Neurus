@@ -513,9 +513,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			// Orthographic projection covering ±field around the origin
 			const glm::mat4 lightProj = glm::ortho(-field, field, -field, field, nearPlane, farPlane);
 
-			// View matrix: match ShadowDepthPass sun-path convention.
-			// World-up = (0,1,0); alternate-up = (1,0,0) for overhead/sun straight-down.
-			constexpr glm::vec3 kWorldUp(0.0f, 1.0f, 0.0f);
+		// View matrix: match ShadowDepthPass sun-path convention.
+		// World-up = (0,0,1); alternate-up = (1,0,0) for overhead/sun straight-down.
+		constexpr glm::vec3 kWorldUp(0.0f, 0.0f, 1.0f);
 			constexpr glm::vec3 kAltUp(1.0f, 0.0f, 0.0f);
 			const glm::vec3 up = (glm::abs(glm::dot(lightDir, kWorldUp)) > 0.999f)
 				? kAltUp : kWorldUp;

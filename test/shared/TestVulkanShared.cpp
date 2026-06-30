@@ -245,9 +245,9 @@ CameraUBOData VulkanTestShared::MakeTestCamera(uint32_t width, uint32_t height)
 		static_cast<float>(width) / static_cast<float>(height),
 		0.1f, 100.0f);
 	const glm::mat4 view = glm::lookAt(
-		glm::vec3(0.0f, 0.0f, 2.0f),
+		glm::vec3(0.0f, -2.0f, 0.0f),
 		glm::vec3(0.0f, 0.0f, 0.0f),
-		glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::vec3(0.0f, 0.0f, 1.0f));
 	cam.viewProj = proj * view;
 	cam.view = view;
 	return cam;
@@ -261,9 +261,9 @@ std::pair<std::vector<TestVertex>, std::vector<uint32_t>> VulkanTestShared::Test
 {
 	std::vector<TestVertex> verts = {
 		//  posX  posY posZ    nrmX nrmY nrmZ    uvX  uvY
-		{   0.0f,-0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.5f, 1.0f },
-		{   0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 1.0f, 0.0f },
-		{  -0.5f, 0.5f, 0.0f,  0.0f, 0.0f, 1.0f, 0.0f, 0.0f },
+		{   0.0f, 0.0f,-0.5f,  0.0f, 1.0f, 0.0f, 0.5f, 1.0f },
+		{   0.5f, 0.0f, 0.5f,  0.0f, 1.0f, 0.0f, 1.0f, 0.0f },
+		{  -0.5f, 0.0f, 0.5f,  0.0f, 1.0f, 0.0f, 0.0f, 0.0f },
 	};
 	std::vector<uint32_t> indices = { 0, 1, 2 };
 	return { verts, indices };

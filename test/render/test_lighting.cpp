@@ -103,12 +103,12 @@ protected:
 		// Build test triangle mesh from inline OBJ data → Mesh → UploadToGPU
 		const std::string triObj =
 			"o TestTriangle\n"
-			"v 0.0 -0.5 0.0\n"
-			"v 0.5 0.5 0.0\n"
-			"v -0.5 0.5 0.0\n"
-			"vn 0.0 0.0 1.0\n"
-			"vn 0.0 0.0 1.0\n"
-			"vn 0.0 0.0 1.0\n"
+			"v  0.0  0.0 -0.5\n"
+			"v  0.5  0.0  0.5\n"
+			"v -0.5  0.0  0.5\n"
+			"vn 0.0 -1.0 0.0\n"
+			"vn 0.0 -1.0 0.0\n"
+			"vn 0.0 -1.0 0.0\n"
 			"vt 0.5 1.0\n"
 			"vt 1.0 0.0\n"
 			"vt 0.0 0.0\n"
@@ -268,7 +268,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	{
 		Scene scene;
 		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 50.0f, glm::vec3(1.0f, 1.0f, 1.0f));
-		light->SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));
+		light->SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));  // Z-up: above the triangle
 		scene.UseLight(light);
 		m_lightingPass->UploadLights(scene);
 	}
@@ -282,7 +282,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
-			.cameraPos = glm::vec3(0.0f, 0.0f, 2.0f),
+			.		cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
 			.invProjView = glm::inverse(testCam.viewProj),
 		});
 
@@ -360,7 +360,7 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
-			.cameraPos = glm::vec3(0.0f, 0.0f, 2.0f),
+			.		cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
 			.invProjView = glm::inverse(testCam.viewProj),
 		};
 		m_lightingPass->Record(*cmd, *m_renderCache, ctx);

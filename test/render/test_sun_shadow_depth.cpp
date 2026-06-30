@@ -1,12 +1,15 @@
 /**
  * @file test_sun_shadow_depth.cpp
- * @brief GPU test: renders a plane into sun-light orthographic shadow depth map,
+ * @brief GPU test: renders a quad into sun-light orthographic shadow depth map,
  *        reads back D32 depth, verifies pixel-by-pixel against mathematical expectation.
  *
- * Scene: Sun dir=(0,0,-1), light at origin, ortho field=2.5, near=-10, far=10.
- * Quad at z=5 (full-field 5x5) -> view z_v = 5-10 = -5
- * -> ndc.z = (far - z_v) / (far - near) = (10-(-5))/20 = 0.75
- * Formula: ndc.z = (far - z_v) / (far - near)  (Vulkan reverse-depth).
+ * Z-up convention: +Y=forward, +Z=up. Sun dir=(0,1,0)=+Y, light at origin,
+ * ortho field=2.5, near=-10, far=10.
+ * Camera: eye = center - sunDir * farPlane = (0,-10,0), looks at center=(0,0,0).
+ * GLM_FORCE_DEPTH_ZERO_TO_ONE → left-handed view (Vz = +y + 10).
+ * Quad at y=-5 (5 units from eye toward center), Vz = 5.
+ * NDC Z = (Vz - near) / (far - near) = (5 - (-10)) / 20 = 15/20 = 0.75
+ * Quad spans full field to fill shadow map.
  * Tolerance: +/-3/255. Reference: first run SKIP, second PASS.
  */
 
@@ -41,7 +44,7 @@ protected:
 	static constexpr float    kField = Light::sun_shadow_field;   // 2.5
 	static constexpr float    kNear  = Light::sun_shadow_near;    // -10
 	static constexpr float    kFar   = Light::sun_shadow_far;     // 10
-	static constexpr float    kQuadZ = 5.f;     // world-space z (z_view = 5-10 = -5)
+	static constexpr float    kQuadY = -5.f;   // world-space y (quad at Y=-5, 5 units forward from eye — Z-up)
 	static constexpr float    kQSize = 2.5f;   // half-width (quad = 5x5, fills full field)
 	static constexpr float    kTol   = 3.f / 255.f;
 
@@ -52,8 +55,12 @@ protected:
 	void TearDown() override { VulkanTestShared::TearDown(); }
 
 	static float ExpectedDepth() {
-		float zv = kQuadZ - kFar;   // view-space z: 5 - 10 = -5
-		return (kFar - zv) / (kFar - kNear);  // (10-(-5))/20 = 0.75
+		// Z-up: camera at Y=-10 looking +Y, quad at Y=-5.
+		// GLM_FORCE_DEPTH_ZERO_TO_ONE → left-handed view: +Z = forward.
+		// Vz = world_y - eye_y = -5 - (-10) = 5 (in view-space)
+		// ndc = (Vz - near) / (far - near) = (5 - (-10)) / 20 = 15/20 = 0.75
+		float Vz = kQuadY + kFar;  // -5 + 10 = 5
+		return (Vz - kNear) / (kFar - kNear);  // (5 - (-10))/20 = 0.75
 	}
 
 	static std::vector<uint8_t> DepthToRGBA8(const std::vector<float>& d) {
@@ -68,12 +75,12 @@ protected:
 	struct TS { std::shared_ptr<Scene> s; std::vector<GeometryRenderItem> items; int uid=-1; };
 	TS BuildScene() {
 		TS r; r.s=std::make_shared<Scene>();
-		// Quad at z=5 covering full ortho field (±2.5) to fill entire shadow map
+		// Quad at y=-5 in XZ plane, 5 units forward from the sun shadow camera at (0,-10,0)
 		const char* ob =
-			"v -2.5 -2.5 5\n"
-			"v  2.5 -2.5 5\n"
-			"v  2.5  2.5 5\n"
-			"v -2.5  2.5 5\n"
+			"v -2.5 -5 -2.5\n"
+			"v  2.5 -5 -2.5\n"
+			"v  2.5 -5  2.5\n"
+			"v -2.5 -5  2.5\n"
 			"f 1 2 3 4\n";
 		auto md=std::make_shared<MeshData>(); md->LoadObjFromString(ob);
 		auto m=std::make_shared<Mesh>(); m->o_name="Q"; m->o_mesh=md;

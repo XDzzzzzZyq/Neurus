@@ -5,8 +5,8 @@
  *        pixel against mathematically-computed expected depth values.
  *
  * Mathematical verification:
- *   - Cube unit at [-0.5, +0.5]^3 positioned at (0,3,0), plane at y=0 spanning [-10,10] in XZ
- *   - Point light at (0, 6, 0), farPlane from Light::point_shadow_far
+ *   - Cube unit at [-0.5, +0.5]^3 positioned at (0,0,3), plane at z=0 spanning [-10,10] in XY (Z-up convention)
+ *   - Point light at (0, 0, 6), farPlane from Light::point_shadow_far
  *   - Depth = dist(lightPos, worldPos) / farPlane written by fragment shader
  *   - For each pixel (px,py) on each face, ray-cast from light to determine expected depth
  *   - Compare pixel-by-pixel with tolerance +/-3/255 (~0.01176)
@@ -110,13 +110,13 @@ protected:
 	static PixelCategory CategorizePixel(const glm::vec3& dir, const glm::vec3& lightPos,
 	                                     const glm::vec3& cubePos = glm::vec3(0.0f))
 	{
-		// Plane y=0 intersection (bounded to [-10, 10] in XZ)
-		const float t_plane = -lightPos.y / dir.y;
+		// Plane z=0 intersection (bounded to [-10, 10] in XY)
+		const float t_plane = -lightPos.z / dir.z;
 		bool hitsPlane = false;
 		if (t_plane > 0.0f)
 		{
 			const glm::vec3 hp = lightPos + t_plane * dir;
-			hitsPlane = (std::abs(hp.x) <= 10.0f && std::abs(hp.z) <= 10.0f);
+			hitsPlane = (std::abs(hp.x) <= 10.0f && std::abs(hp.y) <= 10.0f);
 		}
 
 		// Cube AABB slab test (cube centered at cubePos, extent ±0.5)
@@ -189,13 +189,13 @@ protected:
 
 		const glm::vec3 dir = glm::normalize(FaceDirection(faceIdx, sx, sy));
 
-		// --- Plane y=0 intersection ---
-		const float t_plane = -lightPos.y / dir.y;
+		// --- Plane z=0 intersection ---
+		const float t_plane = -lightPos.z / dir.z;
 		bool hitsPlaneInBounds = false;
 		if (t_plane > 0.0f)
 		{
 			const glm::vec3 hitPoint = lightPos + t_plane * dir;
-			if (std::abs(hitPoint.x) <= 10.0f && std::abs(hitPoint.z) <= 10.0f)
+			if (std::abs(hitPoint.x) <= 10.0f && std::abs(hitPoint.y) <= 10.0f)
 				hitsPlaneInBounds = true;
 		}
 
@@ -472,19 +472,19 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			<< "Face " << face << ": " << badPixels
 			<< " pixels exceed tolerance " << kTolerance;
 
-		// Face-specific sanity checks
-		if (face == 3)  // -Y: sees cube + plane
+		// Face-specific sanity checks (Z-up convention)
+		if (face == 5)  // -Z: looks down, sees cube + plane
 		{
 			EXPECT_GT(cubePixels, 50)
-				<< "Face -Y: cube should cover at least 50 pixels";
+				<< "Face -Z: cube should cover at least 50 pixels (Z-up)";
 			EXPECT_GT(planePixels, 1000)
-				<< "Face -Y: plane should cover most non-cube pixels";
+				<< "Face -Z: plane should cover most non-cube pixels (Z-up)";
 		}
-		else if (face == 2)  // +Y: looks up, sees nothing
+		else if (face == 4)  // +Z: looks up, sees nothing
 		{
-			EXPECT_EQ(cubePixels, 0)   << "Face +Y: should see no cube pixels";
-			EXPECT_EQ(planePixels, 0)  << "Face +Y: should see no plane pixels";
-			EXPECT_GT(bgPixels, 0)     << "Face +Y: all pixels should be background";
+			EXPECT_EQ(cubePixels, 0)   << "Face +Z: should see no cube pixels (Z-up)";
+			EXPECT_EQ(planePixels, 0)  << "Face +Z: should see no plane pixels (Z-up)";
+			EXPECT_GT(bgPixels, 0)     << "Face +Z: all pixels should be background (Z-up)";
 		}
 
 		// 5d. Reference image regression

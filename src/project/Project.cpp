@@ -99,7 +99,7 @@ Project Project::CreateDefault(const std::string& objPath)
 	// --- Camera ---
 	// Default constructor: FOV 60°, near 0.1, far 100, pos(0,0,0), tar(0,0,0)
 	auto camera = std::make_shared<Camera>();
-	camera->SetCamPos(glm::vec3(0.0f, 2.0f, 5.0f));
+	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 	project.m_scene->UseCamera(camera);
 

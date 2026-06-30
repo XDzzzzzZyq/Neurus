@@ -396,7 +396,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		const glm::mat4 orthoProj = glm::ortho(-field, field, -field, field,
 		                                       nearPlane, farPlane);
 
-		constexpr glm::vec3 kWorldUp(0.0f, 1.0f, 0.0f);
+		constexpr glm::vec3 kWorldUp(0.0f, 0.0f, 1.0f);
 		constexpr glm::vec3 kAltUp(1.0f, 0.0f, 0.0f);
 
 		for (const auto& [uid, lightPtr] : ctx.scene->light_list)

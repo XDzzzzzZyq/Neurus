@@ -157,7 +157,18 @@ Renderer Layer owns:
 - Debug builds: Vulkan validation layers enabled
 - Handle `VK_ERROR_DEVICE_LOST` and `VK_ERROR_OUT_OF_DATE_KHR` gracefully
 
-## Current Scope
+### Coordinate System Convention
+
+- **Z-up, +Y forward, right-hand** coordinate system (Blender convention)
+- Up: `+Z`, Forward: `+Y`, Right: `+X`
+- Euler rotation storage: `m_rotation = (pitch=X, roll=Y, yaw=Z)`
+- Rotation order: `T * Rz(yaw) * Rx(pitch) * Ry(roll) * S`
+- `Transform::GetDirection()` rotates `(0,1,0)` forward vector
+- View space is left-handed (`GLM_FORCE_DEPTH_ZERO_TO_ONE`): `+Z` forward, NDC `[0,1]`
+- Camera projection flips Y for Vulkan NDC: `proj[1][1] *= -1`
+- See AGENTS.md for full reference.
+
+### Current Scope
 
 The project delivers a deferred PBR renderer with geometry pass, lighting
 compute pass, and full G-Buffer pipeline through the four-layer architecture.

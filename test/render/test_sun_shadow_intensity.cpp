@@ -6,10 +6,10 @@
  *
  * Scene (via TestMultiShadow with SUNLIGHT):
  *   - Cube: unit cube [-0.5,0.5]^3 at origin, resting on the plane
- *   - Plane: large quad at y=0 spanning [-10,10] in XZ
- *   - 3 sun lights: placed on a ring (y=2, radius=2), direction pointing
+ *   - Plane: large quad at z=0 spanning [-10,10] in XY
+ *   - 3 sun lights: placed on a ring (z=2, radius=2), direction pointing
  *     toward the cube centre (origin), all shadow-casting
- *   - Camera: at (0, 3, 1) looking at origin, FOV=75°, 256x256
+ *   - Camera: at (0, 1, 3) looking at origin, FOV=75°, 256x256
  *
  * Expected shadow pattern per light:
  *   - Pixels behind the cube on the plane: shadowed (intensity > 0)

@@ -32,19 +32,16 @@ Camera::Camera()
 
 glm::mat4 Camera::GetViewMatrix() const
 {
-	return glm::lookAt(GetPosition(), cam_tar, glm::vec3(0.0f, 1.0f, 0.0f));
+	return glm::lookAt(GetPosition(), cam_tar, glm::vec3(0.0f, 0.0f, 1.0f)); // Z-up
 }
 
-glm::mat4 Camera::GetProjectionMatrix()
+glm::mat4 Camera::GetProjectionMatrix() const
 {
-	if (m_frustumDirty)
-	{
-		const float aspect = cam_w / cam_h;
-		m_cachedProjection = glm::perspective(
+	const float aspect = cam_w / cam_h;
+	glm::mat4 projection = glm::perspective(
 			glm::radians(cam_pers), aspect, cam_near, cam_far);
-		m_frustumDirty = false;
-	}
-	return m_cachedProjection;
+	projection[1][1] *= -1.0f;   // Flip Y for Vulkan NDC (Y=-1 at top)
+	return projection;
 }
 
 // -----------------------------------------------------------------------
@@ -55,13 +52,11 @@ void Camera::ChangeCamRatio(float w, float h)
 {
 	cam_w = w;
 	cam_h = h;
-	m_frustumDirty = true;
 }
 
 void Camera::ChangeCamPersp(float persp)
 {
 	cam_pers = persp;
-	m_frustumDirty = true;
 }
 
 void Camera::SetCamPos(const glm::vec3& pos)

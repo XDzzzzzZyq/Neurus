@@ -13,7 +13,7 @@
  *   - CameraSlideEvent  → Pan   (translate camera parallel to view plane)
  *
  * Coordinate System:
- *   - Right-handed Y-up world space
+ *   - Right-handed Z-up world space (+Y forward)
  *   - Camera forward: derived from target - position
  *
  * Architecture:

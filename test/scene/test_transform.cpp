@@ -85,9 +85,14 @@ TEST(Transform3D, TranslateOnly)
 // -----------------------------------------------------------------------
 
 /**
- * @brief Rotation of 90 degrees around X produces correct rotation matrix.
+ * @brief Rotation of 90 degrees around X (pitch) produces correct rotation matrix.
  *
- * Rx(90°) =
+ * Rx(90°) rotates the basis vectors in Z-up right-hand coordinates:
+ * - X axis (1,0,0): unchanged
+ * - Y axis (0,1,0): rotates to +Z (0,0,1)
+ * - Z axis (0,0,1): rotates to -Y (0,-1,0)
+ *
+ * Matrix:
  * [1,  0,  0, 0]
  * [0,  0, -1, 0]
  * [0,  1,  0, 0]
@@ -121,9 +126,15 @@ TEST(Transform3D, Rotate90X)
 // -----------------------------------------------------------------------
 
 /**
- * @brief Rotation of 90 degrees around Y produces correct rotation matrix.
+ * @brief Rotation of 90 degrees around Y (roll, the forward axis) produces
+ *        correct rotation matrix.
  *
- * Ry(90°) =
+ * Ry(90°) in Z-up right-hand coordinates:
+ * - X axis (1,0,0): rotates to -Z (0,0,-1)
+ * - Y axis (0,1,0): unchanged (rotation axis)
+ * - Z axis (0,0,1): rotates to +X (1,0,0)
+ *
+ * Matrix:
  * [ 0, 0, 1, 0]
  * [ 0, 1, 0, 0]
  * [-1, 0, 0, 0]
@@ -289,34 +300,209 @@ TEST(Transform3D, Dirty_InvalidateForcesRecompute)
 // -----------------------------------------------------------------------
 
 /**
- * @brief Full TRS composition: translate, rotate, and scale combined.
+ * @brief Full TRS composition with yaw=90° (rotation around Z-up axis).
+ *
+ * SetPosition(10,20,30), SetRotation(0,0,90) = pitch=0 roll=0 yaw=90°,
+ * SetScale(2,2,2).
+ *
+ * Model matrix = T * Rz(90°) * S:
+ * - Column 0 (scaled X): Rz(90°)*(2,0,0) = (0, 2, 0)
+ * - Column 1 (scaled Y): Rz(90°)*(0,2,0) = (-2, 0, 0)
+ * - Column 2 (scaled Z): Rz(90°)*(0,0,2) = (0, 0, 2)
+ * - Translation: (10, 20, 30)
  */
 TEST(Transform3D, FullTRS)
 {
 	Transform3D t;
 	t.SetPosition(glm::vec3(10.0f, 20.0f, 30.0f));
-	t.SetRotation(glm::vec3(0.0f, 90.0f, 0.0f)); // Yaw 90°
+	t.SetRotation(glm::vec3(0.0f, 0.0f, 90.0f)); // pitch=0, roll=0, yaw=90°
 	t.SetScale(glm::vec3(2.0f));
 
 	glm::mat4 model = t.GetModelMatrix();
 
-	// After Ry(90°) * S(2), X axis becomes Z: [0, 0, -2]
+	// Column 0 (X axis) - rotates to +Y: (0, 2, 0)
 	EXPECT_NEAR(model[0][0], 0.0f, 1e-6f);
-	EXPECT_NEAR(model[0][1], 0.0f, 1e-6f);
-	EXPECT_FLOAT_EQ(model[0][2], -2.0f);
+	EXPECT_FLOAT_EQ(model[0][1], 2.0f);
+	EXPECT_NEAR(model[0][2], 0.0f, 1e-6f);
 
-	// Y axis unchanged: [0, 2, 0]
-	EXPECT_NEAR(model[1][0], 0.0f, 1e-6f);
-	EXPECT_FLOAT_EQ(model[1][1], 2.0f);
+	// Column 1 (Y axis) - rotates to -X: (-2, 0, 0)
+	EXPECT_FLOAT_EQ(model[1][0], -2.0f);
+	EXPECT_NEAR(model[1][1], 0.0f, 1e-6f);
 	EXPECT_NEAR(model[1][2], 0.0f, 1e-6f);
 
-	// Z axis becomes X: [2, 0, 0]
-	EXPECT_FLOAT_EQ(model[2][0], 2.0f);
+	// Column 2 (Z axis) - unchanged: (0, 0, 2)
+	EXPECT_NEAR(model[2][0], 0.0f, 1e-6f);
 	EXPECT_NEAR(model[2][1], 0.0f, 1e-6f);
-	EXPECT_NEAR(model[2][2], 0.0f, 1e-6f);
+	EXPECT_FLOAT_EQ(model[2][2], 2.0f);
 
 	// Translation: [10, 20, 30]
 	EXPECT_FLOAT_EQ(model[3][0], 10.0f);
 	EXPECT_FLOAT_EQ(model[3][1], 20.0f);
 	EXPECT_FLOAT_EQ(model[3][2], 30.0f);
+}
+
+// -----------------------------------------------------------------------
+// Transform3D - GetDirection
+// -----------------------------------------------------------------------
+
+/**
+ * @brief Helper: compute Euler angles (pitch, roll, yaw) from a forward
+ *        direction vector, matching the Rz*Rx*Ry rotation order used by
+ *        Transform3D with Z-up coordinates and forward = (0, 1, 0).
+ *
+ * Derivation (from GetDirection()):
+ *   d = Rz(yaw) * Rx(pitch) * Ry(roll) * (0, 1, 0)
+ *   Ry(roll) has no effect on the Y-axis forward vector, so:
+ *   d = Rz(yaw) * Rx(pitch) * (0, 1, 0)
+ *     = Rz(yaw) * (0, cos(pitch), sin(pitch))
+ *   d.x = -cos(pitch) * sin(yaw)
+ *   d.y =  cos(pitch) * cos(yaw)
+ *   d.z =  sin(pitch)
+ *
+ * Solving:
+ *   pitch = asin(d.z)
+ *   yaw   = atan2(-d.x, d.y)
+ *
+ * @param dir     Normalized forward direction vector.
+ * @param rollDeg Optional roll angle in degrees (default 0).
+ * @return glm::vec3 of (pitch, roll, yaw) in degrees.
+ *         x = pitch (X), y = roll (Y), z = yaw (Z).
+ */
+static glm::vec3 EulerFromDirection(const glm::vec3& dir, float rollDeg = 0.0f)
+{
+	const float pitchRad = std::asin(dir.z);
+	const float yawRad = std::atan2(-dir.x, dir.y);
+	return glm::vec3(glm::degrees(pitchRad), rollDeg, glm::degrees(yawRad));
+}
+
+/**
+ * @brief GetDirection returns the normalized local-space forward vector (0,1,0)
+ *        rotated by the current Euler angles.
+ *
+ * This test verifies GetDirection() by:
+ * 1. Setting a target point and computing the ground-truth direction.
+ * 2. Converting that direction to Euler angles via EulerFromDirection().
+ * 3. Setting those angles on the transform via SetRotation().
+ * 4. Comparing GetDirection() against the ground-truth direction.
+ */
+
+/**
+ * @brief Identity: no rotation → forward is (0, 1, 0).
+ */
+TEST(Transform3D, GetDirection_Identity)
+{
+	Transform3D t;
+	t.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	const glm::vec3 target(0.0f, 1.0f, 0.0f);
+	const glm::vec3 gtDir = glm::normalize(target - t.GetPosition());
+
+	const glm::vec3 euler = EulerFromDirection(gtDir);
+	t.SetRotation(euler);
+
+	const glm::vec3 dir = t.GetDirection();
+	EXPECT_NEAR(dir.x, gtDir.x, 1e-5f);
+	EXPECT_NEAR(dir.y, gtDir.y, 1e-5f);
+	EXPECT_NEAR(dir.z, gtDir.z, 1e-5f);
+}
+
+/**
+ * @brief Yaw -90°: target to the right (+X) from origin → forward ≈ (1, 0, 0).
+ */
+TEST(Transform3D, GetDirection_YawNeg90)
+{
+	Transform3D t;
+	t.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	const glm::vec3 target(1.0f, 0.0f, 0.0f);
+	const glm::vec3 gtDir = glm::normalize(target - t.GetPosition());
+
+	const glm::vec3 euler = EulerFromDirection(gtDir);
+	t.SetRotation(euler);
+
+	const glm::vec3 dir = t.GetDirection();
+	EXPECT_NEAR(dir.x, gtDir.x, 1e-5f);
+	EXPECT_NEAR(dir.y, gtDir.y, 1e-5f);
+	EXPECT_NEAR(dir.z, gtDir.z, 1e-5f);
+}
+
+/**
+ * @brief Yaw +45°: target at (-1, 1, 0) → forward points left-forward in XY plane.
+ */
+TEST(Transform3D, GetDirection_Yaw45Left)
+{
+	Transform3D t;
+	t.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	const glm::vec3 target(-1.0f, 1.0f, 0.0f);
+	const glm::vec3 gtDir = glm::normalize(target - t.GetPosition());
+
+	const glm::vec3 euler = EulerFromDirection(gtDir);
+	t.SetRotation(euler);
+
+	const glm::vec3 dir = t.GetDirection();
+	EXPECT_NEAR(dir.x, gtDir.x, 1e-5f);
+	EXPECT_NEAR(dir.y, gtDir.y, 1e-5f);
+	EXPECT_NEAR(dir.z, gtDir.z, 1e-5f);
+}
+
+/**
+ * @brief Pitch +30°: target elevated above forward → forward has positive Z component.
+ */
+TEST(Transform3D, GetDirection_PitchUp30)
+{
+	Transform3D t;
+	t.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	// 30° up: forward=(0, cos30, sin30) ≈ (0, 0.866, 0.5)
+	const glm::vec3 target(0.0f, std::cos(glm::radians(30.0f)), std::sin(glm::radians(30.0f)));
+	const glm::vec3 gtDir = glm::normalize(target - t.GetPosition());
+
+	const glm::vec3 euler = EulerFromDirection(gtDir);
+	t.SetRotation(euler);
+
+	const glm::vec3 dir = t.GetDirection();
+	EXPECT_NEAR(dir.x, gtDir.x, 1e-5f);
+	EXPECT_NEAR(dir.y, gtDir.y, 1e-5f);
+	EXPECT_NEAR(dir.z, gtDir.z, 1e-5f);
+}
+
+/**
+ * @brief General 3D: non-trivial pitch, roll, and yaw with Z-up coordinate system.
+ *
+ * Uses known Euler angles (pitch, roll, yaw) = (-30°, 15°, 45°) stored as
+ * vec3(pitch, roll, yaw) matching Transform3D's m_rotation convention.
+ *
+ * Independently computes expected direction via Rz*Rx*Ry * (0,1,0).
+ * Ry(roll) has no effect on the Y-axis forward vector, so:
+ *   d = Rz(45°) * Rx(-30°) * (0, 1, 0)
+ *     = Rz(45°) * (0, cos(-30°), sin(-30°))
+ *     = Rz(45°) * (0, 0.8660254, -0.5)
+ *     = (-sin(45°)*0.8660254, cos(45°)*0.8660254, -0.5)
+ *     ≈ (-0.612372, 0.612372, -0.5)
+ */
+TEST(Transform3D, GetDirection_General3D)
+{
+	Transform3D t;
+	t.SetPosition(glm::vec3(5.0f, 2.0f, -3.0f)); // arbitrary, not at origin
+
+	// pitch=-30°, roll=15°, yaw=45°
+	const glm::vec3 eulerDeg(-30.0f, 15.0f, 45.0f);
+	t.SetRotation(eulerDeg);
+
+	// Independently compute expected direction from Euler angles
+	// Using the same Rz*Rx*Ry rotation order as Transform3D::GetDirection()
+	const glm::vec3 rad = glm::radians(eulerDeg);
+	glm::mat4 rot{1.0f};
+	rot = glm::rotate(rot, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Yaw   (Z)
+	rot = glm::rotate(rot, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
+	rot = glm::rotate(rot, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Roll  (Y)
+
+	const glm::vec3 expected = glm::normalize(
+	    glm::vec3(rot * glm::vec4(0.0f, 1.0f, 0.0f, 0.0f)));
+
+	const glm::vec3 dir = t.GetDirection();
+	EXPECT_NEAR(dir.x, expected.x, 1e-5f);
+	EXPECT_NEAR(dir.y, expected.y, 1e-5f);
+	EXPECT_NEAR(dir.z, expected.z, 1e-5f);
 }

@@ -583,6 +583,7 @@ These patterns were established during deferred PBR development and apply to all
 | Duplicated `TestVertex` struct | `struct TestVertex { ... }` defined locally in test file | Use `TestVertex` from `TestVulkanShared.h` |
 | Duplicated helper functions | `HalfToFloat`, `TransitionGbufferToColorAttachment`, `FindMemoryType` repeated across files | Use static helpers from `VulkanTestShared` |
 | Placeholder/stub test file | File with single `GTEST_SKIP` test | Delete from CMakeLists.txt; do NOT write new test logic unless planned |
+| **Stale reference from wrong cwd** | Reference images appear at `D:\Projects\test\render\reference\` instead of `test/render/reference/` | Running test binary directly from `build/debug/` instead of `build/debug/test/` causes `../../../res/` to resolve differently | Always use `ctest` from `build/debug/`; if running the test binary directly, `cd build/debug/test` first. Clean stale directories with `Remove-Item -Recurse -Force test/` at the project root. |
 
 ## Complete Development Cycle Checklist
 
@@ -630,4 +631,4 @@ is NOT acceptable -- skip none of these steps.
 
 6. **Feature workflow** — For new rendering features, follow the full
     pattern in `.github/instructions/development.instructions.md` (4-wave
-    implementation, per-wave verification, common bug fixes).
+    implementation, per-wave verification, common bug fixes)
