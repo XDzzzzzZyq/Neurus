@@ -3,13 +3,13 @@
  * @brief Transform components for 3D spatial representation.
  *
  * Provides Transform base class and Transform3D implementation for
- * position/rotation/scale (TRS) matrix computation. Supports dirty-flag
- * caching for deferred matrix recomputation.
+ * position/rotation/scale (TRS) matrix computation. The model matrix is
+ * recomputed eagerly on every SetPosition/SetRotation/SetScale call.
  *
  * Architecture:
  * - Transform is abstract base with virtual GetTransformPtr() for polymorphic access
  * - Transform3D provides Euler-angle 3D transforms using glm::mat4
- * - Dirty flag caches the model matrix until a component changes
+ * - Model matrix is always up-to-date (eager computation)
  *
  * Transform Composition:
  * - Model matrix = Translate * RotateX * RotateY * RotateZ * Scale
@@ -64,8 +64,8 @@ protected:
  * @brief 3D transform component with TRS (translate/rotate/scale) matrix computation.
  *
  * Transform3D manages position, rotation (Euler angles in degrees), and scale
- * for 3D scene objects. The model matrix is computed lazily and cached via a
- * dirty flag, avoiding redundant matrix multiplications.
+ * for 3D scene objects. The model matrix is computed eagerly whenever a
+ * component changes, so it is always up-to-date on access.
  *
  * Coordinate System:
  * - Right-handed coordinate system, Z-up
@@ -121,21 +121,21 @@ public:
 	/**
 	 * @brief Sets the world position.
 	 * @param pos New position in world space.
-	 * @note Marks the cached model matrix as dirty.
+	 * @note Model matrix is recomputed immediately.
 	 */
 	void SetPosition(const glm::vec3& pos);
 
 	/**
 	 * @brief Sets the rotation as Euler angles.
 	 * @param degrees Rotation in degrees (pitch=X, yaw=Z, roll=Y).
-	 * @note Marks the cached model matrix as dirty.
+	 * @note Model matrix is recomputed immediately.
 	 */
 	void SetRotation(const glm::vec3& degrees);
 
 	/**
 	 * @brief Sets the local scale.
 	 * @param scale Per-axis scale factors.
-	 * @note Marks the cached model matrix as dirty.
+	 * @note Model matrix is recomputed immediately.
 	 */
 	void SetScale(const glm::vec3& scale);
 
@@ -166,11 +166,11 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Computes and returns the model matrix (TRS).
+	 * @brief Returns the model matrix (TRS).
 	 *
-	 * Constructs the matrix as: Translate * Rotate * Scale.
-	 * Rotation is applied in ZXY order (yaw=Z, pitch=X, roll=Y).
-	 * Result is cached until a component changes (dirty flag).
+	 * The matrix is always up-to-date — recomputed eagerly whenever a
+	 * component changes. Composition: Translate * Rotate * Scale with
+	 * rotation applied in ZXY order (yaw=Z, pitch=X, roll=Y).
 	 *
 	 * @return 4x4 model matrix.
 	 */
@@ -198,18 +198,12 @@ public:
 	 */
 	glm::mat3 GetNormalMatrix() const;
 
-	/**
-	 * @brief Forces the cached model matrix to be recomputed on next access.
-	 */
-	void Invalidate() { m_dirty = true; }
-
 private:
 	glm::vec3 m_position{0.0f};    ///< World position.
 	glm::vec3 m_rotation{0.0f};    ///< Euler rotation in degrees (pitch=X, yaw=Z, roll=Y).
 	glm::vec3 m_scale{1.0f};       ///< Per-axis scale.
 
-	mutable bool m_dirty{true};        ///< True if cached matrix needs recomputation.
-	mutable glm::mat4 m_cachedMatrix{1.0f}; ///< Cached model matrix.
+	glm::mat4 m_modelMatrix{1.0f}; ///< Model matrix, recomputed eagerly on any setter call.
 };
 
-} // namespace neurus
+} // namespa

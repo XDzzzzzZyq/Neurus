@@ -19,51 +19,55 @@
 namespace neurus {
 
 // -----------------------------------------------------------------------
-// Setters
+// Internal: compute model matrix from current TRS components
+// -----------------------------------------------------------------------
+
+static glm::mat4 ComputeModelMatrix(const glm::vec3& position,
+                                    const glm::vec3& rotation,
+                                    const glm::vec3& scale)
+{
+	glm::mat4 mat{1.0f};
+	const glm::vec3 rad = glm::radians(rotation);
+
+	// TRS: T * Rz(yaw) * Rx(pitch) * Ry(roll) * S
+	mat = glm::translate(mat, position);
+	mat = glm::rotate(mat, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Yaw   (Z = up)
+	mat = glm::rotate(mat, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
+	mat = glm::rotate(mat, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Roll  (Y = forward)
+	mat = glm::scale(mat, scale);
+
+	return mat;
+}
+
+// -----------------------------------------------------------------------
+// Setters — eagerly recompute model matrix
 // -----------------------------------------------------------------------
 
 void Transform3D::SetPosition(const glm::vec3& pos)
 {
 	m_position = pos;
-	m_dirty = true;
+	m_modelMatrix = ComputeModelMatrix(m_position, m_rotation, m_scale);
 }
 
 void Transform3D::SetRotation(const glm::vec3& degrees)
 {
 	m_rotation = degrees;
-	m_dirty = true;
+	m_modelMatrix = ComputeModelMatrix(m_position, m_rotation, m_scale);
 }
 
 void Transform3D::SetScale(const glm::vec3& scale)
 {
 	m_scale = scale;
-	m_dirty = true;
+	m_modelMatrix = ComputeModelMatrix(m_position, m_rotation, m_scale);
 }
 
 // -----------------------------------------------------------------------
-// Matrix computation
+// Matrix access
 // -----------------------------------------------------------------------
 
 glm::mat4 Transform3D::GetModelMatrix() const
 {
-	if (!m_dirty)
-	{
-		return m_cachedMatrix;
-	}
-
-	glm::mat4 mat{1.0f};
-	const glm::vec3 rad = glm::radians(m_rotation);
-
-	// TRS: T * Rz(yaw) * Rx(pitch) * Ry(roll) * S
-	mat = glm::translate(mat, m_position);
-	mat = glm::rotate(mat, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Yaw   (Z = up)
-	mat = glm::rotate(mat, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
-	mat = glm::rotate(mat, rad.y, glm::vec3(0.0f, 1.0f, 0.0f)); // Roll  (Y = forward)
-	mat = glm::scale(mat, m_scale);
-
-	m_cachedMatrix = mat;
-	m_dirty = false;
-	return m_cachedMatrix;
+	return m_modelMatrix;
 }
 
 glm::vec3 Transform3D::GetDirection() const
@@ -87,7 +91,7 @@ glm::vec3 Transform3D::GetDirection() const
 
 glm::mat3 Transform3D::GetNormalMatrix() const
 {
-	return glm::transpose(glm::inverse(glm::mat3(GetModelMatrix())));
+	return glm::transpose(glm::inverse(glm::mat3(m_modelMatrix)));
 }
 
 } // namespace neurus

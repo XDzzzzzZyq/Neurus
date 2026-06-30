@@ -19,54 +19,73 @@ Camera::Camera(float w, float h, float per, float n, float f)
 	, cam_far(f)
 {
 	o_type = ObjectID::GOType::GO_CAM;
+	RecomputeMatrices();
 }
 
 Camera::Camera()
 {
 	o_type = ObjectID::GOType::GO_CAM;
+	RecomputeMatrices();
 }
 
 // -----------------------------------------------------------------------
-// View / Projection matrices
+// Internal: recompute view + projection matrices eagerly
 // -----------------------------------------------------------------------
 
-glm::mat4 Camera::GetViewMatrix() const
+void Camera::RecomputeMatrices()
 {
-	return glm::lookAt(GetPosition(), cam_tar, glm::vec3(0.0f, 0.0f, 1.0f)); // Z-up
-}
+	m_cachedView = glm::lookAt(GetPosition(), cam_tar, glm::vec3(0.0f, 0.0f, 1.0f)); // Z-up
 
-glm::mat4 Camera::GetProjectionMatrix() const
-{
 	const float aspect = cam_w / cam_h;
 	glm::mat4 projection = glm::perspective(
 			glm::radians(cam_pers), aspect, cam_near, cam_far);
 	projection[1][1] *= -1.0f;   // Flip Y for Vulkan NDC (Y=-1 at top)
-	return projection;
+	m_cachedProj = projection;
 }
 
 // -----------------------------------------------------------------------
-// Parameter setters
+// View / Projection matrix access
+// -----------------------------------------------------------------------
+
+glm::mat4 Camera::GetViewMatrix() const
+{
+	return m_cachedView;
+}
+
+glm::mat4 Camera::GetProjectionMatrix() const
+{
+	return m_cachedProj;
+}
+
+// -----------------------------------------------------------------------
+// Parameter setters — eagerly recompute matrices
 // -----------------------------------------------------------------------
 
 void Camera::ChangeCamRatio(float w, float h)
 {
 	cam_w = w;
 	cam_h = h;
+	RecomputeMatrices();
 }
 
 void Camera::ChangeCamPersp(float persp)
 {
 	cam_pers = persp;
+	RecomputeMatrices();
 }
 
 void Camera::SetCamPos(const glm::vec3& pos)
 {
 	SetPosition(pos);
+	// View matrix depends on position, so recompute eagerly
+	// (SetPosition already recomputed the model matrix)
+	RecomputeMatrices();
 }
 
 void Camera::SetTarPos(const glm::vec3& pos)
 {
 	cam_tar = pos;
+	RecomputeMatrices();
 }
 
 // -----------------------------------------------------------------------

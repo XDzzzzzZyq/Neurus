@@ -229,13 +229,13 @@ TEST(Transform3D, NormalMatrix)
 }
 
 // -----------------------------------------------------------------------
-// Transform3D - Dirty flag / cached matrix
+// Transform3D - Eager matrix update
 // -----------------------------------------------------------------------
 
 /**
- * @brief Cached matrix is reused when no components have changed.
+ * @brief Repeated calls return the same matrix when no changes occur.
  */
-TEST(Transform3D, Dirty_CachesMatrixOnNoChange)
+TEST(Transform3D, Eager_ReturnsSameMatrixOnRepeatedAccess)
 {
 	Transform3D t;
 	t.SetPosition(glm::vec3(1.0f, 2.0f, 3.0f));
@@ -243,14 +243,14 @@ TEST(Transform3D, Dirty_CachesMatrixOnNoChange)
 	glm::mat4 first = t.GetModelMatrix();
 	glm::mat4 second = t.GetModelMatrix();
 
-	// Without modifying anything, same matrix returned from cache
+	// Without modifying anything, same matrix returned
 	EXPECT_EQ(first, second);
 }
 
 /**
- * @brief Modifying a transform component recomputes the cached matrix.
+ * @brief Modifying a transform component updates the model matrix immediately.
  */
-TEST(Transform3D, Dirty_RecomputesOnPositionChange)
+TEST(Transform3D, Eager_UpdatesOnPositionChange)
 {
 	Transform3D t;
 	t.SetPosition(glm::vec3(1.0f, 2.0f, 3.0f));
@@ -267,32 +267,6 @@ TEST(Transform3D, Dirty_RecomputesOnPositionChange)
 	EXPECT_FLOAT_EQ(third[3][0], 4.0f);
 	EXPECT_FLOAT_EQ(third[3][1], 5.0f);
 	EXPECT_FLOAT_EQ(third[3][2], 6.0f);
-}
-
-/**
- * @brief Invalidate() forces recomputation on next GetModelMatrix() call.
- */
-TEST(Transform3D, Dirty_InvalidateForcesRecompute)
-{
-	Transform3D t;
-	t.SetPosition(glm::vec3(7.0f, 8.0f, 9.0f));
-	glm::mat4 first = t.GetModelMatrix();
-
-	// Modify without calling a setter
-	t.Invalidate();
-	glm::mat4 second = t.GetModelMatrix();
-
-	// Without actual data change, the result should be the same
-	// (dirty flag causes recomputation, but inputs are unchanged)
-	EXPECT_EQ(first, second);
-
-	// Now change and invalidate
-	t.SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-	t.Invalidate();
-	glm::mat4 third = t.GetModelMatrix();
-
-	EXPECT_NE(first, third);
-	EXPECT_EQ(third, glm::mat4(1.0f));
 }
 
 // -----------------------------------------------------------------------

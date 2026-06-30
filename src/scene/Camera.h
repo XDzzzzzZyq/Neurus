@@ -34,7 +34,8 @@ namespace neurus {
  * and near/far clip planes. Transform3D provides position/rotation via standard
  * scene graph interface.
  *
- * Frustum matrices are cached and recomputed only when parameters change.
+ * View and projection matrices are recomputed eagerly whenever a camera
+ * parameter changes (FOV, aspect, near/far, position, target).
  * Camera data can be serialized to float array for GPU upload.
  *
  * @note Inheritance: Inherits identity from ObjectID, transform from Transform3D.
@@ -122,8 +123,9 @@ public:
 	}
 
 	/**
-	 * @brief Computes the view matrix from camera position and target.
+	 * @brief Returns the cached view matrix (lookAt from position to target).
 	 *
+	 * Recomputed eagerly whenever camera position or target changes.
 	 * Uses glm::lookAt with the camera position (from Transform3D),
 	 * the look-at target, and world up vector (0, 0, 1) (Z-up).
 	 *
@@ -132,10 +134,10 @@ public:
 	glm::mat4 GetViewMatrix() const;
 
 	/**
-	 * @brief Computes and caches the perspective projection matrix.
+	 * @brief Returns the cached perspective projection matrix.
 	 *
-	 * Uses glm::perspective with cached dirty flag. Matrix is recomputed
-	 * only when camera parameters (FOV, aspect, near, far) change.
+	 * Recomputed eagerly whenever FOV, aspect ratio, near, or far changes.
+	 * Uses glm::perspective with Y-flip for Vulkan NDC.
 	 *
 	 * @return 4x4 projection matrix.
 	 */
@@ -145,14 +147,14 @@ public:
 	 * @brief Updates the viewport aspect ratio from width and height.
 	 * @param w New viewport width in pixels
 	 * @param h New viewport height in pixels
-	 * @note Marks cached projection matrix as dirty.
+	 * @note Projection and view matrices are recomputed immediately.
 	 */
 	void ChangeCamRatio(float w, float h);
 
 	/**
 	 * @brief Updates the perspective field of view.
 	 * @param persp New FOV in degrees
-	 * @note Marks cached projection matrix as dirty.
+	 * @note Projection and view matrices are recomputed immediately.
 	 */
 	void ChangeCamPersp(float persp);
 
@@ -186,6 +188,13 @@ public:
 	 * @note Overrides ObjectID::GetTransform().
 	 */
 	void* GetTransform() override;
+
+private:
+	/** @brief Recomputes view and projection matrices from current parameters. */
+	void RecomputeMatrices();
+
+	glm::mat4 m_cachedView{1.0f};     ///< Cached view matrix (lookAt).
+	glm::mat4 m_cachedProj{1.0f};     ///< Cached projection matrix (perspective).
 };
 
 } // namespace neurus
