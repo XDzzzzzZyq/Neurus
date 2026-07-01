@@ -9,8 +9,7 @@
  * Architecture:
  * - SceneContext: Owns active Scene* pointer, provides const accessors
  * - EditorContext: Owns SelectionManager, editor state, dirty tracking (QObject with signals)
- * - RenderContext: Non-owning RenderConfigs* pointer (stub - T45 creates RenderConfigs)
- * - Context: Composite aggregating all three; subscribes to EventQueue events
+ * - Context: Composite aggregating both; subscribes to EventQueue events
  */
 
 #pragma once
@@ -26,7 +25,6 @@ namespace neurus {
 class Scene;
 class Camera;
 class ObjectID;
-class RenderConfigs;
 class EventQueue;
 
 // ===========================================================================
@@ -158,43 +156,11 @@ private:
 };
 
 // ===========================================================================
-// RenderContext - render configuration access
-// ===========================================================================
-
-/**
- * @brief Links to rendering configuration without owning it.
- *
- * RenderContext provides access to RenderConfigs via non-owning pointer.
- * This allows Renderer to read settings without coupling to config ownership.
- *
- * @note Ownership: RenderConfigs is owned externally (Editor or Application).
- * @note Stub: RenderConfigs will be implemented in Phase 5 T45.
- */
-class RenderContext
-{
-public:
-	/**
-	 * @brief Sets the render configuration to use.
-	 * @param config Non-owning pointer to RenderConfigs.
-	 */
-	void UseConfig(RenderConfigs* config) { ctx_config = config; }
-
-	/**
-	 * @brief Returns pointer to render configuration.
-	 * @return Non-owning pointer to RenderConfigs, or nullptr if not set.
-	 */
-	RenderConfigs* GetConfig() const { return ctx_config; }
-
-private:
-	RenderConfigs* ctx_config = nullptr; ///< Non-owning pointer to render settings
-};
-
-// ===========================================================================
 // Context - composite aggregating all sub-contexts
 // ===========================================================================
 
 /**
- * @brief Unified context container aggregating all context types.
+ * @brief Unified context container aggregating scene and editor state.
  *
  * Context is the single source of truth for queryable application state.
  * It is passed across layers to enable decoupled data access:
@@ -209,7 +175,6 @@ class Context
 public:
 	SceneContext scene{};   ///< Scene graph read-only view
 	EditorContext editor;   ///< Editor state (selections, signals, dirty flag)
-	RenderContext render{}; ///< Render settings accessor
 
 public:
 	/**

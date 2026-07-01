@@ -303,32 +303,6 @@ TEST_F(SceneStatusTest, NoCrossContaminationWithOtherSignals)
 }
 
 // ===========================================================================
-// RenderContext tests
-// ===========================================================================
-
-class RenderContextTest : public ::testing::Test
-{
-};
-
-TEST_F(RenderContextTest, DefaultNullConfig)
-{
-	RenderContext rc;
-	EXPECT_EQ(rc.GetConfig(), nullptr);
-}
-
-TEST_F(RenderContextTest, UseConfig_StoresPointer)
-{
-	RenderContext rc;
-	// RenderConfigs is a forward-declared stub — we test with a dummy int
-	// cast to verify the pointer round-trip works.
-	int dummy = 42;
-	auto* fakeConfig = reinterpret_cast<RenderConfigs*>(&dummy);
-
-	rc.UseConfig(fakeConfig);
-	EXPECT_EQ(rc.GetConfig(), fakeConfig);
-}
-
-// ===========================================================================
 // Context composite tests
 // ===========================================================================
 
@@ -408,8 +382,6 @@ TEST_F(ContextTest, SubContextsAccessible)
 	EXPECT_EQ(&m_context->scene, &m_context->scene);  // sanity
 	EXPECT_NE(m_context->editor.metaObject(), nullptr); // is QObject
 
-	// RenderContext starts with null config
-	EXPECT_EQ(m_context->render.GetConfig(), nullptr);
 }
 
 TEST_F(ContextTest, SetSceneThroughEditorPropagatesToSceneContext)

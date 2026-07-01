@@ -6,7 +6,7 @@
  *
  * Provides the Project class which encapsulates a Scene and its serialization
  * to/from .neurus.json files via cereal JSON archives. The Project is the
- * top-level serialization unit: it owns the Scene and (eventually) RenderConfigs.
+ * top-level serialization unit: it owns the Scene.
  *
  * Architecture:
  * - Project owns Scene via unique_ptr (enables move semantics for factory pattern)
@@ -24,6 +24,7 @@
 #include <cereal/cereal.hpp>
 
 #include "scene/Scene.h"
+#include "render/RenderConfig.h"
 
 namespace neurus::project
 {
@@ -46,6 +47,11 @@ namespace neurus::project
  *       "sprite_list": [],
  *       "dLine_list": [],
  *       "dPoints_list": []
+ *     },
+ *     "proj_config": {
+ *       "r_pipeline": "Deferred",
+ *       "r_aa": "None",
+ *       ...
  *     }
  *   }
  * }
@@ -143,12 +149,29 @@ public:
 	 * @brief Cereal serialization entry point.
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
-	 * @note Serializes scene data and the IBL/HDR environment path.
+	 * @note Serializes scene data and RenderConfig. On input, missing
+	 *       RenderConfig (old file format) defaults to initialized values.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void save(Archive& ar) const
+	{
+		ar(cereal::make_nvp("m_scene", *proj_scene),
+		   CEREAL_NVP(proj_config));
+	}
+
+	template<class Archive>
+	void load(Archive& ar)
 	{
 		ar(cereal::make_nvp("m_scene", *proj_scene));
+		// Config is optional — old files won't have it
+		try
+		{
+			ar(CEREAL_NVP(proj_config));
+		}
+		catch (const cereal::Exception&)
+		{
+			proj_config = RenderConfig{};
+		}
 	}
 
 private:
@@ -162,8 +185,9 @@ private:
 	Project();
 
 	std::unique_ptr<Scene> proj_scene;   ///< Owned scene container (all scene objects)
-	std::string proj_filePath;   ///< Path to the .neurus.json file (empty if never saved)
-	bool proj_dirty = false;     ///< Unsaved modifications flag
+	RenderConfig proj_config;           ///< Rendering configuration (persisted alongside scene)
+	std::string proj_filePath;          ///< Path to the .neurus.json file (empty if never saved)
+	bool proj_dirty = false;            ///< Unsaved modifications flag
 };
 
 } // namespace neurus::project

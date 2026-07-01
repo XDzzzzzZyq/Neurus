@@ -19,6 +19,7 @@
 #pragma once
 
 #include "passes/Pass.h"
+#include "RenderConfig.h"
 #include "Swapchain.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -232,6 +233,9 @@ private:
 	const vk::raii::PhysicalDevice& r_physicalDevice;
 	vk::Queue r_graphicsQueue;
 	uint32_t r_queueFamilyIndex;
+
+	// --- Render config (user-settable pipeline options) ---
+	RenderConfig r_config;
 
 	// --- Swapchain ---
 	std::unique_ptr<Swapchain> r_swapchain;
