@@ -193,8 +193,8 @@ private:
 	/** @brief Recomputes view and projection matrices from current parameters. */
 	void RecomputeMatrices();
 
-	glm::mat4 m_cachedView{1.0f};     ///< Cached view matrix (lookAt).
-	glm::mat4 m_cachedProj{1.0f};     ///< Cached projection matrix (perspective).
+	glm::mat4 o_cachedView{1.0f};     ///< Cached view matrix (lookAt).
+	glm::mat4 o_cachedProj{1.0f};     ///< Cached projection matrix (perspective).
 };
 
 } // namespace neurus

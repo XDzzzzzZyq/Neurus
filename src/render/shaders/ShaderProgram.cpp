@@ -11,23 +11,23 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 {
 	// --- Create shader modules from SPIR-V bytecode ---
 	vk::ShaderModuleCreateInfo vertCreateInfo({}, vertSize, vertSpv);
-	m_vertModule = std::make_unique<vk::raii::ShaderModule>(device, vertCreateInfo);
+	sh_vertModule = std::make_unique<vk::raii::ShaderModule>(device, vertCreateInfo);
 
 	vk::ShaderModuleCreateInfo fragCreateInfo({}, fragSize, fragSpv);
-	m_fragModule = std::make_unique<vk::raii::ShaderModule>(device, fragCreateInfo);
+	sh_fragModule = std::make_unique<vk::raii::ShaderModule>(device, fragCreateInfo);
 
 	// --- Shader stages ---
 	vk::PipelineShaderStageCreateInfo vertStage(
 		{},
 		vk::ShaderStageFlagBits::eVertex,
-		**m_vertModule,
+		**sh_vertModule,
 		"main"
 	);
 
 	vk::PipelineShaderStageCreateInfo fragStage(
 		{},
 		vk::ShaderStageFlagBits::eFragment,
-		**m_fragModule,
+		**sh_fragModule,
 		"main"
 	);
 
@@ -77,7 +77,7 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 
 	// --- Pipeline layout (empty - no descriptors or push constants for triangle) ---
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo;
-	m_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, pipelineLayoutCreateInfo);
+	sh_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, pipelineLayoutCreateInfo);
 
 	// --- Dynamic rendering pipeline create info ---
 	vk::Format colorFormats[] = { vk::Format::eB8G8R8A8Srgb };
@@ -99,7 +99,7 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 		nullptr,  // No depth/stencil
 		&colorBlend,
 		&dynamicState,
-		**m_pipelineLayout,
+		**sh_pipelineLayout,
 		nullptr,  // No render pass (dynamic rendering)
 		0,
 		nullptr,  // No base pipeline
@@ -107,12 +107,12 @@ ShaderProgram::ShaderProgram(const vk::raii::Device& device,
 		&renderingCreateInfo
 	);
 
-	m_pipeline = std::make_unique<vk::raii::Pipeline>(device, nullptr, pipelineCreateInfo);
+	sh_pipeline = std::make_unique<vk::raii::Pipeline>(device, nullptr, pipelineCreateInfo);
 
 #ifdef _DEBUG
 	device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
 		vk::ObjectType::ePipeline,
-		reinterpret_cast<uint64_t>(static_cast<VkPipeline>(**m_pipeline)),
+		reinterpret_cast<uint64_t>(static_cast<VkPipeline>(**sh_pipeline)),
 		"ShaderProgram::TriangleMVP"));
 #endif
 

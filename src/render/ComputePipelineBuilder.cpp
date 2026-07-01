@@ -6,7 +6,7 @@
 namespace neurus {
 
 ComputePipelineBuilder::ComputePipelineBuilder(const vk::raii::Device& device)
-	: m_device(device)
+	: p_device(device)
 {
 }
 
@@ -15,33 +15,33 @@ ComputePipelineBuilder& ComputePipelineBuilder::SetShaderStage(
 	const char* entryPoint)
 {
 	// Build the shader stage create info
-	m_stageInfo = vk::PipelineShaderStageCreateInfo(
+	p_stageInfo = vk::PipelineShaderStageCreateInfo(
 		{},                                          // flags
 		vk::ShaderStageFlagBits::eCompute,           // stage
 		*shader.handle(),                            // module
 		entryPoint                                   // pName
 	);
-	m_stageSet = true;
+	p_stageSet = true;
 	return *this;
 }
 
 ComputePipelineBuilder& ComputePipelineBuilder::AddDescriptorSetLayout(
 	vk::DescriptorSetLayout layout)
 {
-	m_descriptorSetLayouts.push_back(layout);
+	p_descriptorSetLayouts.push_back(layout);
 	return *this;
 }
 
 ComputePipelineBuilder& ComputePipelineBuilder::AddPushConstantRange(
 	const vk::PushConstantRange& range)
 {
-	m_pushConstantRanges.push_back(range);
+	p_pushConstantRanges.push_back(range);
 	return *this;
 }
 
 vk::raii::Pipeline ComputePipelineBuilder::BuildComputePipeline()
 {
-	if (!m_stageSet)
+	if (!p_stageSet)
 	{
 		throw std::runtime_error("ComputePipelineBuilder: No shader stage set. Call SetShaderStage() before BuildComputePipeline().");
 	}
@@ -49,28 +49,28 @@ vk::raii::Pipeline ComputePipelineBuilder::BuildComputePipeline()
 	// --- Create pipeline layout ---
 	vk::PipelineLayoutCreateInfo layoutCreateInfo(
 		{},
-		m_descriptorSetLayouts,
-		m_pushConstantRanges);
+		p_descriptorSetLayouts,
+		p_pushConstantRanges);
 
-	m_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(
-		m_device, layoutCreateInfo);
+	p_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(
+		p_device, layoutCreateInfo);
 
 	// --- Create compute pipeline ---
 	vk::ComputePipelineCreateInfo computeCreateInfo(
 		{},                // flags
-		m_stageInfo,       // stage
-		*m_pipelineLayout  // layout
+		p_stageInfo,       // stage
+		*p_pipelineLayout  // layout
 	);
 
-	auto pipeline = vk::raii::Pipeline(m_device, nullptr, computeCreateInfo);
+	auto pipeline = vk::raii::Pipeline(p_device, nullptr, computeCreateInfo);
 
 #ifdef _DEBUG
-	if (!m_debugName.empty())
+	if (!p_debugName.empty())
 	{
-		m_device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
+		p_device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
 			vk::ObjectType::ePipeline,
 			reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*pipeline)),
-			m_debugName.c_str()));
+			p_debugName.c_str()));
 	}
 #endif
 
@@ -83,7 +83,7 @@ vk::raii::Pipeline ComputePipelineBuilder::BuildComputePipeline()
 
 ComputePipelineBuilder& ComputePipelineBuilder::SetDebugName(const char* name)
 {
-	m_debugName = name ? name : "";
+	p_debugName = name ? name : "";
 	return *this;
 }
 

@@ -173,9 +173,9 @@ ImageData::ImageData(const std::string& path)
 
 ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
                      uint32_t arrayLayers)
-	: m_width(w)
-	, m_height(h)
-	, m_format(fmt)
+	: im_width(w)
+	, im_height(h)
+	, im_format(fmt)
 {
 	if (!data || w == 0 || h == 0 || arrayLayers == 0)
 		return;
@@ -185,8 +185,8 @@ ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
 		return;
 
 	const size_t byteCount = static_cast<size_t>(w) * h * bpp * arrayLayers;
-	m_pixelData.resize(byteCount);
-	std::memcpy(m_pixelData.data(), data, byteCount);
+	im_pixelData.resize(byteCount);
+	std::memcpy(im_pixelData.data(), data, byteCount);
 }
 
 // ===========================================================================
@@ -195,27 +195,27 @@ ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
 
 bool ImageData::SavePNG(const std::string& path, bool remapSigned) const
 {
-	const uint32_t channels = ChannelCount(m_format);
+	const uint32_t channels = ChannelCount(im_format);
 	std::vector<uint8_t> pngData;
 
-	if (m_format == vk::Format::eR16G16B16A16Sfloat ||
-	    m_format == vk::Format::eR16G16B16A16Unorm ||
-	    m_format == vk::Format::eR16G16B16A16Snorm)
+	if (im_format == vk::Format::eR16G16B16A16Sfloat ||
+	    im_format == vk::Format::eR16G16B16A16Unorm ||
+	    im_format == vk::Format::eR16G16B16A16Snorm)
 	{
-		pngData = ConvertHalfToU8(m_pixelData.data(), m_width, m_height, remapSigned);
+		pngData = ConvertHalfToU8(im_pixelData.data(), im_width, im_height, remapSigned);
 	}
 	else
 	{
-		pngData = m_pixelData;
-		if (IsBGRFormat(m_format) && channels >= 3)
-			SwizzleBGRtoRGB(pngData.data(), m_width, m_height, channels);
+		pngData = im_pixelData;
+		if (IsBGRFormat(im_format) && channels >= 3)
+			SwizzleBGRtoRGB(pngData.data(), im_width, im_height, channels);
 	}
 
 	EnsureDirectory(path);
-	const int stride = static_cast<int>(m_width) * static_cast<int>(channels);
+	const int stride = static_cast<int>(im_width) * static_cast<int>(channels);
 	return stbi_write_png(path.c_str(),
-	                      static_cast<int>(m_width),
-	                      static_cast<int>(m_height),
+	                      static_cast<int>(im_width),
+	                      static_cast<int>(im_height),
 	                      static_cast<int>(channels),
 	                      pngData.data(), stride) != 0;
 }
@@ -226,23 +226,23 @@ bool ImageData::SavePNG(const std::string& path, bool remapSigned) const
 
 bool ImageData::SaveHDR(const std::string& path) const
 {
-	const auto* src = reinterpret_cast<const float*>(m_pixelData.data());
+	const auto* src = reinterpret_cast<const float*>(im_pixelData.data());
 
 	std::string out;
-	out.reserve(256 + static_cast<size_t>(m_width) * m_height * 4);
+	out.reserve(256 + static_cast<size_t>(im_width) * im_height * 4);
 
 	// --- Radiance header ---
 	out += "#?RADIANCE\n";
 	out += "FORMAT=32-bit_rle_rgbe\n";
 	out += "\n";
-	out += "-Y " + std::to_string(m_height) + " +X " + std::to_string(m_width) + "\n";
+	out += "-Y " + std::to_string(im_height) + " +X " + std::to_string(im_width) + "\n";
 
 	// --- RGBE pixel data (flat, non-RLE) ---
-	for (uint32_t y = 0; y < m_height; ++y)
+	for (uint32_t y = 0; y < im_height; ++y)
 	{
-		for (uint32_t x = 0; x < m_width; ++x)
+		for (uint32_t x = 0; x < im_width; ++x)
 		{
-			const size_t idx = (static_cast<size_t>(y) * m_width + x) * 4;
+			const size_t idx = (static_cast<size_t>(y) * im_width + x) * 4;
 			const float r = src[idx + 0];
 			const float g = src[idx + 1];
 			const float b = src[idx + 2];
@@ -307,13 +307,13 @@ void ImageData::LoadFromPath(const std::string& path)
 
 		NEURUS_LOG("[ImageData] Loaded HDR: " << path << " (" << w << "x" << h << ", " << c << " channels)");
 
-		m_width = static_cast<uint32_t>(w);
-		m_height = static_cast<uint32_t>(h);
-		m_format = vk::Format::eR32G32B32A32Sfloat;
+		im_width = static_cast<uint32_t>(w);
+		im_height = static_cast<uint32_t>(h);
+		im_format = vk::Format::eR32G32B32A32Sfloat;
 
 		const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * 4 * sizeof(float);
-		m_pixelData.resize(byteCount);
-		std::memcpy(m_pixelData.data(), data, byteCount);
+		im_pixelData.resize(byteCount);
+		std::memcpy(im_pixelData.data(), data, byteCount);
 		stbi_image_free(data);
 	}
 	else
@@ -328,13 +328,13 @@ void ImageData::LoadFromPath(const std::string& path)
 
 		NEURUS_LOG("[ImageData] Loaded LDR: " << path << " (" << w << "x" << h << ", " << c << " channels)");
 
-		m_width = static_cast<uint32_t>(w);
-		m_height = static_cast<uint32_t>(h);
-		m_format = vk::Format::eR8G8B8A8Srgb;
+		im_width = static_cast<uint32_t>(w);
+		im_height = static_cast<uint32_t>(h);
+		im_format = vk::Format::eR8G8B8A8Srgb;
 
 		const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * 4;
-		m_pixelData.resize(byteCount);
-		std::memcpy(m_pixelData.data(), data, byteCount);
+		im_pixelData.resize(byteCount);
+		std::memcpy(im_pixelData.data(), data, byteCount);
 		stbi_image_free(data);
 	}
 }

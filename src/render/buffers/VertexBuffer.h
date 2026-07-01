@@ -60,14 +60,14 @@ public:
 	VertexBuffer& operator=(VertexBuffer&&) noexcept = default;
 
 	/** @brief Number of vertices in the buffer. */
-	uint32_t GetVertexCount() const { return m_vertexCount; }
+	uint32_t GetVertexCount() const { return b_vertexCount; }
 
 	/** @brief Byte stride between consecutive vertices. */
-	uint32_t GetStride() const { return m_stride; }
+	uint32_t GetStride() const { return b_stride; }
 
 private:
-	uint32_t m_vertexCount;
-	uint32_t m_stride;
+	uint32_t b_vertexCount;
+	uint32_t b_stride;
 };
 
 } // namespace neurus

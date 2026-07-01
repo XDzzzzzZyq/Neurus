@@ -19,32 +19,32 @@ namespace neurus {
 
 const Camera* SceneContext::GetActiveCamera() const
 {
-	if (m_activeScene == nullptr)
+	if (ctx_activeScene == nullptr)
 	{
 		return nullptr;
 	}
-	return m_activeScene->GetActiveCamera();
+	return ctx_activeScene->GetActiveCamera();
 }
 
 const ObjectID* SceneContext::GetObjectID(int id) const
 {
-	if (m_activeScene == nullptr)
+	if (ctx_activeScene == nullptr)
 	{
 		return nullptr;
 	}
-	return m_activeScene->GetObjectID(id);
+	return ctx_activeScene->GetObjectID(id);
 }
 
 std::vector<const ObjectID*> SceneContext::GetObjectIDs() const
 {
-	if (m_activeScene == nullptr)
+	if (ctx_activeScene == nullptr)
 	{
 		return {};
 	}
 
 	std::vector<const ObjectID*> objList{};
-	objList.reserve(m_activeScene->obj_list.size());
-	for (const auto& [id, obj] : m_activeScene->obj_list)
+	objList.reserve(ctx_activeScene->obj_list.size());
+	for (const auto& [id, obj] : ctx_activeScene->obj_list)
 	{
 		objList.push_back(obj.get());
 	}
@@ -62,9 +62,9 @@ EditorContext::EditorContext(QObject* parent)
 
 void EditorContext::SetScene(Scene* scene)
 {
-	if (m_sceneCtx)
+	if (ctx_sceneCtx)
 	{
-		m_sceneCtx->UseScene(scene);
+		ctx_sceneCtx->UseScene(scene);
 	}
 }
 
@@ -75,11 +75,11 @@ void EditorContext::NotifySceneChanged(int status)
 
 const Scene* EditorContext::activeScene() const
 {
-	if (m_sceneCtx == nullptr)
+	if (ctx_sceneCtx == nullptr)
 	{
 		return nullptr;
 	}
-	return m_sceneCtx->GetActiveScene();
+	return ctx_sceneCtx->GetActiveScene();
 }
 
 // ===========================================================================
@@ -89,7 +89,7 @@ const Scene* EditorContext::activeScene() const
 Context::Context(class EventQueue& pool)
 {
 	// Wire back-pointer: EditorContext needs access to its sibling SceneContext
-	editor.m_sceneCtx = &scene;
+	editor.ctx_sceneCtx = &scene;
 
 	// Subscribe to scene status changes → propagate to EditorContext signal
 	pool.subscribe<SceneStatusChanged>([this](const SceneStatusChanged& e) {

@@ -75,20 +75,20 @@ vk::raii::Instance VulkanContext::CreateInstance()
 
 VulkanContext::VulkanContext(vk::raii::Instance&& instance)
 {
-	m_instance = std::make_unique<vk::raii::Instance>(std::move(instance));
+	ctx_instance = std::make_unique<vk::raii::Instance>(std::move(instance));
 }
 
 void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 {
-	m_physicalDevices = vk::raii::PhysicalDevices(*m_instance);
-	m_selectedDeviceIndex = selectPhysicalDeviceIndex();
-	auto& pd = m_physicalDevices[m_selectedDeviceIndex];
+	ctx_physicalDevices = vk::raii::PhysicalDevices(*ctx_instance);
+	ctx_selectedDeviceIndex = selectPhysicalDeviceIndex();
+	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
 	auto props = pd.getProperties();
-	m_gpuName = props.deviceName.data();
-	m_graphicsQueueFamily = findGraphicsQueueFamily(surface);
+	ctx_gpuName = props.deviceName.data();
+	ctx_graphicsQueueFamily = findGraphicsQueueFamily(surface);
 
 	float prio = 1.0f;
-	vk::DeviceQueueCreateInfo qCI({}, m_graphicsQueueFamily, 1, &prio);
+	vk::DeviceQueueCreateInfo qCI({}, ctx_graphicsQueueFamily, 1, &prio);
 
 	vk::PhysicalDeviceMultiviewFeatures multiviewFeature;
 	multiviewFeature.multiview = VK_TRUE;
@@ -120,25 +120,25 @@ void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 
 	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &descriptorIndexing);
 
-	m_device = std::make_unique<vk::raii::Device>(pd, devCI);
-	m_graphicsQueue = m_device->getQueue(m_graphicsQueueFamily, 0);
+	ctx_device = std::make_unique<vk::raii::Device>(pd, devCI);
+	ctx_graphicsQueue = ctx_device->getQueue(ctx_graphicsQueueFamily, 0);
 }
 
 VulkanContext::~VulkanContext() {}
 
 uint32_t VulkanContext::selectPhysicalDeviceIndex()
 {
-	if (m_physicalDevices.empty())
+	if (ctx_physicalDevices.empty())
 		throw std::runtime_error("No Vulkan-capable GPUs found.");
-	for (uint32_t i = 0; i < (uint32_t)m_physicalDevices.size(); ++i)
-		if (m_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
+	for (uint32_t i = 0; i < (uint32_t)ctx_physicalDevices.size(); ++i)
+		if (ctx_physicalDevices[i].getProperties().deviceType == vk::PhysicalDeviceType::eDiscreteGpu)
 			return i;
 	return 0;
 }
 
 uint32_t VulkanContext::findGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface)
 {
-	auto& pd = m_physicalDevices[m_selectedDeviceIndex];
+	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
 	auto qf = pd.getQueueFamilyProperties();
 	for (uint32_t i = 0; i < (uint32_t)qf.size(); ++i)
 	{

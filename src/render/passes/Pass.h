@@ -109,7 +109,7 @@ protected:
 	Pass() = default;
 
 	// --- Device reference (non-owning) ---
-	const vk::raii::Device* m_device = nullptr;
+	const vk::raii::Device* p_device = nullptr;
 };
 
 } // namespace neurus

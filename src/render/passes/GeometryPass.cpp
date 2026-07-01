@@ -31,44 +31,44 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
                            size_t vertSize,
                            const uint32_t* fragSpv,
                            size_t fragSize)
-	: m_physicalDevice(&physicalDevice)
+	: p_physicalDevice(&physicalDevice)
 	// --- Descriptor set layout ---
-	, m_cameraLayout(CreateCameraLayout(device))
+	, p_cameraLayout(CreateCameraLayout(device))
 	// --- Camera UBO (host-visible for per-frame memcpy update) ---
-	, m_cameraUBO(device, physicalDevice, "CameraUBO")
+	, p_cameraUBO(device, physicalDevice, "CameraUBO")
 	// --- Descriptor pool (1 set, 1 UBO) ---
-	, m_descriptorPool(device,
+	, p_descriptorPool(device,
 	                   1,
-	                   DescriptorPool::CalculatePoolSizes({&m_cameraLayout}, 1))
+	                   DescriptorPool::CalculatePoolSizes({&p_cameraLayout}, 1))
 	// --- Camera descriptor set (allocated from pool) ---
-	, m_cameraDescriptorSet(std::move(
-	      m_descriptorPool.Allocate(m_cameraLayout, 1).front()))
-	, m_pipelineLayout(nullptr)
-	, m_pipeline(nullptr)
+	, p_cameraDescriptorSet(std::move(
+	      p_descriptorPool.Allocate(p_cameraLayout, 1).front()))
+	, p_pipelineLayout(nullptr)
+	, p_pipeline(nullptr)
 {
-	m_device = &device;
+	p_device = &device;
 
 	// --- Write camera UBO to descriptor set ---
-	m_cameraDescriptorSet.WriteBuffer(0, m_cameraUBO.GetDescriptorInfo(),
+	p_cameraDescriptorSet.WriteBuffer(0, p_cameraUBO.GetDescriptorInfo(),
 	                                  vk::DescriptorType::eUniformBuffer);
 
 #ifdef _DEBUG
-	m_cameraDescriptorSet.SetDebugName("GeometryPass_CameraSet");
+	p_cameraDescriptorSet.SetDebugName("GeometryPass_CameraSet");
 #endif
 
 	// --- Build vertex input layout ---
-	m_vertexLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);   // pos @ 0
-	m_vertexLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // normal @ 12
-	m_vertexLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // uv @ 24
+	p_vertexLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);   // pos @ 0
+	p_vertexLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // normal @ 12
+	p_vertexLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // uv @ 24
 
 	// --- Create graphics pipeline ---
-	m_pipeline = CreatePipeline(device, vertSpv, vertSize, fragSpv, fragSize);
+	p_pipeline = CreatePipeline(device, vertSpv, vertSize, fragSpv, fragSize);
 
 	NEURUS_LOG("[GeometryPass] vertSize=" << vertSize
 	          << " fragSize=" << fragSize
 	          << " colorAttachments=4"
 	          << " depthAttachments=1"
-	          << " vertexStride=" << m_vertexLayout.GetStride());
+	          << " vertexStride=" << p_vertexLayout.GetStride());
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
 
 	// --- Descriptor set layout handles ---
 	std::vector<vk::DescriptorSetLayout> descriptorSetLayouts = {
-		*m_cameraLayout.layout()
+		*p_cameraLayout.layout()
 	};
 
 	// --- Build pipeline via PipelineBuilder ---
@@ -133,7 +133,7 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
 		.SetDebugName("GeometryPass::G-Buffer")
 		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
 		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(m_vertexLayout)
+		.SetVertexInput(p_vertexLayout)
 		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 		.SetRasterization(vk::PolygonMode::eFill,
 		                  vk::CullModeFlagBits::eNone,
@@ -154,7 +154,7 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
 	vk::PipelineLayoutCreateInfo layoutCI({},
 	                                       descriptorSetLayouts,
 	                                       pushConstantRanges);
-	m_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
+	p_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
 
 	return pipeline;
 }
@@ -171,7 +171,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const auto& renderExtent = ctx.renderExtent;
 
 	// --- 1. Upload camera data to UBO ---
-	m_cameraUBO.Upload(cameraData);
+	p_cameraUBO.Upload(cameraData);
 
 	// --- 2. Collect G-Buffer attachment image views ---
 	//     Attachments start in ImageState::Undefined (first frame) or
@@ -217,20 +217,20 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	cmdBuf.setScissor(0, scissor);
 
 	// --- 5. Bind pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *m_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipeline);
 
 	// --- 6. Bind camera descriptor set (set 0) ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-	                          *m_pipelineLayout,
+	                          *p_pipelineLayout,
 	                          0,                           // firstSet
-	                          {m_cameraDescriptorSet.handle()},
+	                          {p_cameraDescriptorSet.handle()},
 	                          {});
 
 	// --- 7. Draw each render item ---
 	for (const auto& item : renderItems)
 	{
 		// Push per-draw constants (model + normalMatrix)
-		cmdBuf.pushConstants<PushConstants>(*m_pipelineLayout,
+		cmdBuf.pushConstants<PushConstants>(*p_pipelineLayout,
 		                                    vk::ShaderStageFlagBits::eVertex,
 		                                    0,
 		                                    item.pushConstants);

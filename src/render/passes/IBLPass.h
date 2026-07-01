@@ -145,14 +145,14 @@ private:
 	                     float roughnessSq);
 
 	// --- References (non-owning) ---
-	vk::Queue m_graphicsQueue;
-	uint32_t m_queueFamilyIndex;
+	vk::Queue p_graphicsQueue;
+	uint32_t p_queueFamilyIndex;
 
 	// --- Pipelines ---
-	std::unique_ptr<ComputePipelineBuilder> m_irradiancePipelineBuilder;
-	vk::raii::Pipeline m_irradiancePipeline;
-	std::unique_ptr<ComputePipelineBuilder> m_specularPipelineBuilder;
-	vk::raii::Pipeline m_specularPipeline;
+	std::unique_ptr<ComputePipelineBuilder> p_irradiancePipelineBuilder;
+	vk::raii::Pipeline p_irradiancePipeline;
+	std::unique_ptr<ComputePipelineBuilder> p_specularPipelineBuilder;
+	vk::raii::Pipeline p_specularPipeline;
 };
 
 } // namespace neurus

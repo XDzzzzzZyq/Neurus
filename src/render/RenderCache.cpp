@@ -14,8 +14,8 @@ namespace neurus {
 
 RenderCache::RenderCache(const vk::raii::Device& device,
                        const vk::raii::PhysicalDevice& physicalDevice)
-	: m_device(&device)
-	, m_physicalDevice(&physicalDevice)
+	: rc_device(&device)
+	, rc_physicalDevice(&physicalDevice)
 {
 }
 
@@ -27,8 +27,8 @@ void RenderCache::createAttachment(const AttachmentName name, const vk::Extent2D
 {
 	const auto config = ConfigFor(name);
 
-	Image image(*m_device,
-	                  *m_physicalDevice,
+	Image image(*rc_device,
+	                  *rc_physicalDevice,
 	                  extent,
 	                  config.format,
 	                  config.usage,
@@ -36,7 +36,7 @@ void RenderCache::createAttachment(const AttachmentName name, const vk::Extent2D
 	                  config.imageType,
 	                  AttachmentNameToString(name));  // debug name
 
-	m_attachments.emplace(name, std::move(image));
+	rc_attachments.emplace(name, std::move(image));
 }
 
 // ---------------------------------------------------------------------------
@@ -45,22 +45,22 @@ void RenderCache::createAttachment(const AttachmentName name, const vk::Extent2D
 
 Image& RenderCache::GetAttachment(const AttachmentName name, const vk::Extent2D extent)
 {
-	auto it = m_attachments.find(name);
-	if (it == m_attachments.end())
+	auto it = rc_attachments.find(name);
+	if (it == rc_attachments.end())
 	{
 		NEURUS_LOG("[RenderCache] Lazily creating attachment \""
 		          << AttachmentNameToString(name) << "\" at "
 		          << extent.width << "x" << extent.height);
 		createAttachment(name, extent);
-		it = m_attachments.find(name);
+		it = rc_attachments.find(name);
 	}
 	return it->second;
 }
 
 const Image& RenderCache::GetAttachment(const AttachmentName name) const
 {
-	const auto it = m_attachments.find(name);
-	if (it == m_attachments.end())
+	const auto it = rc_attachments.find(name);
+	if (it == rc_attachments.end())
 	{
 		throw std::out_of_range("RenderCache::GetAttachment: attachment not found");
 	}
@@ -73,8 +73,8 @@ const Image& RenderCache::GetAttachment(const AttachmentName name) const
 
 Image& RenderCache::GetShadowMap(const int lightUID, const LightType type)
 {
-	auto it = m_shadowMaps.find(lightUID);
-	if (it != m_shadowMaps.end())
+	auto it = rc_shadowMaps.find(lightUID);
+	if (it != rc_shadowMaps.end())
 	{
 		return it->second;
 	}
@@ -84,8 +84,8 @@ Image& RenderCache::GetShadowMap(const int lightUID, const LightType type)
 		constexpr vk::Extent2D kSunShadowRes{2048, 2048};
 		const std::string debugName = "SunShadowDepth_Light_" + std::to_string(lightUID);
 
-		Image sunShadow(*m_device,
-		                *m_physicalDevice,
+		Image sunShadow(*rc_device,
+		                *rc_physicalDevice,
 		                kSunShadowRes,
 		                vk::Format::eD32Sfloat,
 		                vk::ImageUsageFlagBits::eDepthStencilAttachment |
@@ -95,7 +95,7 @@ Image& RenderCache::GetShadowMap(const int lightUID, const LightType type)
 		                Image::ImageType::e2D,
 		                debugName.c_str()); // debug name
 
-		const auto [insertedIt, _] = m_shadowMaps.emplace(lightUID, std::move(sunShadow));
+		const auto [insertedIt, _] = rc_shadowMaps.emplace(lightUID, std::move(sunShadow));
 		return insertedIt->second;
 	}
 
@@ -103,8 +103,8 @@ Image& RenderCache::GetShadowMap(const int lightUID, const LightType type)
 	constexpr vk::Extent2D kShadowRes{1024, 1024};
 	const std::string debugName = "ShadowDepthCubemap_Light_" + std::to_string(lightUID);
 
-	Image cubemap(*m_device,
-	              *m_physicalDevice,
+	Image cubemap(*rc_device,
+	              *rc_physicalDevice,
 	              kShadowRes,
 	              vk::Format::eD32Sfloat,
 	              vk::ImageUsageFlagBits::eDepthStencilAttachment |
@@ -114,24 +114,24 @@ Image& RenderCache::GetShadowMap(const int lightUID, const LightType type)
 	              Image::ImageType::eCube,
 	              debugName.c_str()); // debug name
 
-	const auto [insertedIt, _] = m_shadowMaps.emplace(lightUID, std::move(cubemap));
+	const auto [insertedIt, _] = rc_shadowMaps.emplace(lightUID, std::move(cubemap));
 	return insertedIt->second;
 }
 
 Image& RenderCache::GetShadowIntensityArray(const vk::Extent2D extent)
 {
-	if (m_shadowIntensityArray)
+	if (rc_shadowIntensityArray)
 	{
-		return *m_shadowIntensityArray;
+		return *rc_shadowIntensityArray;
 	}
 
 	NEURUS_LOG("[RenderCache] Lazily creating shadow intensity array at "
 	           << extent.width << "x" << extent.height
 	           << " with " << MAX_SHADOW_LAYERS << " layers");
 
-	m_shadowIntensityArray = std::make_unique<Image>(
-		*m_device,
-		*m_physicalDevice,
+	rc_shadowIntensityArray = std::make_unique<Image>(
+		*rc_device,
+		*rc_physicalDevice,
 		extent,
 		vk::Format::eR8Unorm,
 		vk::ImageUsageFlagBits::eStorage |
@@ -144,18 +144,18 @@ Image& RenderCache::GetShadowIntensityArray(const vk::Extent2D extent)
 		false,                          // arrayView
 		MAX_SHADOW_LAYERS);             // arrayLayers
 
-	return *m_shadowIntensityArray;
+	return *rc_shadowIntensityArray;
 }
 
 uint32_t RenderCache::GetShadowIntensityLayer(const int lightUID, const vk::Extent2D /*extent*/)
 {
-	auto it = m_shadowIntensityLayerIndex.find(lightUID);
-	if (it != m_shadowIntensityLayerIndex.end())
+	auto it = rc_shadowIntensityLayerIndex.find(lightUID);
+	if (it != rc_shadowIntensityLayerIndex.end())
 	{
 		return it->second;
 	}
 
-	const uint32_t layer = static_cast<uint32_t>(m_shadowIntensityLayerIndex.size());
+	const uint32_t layer = static_cast<uint32_t>(rc_shadowIntensityLayerIndex.size());
 	if (layer >= MAX_SHADOW_LAYERS)
 	{
 		NEURUS_ERR("[RenderCache] Shadow intensity layer overflow: lightUID="
@@ -164,7 +164,7 @@ uint32_t RenderCache::GetShadowIntensityLayer(const int lightUID, const vk::Exte
 		return 0;
 	}
 
-	m_shadowIntensityLayerIndex[lightUID] = layer;
+	rc_shadowIntensityLayerIndex[lightUID] = layer;
 	NEURUS_LOG("[RenderCache] Allocated shadow intensity layer " << layer
 	           << " for lightUID=" << lightUID);
 	return layer;
@@ -172,15 +172,15 @@ uint32_t RenderCache::GetShadowIntensityLayer(const int lightUID, const vk::Exte
 
 Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D extent)
 {
-	auto it = m_shadowColorMaps.find(lightUID);
-	if (it != m_shadowColorMaps.end())
+	auto it = rc_shadowColorMaps.find(lightUID);
+	if (it != rc_shadowColorMaps.end())
 	{
 		return it->second;
 	}
 
 	const std::string debugName = "ShadowColorCubemap_Light_" + std::to_string(lightUID);
-	Image colorCube(*m_device,
-	                *m_physicalDevice,
+	Image colorCube(*rc_device,
+	                *rc_physicalDevice,
 	                extent,
 	                vk::Format::eR32G32B32A32Sfloat,
 	                vk::ImageUsageFlagBits::eColorAttachment |
@@ -190,15 +190,15 @@ Image& RenderCache::GetShadowColorMap(const int lightUID, const vk::Extent2D ext
 	                Image::ImageType::eCube,
 	                debugName.c_str()); // debug name
 
-	const auto [insertedIt, _] = m_shadowColorMaps.emplace(lightUID, std::move(colorCube));
+	const auto [insertedIt, _] = rc_shadowColorMaps.emplace(lightUID, std::move(colorCube));
 	return insertedIt->second;
 }
 
 std::vector<int> RenderCache::GetShadowMapUIDs() const
 {
 	std::vector<int> uids;
-	uids.reserve(m_shadowMaps.size());
-	for (const auto& [uid, _] : m_shadowMaps)
+	uids.reserve(rc_shadowMaps.size());
+	for (const auto& [uid, _] : rc_shadowMaps)
 	{
 		uids.push_back(uid);
 	}
@@ -207,25 +207,25 @@ std::vector<int> RenderCache::GetShadowMapUIDs() const
 
 Image* RenderCache::GetShadowIntensityArray() const
 {
-	return m_shadowIntensityArray.get();
+	return rc_shadowIntensityArray.get();
 }
 
 uint32_t RenderCache::GetShadowIntensityLayerIndex(const int lightUID) const
 {
-	const auto it = m_shadowIntensityLayerIndex.find(lightUID);
-	return (it != m_shadowIntensityLayerIndex.end()) ? it->second : 0;
+	const auto it = rc_shadowIntensityLayerIndex.find(lightUID);
+	return (it != rc_shadowIntensityLayerIndex.end()) ? it->second : 0;
 }
 
 void RenderCache::RemoveLight(const int lightUID)
 {
-	m_shadowMaps.erase(lightUID);
-	m_shadowIntensityLayerIndex.erase(lightUID);
-	m_shadowColorMaps.erase(lightUID);
+	rc_shadowMaps.erase(lightUID);
+	rc_shadowIntensityLayerIndex.erase(lightUID);
+	rc_shadowColorMaps.erase(lightUID);
 }
 
 bool RenderCache::HasAttachment(const AttachmentName name) const
 {
-	return m_attachments.find(name) != m_attachments.end();
+	return rc_attachments.find(name) != rc_attachments.end();
 }
 
 // ---------------------------------------------------------------------------
@@ -234,20 +234,20 @@ bool RenderCache::HasAttachment(const AttachmentName name) const
 
 void RenderCache::Clean()
 {
-	m_attachments.clear();
-	m_shadowMaps.clear();
-	m_shadowColorMaps.clear();
-	m_shadowIntensityArray.reset();
-	m_shadowIntensityLayerIndex.clear();
+	rc_attachments.clear();
+	rc_shadowMaps.clear();
+	rc_shadowColorMaps.clear();
+	rc_shadowIntensityArray.reset();
+	rc_shadowIntensityLayerIndex.clear();
 }
 
 void RenderCache::CleanScreenSpace()
 {
-	m_attachments.clear();
-	m_shadowColorMaps.clear();
-	m_shadowIntensityArray.reset();
-	m_shadowIntensityLayerIndex.clear();
-	// m_shadowMaps preserved — shadow cubemaps survive resize
+	rc_attachments.clear();
+	rc_shadowColorMaps.clear();
+	rc_shadowIntensityArray.reset();
+	rc_shadowIntensityLayerIndex.clear();
+	// rc_shadowMaps preserved — shadow cubemaps survive resize
 }
 
 // ---------------------------------------------------------------------------

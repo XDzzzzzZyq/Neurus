@@ -45,20 +45,20 @@ static glm::mat4 ComputeModelMatrix(const glm::vec3& position,
 
 void Transform3D::SetPosition(const glm::vec3& pos)
 {
-	m_position = pos;
-	m_modelMatrix = ComputeModelMatrix(m_position, m_rotation, m_scale);
+	o_position = pos;
+	o_modelMatrix = ComputeModelMatrix(o_position, o_rotation, o_scale);
 }
 
 void Transform3D::SetRotation(const glm::vec3& degrees)
 {
-	m_rotation = degrees;
-	m_modelMatrix = ComputeModelMatrix(m_position, m_rotation, m_scale);
+	o_rotation = degrees;
+	o_modelMatrix = ComputeModelMatrix(o_position, o_rotation, o_scale);
 }
 
 void Transform3D::SetScale(const glm::vec3& scale)
 {
-	m_scale = scale;
-	m_modelMatrix = ComputeModelMatrix(m_position, m_rotation, m_scale);
+	o_scale = scale;
+	o_modelMatrix = ComputeModelMatrix(o_position, o_rotation, o_scale);
 }
 
 // -----------------------------------------------------------------------
@@ -67,13 +67,13 @@ void Transform3D::SetScale(const glm::vec3& scale)
 
 glm::mat4 Transform3D::GetModelMatrix() const
 {
-	return m_modelMatrix;
+	return o_modelMatrix;
 }
 
 glm::vec3 Transform3D::GetDirection() const
 {
 	// Build rotation matrix matching GetModelMatrix() order: Rz * Rx * Ry
-	const glm::vec3 rad = glm::radians(m_rotation);
+	const glm::vec3 rad = glm::radians(o_rotation);
 	glm::mat4 rot{1.0f};
 	rot = glm::rotate(rot, rad.z, glm::vec3(0.0f, 0.0f, 1.0f)); // Yaw   (Z = up)
 	rot = glm::rotate(rot, rad.x, glm::vec3(1.0f, 0.0f, 0.0f)); // Pitch (X)
@@ -91,7 +91,7 @@ glm::vec3 Transform3D::GetDirection() const
 
 glm::mat3 Transform3D::GetNormalMatrix() const
 {
-	return glm::transpose(glm::inverse(glm::mat3(m_modelMatrix)));
+	return glm::transpose(glm::inverse(glm::mat3(o_modelMatrix)));
 }
 
 } // namespace neurus

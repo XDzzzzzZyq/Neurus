@@ -14,7 +14,7 @@ void BufferLayout::AddAttribute(uint32_t location, vk::Format format, uint32_t o
 	desc.format = format;
 	desc.offset = offset;
 
-	m_attributes.push_back(desc);
+	b_attributes.push_back(desc);
 }
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ vk::VertexInputBindingDescription BufferLayout::GetBindingDescription() const
 const std::vector<vk::VertexInputAttributeDescription>&
 BufferLayout::GetAttributeDescriptions() const
 {
-	return m_attributes;
+	return b_attributes;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,13 +46,13 @@ BufferLayout::GetAttributeDescriptions() const
 
 uint32_t BufferLayout::GetStride() const
 {
-	if (m_attributes.empty())
+	if (b_attributes.empty())
 	{
 		return 0;
 	}
 
 	// Stride = offset of last attribute + size of its format
-	const auto& last = m_attributes.back();
+	const auto& last = b_attributes.back();
 	return last.offset + GetFormatSize(last.format);
 }
 

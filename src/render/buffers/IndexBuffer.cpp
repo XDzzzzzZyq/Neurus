@@ -25,7 +25,7 @@ IndexBuffer::IndexBuffer(const vk::raii::Device& device,
 	            size,
 	            vk::BufferUsageFlagBits::eIndexBuffer,
 	            debugName)
-	, m_indexCount(indexCount)
+	, b_indexCount(indexCount)
 {
 	if (data == nullptr && size > 0)
 	{

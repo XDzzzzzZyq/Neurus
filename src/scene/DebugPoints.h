@@ -94,9 +94,12 @@ public:
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
-		   CEREAL_NVP(m_pointType), CEREAL_NVP(m_color),
-		   CEREAL_NVP(m_scale), CEREAL_NVP(m_opacity),
-		   CEREAL_NVP(m_projectionMode), CEREAL_NVP(m_points));
+		   cereal::make_nvp("m_pointType", o_pointType),
+		   cereal::make_nvp("m_color", o_color),
+		   cereal::make_nvp("m_scale", o_scale),
+		   cereal::make_nvp("m_opacity", o_opacity),
+		   cereal::make_nvp("m_projectionMode", o_projectionMode),
+		   cereal::make_nvp("m_points", o_points));
 	}
 
 	// Non-copyable (UID semantics)
@@ -132,51 +135,51 @@ public:
 	 * @brief Returns the number of stored points.
 	 * @return Point count.
 	 */
-	int GetPointCount() const { return static_cast<int>(m_points.size()); }
+	int GetPointCount() const { return static_cast<int>(o_points.size()); }
 
 	/**
 	 * @brief Returns a const reference to the point storage.
 	 * @return Const reference to vector of point positions.
 	 */
-	const std::vector<glm::vec3>& GetPoints() const { return m_points; }
+	const std::vector<glm::vec3>& GetPoints() const { return o_points; }
 
 	// -----------------------------------------------------------------------
 	// Properties
 	// -----------------------------------------------------------------------
 
 	/** @brief Sets the point sprite type. */
-	void SetPointType(PointType type) { m_pointType = type; }
+	void SetPointType(PointType type) { o_pointType = type; }
 	/** @brief Returns the point sprite type. */
-	PointType GetPointType() const { return m_pointType; }
+	PointType GetPointType() const { return o_pointType; }
 
 	/** @brief Sets the point color. */
-	void SetColor(const glm::vec4& color) { m_color = color; }
+	void SetColor(const glm::vec4& color) { o_color = color; }
 	/** @brief Returns the point color. */
-	const glm::vec4& GetColor() const { return m_color; }
+	const glm::vec4& GetColor() const { return o_color; }
 
 	/** @brief Sets the point scale factor. */
-	void SetScale(float scale) { m_scale = scale; }
+	void SetScale(float scale) { o_scale = scale; }
 	/** @brief Returns the point scale factor. */
-	float GetScale() const { return m_scale; }
+	float GetScale() const { return o_scale; }
 
 	/** @brief Sets the opacity (0.0 = transparent, 1.0 = opaque). */
-	void SetOpacity(float opacity) { m_opacity = opacity; }
+	void SetOpacity(float opacity) { o_opacity = opacity; }
 	/** @brief Returns the opacity value. */
-	float GetOpacity() const { return m_opacity; }
+	float GetOpacity() const { return o_opacity; }
 
 	/** @brief Sets the projection mode (0 = screen, 1 = world, etc.). */
-	void SetProjectionMode(int mode) { m_projectionMode = mode; }
+	void SetProjectionMode(int mode) { o_projectionMode = mode; }
 	/** @brief Returns the projection mode. */
-	int GetProjectionMode() const { return m_projectionMode; }
+	int GetProjectionMode() const { return o_projectionMode; }
 
 private:
-	PointType m_pointType{PointType::SQUARE};    ///< Point sprite shape.
-	glm::vec4 m_color{1.0f, 1.0f, 1.0f, 1.0f};  ///< Point RGBA color.
-	float m_scale{1.0f};                          ///< Point size scale.
-	float m_opacity{1.0f};                        ///< Opacity (0-1).
-	int m_projectionMode{0};                      ///< Projection mode identifier.
+	PointType o_pointType{PointType::SQUARE};    ///< Point sprite shape.
+	glm::vec4 o_color{1.0f, 1.0f, 1.0f, 1.0f};  ///< Point RGBA color.
+	float o_scale{1.0f};                          ///< Point size scale.
+	float o_opacity{1.0f};                        ///< Opacity (0-1).
+	int o_projectionMode{0};                      ///< Projection mode identifier.
 
-	std::vector<glm::vec3> m_points;              ///< Point positions.
+	std::vector<glm::vec3> o_points;              ///< Point positions.
 };
 
 } // namespace neurus

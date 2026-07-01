@@ -34,7 +34,7 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	ads::CDockManager::setConfigFlag(ads::CDockManager::OpaqueSplitterResize, false);
 	ads::CDockManager::setConfigFlag(ads::CDockManager::FocusHighlighting, true);
 
-	m_dockManager = new ads::CDockManager(this);
+	win_dockManager = new ads::CDockManager(this);
 
 	CreateDocks();
 	LoadLayout();   // Restore saved layout if available
@@ -49,29 +49,29 @@ NeurusMainWindow::~NeurusMainWindow() = default;
 
 HWND NeurusMainWindow::getViewportHwnd() const
 {
-	return m_viewportWidget ? m_viewportWidget->hwnd() : nullptr;
+	return win_viewportWidget ? win_viewportWidget->hwnd() : nullptr;
 }
 
 int NeurusMainWindow::getViewportWidth() const
 {
-	return m_viewportWidget ? m_viewportWidget->width() : 0;
+	return win_viewportWidget ? win_viewportWidget->width() : 0;
 }
 
 int NeurusMainWindow::getViewportHeight() const
 {
-	return m_viewportWidget ? m_viewportWidget->height() : 0;
+	return win_viewportWidget ? win_viewportWidget->height() : 0;
 }
 
 VulkanWidget* NeurusMainWindow::getVulkanWidget() const
 {
-	return m_viewportWidget;
+	return win_viewportWidget;
 }
 
 void NeurusMainWindow::SetScene(Scene* scene)
 {
-	if (m_propertyEditor)
+	if (win_propertyEditor)
 	{
-		m_propertyEditor->SetScene(scene);
+		win_propertyEditor->SetScene(scene);
 	}
 }
 
@@ -202,56 +202,56 @@ static QWidget* makePlaceholder(const QString& text)
 
 void NeurusMainWindow::CreateDocks()
 {
-	if (!m_viewportWidget){
+	if (!win_viewportWidget){
 		// Create VulkanWidget after docks — CreateDocks() places it as viewport content
-		m_viewportWidget = new VulkanWidget();
-		m_viewportWidget->resize(800, 600);
-		m_viewportWidget->winId();  // Force native window handle creation
+		win_viewportWidget = new VulkanWidget();
+		win_viewportWidget->resize(800, 600);
+		win_viewportWidget->winId();  // Force native window handle creation
 
 		// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
-		m_viewportDock = new ads::CDockWidget(m_dockManager, "Viewport");
-		m_viewportDock->setWidget(m_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
-		m_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+		win_viewportDock = new ads::CDockWidget(win_dockManager, "Viewport");
+		win_viewportDock->setWidget(win_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+		win_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
 		// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
-		m_dockManager->addDockWidget(ads::LeftDockWidgetArea, m_viewportDock);
+		win_dockManager->addDockWidget(ads::LeftDockWidgetArea, win_viewportDock);
 	}
 
 	// --- Left: Shader Editor ---
-	auto* shaderDock = new ads::CDockWidget(m_dockManager, "Shader Editor");
+	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
 	shaderDock->setWidget(makePlaceholder("Shader Editor"));
 	shaderDock->resize(280, 300);
 	shaderDock->setMinimumSize(200, 200);
-	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
+	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
 
 	// --- Left: Outliner ---
-	auto* outlinerDock = new ads::CDockWidget(m_dockManager, "Outliner");
+	auto* outlinerDock = new ads::CDockWidget(win_dockManager, "Outliner");
 	auto* outlinerPanel = new OutlinerPanel();
 	outlinerDock->setWidget(outlinerPanel);
 	outlinerDock->resize(280, 300);
 	outlinerDock->setMinimumSize(200, 200);
-	m_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
+	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
 
 	// --- Right: Property Editor ---
-	m_propertyEditor = new PropertyEditor(nullptr);  // Scene set later via SetScene()
-	auto* propDock = new ads::CDockWidget(m_dockManager, "Property Editor");
-	propDock->setWidget(m_propertyEditor);
+	win_propertyEditor = new PropertyEditor(nullptr);  // Scene set later via SetScene()
+	auto* propDock = new ads::CDockWidget(win_dockManager, "Property Editor");
+	propDock->setWidget(win_propertyEditor);
 	propDock->resize(280, 300);
 	propDock->setMinimumSize(200, 200);
-	m_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
+	win_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
 
 	// --- Right: Render Config ---
-	auto* configDock = new ads::CDockWidget(m_dockManager, "Render Config");
+	auto* configDock = new ads::CDockWidget(win_dockManager, "Render Config");
 	configDock->setWidget(makePlaceholder("Render Config"));
 	configDock->resize(280, 300);
 	configDock->setMinimumSize(200, 200);
-	m_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
+	win_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
 
 	// --- Bottom: Texture Viewer ---
-	auto* textureDock = new ads::CDockWidget(m_dockManager, "Texture Viewer");
+	auto* textureDock = new ads::CDockWidget(win_dockManager, "Texture Viewer");
 	textureDock->setWidget(makePlaceholder("Texture Viewer"));
 	textureDock->resize(300, 200);
 	textureDock->setMinimumSize(200, 150);
-	m_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
+	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
 }
 
 // =========================================================================
@@ -264,7 +264,7 @@ void NeurusMainWindow::SaveLayout()
 	QFile file(path);
 	if (file.open(QIODevice::WriteOnly))
 	{
-		QByteArray state = m_dockManager->saveState();
+		QByteArray state = win_dockManager->saveState();
 		file.write(state);
 		file.close();
 	}
@@ -278,17 +278,17 @@ void NeurusMainWindow::LoadLayout()
 	{
 		QByteArray state = file.readAll();
 		file.close();
-		m_dockManager->restoreState(state);
+		win_dockManager->restoreState(state);
 	}
 }
 
 void NeurusMainWindow::RestoreDefaultLayout()
 {
 	// Delete all non-viewport docks
-	auto docks = m_dockManager->dockWidgetsMap();
+	auto docks = win_dockManager->dockWidgetsMap();
 	for (auto it = docks.begin(); it != docks.end(); ++it)
 	{
-		if (it.value() != m_viewportDock)
+		if (it.value() != win_viewportDock)
 		{
 			it.value()->deleteDockWidget();
 		}

@@ -74,16 +74,16 @@ void Mesh::UploadToGPU(const vk::raii::Device& device,
 	const uint32_t indexCount = static_cast<uint32_t>(meshData.indexArray.size());
 	const vk::DeviceSize indexDataSize = static_cast<vk::DeviceSize>(indexCount * sizeof(uint32_t));
 
-	m_gpuVertices = std::make_unique<VertexBuffer>(
+	me_gpuVertices = std::make_unique<VertexBuffer>(
 		device, physicalDevice, queue, queueFamilyIndex,
 		strippedVertices.data(), vertexDataSize, kVertexStride, vertexCount,
 		("VBO_" + meshData.name).c_str());
-	m_gpuIndices = std::make_unique<IndexBuffer>(
+	me_gpuIndices = std::make_unique<IndexBuffer>(
 		device, physicalDevice, queue, queueFamilyIndex,
 		meshData.indexArray.data(), indexDataSize, indexCount,
 		("IBO_" + meshData.name).c_str());
-	m_gpuIndexCount = indexCount;
-	m_gpuDevice = &device;
+	me_gpuIndexCount = indexCount;
+	me_gpuDevice = &device;
 
 	NEURUS_LOG("[Mesh] Uploaded mesh " << GetObjectID()
 	           << " ('" << meshData.name << "')"
@@ -93,12 +93,12 @@ void Mesh::UploadToGPU(const vk::raii::Device& device,
 
 void Mesh::ReleaseGPUBuffers()
 {
-	if (m_gpuDevice) {
-		m_gpuDevice->waitIdle();
+	if (me_gpuDevice) {
+		me_gpuDevice->waitIdle();
 	}
-	m_gpuVertices.reset();
-	m_gpuIndices.reset();
-	m_gpuIndexCount = 0;
+	me_gpuVertices.reset();
+	me_gpuIndices.reset();
+	me_gpuIndexCount = 0;
 }
 
 void Mesh::SetObjShader(void* shader) { o_shader = shader; }

@@ -23,19 +23,19 @@ Image::Image(const vk::raii::Device& device,
              const char* debugName,
              const bool arrayView,
              const uint32_t arrayLayers)
-	: m_extent(extent)
-	, m_format(format)
-	, m_usage(usage)
-	, m_mipLevels(mipLevels)
-	, m_imageType(imageType)
-	, m_arrayView(arrayView)
-	, m_userArrayLayers(arrayLayers)
+	: im_extent(extent)
+	, im_format(format)
+	, im_usage(usage)
+	, im_mipLevels(mipLevels)
+	, im_imageType(imageType)
+	, im_arrayView(arrayView)
+	, im_userArrayLayers(arrayLayers)
 {
 	createImage(device, physicalDevice);
 	allocateAndBindMemory(device, physicalDevice);
 	createImageView(device, debugName);
 
-	if (m_imageType == ImageType::eCube)
+	if (im_imageType == ImageType::eCube)
 	{
 		createArrayView(device);
 	}
@@ -46,7 +46,7 @@ Image::Image(const vk::raii::Device& device,
 	{
 		const vk::DebugUtilsObjectNameInfoEXT nameInfo(
 			vk::ObjectType::eImage,
-			reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_image)),
+			reinterpret_cast<uint64_t>(static_cast<VkImage>(*im_image)),
 			debugName);
 		device.setDebugUtilsObjectNameEXT(nameInfo);
 
@@ -56,7 +56,7 @@ Image::Image(const vk::raii::Device& device,
 			memName += "_Mem";
 			vk::DebugUtilsObjectNameInfoEXT memNameInfo(
 				vk::ObjectType::eDeviceMemory,
-				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*m_deviceMemory)),
+				reinterpret_cast<uint64_t>(static_cast<VkDeviceMemory>(*im_deviceMemory)),
 				memName.c_str());
 			device.setDebugUtilsObjectNameEXT(memNameInfo);
 		}
@@ -64,15 +64,15 @@ Image::Image(const vk::raii::Device& device,
 #endif
 
 	{
-		const char* typeStr = (m_imageType == ImageType::e2D) ? "2D" :
-		                      (m_imageType == ImageType::eCube) ? "Cube" :
-		                      (m_imageType == ImageType::eDepthStencil) ? "DepthStencil" : "Unknown";
-		NEURUS_LOG("[Image] " << m_extent.width << "x" << m_extent.height
-		          << " mips=" << m_mipLevels
+		const char* typeStr = (im_imageType == ImageType::e2D) ? "2D" :
+		                      (im_imageType == ImageType::eCube) ? "Cube" :
+		                      (im_imageType == ImageType::eDepthStencil) ? "DepthStencil" : "Unknown";
+		NEURUS_LOG("[Image] " << im_extent.width << "x" << im_extent.height
+		          << " mips=" << im_mipLevels
 		          << " type=" << typeStr
-		          << " format=" << vk::to_string(m_format)
-		          << " usage=" << vk::to_string(m_usage)
-		          << " handle=0x" << std::hex << reinterpret_cast<uint64_t>(static_cast<VkImage>(*m_image)) << std::dec
+		          << " format=" << vk::to_string(im_format)
+		          << " usage=" << vk::to_string(im_usage)
+		          << " handle=0x" << std::hex << reinterpret_cast<uint64_t>(static_cast<VkImage>(*im_image)) << std::dec
 		          << (debugName ? " name='" : "")
 		          << (debugName ? debugName : "")
 		          << (debugName ? "'" : ""));
@@ -122,43 +122,43 @@ void Image::createImage(const vk::raii::Device& device,
 {
 	vk::ImageCreateFlags createFlags;
 
-	switch (m_imageType)
+	switch (im_imageType)
 	{
 	case ImageType::eCube:
-		m_arrayLayers = 6;
+		im_arrayLayers = 6;
 		createFlags = vk::ImageCreateFlagBits::eCubeCompatible;
 		break;
 	case ImageType::eDepthStencil:
-		m_arrayLayers = 1;
+		im_arrayLayers = 1;
 		createFlags = {};
 		break;
 	case ImageType::eArray:
-		m_arrayLayers = m_userArrayLayers;
+		im_arrayLayers = im_userArrayLayers;
 		createFlags = {};
 		break;
 	case ImageType::e2D:
 	default:
-		m_arrayLayers = 1;
+		im_arrayLayers = 1;
 		createFlags = {};
 		break;
 	}
 
-	const vk::Extent3D extent3D(m_extent.width, m_extent.height, 1);
+	const vk::Extent3D extent3D(im_extent.width, im_extent.height, 1);
 	const vk::ImageCreateInfo imageCI(
 		createFlags,
 		vk::ImageType::e2D,
-		m_format,
+		im_format,
 		extent3D,
-		m_mipLevels,
-		m_arrayLayers,
+		im_mipLevels,
+		im_arrayLayers,
 		vk::SampleCountFlagBits::e1,
 		vk::ImageTiling::eOptimal,
-		m_usage,
+		im_usage,
 		vk::SharingMode::eExclusive,
 		{},
 		vk::ImageLayout::eUndefined);
 
-	m_image = vk::raii::Image(device, imageCI);
+	im_image = vk::raii::Image(device, imageCI);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,15 +168,15 @@ void Image::createImage(const vk::raii::Device& device,
 void Image::allocateAndBindMemory(const vk::raii::Device& device,
                                         const vk::raii::PhysicalDevice& physicalDevice)
 {
-	const auto memReqs = m_image.getMemoryRequirements();
+	const auto memReqs = im_image.getMemoryRequirements();
 	const auto typeIndex = FindMemoryType(physicalDevice,
 	                                      memReqs.memoryTypeBits,
 	                                      vk::MemoryPropertyFlagBits::eDeviceLocal);
 
 	const vk::MemoryAllocateInfo allocInfo(memReqs.size, typeIndex);
-	m_deviceMemory = vk::raii::DeviceMemory(device, allocInfo);
+	im_deviceMemory = vk::raii::DeviceMemory(device, allocInfo);
 
-	m_image.bindMemory(*m_deviceMemory, 0);
+	im_image.bindMemory(*im_deviceMemory, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,15 +188,15 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 	vk::ImageViewType viewType;
 	vk::ImageAspectFlags aspect;
 
-	switch (m_imageType)
+	switch (im_imageType)
 	{
 	case ImageType::eCube:
 		viewType = vk::ImageViewType::eCube;
-		aspect = AspectFromFormat(m_format);
+		aspect = AspectFromFormat(im_format);
 		break;
 	case ImageType::eDepthStencil:
 		viewType = vk::ImageViewType::e2D;
-		aspect = AspectFromFormat(m_format);
+		aspect = AspectFromFormat(im_format);
 		break;
 	case ImageType::eArray:
 		viewType = vk::ImageViewType::e2DArray;
@@ -210,42 +210,42 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 		// Aspect derived from format so depth-only formats (D32) get the correct
 		// eDepth aspect, while color formats get eColor.
 		viewType = vk::ImageViewType::e2D;
-		aspect = AspectFromFormat(m_format);
+		aspect = AspectFromFormat(im_format);
 		break;
 	}
 
 	const vk::ImageSubresourceRange subresourceRange(
 		aspect,
 		0,               // baseMipLevel
-		m_mipLevels,     // levelCount
+		im_mipLevels,     // levelCount
 		0,               // baseArrayLayer
-		m_arrayLayers    // layerCount
+		im_arrayLayers    // layerCount
 	);
 
 	const vk::ComponentMapping components; // identity mapping
 
 	const vk::ImageViewCreateInfo viewCI(
 		{},
-		*m_image,
+		*im_image,
 		viewType,
-		m_format,
+		im_format,
 		components,
 		subresourceRange);
 
-	m_imageView = vk::raii::ImageView(device, viewCI);
+	im_imageView = vk::raii::ImageView(device, viewCI);
 
 	// --- If arrayView requested, create an additional 2D_ARRAY view ---
-	if (m_imageType == ImageType::e2D && m_arrayView)
+	if (im_imageType == ImageType::e2D && im_arrayView)
 	{
 		const vk::ImageViewCreateInfo arrayViewCI(
 			{},
-			*m_image,
+			*im_image,
 			vk::ImageViewType::e2DArray,
-			m_format,
+			im_format,
 			components,
 			subresourceRange);
-		m_arrayImageView = vk::raii::ImageView(device, arrayViewCI);
-		m_hasArrayView = true;
+		im_arrayImageView = vk::raii::ImageView(device, arrayViewCI);
+		im_hasArrayView = true;
 
 #ifdef _DEBUG
 		if (debugName && *debugName)
@@ -254,7 +254,7 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 			arrayViewName += "_ArrayView";
 			vk::DebugUtilsObjectNameInfoEXT nameInfo(
 				vk::ObjectType::eImageView,
-				reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_arrayImageView)),
+				reinterpret_cast<uint64_t>(static_cast<VkImageView>(*im_arrayImageView)),
 				arrayViewName.c_str());
 			device.setDebugUtilsObjectNameEXT(nameInfo);
 		}
@@ -269,7 +269,7 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 		viewName += "_View";
 		vk::DebugUtilsObjectNameInfoEXT nameInfo(
 			vk::ObjectType::eImageView,
-			reinterpret_cast<uint64_t>(static_cast<VkImageView>(*m_imageView)),
+			reinterpret_cast<uint64_t>(static_cast<VkImageView>(*im_imageView)),
 			viewName.c_str());
 		device.setDebugUtilsObjectNameEXT(nameInfo);
 	}
@@ -282,27 +282,27 @@ void Image::createImageView(const vk::raii::Device& device, const char* debugNam
 
 void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 {
-	if (m_mipLevels <= 1)
+	if (im_mipLevels <= 1)
 	{
 		return;
 	}
 
-	const auto aspect = AspectFromFormat(m_format);
+	const auto aspect = AspectFromFormat(im_format);
 
-	int32_t mipWidth  = static_cast<int32_t>(m_extent.width);
-	int32_t mipHeight = static_cast<int32_t>(m_extent.height);
+	int32_t mipWidth  = static_cast<int32_t>(im_extent.width);
+	int32_t mipHeight = static_cast<int32_t>(im_extent.height);
 
-	for (uint32_t i = 1; i < m_mipLevels; ++i)
+	for (uint32_t i = 1; i < im_mipLevels; ++i)
 	{
 		// At this point, level (i-1) is guaranteed to be in TransferDst:
 		//   - Iteration 1: set by the initial full-image barrier before GenerateMipmaps
 		//   - Iteration N: level (i-1) was the blit destination in iteration (N-1)
-		// We reset m_state so Barrier::Transition reads the correct "old" layout.
+		// We reset im_state so Barrier::Transition reads the correct "old" layout.
 
 		// --- Transition level (i-1) TransferDst → TransferSrc ---
-		m_state = ImageState::TransferDst;
+		im_state = ImageState::TransferDst;
 		{
-			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, m_arrayLayers);
+			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, im_arrayLayers);
 			Barrier::Transition(*cmdBuf, *this, ImageState::TransferSrc, range);
 		}
 
@@ -315,14 +315,14 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 		blit.srcSubresource.aspectMask     = aspect;
 		blit.srcSubresource.mipLevel       = i - 1;
 		blit.srcSubresource.baseArrayLayer = 0;
-		blit.srcSubresource.layerCount     = m_arrayLayers;
+		blit.srcSubresource.layerCount     = im_arrayLayers;
 		blit.srcOffsets[0] = vk::Offset3D(0, 0, 0);
 		blit.srcOffsets[1] = vk::Offset3D(srcWidth, srcHeight, 1);
 
 		blit.dstSubresource.aspectMask     = aspect;
 		blit.dstSubresource.mipLevel       = i;
 		blit.dstSubresource.baseArrayLayer = 0;
-		blit.dstSubresource.layerCount     = m_arrayLayers;
+		blit.dstSubresource.layerCount     = im_arrayLayers;
 		blit.dstOffsets[0] = vk::Offset3D(0, 0, 0);
 		blit.dstOffsets[1] = vk::Offset3D(dstWidth, dstHeight, 1);
 
@@ -330,15 +330,15 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 		auto vulkanDstState = Barrier::ToVulkanImageState(ImageState::TransferDst);
 
 		cmdBuf.blitImage(
-			*m_image, vulkanSrcState.layout,
-			*m_image, vulkanDstState.layout,
+			*im_image, vulkanSrcState.layout,
+			*im_image, vulkanDstState.layout,
 			{ blit },
 			vk::Filter::eLinear);
 
 		// --- Transition level (i-1) TransferSrc → ShaderRead ---
-		m_state = ImageState::TransferSrc;
+		im_state = ImageState::TransferSrc;
 		{
-			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, m_arrayLayers);
+			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, im_arrayLayers);
 			Barrier::Transition(*cmdBuf, *this, ImageState::ColorShaderRead, range);
 		}
 
@@ -347,14 +347,14 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 	}
 
 	// --- Transition last mip level TransferDst → ShaderRead ---
-	m_state = ImageState::TransferDst;
+	im_state = ImageState::TransferDst;
 	{
-		vk::ImageSubresourceRange lastRange(aspect, m_mipLevels - 1, 1, 0, m_arrayLayers);
+		vk::ImageSubresourceRange lastRange(aspect, im_mipLevels - 1, 1, 0, im_arrayLayers);
 		Barrier::Transition(*cmdBuf, *this, ImageState::ColorShaderRead, lastRange);
 	}
 
 	// Update CPU-side state tracking to reflect the final layout
-	m_state = ImageState::ColorShaderRead;
+	im_state = ImageState::ColorShaderRead;
 }
 
 // ---------------------------------------------------------------------------
@@ -408,23 +408,23 @@ void Image::UploadImageData(const vk::raii::Device& device,
 		copyRegion.bufferRowLength   = 0;
 		copyRegion.bufferImageHeight = 0;
 		copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-			AspectFromFormat(m_format), 0, 0, m_arrayLayers);
+			AspectFromFormat(im_format), 0, 0, im_arrayLayers);
 		copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
-		copyRegion.imageExtent = vk::Extent3D(m_extent.width, m_extent.height, 1);
+		copyRegion.imageExtent = vk::Extent3D(im_extent.width, im_extent.height, 1);
 
-		cmdBufs[0].copyBufferToImage(*stagingBuffer, *m_image,
+		cmdBufs[0].copyBufferToImage(*stagingBuffer, *im_image,
 		                             vk::ImageLayout::eTransferDstOptimal,
 		                             { copyRegion });
 	}
 
 	// --- Transition mip level 0 TransferDst → ShaderRead (only the uploaded mip) ---
 	{
-		vk::ImageSubresourceRange mip0Range(AspectFromFormat(m_format), 0, 1, 0, m_arrayLayers);
+		vk::ImageSubresourceRange mip0Range(AspectFromFormat(im_format), 0, 1, 0, im_arrayLayers);
 		Barrier::Transition(*cmdBufs[0], *this, ImageState::ColorShaderRead, mip0Range);
 	}
 
 	// Update CPU-side state tracking (other mips stay in TransferDst for mipmap generation)
-	m_state = ImageState::ColorShaderRead;
+	im_state = ImageState::ColorShaderRead;
 
 	cmdBufs[0].end();
 
@@ -444,23 +444,23 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
                                 const vk::ImageSubresourceRange* subresourceRange,
                                 vk::Extent2D readExtent)
 {
-	const uint32_t bytesPerPixel = ImageData::PixelByteSize(m_format);
+	const uint32_t bytesPerPixel = ImageData::PixelByteSize(im_format);
 
 	if (bytesPerPixel == 0)
 	{
-		NEURUS_ERR("[Image] ReadImageData: unsupported format " << vk::to_string(m_format));
+		NEURUS_ERR("[Image] ReadImageData: unsupported format " << vk::to_string(im_format));
 		return ImageData();
 	}
 
 	// Extent to read: explicit override or full image
 	const vk::Extent2D copyExtent = (readExtent.width == 0 && readExtent.height == 0)
-		? m_extent
+		? im_extent
 		: readExtent;
 
 	// Determine what to read (default: mip 0, layer 0)
 	const auto range = subresourceRange
 		? *subresourceRange
-		: vk::ImageSubresourceRange(AspectFromFormat(m_format), 0, 1, 0, 1);
+		: vk::ImageSubresourceRange(AspectFromFormat(im_format), 0, 1, 0, 1);
 
 	const uint32_t layerCount = range.layerCount;
 	const uint32_t baseLayer  = range.baseArrayLayer;
@@ -499,11 +499,11 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	copyRegion.bufferRowLength   = 0;
 	copyRegion.bufferImageHeight = 0;
 	copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
-		AspectFromFormat(m_format), range.baseMipLevel, baseLayer, layerCount);
+		AspectFromFormat(im_format), range.baseMipLevel, baseLayer, layerCount);
 	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 	copyRegion.imageExtent = vk::Extent3D(copyExtent.width, copyExtent.height, 1);
 
-	cmdBufs[0].copyImageToBuffer(*m_image, vk::ImageLayout::eTransferSrcOptimal,
+	cmdBufs[0].copyImageToBuffer(*im_image, vk::ImageLayout::eTransferSrcOptimal,
 	                             *stagingBuffer, { copyRegion });
 
 	vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite,
@@ -519,7 +519,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	queue.waitIdle();
 
 	void* mapped = stagingMemory.mapMemory(0, imageSize);
-	ImageData result(mapped, copyExtent.width, copyExtent.height, m_format, layerCount);
+	ImageData result(mapped, copyExtent.width, copyExtent.height, im_format, layerCount);
 	stagingMemory.unmapMemory();
 
 	return result;
@@ -578,11 +578,11 @@ uint32_t Image::FindMemoryType(const vk::raii::PhysicalDevice& physicalDevice,
 
 const vk::raii::ImageView& Image::ImageViewArrayHandle() const
 {
-	if (m_hasArrayView)
+	if (im_hasArrayView)
 	{
-		return m_arrayImageView;
+		return im_arrayImageView;
 	}
-	return m_imageView;
+	return im_imageView;
 }
 
 // ---------------------------------------------------------------------------
@@ -591,17 +591,17 @@ const vk::raii::ImageView& Image::ImageViewArrayHandle() const
 
 const vk::raii::ImageView& Image::ArrayView() const
 {
-	return m_cubeArrayView;
+	return im_cubeArrayView;
 }
 
 void Image::createArrayView(const vk::raii::Device& device)
 {
-	const auto aspect = AspectFromFormat(m_format);
-	vk::ImageViewCreateInfo ci({}, *m_image,
-		vk::ImageViewType::e2DArray, m_format,
+	const auto aspect = AspectFromFormat(im_format);
+	vk::ImageViewCreateInfo ci({}, *im_image,
+		vk::ImageViewType::e2DArray, im_format,
 		vk::ComponentMapping(),
 		vk::ImageSubresourceRange(aspect, 0, 1, 0, 6));
-	m_cubeArrayView = vk::raii::ImageView(device, ci);
+	im_cubeArrayView = vk::raii::ImageView(device, ci);
 }
 
 // ---------------------------------------------------------------------------
@@ -610,27 +610,27 @@ void Image::createArrayView(const vk::raii::Device& device)
 
 vk::ImageSubresourceRange Image::AllSubresources() const
 {
-	return { AspectFromFormat(m_format), 0, m_mipLevels, 0, m_arrayLayers };
+	return { AspectFromFormat(im_format), 0, im_mipLevels, 0, im_arrayLayers };
 }
 
 vk::ImageSubresourceRange Image::Mip(uint32_t level) const
 {
-	return { AspectFromFormat(m_format), level, 1, 0, m_arrayLayers };
+	return { AspectFromFormat(im_format), level, 1, 0, im_arrayLayers };
 }
 
 vk::ImageSubresourceRange Image::Mips(uint32_t base, uint32_t count) const
 {
-	return { AspectFromFormat(m_format), base, count, 0, m_arrayLayers };
+	return { AspectFromFormat(im_format), base, count, 0, im_arrayLayers };
 }
 
 vk::ImageSubresourceRange Image::Layer(uint32_t layer) const
 {
-	return { AspectFromFormat(m_format), 0, m_mipLevels, layer, 1 };
+	return { AspectFromFormat(im_format), 0, im_mipLevels, layer, 1 };
 }
 
 vk::ImageSubresourceRange Image::Layers(uint32_t base, uint32_t count) const
 {
-	return { AspectFromFormat(m_format), 0, m_mipLevels, base, count };
+	return { AspectFromFormat(im_format), 0, im_mipLevels, base, count };
 }
 
 } // namespace neurus

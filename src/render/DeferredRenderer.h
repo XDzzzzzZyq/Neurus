@@ -133,7 +133,7 @@ public:
 	void WaitIdle();
 
 	/** @brief Returns the current swapchain extent. */
-	vk::Extent2D GetExtent() const { return m_swapchain ? m_swapchain->extent() : vk::Extent2D{800, 600}; }
+	vk::Extent2D GetExtent() const { return r_swapchain ? r_swapchain->extent() : vk::Extent2D{800, 600}; }
 
 	/**
 	 * @brief Captures the current swapchain image to a timestamped PNG file.
@@ -228,45 +228,45 @@ private:
 	                                               uint32_t queueFamilyIndex);
 
 	// --- Borrowed objects ---
-	const vk::raii::Device& m_device;
-	const vk::raii::PhysicalDevice& m_physicalDevice;
-	vk::Queue m_graphicsQueue;
-	uint32_t m_queueFamilyIndex;
+	const vk::raii::Device& r_device;
+	const vk::raii::PhysicalDevice& r_physicalDevice;
+	vk::Queue r_graphicsQueue;
+	uint32_t r_queueFamilyIndex;
 
 	// --- Swapchain ---
-	std::unique_ptr<Swapchain> m_swapchain;
+	std::unique_ptr<Swapchain> r_swapchain;
 
 	// --- Deferred pipeline ---
-	std::unique_ptr<RenderCache> m_renderCache;
+	std::unique_ptr<RenderCache> r_renderCache;
 	// --- Polymorphic pass container (owning) ---
-	std::vector<std::unique_ptr<Pass>> m_passes;
+	std::vector<std::unique_ptr<Pass>> r_passes;
 
 	// --- Cached raw pointers for zero-cost access (non-owning) ---
-	GeometryPass* m_geometryPass = nullptr;
-	LightingPass* m_lightingPass = nullptr;
-	SSAOPass*   m_ssaoPass     = nullptr;
-	IBLPass*    m_iblPass      = nullptr;
-	ShadowDepthPass* m_shadowDepthPass = nullptr;
-	ShadowIntensityPass* m_shadowIntensityPass = nullptr;
+	GeometryPass* r_geometryPass = nullptr;
+	LightingPass* r_lightingPass = nullptr;
+	SSAOPass*   r_ssaoPass     = nullptr;
+	IBLPass*    r_iblPass      = nullptr;
+	ShadowDepthPass* r_shadowDepthPass = nullptr;
+	ShadowIntensityPass* r_shadowIntensityPass = nullptr;
 
 	// --- Command pool ---
-	vk::raii::CommandPool m_commandPool;
+	vk::raii::CommandPool r_commandPool;
 
 	// --- Command buffers (one per swapchain image, reused each frame) ---
-	std::vector<vk::raii::CommandBuffer> m_commandBuffers;
+	std::vector<vk::raii::CommandBuffer> r_commandBuffers;
 
 	// --- Synchronization ---
 	static constexpr uint32_t kMaxFramesInFlight = 2;
 	static constexpr uint64_t kFenceTimeoutNs = 100'000'000;
 
-	std::vector<vk::raii::Fence> m_inFlightFences;
-	std::vector<vk::raii::Semaphore> m_imageAvailableSemaphores;
-	std::vector<vk::raii::Semaphore> m_renderFinishedSemaphores;
-	uint32_t m_currentFrame = 0;
-	uint32_t m_swapchainGeneration = 0;
+	std::vector<vk::raii::Fence> r_inFlightFences;
+	std::vector<vk::raii::Semaphore> r_imageAvailableSemaphores;
+	std::vector<vk::raii::Semaphore> r_renderFinishedSemaphores;
+	uint32_t r_currentFrame = 0;
+	uint32_t r_swapchainGeneration = 0;
 
 	// --- Last acquired swapchain image index (for screenshot) ---
-	uint32_t m_lastImageIndex = 0;
+	uint32_t r_lastImageIndex = 0;
 
 };
 

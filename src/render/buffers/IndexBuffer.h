@@ -59,13 +59,13 @@ public:
 	IndexBuffer& operator=(IndexBuffer&&) noexcept = default;
 
 	/** @brief Number of indices in the buffer. */
-	uint32_t GetIndexCount() const { return m_indexCount; }
+	uint32_t GetIndexCount() const { return b_indexCount; }
 
 	/** @brief Index type - always VK_INDEX_TYPE_UINT32. */
 	vk::IndexType GetIndexType() const { return vk::IndexType::eUint32; }
 
 private:
-	uint32_t m_indexCount;
+	uint32_t b_indexCount;
 };
 
 } // namespace neurus

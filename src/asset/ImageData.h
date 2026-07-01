@@ -52,14 +52,14 @@ public:
 	// --- Validity ---
 
 	/** @brief True if a valid image is loaded (non-zero dimensions, non-empty pixel data). */
-	bool IsValid() const { return m_width > 0 && m_height > 0 && !m_pixelData.empty(); }
+	bool IsValid() const { return im_width > 0 && im_height > 0 && !im_pixelData.empty(); }
 
 	// --- Getters ---
 
-	const std::vector<uint8_t>& GetPixelData() const { return m_pixelData; }
-	uint32_t GetWidth() const { return m_width; }
-	uint32_t GetHeight() const { return m_height; }
-	vk::Format GetFormat() const { return m_format; }
+	const std::vector<uint8_t>& GetPixelData() const { return im_pixelData; }
+	uint32_t GetWidth() const { return im_width; }
+	uint32_t GetHeight() const { return im_height; }
+	vk::Format GetFormat() const { return im_format; }
 
 	// -------------------------------------------------------------------
 	// Format helpers (static)
@@ -119,17 +119,17 @@ private:
 	static void EnsureDirectory(const std::string& filePath);
 
 	/**
-	 * @brief Loads pixel data from file, filling m_pixelData, m_width, m_height, m_format.
+	 * @brief Loads pixel data from file, filling im_pixelData, im_width, im_height, im_format.
 	 * @param path File path to the image.
 	 */
 	void LoadFromPath(const std::string& path);
 
 	// --- Data ---
 
-	std::vector<uint8_t> m_pixelData;  ///< Owning pixel data (raw bytes, format-dependent byte count)
-	uint32_t m_width = 0;
-	uint32_t m_height = 0;
-	vk::Format m_format = vk::Format::eUndefined;
+	std::vector<uint8_t> im_pixelData;  ///< Owning pixel data (raw bytes, format-dependent byte count)
+	uint32_t im_width = 0;
+	uint32_t im_height = 0;
+	vk::Format im_format = vk::Format::eUndefined;
 };
 
 } // namespace neurus

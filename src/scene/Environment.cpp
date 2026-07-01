@@ -31,13 +31,13 @@ Environment::~Environment() = default;
 
 void Environment::SetEquirectPath(const std::string& path)
 {
-	m_equirectPath = path;
-	m_dirty = true;
+	o_equirectPath = path;
+	o_dirty = true;
 }
 
 const std::string& Environment::GetEquirectPath() const
 {
-	return m_equirectPath;
+	return o_equirectPath;
 }
 
 // -----------------------------------------------------------------------
@@ -46,12 +46,12 @@ const std::string& Environment::GetEquirectPath() const
 
 void Environment::SetIntensity(float i)
 {
-	m_intensity = i;
+	o_intensity = i;
 }
 
 float Environment::GetIntensity() const
 {
-	return m_intensity;
+	return o_intensity;
 }
 
 // -----------------------------------------------------------------------
@@ -60,12 +60,12 @@ float Environment::GetIntensity() const
 
 void Environment::SetRotation(float r)
 {
-	m_rotation = r;
+	o_rotation = r;
 }
 
 float Environment::GetRotation() const
 {
-	return m_rotation;
+	return o_rotation;
 }
 
 // -----------------------------------------------------------------------
@@ -74,12 +74,12 @@ float Environment::GetRotation() const
 
 bool Environment::IsDirty() const
 {
-	return m_dirty;
+	return o_dirty;
 }
 
 void Environment::ClearDirty()
 {
-	m_dirty = false;
+	o_dirty = false;
 }
 
 // -----------------------------------------------------------------------
@@ -90,7 +90,7 @@ void Environment::BuildIBLTextures(const vk::raii::Device& device,
                                  const vk::raii::PhysicalDevice& physicalDevice)
 {
 	// Already initialised — nothing to do
-	if (m_diffuseTexture && m_specularTexture)
+	if (o_diffuseTexture && o_specularTexture)
 	{
 		return;
 	}
@@ -130,9 +130,9 @@ void Environment::BuildIBLTextures(const vk::raii::Device& device,
 	auto specularSampler = CreateCubemapSampler(device, kSpecularMips);
 
 	// --- Wrap in Textures ---
-	m_diffuseTexture = std::make_unique<Texture>(
+	o_diffuseTexture = std::make_unique<Texture>(
 	    Texture::FromImage(std::move(diffuseImage), std::move(diffuseSampler)));
-	m_specularTexture = std::make_unique<Texture>(
+	o_specularTexture = std::make_unique<Texture>(
 	    Texture::FromImage(std::move(specularImage), std::move(specularSampler)));
 
 	NEURUS_LOG("[Environment] Cubemaps ready: diffuse " << kDiffuseRes << "px (1 mip), specular "
@@ -141,22 +141,22 @@ void Environment::BuildIBLTextures(const vk::raii::Device& device,
 
 Image* Environment::GetCubemapDiffuse() const
 {
-	return m_diffuseTexture ? m_diffuseTexture->GetImage() : nullptr;
+	return o_diffuseTexture ? o_diffuseTexture->GetImage() : nullptr;
 }
 
 Image* Environment::GetCubemapSpecular() const
 {
-	return m_specularTexture ? m_specularTexture->GetImage() : nullptr;
+	return o_specularTexture ? o_specularTexture->GetImage() : nullptr;
 }
 
 Texture* Environment::GetDiffuseTexture() const
 {
-	return m_diffuseTexture.get();
+	return o_diffuseTexture.get();
 }
 
 Texture* Environment::GetSpecularTexture() const
 {
-	return m_specularTexture.get();
+	return o_specularTexture.get();
 }
 
 // -----------------------------------------------------------------------

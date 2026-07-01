@@ -140,7 +140,7 @@ public:
 private:
 	UIEvents() = default;
 
-	QString m_gpuName;
+	QString evt_gpuName;
 };
 
 } // namespace neurus

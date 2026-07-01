@@ -73,7 +73,7 @@ public:
 	size_t GetIndexCount() const;
 
 private:
-	ByteArray m_meshData;
+	ByteArray me_meshData;
 
 	// --- Parsing helpers ---
 
@@ -141,12 +141,12 @@ private:
 	};
 
 	// Deduplication map
-	std::unordered_map<VertexKey, uint32_t, VertexKeyHash> m_vertexMap;
+	std::unordered_map<VertexKey, uint32_t, VertexKeyHash> me_vertexMap;
 
 	// Raw position copies for bounding box computation
-	std::vector<glm::vec3> m_rawPositions;
+	std::vector<glm::vec3> me_rawPositions;
 
-	uint32_t m_nextIndex = 0;
+	uint32_t me_nextIndex = 0;
 };
 
 } // namespace neurus

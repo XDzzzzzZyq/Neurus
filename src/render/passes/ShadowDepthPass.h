@@ -66,7 +66,7 @@ public:
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& /*cache*/, const RenderContext& ctx) override;
 
 	// --- Accessors ---
-	uint32_t Resolution() const { return m_resolution; }
+	uint32_t Resolution() const { return p_resolution; }
 
 private:
 	static DescriptorSetLayout CreateSSBOLayout(const vk::raii::Device& device);
@@ -77,24 +77,24 @@ private:
 	void createPipeline(const vk::raii::Device& device);
 
 	// --- Parameters ---
-	uint32_t m_resolution;
-	const vk::raii::PhysicalDevice* m_physicalDevice = nullptr;
+	uint32_t p_resolution;
+	const vk::raii::PhysicalDevice* p_physicalDevice = nullptr;
 
 	// --- GPU resources ---
 	// Static SSBO with 6 face VP matrices (computed once from origin; never changes)
-	std::unique_ptr<GPUBuffer> m_faceVPs;
-	DescriptorSetLayout m_ssboLayout;
-	DescriptorPool m_ssboPool;
-	std::unique_ptr<DescriptorSet> m_ssboSet;
-	BufferLayout m_vtxLayout;
+	std::unique_ptr<GPUBuffer> p_faceVPs;
+	DescriptorSetLayout p_ssboLayout;
+	DescriptorPool p_ssboPool;
+	std::unique_ptr<DescriptorSet> p_ssboSet;
+	BufferLayout p_vtxLayout;
 
 	// Graphics pipeline (multiview depth+colour)
-	vk::raii::PipelineLayout m_pipelineLayout = nullptr;
-	vk::raii::Pipeline m_pipeline = nullptr;
+	vk::raii::PipelineLayout p_pipelineLayout = nullptr;
+	vk::raii::Pipeline p_pipeline = nullptr;
 
 	// Sun light pipeline (non-multiview depth-only, push-constant mat4 lightViewProj)
-	vk::raii::PipelineLayout m_sunPipelineLayout = nullptr;
-	vk::raii::Pipeline m_sunPipeline = nullptr;
+	vk::raii::PipelineLayout p_sunPipelineLayout = nullptr;
+	vk::raii::Pipeline p_sunPipeline = nullptr;
 	void createSunPipeline(const vk::raii::Device& device);
 };
 

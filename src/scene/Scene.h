@@ -309,7 +309,7 @@ public:
 	void UpdateObjTransforms();
 
 private:
-	SceneModifStatus m_status = SceneModifStatus::SceneChanged; ///< Current scene modification state
+	SceneModifStatus sc_status = SceneModifStatus::SceneChanged; ///< Current scene modification state
 
 	/**
 	 * @brief Registers an object in both its type-specific pool and the master obj_list.

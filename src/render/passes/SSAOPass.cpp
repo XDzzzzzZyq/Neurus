@@ -36,14 +36,14 @@ namespace {
 class DeterministicRNG
 {
 public:
-	explicit DeterministicRNG(uint32_t seed = 0xDEADBEEF) : m_state(seed) {}
+	explicit DeterministicRNG(uint32_t seed = 0xDEADBEEF) : rng_state(seed) {}
 
 	float rand01()
 	{
-		m_state ^= m_state << 13;
-		m_state ^= m_state >> 17;
-		m_state ^= m_state << 5;
-		return static_cast<float>(m_state) / static_cast<float>(UINT32_MAX);
+		rng_state ^= rng_state << 13;
+		rng_state ^= rng_state >> 17;
+		rng_state ^= rng_state << 5;
+		return static_cast<float>(rng_state) / static_cast<float>(UINT32_MAX);
 	}
 
 	float rand11()
@@ -67,7 +67,7 @@ public:
 	}
 
 private:
-	uint32_t m_state;
+	uint32_t rng_state;
 };
 
 } // anonymous namespace
@@ -85,7 +85,7 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
                    size_t compSize)
 	: ComputePass(device, physicalDevice,
 	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
-	, m_pipeline(CreatePipeline(device, compSpv, compSize))
+	, p_pipeline(CreatePipeline(device, compSpv, compSize))
 {
 	NEURUS_LOG("[SSAOPass] compSize=" << compSize << " numSets=" << numSets
 	           << " kernelLength=" << kDefaultKernelLength
@@ -93,16 +93,16 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 
 	// --- Generate and upload kernel + initial camera data ---
 	{
-		m_kernelSamples = GenerateKernel();
+		p_kernelSamples = GenerateKernel();
 		SSAOParamsGpu initialParams = {};
 		for (size_t i = 0; i < kMaxKernelSamples; ++i)
 		{
-			initialParams.kernelSamples[i] = m_kernelSamples[i];
+			initialParams.kernelSamples[i] = p_kernelSamples[i];
 		}
 
-		m_paramsUBO = std::make_unique<UniformBuffer<SSAOParamsGpu>>(
+		p_paramsUBO = std::make_unique<UniformBuffer<SSAOParamsGpu>>(
 			device, physicalDevice, "SSAOParamsUBO");
-		m_paramsUBO->Upload(initialParams);
+		p_paramsUBO->Upload(initialParams);
 
 		NEURUS_LOG("[SSAOPass] Created params UBO (" << sizeof(SSAOParamsGpu) << " bytes, "
 		           << kMaxKernelSamples << " kernel samples)");
@@ -112,13 +112,13 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	{
 		const auto noise = GenerateNoise();
 
-		m_noiseUBO = std::make_unique<GPUBuffer>(
+		p_noiseUBO = std::make_unique<GPUBuffer>(
 			device, physicalDevice,
 			graphicsQueue, queueFamilyIndex,
 			sizeof(noise),
 			vk::BufferUsageFlagBits::eUniformBuffer,
 			"SSAONoiseUBO");
-		m_noiseUBO->Upload(noise.data(), sizeof(noise));
+		p_noiseUBO->Upload(noise.data(), sizeof(noise));
 
 		NEURUS_LOG("[SSAOPass] Created noise UBO (" << sizeof(noise) << " bytes, "
 		           << kNoiseEntryCount << " entries)");
@@ -128,7 +128,7 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	for (uint32_t i = 0; i < numSets; ++i)
 	{
 		const std::string dsName = "SSAOPass_Set" + std::to_string(i);
-		m_descriptorSets[i].SetDebugName(dsName.c_str());
+		p_descriptorSets[i].SetDebugName(dsName.c_str());
 	}
 #endif
 }
@@ -235,9 +235,9 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
 		4 * sizeof(int32_t));  // kernelLength, radius (float), noiseSize, frameIndex
 
 	// --- Build compute pipeline ---
-	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+	return p_pipelineBuilder->SetShaderStage(compModule, "main")
 		.SetDebugName("SSAOPass")
-		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
+		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();
 }
@@ -248,7 +248,7 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
 
 void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
-	DescriptorSet& dstSet = m_descriptorSets[setIndex];
+	DescriptorSet& dstSet = p_descriptorSets[setIndex];
 
 	// --- Write G-Buffer input descriptors (combined image samplers) ---
 	{
@@ -263,7 +263,7 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 			const auto& attachment = cache.GetAttachment(gBufferInputs[i], extent);
 
 			vk::DescriptorImageInfo imageInfo(
-				*m_sampler,                              // sampler
+				*p_sampler,                              // sampler
 				*attachment.ImageViewHandle(),           // imageView
 				vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 			);
@@ -289,13 +289,13 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 
 	// --- Write SSAO params UBO ---
 	{
-		dstSet.WriteBuffer(4, m_paramsUBO->GetDescriptorInfo(),
+		dstSet.WriteBuffer(4, p_paramsUBO->GetDescriptorInfo(),
 		                   vk::DescriptorType::eUniformBuffer);
 	}
 
 	// --- Write noise UBO ---
 	{
-		dstSet.WriteBuffer(5, m_noiseUBO->GetDescriptorInfo(),
+		dstSet.WriteBuffer(5, p_noiseUBO->GetDescriptorInfo(),
 		                   vk::DescriptorType::eUniformBuffer);
 	}
 }
@@ -321,9 +321,9 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 		params.camZ = ctx.cameraPos.z;
 		params.camW = 0.0f;
 		for (size_t i = 0; i < kMaxKernelSamples; ++i)
-			params.kernelSamples[i] = m_kernelSamples[i];
+			params.kernelSamples[i] = p_kernelSamples[i];
 
-		m_paramsUBO->Upload(params);
+		p_paramsUBO->Upload(params);
 	}
 
 	// --- 1. Write descriptor set for this frame slot ---
@@ -349,13 +349,13 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	}
 
 	// --- 3. Bind compute pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipeline);
 
 	// --- 4. Bind descriptor set ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          *m_pipelineBuilder->pipelineLayout(),
+	                          *p_pipelineBuilder->pipelineLayout(),
 	                          0,                                    // firstSet
-	                          {m_descriptorSets[frameIndex].handle()},
+	                          {p_descriptorSets[frameIndex].handle()},
 	                          {});
 
 	// --- 5. Push constants ---
@@ -369,13 +369,13 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 		};
 
 		SSAOPushConstants pc = {};
-		pc.kernelLength = m_kernelLength;
-		pc.radius       = m_radius;
-		pc.noiseSize    = m_noiseSize;
+		pc.kernelLength = p_kernelLength;
+		pc.radius       = p_radius;
+		pc.noiseSize    = p_noiseSize;
 		pc.frameIndex   = static_cast<int32_t>(frameIndex);
 
 		cmdBuf.pushConstants<SSAOPushConstants>(
-			*m_pipelineBuilder->pipelineLayout(),
+			*p_pipelineBuilder->pipelineLayout(),
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pc);

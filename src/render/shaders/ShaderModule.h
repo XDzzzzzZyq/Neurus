@@ -60,7 +60,7 @@ public:
 	static ShaderModule FromEmbedded(const vk::raii::Device& device, const uint32_t* data, size_t size);
 
 	/** @brief The underlying vk::raii::ShaderModule handle. */
-	const vk::raii::ShaderModule& handle() const { return *m_module; }
+	const vk::raii::ShaderModule& handle() const { return *sh_module; }
 
 	/**
 	 * @brief Builds a VkPipelineShaderStageCreateInfo for this shader module.
@@ -78,7 +78,7 @@ public:
 		const char* entryPoint = "main") const;
 
 private:
-	std::unique_ptr<vk::raii::ShaderModule> m_module;
+	std::unique_ptr<vk::raii::ShaderModule> sh_module;
 };
 
 } // namespace neurus

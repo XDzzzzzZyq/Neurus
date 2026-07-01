@@ -286,26 +286,26 @@ private:
 	 * Called every frame during Record(). One set per in-flight frame
 	 * prevents updating a set while the GPU is still reading it.
 	 *
-	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).
 	 */
 	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 
 	// --- Queue handles for SSBO creation ---
-	vk::Queue m_graphicsQueue;
-	uint32_t m_queueFamilyIndex;
+	vk::Queue p_graphicsQueue;
+	uint32_t p_queueFamilyIndex;
 
 	// --- Pipeline ---
-	vk::raii::Pipeline m_pipeline;
+	vk::raii::Pipeline p_pipeline;
 
 	// --- Owned light SSBO ---
-	std::unique_ptr<GPUBuffer> m_lightSSBO;
-	uint32_t m_lightCount = 0;
-	std::unique_ptr<GPUBuffer> m_sunLightSSBO;
-	uint32_t m_sunLightCount = 0;
+	std::unique_ptr<GPUBuffer> p_lightSSBO;
+	uint32_t p_lightCount = 0;
+	std::unique_ptr<GPUBuffer> p_sunLightSSBO;
+	uint32_t p_sunLightCount = 0;
 
 	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---
-	std::unique_ptr<Image> m_fallbackIrradianceCube;
-	std::unique_ptr<Image> m_fallbackPrefilteredCube;
-	vk::raii::Sampler m_fallbackCubeSampler = nullptr;
+	std::unique_ptr<Image> p_fallbackIrradianceCube;
+	std::unique_ptr<Image> p_fallbackPrefilteredCube;
+	vk::raii::Sampler p_fallbackCubeSampler = nullptr;
 };
 } // namespace neurus

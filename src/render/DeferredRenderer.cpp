@@ -71,18 +71,18 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
                                     const vk::raii::SurfaceKHR& surface,
                                     uint32_t width,
                                     uint32_t height)
-	: m_device(device)
-	, m_physicalDevice(physicalDevice)
-	, m_graphicsQueue(graphicsQueue)
-	, m_queueFamilyIndex(queueFamilyIndex)
-	, m_commandPool(createCommandPool(device, queueFamilyIndex))
+	: r_device(device)
+	, r_physicalDevice(physicalDevice)
+	, r_graphicsQueue(graphicsQueue)
+	, r_queueFamilyIndex(queueFamilyIndex)
+	, r_commandPool(createCommandPool(device, queueFamilyIndex))
 {
 	// --- 1. Create swapchain ---
-	m_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
-	const auto extent = m_swapchain->extent();
+	r_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
+	const auto extent = r_swapchain->extent();
 
 	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
-	m_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
+	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
 
 	// --- 3. Create geometry pass ---
 	{
@@ -90,8 +90,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
 			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
 			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
-		m_geometryPass = geoPass.get();
-		m_passes.push_back(std::move(geoPass));
+		r_geometryPass = geoPass.get();
+		r_passes.push_back(std::move(geoPass));
 	}
 
 	// --- 5. Create lighting pass ---
@@ -99,10 +99,10 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto lightPass = std::make_unique<LightingPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			m_graphicsQueue, m_queueFamilyIndex,
+			r_graphicsQueue, r_queueFamilyIndex,
 			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
-		m_lightingPass = lightPass.get();
-		m_passes.push_back(std::move(lightPass));
+		r_lightingPass = lightPass.get();
+		r_passes.push_back(std::move(lightPass));
 	}
 
 	// --- 6. Create SSAO pass ---
@@ -110,21 +110,21 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto ssaoPass = std::make_unique<SSAOPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			m_graphicsQueue, m_queueFamilyIndex,
+			r_graphicsQueue, r_queueFamilyIndex,
 			ssao_comp_spv, sizeof(ssao_comp_spv));
-		m_ssaoPass = ssaoPass.get();
-		m_passes.push_back(std::move(ssaoPass));
+		r_ssaoPass = ssaoPass.get();
+		r_passes.push_back(std::move(ssaoPass));
 	}
 
 	// --- 7. Create IBL pass (pure compute service) ---
 	{
 		auto iblPass = std::make_unique<IBLPass>(
 			device, physicalDevice,
-			m_graphicsQueue, m_queueFamilyIndex,
+			r_graphicsQueue, r_queueFamilyIndex,
 			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
 			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
-		m_iblPass = iblPass.get();
-		m_passes.push_back(std::move(iblPass));
+		r_iblPass = iblPass.get();
+		r_passes.push_back(std::move(iblPass));
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");
 	}
 
@@ -133,8 +133,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto shadowDepth = std::make_unique<ShadowDepthPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
 			ShadowDepthPass::kDefaultResolution);
-		m_shadowDepthPass = shadowDepth.get();
-		m_passes.push_back(std::move(shadowDepth));
+		r_shadowDepthPass = shadowDepth.get();
+		r_passes.push_back(std::move(shadowDepth));
 		NEURUS_LOG("[DeferredRenderer] ShadowDepthPass created");
 	}
 
@@ -145,16 +145,16 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 			kMaxFramesInFlight,
 			graphicsQueue, queueFamilyIndex,
 			shadow_eval_comp_spv, sizeof(shadow_eval_comp_spv));
-		m_shadowIntensityPass = shadowIntensity.get();
-		m_passes.push_back(std::move(shadowIntensity));
+		r_shadowIntensityPass = shadowIntensity.get();
+		r_passes.push_back(std::move(shadowIntensity));
 		NEURUS_LOG("[DeferredRenderer] ShadowIntensityPass created");
 	}
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
-	uint32_t imageCount = m_swapchain->imageCount();
+	uint32_t imageCount = r_swapchain->imageCount();
 
 	// Verify the swapchain supports TRANSFER_DST for the blit composite path
-	const bool hasTransferDst = (m_swapchain->actualImageUsage() & vk::ImageUsageFlagBits::eTransferDst) != vk::ImageUsageFlags{};
+	const bool hasTransferDst = (r_swapchain->actualImageUsage() & vk::ImageUsageFlagBits::eTransferDst) != vk::ImageUsageFlags{};
 	if (!hasTransferDst)
 	{
 		throw std::runtime_error(
@@ -163,8 +163,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 			"Try running on a GPU/driver that supports this usage flag for the surface format.");
 	}
 
-	vk::CommandBufferAllocateInfo cmdBufAlloc(*m_commandPool, vk::CommandBufferLevel::ePrimary, imageCount);
-	m_commandBuffers = vk::raii::CommandBuffers(device, cmdBufAlloc);
+	vk::CommandBufferAllocateInfo cmdBufAlloc(*r_commandPool, vk::CommandBufferLevel::ePrimary, imageCount);
+	r_commandBuffers = vk::raii::CommandBuffers(device, cmdBufAlloc);
 
 	// --- Set debug names for command buffers ---
 #ifdef _DEBUG
@@ -174,12 +174,12 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		snprintf(nameBuf, sizeof(nameBuf), "DeferredRenderer::FrameCmd[%u]", i);
 		const vk::DebugUtilsObjectNameInfoEXT nameInfo(
 			vk::ObjectType::eCommandBuffer,
-			reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*m_commandBuffers[i])),
+			reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*r_commandBuffers[i])),
 			nameBuf);
 		device.setDebugUtilsObjectNameEXT(nameInfo);
 		NEURUS_LOG("[DeferredRenderer] CmdBuf[" << i << "] handle=0x"
 		          << std::hex << reinterpret_cast<uint64_t>(
-		                 static_cast<VkCommandBuffer>(*m_commandBuffers[i]))
+		                 static_cast<VkCommandBuffer>(*r_commandBuffers[i]))
 		          << std::dec << " name='" << nameBuf << "'");
 	}
 #endif
@@ -187,12 +187,12 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 10. Create sync objects ---
 	for (uint32_t i = 0; i < kMaxFramesInFlight; ++i)
 	{
-		m_inFlightFences.emplace_back(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
-		m_imageAvailableSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+		r_inFlightFences.emplace_back(device, vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));
+		r_imageAvailableSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 	}
 	for (uint32_t i = 0; i < imageCount; ++i)
 	{
-		m_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+		r_renderFinishedSemaphores.emplace_back(device, vk::SemaphoreCreateInfo());
 	}
 
 	NEURUS_LOG("[DeferredRenderer] " << extent.width << "x" << extent.height
@@ -204,7 +204,7 @@ DeferredRenderer::~DeferredRenderer()
 {
 	WaitIdle();
 	// vk::raii destructors clean up automatically in reverse declaration order.
-	// m_passes vector destroys all passes in construction order (GeometryPass → LightingPass →
+	// r_passes vector destroys all passes in construction order (GeometryPass → LightingPass →
 	//   SSAOPass → IBLPass), before RenderCache.
 }
 
@@ -219,7 +219,7 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 	// --- Collect shadow-casting sun light UIDs (allocated after point lights, indices N..N+M-1) ---
 	std::vector<int32_t> sunShadowUIDs;
 
-	if (m_shadowDepthPass)
+	if (r_shadowDepthPass)
 	{
 		for (const auto& [id, light] : scene.light_list)
 		{
@@ -257,10 +257,10 @@ void DeferredRenderer::UploadLights(const Scene& scene)
 	}
 
 	// --- Upload lights to GPU, assigning shadowMapIndex per light ---
-	if (m_lightingPass)
+	if (r_lightingPass)
 	{
-		m_lightingPass->UploadLights(scene, &uidToShadowIndex);
-		m_lightingPass->UploadSunLights(scene, &uidToShadowIndex);
+		r_lightingPass->UploadLights(scene, &uidToShadowIndex);
+		r_lightingPass->UploadSunLights(scene, &uidToShadowIndex);
 	}
 }
 
@@ -313,7 +313,7 @@ void DeferredRenderer::GenerateIBL(const Image& equirectImage,
                                     Image& diffuseOut,
                                     Image& specularOut)
 {
-	m_iblPass->Generate(equirectImage, diffuseOut, specularOut);
+	r_iblPass->Generate(equirectImage, diffuseOut, specularOut);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,11 +327,11 @@ void DeferredRenderer::DrawFrame()
 	fallbackCam.SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	fallbackCam.cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 
-	auto& fence = m_inFlightFences[m_currentFrame];
-	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
+	auto& fence = r_inFlightFences[r_currentFrame];
+	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
 
 	// --- Wait for this frame slot's fence ---
-	if (m_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
+	if (r_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
 		return;  // Timeout - skip this frame
 	}
@@ -341,8 +341,8 @@ void DeferredRenderer::DrawFrame()
 	bool skipFrame = false;
 	try
 	{
-		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
-		m_lastImageIndex = imageIndex;
+		imageIndex = r_swapchain->AcquireNextImage(imageAvailable);
+		r_lastImageIndex = imageIndex;
 	}
 	catch (const vk::OutOfDateKHRError&)
 	{
@@ -356,7 +356,7 @@ void DeferredRenderer::DrawFrame()
 	}
 
 	// --- Handle swapchain recreation (from out-of-date acquire or external resize) ---
-	if (m_swapchain->generation() != m_swapchainGeneration)
+	if (r_swapchain->generation() != r_swapchainGeneration)
 	{
 		recreateSwapchain();
 		skipFrame = true;
@@ -364,32 +364,32 @@ void DeferredRenderer::DrawFrame()
 
 	if (skipFrame)
 	{
-		// Don't advance m_currentFrame - retry same slot next frame
+		// Don't advance r_currentFrame - retry same slot next frame
 		return;
 	}
 
 	// Only reset fence after successful acquire
-	m_device.resetFences(*fence);
+	r_device.resetFences(*fence);
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---
-	vk::CommandBuffer cmdBufRaw = *m_commandBuffers[imageIndex];
+	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
 	// No-args DrawFrame is deprecated and used only as camera-fallback.
 	// Pass empty render items (no geometry drawn) - the fallback exists only
 	// to prevent a crash when no camera is configured.
-	recordFrame(m_commandBuffers[imageIndex], imageIndex, fallbackCam, {}, nullptr);
+	recordFrame(r_commandBuffers[imageIndex], imageIndex, fallbackCam, {}, nullptr);
 
-	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
+	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
 	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBufRaw, *renderFinished);
-	m_graphicsQueue.submit(submitInfo, *fence);
+	r_graphicsQueue.submit(submitInfo, *fence);
 
 	// --- Present ---
 	bool presentFailed = false;
 	try
 	{
-		m_swapchain->Present(renderFinished, imageIndex, m_graphicsQueue);
+		r_swapchain->Present(renderFinished, imageIndex, r_graphicsQueue);
 	}
 	catch (const std::exception& e)
 	{
@@ -398,7 +398,7 @@ void DeferredRenderer::DrawFrame()
 	}
 
 	// --- Handle swapchain recreation after present ---
-	if (m_swapchain->generation() != m_swapchainGeneration)
+	if (r_swapchain->generation() != r_swapchainGeneration)
 	{
 		recreateSwapchain();
 		presentFailed = true;
@@ -410,7 +410,7 @@ void DeferredRenderer::DrawFrame()
 		return;
 	}
 
-	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
+	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
 }
 
 void DeferredRenderer::DrawFrame(const Scene& scene)
@@ -423,11 +423,11 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 		return;
 	}
 
-	auto& fence = m_inFlightFences[m_currentFrame];
-	auto& imageAvailable = m_imageAvailableSemaphores[m_currentFrame];
+	auto& fence = r_inFlightFences[r_currentFrame];
+	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
 
 	// --- Wait for this frame slot's fence ---
-	if (m_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
+	if (r_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
 		return;  // Timeout - skip this frame
 	}
@@ -437,8 +437,8 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	bool skipFrame = false;
 	try
 	{
-		imageIndex = m_swapchain->AcquireNextImage(imageAvailable);
-		m_lastImageIndex = imageIndex;
+		imageIndex = r_swapchain->AcquireNextImage(imageAvailable);
+		r_lastImageIndex = imageIndex;
 	}
 	catch (const vk::OutOfDateKHRError&)
 	{
@@ -452,7 +452,7 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	}
 
 	// --- Handle swapchain recreation (from out-of-date acquire or external resize) ---
-	if (m_swapchain->generation() != m_swapchainGeneration)
+	if (r_swapchain->generation() != r_swapchainGeneration)
 	{
 		recreateSwapchain();
 		skipFrame = true;
@@ -464,7 +464,7 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	}
 
 	// Only reset fence after successful acquire
-	m_device.resetFences(*fence);
+	r_device.resetFences(*fence);
 
 	// --- Build render items from scene meshes (querying mesh GPU buffers directly) ---
 	std::vector<GeometryRenderItem> renderItems;
@@ -483,21 +483,21 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	}
 
 	// --- Record and submit (reuse pre-allocated command buffer) ---
-	vk::CommandBuffer cmdBufRaw = *m_commandBuffers[imageIndex];
+	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
-	recordFrame(m_commandBuffers[imageIndex], imageIndex, *activeCam, renderItems, &scene);
+	recordFrame(r_commandBuffers[imageIndex], imageIndex, *activeCam, renderItems, &scene);
 
-	auto& renderFinished = m_renderFinishedSemaphores[imageIndex];
+	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
 	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBufRaw, *renderFinished);
-	m_graphicsQueue.submit(submitInfo, *fence);
+	r_graphicsQueue.submit(submitInfo, *fence);
 
 	// --- Present ---
 	bool presentFailed = false;
 	try
 	{
-		m_swapchain->Present(renderFinished, imageIndex, m_graphicsQueue);
+		r_swapchain->Present(renderFinished, imageIndex, r_graphicsQueue);
 	}
 	catch (const std::exception& e)
 	{
@@ -506,7 +506,7 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	}
 
 	// --- Handle swapchain recreation after present ---
-	if (m_swapchain->generation() != m_swapchainGeneration)
+	if (r_swapchain->generation() != r_swapchainGeneration)
 	{
 		recreateSwapchain();
 		presentFailed = true;
@@ -517,19 +517,19 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 		return;
 	}
 
-	m_currentFrame = (m_currentFrame + 1) % kMaxFramesInFlight;
+	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
 }
 
 void DeferredRenderer::WaitIdle()
 {
-	m_device.waitIdle();
+	r_device.waitIdle();
 }
 
 void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
 {
-	uint32_t oldGen = m_swapchain->generation();
-	m_swapchain->Recreate(width, height);
-	if (m_swapchain->generation() != oldGen)
+	uint32_t oldGen = r_swapchain->generation();
+	r_swapchain->Recreate(width, height);
+	if (r_swapchain->generation() != oldGen)
 	{
 		recreateSwapchain();
 	}
@@ -541,30 +541,30 @@ void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
 
 void DeferredRenderer::recreateSwapchain()
 {
-	m_device.waitIdle();
+	r_device.waitIdle();
 
-	uint32_t newImageCount = m_swapchain->imageCount();
-	vk::Extent2D newExtent = m_swapchain->extent();
+	uint32_t newImageCount = r_swapchain->imageCount();
+	vk::Extent2D newExtent = r_swapchain->extent();
 	// Clear screen-space attachments (G-Buffer + shadow intensities).
 	// Shadow cubemaps survive resize.  Attachments are re-created lazily
 	// on first GetAttachment() call in the next frame.
-	m_renderCache->CleanScreenSpace();
+	r_renderCache->CleanScreenSpace();
 
 	// Rebuild render-finished semaphores (one per swapchain image)
-	m_renderFinishedSemaphores.clear();
+	r_renderFinishedSemaphores.clear();
 	for (uint32_t i = 0; i < newImageCount; ++i)
 	{
-		m_renderFinishedSemaphores.emplace_back(m_device, vk::SemaphoreCreateInfo());
+		r_renderFinishedSemaphores.emplace_back(r_device, vk::SemaphoreCreateInfo());
 	}
 
 	// Rebuild command buffers if image count changed (swapchain image count
 	// may differ across surfaces/drivers).
-	if (m_commandBuffers.size() != newImageCount)
+	if (r_commandBuffers.size() != newImageCount)
 	{
-		m_commandBuffers.clear();
+		r_commandBuffers.clear();
 		vk::CommandBufferAllocateInfo cmdBufAlloc(
-			*m_commandPool, vk::CommandBufferLevel::ePrimary, newImageCount);
-		m_commandBuffers = vk::raii::CommandBuffers(m_device, cmdBufAlloc);
+			*r_commandPool, vk::CommandBufferLevel::ePrimary, newImageCount);
+		r_commandBuffers = vk::raii::CommandBuffers(r_device, cmdBufAlloc);
 
 #ifdef _DEBUG
 		for (uint32_t i = 0; i < newImageCount; ++i)
@@ -573,18 +573,18 @@ void DeferredRenderer::recreateSwapchain()
 			snprintf(nameBuf, sizeof(nameBuf), "DeferredRenderer::FrameCmd[%u]", i);
 			const vk::DebugUtilsObjectNameInfoEXT nameInfo(
 				vk::ObjectType::eCommandBuffer,
-				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*m_commandBuffers[i])),
+				reinterpret_cast<uint64_t>(static_cast<VkCommandBuffer>(*r_commandBuffers[i])),
 				nameBuf);
-			m_device.setDebugUtilsObjectNameEXT(nameInfo);
+			r_device.setDebugUtilsObjectNameEXT(nameInfo);
 			NEURUS_LOG("[DeferredRenderer] CmdBuf[" << i << "] handle=0x"
 			          << std::hex << reinterpret_cast<uint64_t>(
-			                 static_cast<VkCommandBuffer>(*m_commandBuffers[i]))
+			                 static_cast<VkCommandBuffer>(*r_commandBuffers[i]))
 			          << std::dec << " name='" << nameBuf << "'");
 		}
 #endif
 	}
 
-	m_swapchainGeneration = m_swapchain->generation();
+	r_swapchainGeneration = r_swapchain->generation();
 }
 
 // ---------------------------------------------------------------------------
@@ -596,7 +596,7 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
                                    const std::vector<GeometryRenderItem>& renderItems,
                                    const Scene* scene)
 {
-	const vk::Extent2D extent = m_swapchain->extent();
+	const vk::Extent2D extent = r_swapchain->extent();
 
 	// --- Reset command buffer (ensures it's not in a bad state) then begin ---
 	cmdBuf.reset();
@@ -607,7 +607,7 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Build per-frame render context (constructed once, passed to all passes) ---
 	RenderContext ctx{};
 	ctx.renderExtent = extent;
-	ctx.frameIndex = m_currentFrame;
+	ctx.frameIndex = r_currentFrame;
 	ctx.view = camera.GetViewMatrix();
 	ctx.viewProj = camera.GetProjectionMatrix() * ctx.view;
 	ctx.cameraPos = camera.GetPosition();
@@ -616,24 +616,24 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	ctx.scene = scene;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
-	m_geometryPass->Record(cmdBuf, *m_renderCache, ctx);
+	r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---
-	m_shadowDepthPass->Record(cmdBuf, *m_renderCache, ctx);
+	r_shadowDepthPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 1c: ShadowIntensityPass → per-pixel shadow evaluation from cubemap ---
-	m_shadowIntensityPass->Record(cmdBuf, *m_renderCache, ctx);
+	r_shadowIntensityPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
-	m_ssaoPass->Record(cmdBuf, *m_renderCache, ctx);
+	r_ssaoPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
-	m_lightingPass->Record(cmdBuf, *m_renderCache, ctx);
+	r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 4: Blit HDRColor → swapchain image ---
-	auto& hdrColor = m_renderCache->GetAttachment(AttachmentName::HDRColor, extent);
+	auto& hdrColor = r_renderCache->GetAttachment(AttachmentName::HDRColor, extent);
 	const vk::Image hdrImage = *hdrColor.ImageHandle();
-	const vk::Image swapchainImage = m_swapchain->images()[imageIndex];
+	const vk::Image swapchainImage = r_swapchain->images()[imageIndex];
 
 	// Barrier 1: HDRColor GENERAL → TRANSFER_SRC_OPTIMAL
 	// Barrier 2: Swapchain image UNDEFINED → TRANSFER_DST_OPTIMAL
@@ -704,25 +704,25 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 
 bool DeferredRenderer::TakeScreenshot()
 {
-	if (!m_swapchain)
+	if (!r_swapchain)
 	{
 		return false;
 	}
 
-	const auto& images = m_swapchain->images();
-	if (m_lastImageIndex >= images.size())
+	const auto& images = r_swapchain->images();
+	if (r_lastImageIndex >= images.size())
 	{
 		return false;
 	}
 
-	const vk::Image scImage = images[m_lastImageIndex];
-	const vk::Format scFormat = m_swapchain->format();
-	const vk::Extent2D scExtent = m_swapchain->extent();
+	const vk::Image scImage = images[r_lastImageIndex];
+	const vk::Format scFormat = r_swapchain->format();
+	const vk::Extent2D scExtent = r_swapchain->extent();
 
 	const std::string path = Screenshot::timestampedFilename("screenshots/swapchain", ".png");
 
-	return Screenshot::CaptureSwapchain(m_device, m_physicalDevice,
-	                                     m_graphicsQueue, m_queueFamilyIndex,
+	return Screenshot::CaptureSwapchain(r_device, r_physicalDevice,
+	                                     r_graphicsQueue, r_queueFamilyIndex,
 	                                     scImage, scFormat, scExtent, path);
 }
 
@@ -730,18 +730,18 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 {
 	int count = 0;
 
-	if (m_renderCache)
+	if (r_renderCache)
 	{
-		count = Screenshot::CaptureAllAttachments(m_device, m_physicalDevice,
-		                                          m_graphicsQueue, m_queueFamilyIndex,
-		                                          *m_renderCache,
-		                                          m_swapchain->extent(),
+		count = Screenshot::CaptureAllAttachments(r_device, r_physicalDevice,
+		                                          r_graphicsQueue, r_queueFamilyIndex,
+		                                          *r_renderCache,
+		                                          r_swapchain->extent(),
 		                                          "screenshots/gbuffer");
 	}
 
 	// --- Export shadow cubemaps as equirectangular PNGs ---
 	{
-		const auto shadowUIDs = m_renderCache->GetShadowMapUIDs();
+		const auto shadowUIDs = r_renderCache->GetShadowMapUIDs();
 		for (int lightUID : shadowUIDs)
 		{
 			const std::string result = ExportShadowDepthEquirect(
@@ -755,18 +755,18 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 
 	// --- Export shadow intensity array layers ---
 	{
-		Image* intensityArray = m_renderCache->GetShadowIntensityArray();
+		Image* intensityArray = r_renderCache->GetShadowIntensityArray();
 		if (intensityArray)
 		{
-			const vk::Extent2D extent = m_swapchain->extent();
-			const auto shadowUIDs = m_renderCache->GetShadowMapUIDs();
+			const vk::Extent2D extent = r_swapchain->extent();
+			const auto shadowUIDs = r_renderCache->GetShadowMapUIDs();
 			for (int lightUID : shadowUIDs)
 			{
-				const uint32_t layer = m_renderCache->GetShadowIntensityLayerIndex(lightUID);
+				const uint32_t layer = r_renderCache->GetShadowIntensityLayerIndex(lightUID);
 				const std::string path = Screenshot::timestampedFilename(
 					"screenshots/shadow_intensity_Light" + std::to_string(lightUID), ".png");
-				if (Screenshot::CaptureImageLayer(m_device, m_physicalDevice,
-				                                   m_graphicsQueue, m_queueFamilyIndex,
+				if (Screenshot::CaptureImageLayer(r_device, r_physicalDevice,
+				                                   r_graphicsQueue, r_queueFamilyIndex,
 				                                   *intensityArray, layer, path))
 				{
 					++count;
@@ -785,18 +785,18 @@ int DeferredRenderer::TakeScreenshotAllAttachments()
 std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
                                                           const std::string& filenamePrefix)
 {
-	if (!m_shadowDepthPass || !m_renderCache)
+	if (!r_shadowDepthPass || !r_renderCache)
 	{
 		return {};
 	}
 
-	auto& cubemap = m_renderCache->GetShadowMap(lightUID, LightType::POINTLIGHT);
-	const uint32_t cubeRes = m_shadowDepthPass->Resolution();
+	auto& cubemap = r_renderCache->GetShadowMap(lightUID, LightType::POINTLIGHT);
+	const uint32_t cubeRes = r_shadowDepthPass->Resolution();
 	const uint32_t equiWidth = cubeRes * 2;
 	const uint32_t equiHeight = cubeRes;
 
 	// --- 1. Create temporary equirect output image (rgba32f) ---
-	Image equirectImage(m_device, m_physicalDevice,
+	Image equirectImage(r_device, r_physicalDevice,
 	                    vk::Extent2D{equiWidth, equiHeight},
 	                    vk::Format::eR32G32B32A32Sfloat,
 	                    vk::ImageUsageFlagBits::eStorage |
@@ -814,7 +814,7 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
 		0.0f, VK_FALSE, 0.0f, VK_FALSE,
 		vk::CompareOp::eAlways,
 		0.0f, 0.0f, vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
-	vk::raii::Sampler cubeSampler(m_device, samplerCI);
+	vk::raii::Sampler cubeSampler(r_device, samplerCI);
 
 	// --- 3. Descriptor set layout (2 bindings) ---
 	DescriptorSetLayout c2eLayout = BuildLayout()
@@ -822,9 +822,9 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
 		            vk::ShaderStageFlagBits::eCompute)
 		.AddBinding(1, vk::DescriptorType::eStorageImage,
 		            vk::ShaderStageFlagBits::eCompute)
-		.Build(m_device);
+		.Build(r_device);
 
-	DescriptorPool c2ePool(m_device, 1,
+	DescriptorPool c2ePool(r_device, 1,
 		DescriptorPool::CalculatePoolSizes({&c2eLayout}, 1));
 	auto c2eSet = std::move(c2ePool.Allocate(c2eLayout, 1).front());
 
@@ -840,10 +840,10 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
 	}
 
 	// --- 4. Create compute pipeline ---
-	auto compModule = ShaderModule::FromEmbedded(m_device,
+	auto compModule = ShaderModule::FromEmbedded(r_device,
 		c2e_comp_spv, sizeof(c2e_comp_spv));
 
-	ComputePipelineBuilder c2eBuilder(m_device);
+	ComputePipelineBuilder c2eBuilder(r_device);
 	c2eBuilder.SetShaderStage(std::move(compModule), "main");
 	c2eBuilder.SetDebugName("DeferredRenderer::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
@@ -854,10 +854,10 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
 	// --- 5. Record & dispatch ---
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
-		                                  m_queueFamilyIndex);
-		vk::raii::CommandPool cmdPool(m_device, poolCI);
+		                                  r_queueFamilyIndex);
+		vk::raii::CommandPool cmdPool(r_device, poolCI);
 		vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-		vk::raii::CommandBuffers cmdBufs(m_device, allocInfo);
+		vk::raii::CommandBuffers cmdBufs(r_device, allocInfo);
 
 		auto& cmd = cmdBufs[0];
 		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
@@ -890,13 +890,13 @@ std::string DeferredRenderer::ExportShadowDepthEquirect(const int lightUID,
 		cmd.end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
-		m_graphicsQueue.submit(submitInfo);
-		m_graphicsQueue.waitIdle();
+		r_graphicsQueue.submit(submitInfo);
+		r_graphicsQueue.waitIdle();
 	}
 
 	// --- 6. Read back equirect as grayscale PNG ---
 	auto equirectData = equirectImage.ReadImageData(
-		m_device, m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex);
+		r_device, r_physicalDevice, r_graphicsQueue, r_queueFamilyIndex);
 
 	if (!equirectData.IsValid())
 	{

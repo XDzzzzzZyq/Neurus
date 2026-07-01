@@ -8,7 +8,7 @@ namespace neurus {
 ShaderModule::ShaderModule(const vk::raii::Device& device, const std::vector<uint32_t>& spirv)
 {
 	vk::ShaderModuleCreateInfo createInfo({}, spirv.size() * sizeof(uint32_t), spirv.data());
-	m_module = std::make_unique<vk::raii::ShaderModule>(device, createInfo);
+	sh_module = std::make_unique<vk::raii::ShaderModule>(device, createInfo);
 }
 
 ShaderModule::~ShaderModule()
@@ -56,7 +56,7 @@ vk::PipelineShaderStageCreateInfo ShaderModule::GetStageInfo(
 	return vk::PipelineShaderStageCreateInfo(
 		{},
 		stage,
-		**m_module,
+		**sh_module,
 		entryPoint
 	);
 }

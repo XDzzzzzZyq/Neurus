@@ -94,11 +94,11 @@ void Barrier::Transition(VkCommandBuffer cmd,
                           ImageState after)
 {
 	Transition(cmd, image, after, image.AllSubresources());
-	image.m_state = after;
+	image.im_state = after;
 }
 
 // ---------------------------------------------------------------------------
-// Transition (explicit subresource range — does NOT update m_state)
+// Transition (explicit subresource range — does NOT update im_state)
 // ---------------------------------------------------------------------------
 
 void Barrier::Transition(VkCommandBuffer cmd,
@@ -106,7 +106,7 @@ void Barrier::Transition(VkCommandBuffer cmd,
                           ImageState after,
                           const vk::ImageSubresourceRange& subresourceRange)
 {
-	const ImageState before = image.m_state;
+	const ImageState before = image.im_state;
 
 	const auto beforeState = ToVulkanImageState(before);
 	const auto afterState  = ToVulkanImageState(after);

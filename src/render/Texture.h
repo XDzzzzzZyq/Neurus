@@ -150,25 +150,25 @@ public:
 	// --- Queries ---
 
 	/** @brief True if the Texture contains a valid Image. */
-	bool IsValid() const { return m_image != nullptr; }
+	bool IsValid() const { return tex_image != nullptr; }
 
 	/** @brief Underlying Image (nullptr if invalid). */
-	Image* GetImage() const { return m_image.get(); }
+	Image* GetImage() const { return tex_image.get(); }
 
 	/** @brief Underlying VkSampler handle. Only valid if HasSampler() is true. */
-	const vk::raii::Sampler& GetSampler() const { return m_sampler; }
+	const vk::raii::Sampler& GetSampler() const { return tex_sampler; }
 
 	/** @brief True if a sampler was created for this Texture. */
-	bool HasSampler() const { return *m_sampler != vk::Sampler{}; }
+	bool HasSampler() const { return *tex_sampler != vk::Sampler{}; }
 
 	/** @brief Image extent. Returns {0,0} if invalid. */
-	vk::Extent2D Extent() const { return m_image ? m_image->Extent() : vk::Extent2D{}; }
+	vk::Extent2D Extent() const { return tex_image ? tex_image->Extent() : vk::Extent2D{}; }
 
 	/** @brief Image format. Returns eUndefined if invalid. */
-	vk::Format Format() const { return m_image ? m_image->Format() : vk::Format::eUndefined; }
+	vk::Format Format() const { return tex_image ? tex_image->Format() : vk::Format::eUndefined; }
 
 	/** @brief Number of mip levels. Returns 0 if invalid. */
-	uint32_t MipLevels() const { return m_image ? m_image->MipLevels() : 0; }
+	uint32_t MipLevels() const { return tex_image ? tex_image->MipLevels() : 0; }
 
 	// -------------------------------------------------------------------
 	// Texture loading (cached)
@@ -257,8 +257,8 @@ private:
 	 */
 	static uint32_t computeMipLevels(uint32_t width, uint32_t height);
 
-	std::unique_ptr<Image> m_image;
-	vk::raii::Sampler m_sampler = nullptr;
+	std::unique_ptr<Image> tex_image;
+	vk::raii::Sampler tex_sampler = nullptr;
 
 	// --- Texture cache ---
 	static std::unordered_map<std::string, TextureRes> s_cache;

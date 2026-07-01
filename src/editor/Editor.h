@@ -61,7 +61,7 @@ public:
 	{
 		auto ctrl = std::make_unique<T>();
 		ctrl->Init(bus);
-		m_controllers.push_back(std::move(ctrl));
+		ed_controllers.push_back(std::move(ctrl));
 	}
 
 	/**
@@ -91,14 +91,14 @@ private:
 	void GenerateIBL(const std::shared_ptr<Environment>& env);  ///< Shared IBL generation: loads HDR/fallback, generates cubemaps via IBLPass
 
 	// --- Owned ---
-	std::unique_ptr<neurus::project::Project> m_project;
-	std::unique_ptr<Context> m_context;
-	std::vector<std::unique_ptr<Controllers>> m_controllers;
+	std::unique_ptr<neurus::project::Project> ed_project;
+	std::unique_ptr<Context> ed_context;
+	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---
-	VulkanContext* m_vkContext = nullptr;
-	DeferredRenderer* m_renderer = nullptr;
-	Scene* m_ownerScene = nullptr;  ///< Scene passed to Initialize()
+	VulkanContext* ed_vkContext = nullptr;
+	DeferredRenderer* ed_renderer = nullptr;
+	Scene* ed_ownerScene = nullptr;  ///< Scene passed to Initialize()
 };
 
 } // namespace neurus

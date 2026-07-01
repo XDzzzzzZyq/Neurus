@@ -324,21 +324,21 @@ public:
 
 private:
 	// --- Shader stages ---
-	std::vector<vk::PipelineShaderStageCreateInfo> m_stages;
+	std::vector<vk::PipelineShaderStageCreateInfo> p_stages;
 
 	// --- Vertex input ---
-	vk::PipelineVertexInputStateCreateInfo m_vertexInput = {};
-	std::vector<vk::VertexInputBindingDescription> m_vertexBindings;
-	std::vector<vk::VertexInputAttributeDescription> m_vertexAttributes;
-	bool m_vertexInputSet = false;
+	vk::PipelineVertexInputStateCreateInfo p_vertexInput = {};
+	std::vector<vk::VertexInputBindingDescription> p_vertexBindings;
+	std::vector<vk::VertexInputAttributeDescription> p_vertexAttributes;
+	bool p_vertexInputSet = false;
 
 	// --- Input assembly ---
-	vk::PipelineInputAssemblyStateCreateInfo m_inputAssembly =
+	vk::PipelineInputAssemblyStateCreateInfo p_inputAssembly =
 		vk::PipelineInputAssemblyStateCreateInfo(
 			{}, vk::PrimitiveTopology::eTriangleList, VK_FALSE);
 
 	// --- Rasterization ---
-	vk::PipelineRasterizationStateCreateInfo m_rasterizer =
+	vk::PipelineRasterizationStateCreateInfo p_rasterizer =
 		vk::PipelineRasterizationStateCreateInfo(
 			{}, VK_FALSE, VK_FALSE,
 			vk::PolygonMode::eFill,
@@ -347,40 +347,40 @@ private:
 			VK_FALSE, 0.0f, 0.0f, 0.0f, 1.0f);
 
 	// --- Multisampling ---
-	vk::PipelineMultisampleStateCreateInfo m_multisample =
+	vk::PipelineMultisampleStateCreateInfo p_multisample =
 		vk::PipelineMultisampleStateCreateInfo(
 			{}, vk::SampleCountFlagBits::e1);
 
 	// --- Depth / stencil ---
-	std::optional<vk::PipelineDepthStencilStateCreateInfo> m_depthStencil;
+	std::optional<vk::PipelineDepthStencilStateCreateInfo> p_depthStencil;
 
 	// --- Color blending ---
-	std::vector<vk::PipelineColorBlendAttachmentState> m_colorBlendAttachments;
-	vk::PipelineColorBlendStateCreateInfo m_colorBlend;
+	std::vector<vk::PipelineColorBlendAttachmentState> p_colorBlendAttachments;
+	vk::PipelineColorBlendStateCreateInfo p_colorBlend;
 
 	// --- Dynamic states ---
-	std::vector<vk::DynamicState> m_dynamicStates = {
+	std::vector<vk::DynamicState> p_dynamicStates = {
 		vk::DynamicState::eViewport,
 		vk::DynamicState::eScissor,
 	};
-	vk::PipelineDynamicStateCreateInfo m_dynamicState;
+	vk::PipelineDynamicStateCreateInfo p_dynamicState;
 
 	// --- Pipeline layout ---
-	std::vector<vk::DescriptorSetLayout> m_descriptorSetLayouts;
-	std::vector<vk::PushConstantRange> m_pushConstantRanges;
+	std::vector<vk::DescriptorSetLayout> p_descriptorSetLayouts;
+	std::vector<vk::PushConstantRange> p_pushConstantRanges;
 
 	// --- Pipeline cache ---
-	vk::PipelineCache m_pipelineCache = VK_NULL_HANDLE;
+	vk::PipelineCache p_pipelineCache = VK_NULL_HANDLE;
 
 	// --- Dynamic rendering ---
-	std::vector<vk::Format> m_colorFormats;
-	std::optional<vk::Format> m_depthFormat;
-	std::optional<vk::Format> m_stencilFormat;
+	std::vector<vk::Format> p_colorFormats;
+	std::optional<vk::Format> p_depthFormat;
+	std::optional<vk::Format> p_stencilFormat;
 
-	uint32_t m_viewMask = 0;
+	uint32_t p_viewMask = 0;
 
 	// --- Debug ---
-	std::string m_debugName;
+	std::string p_debugName;
 };
 
 } // namespace neurus

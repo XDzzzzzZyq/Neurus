@@ -155,7 +155,7 @@ public:
 	/**
 	 * @brief Returns all light UIDs that currently have shadow cubemaps.
 	 *
-	 * Iterates m_shadowMaps keys.  Returns an empty vector if no shadow maps exist.
+	 * Iterates rc_shadowMaps keys.  Returns an empty vector if no shadow maps exist.
 	 *
 	 * @return Vector of light UID integers.
 	 */
@@ -171,7 +171,7 @@ public:
 	/**
 	 * @brief Removes all per-light shadow resources for the given light.
 	 *
-	 * Erases entries from m_shadowMaps, m_shadowColorMaps,
+	 * Erases entries from rc_shadowMaps, rc_shadowColorMaps,
 	 * and recycles the intensity layer index.
 	 * Safe to call for lights that have no resources yet.
 	 *
@@ -203,9 +203,9 @@ public:
 	/**
 	 * @brief Clear screen-space attachments (G-Buffer) and shadow intensities.
 	 *
-	 * Preserves shadow cubemaps (m_shadowMaps) which are owned by
+	 * Preserves shadow cubemaps (rc_shadowMaps) which are owned by
 	 * this RenderCache and retain their fixed 1024×1024 resolution.
-	 * Screen-space attachments (Position through SSR in m_attachments)
+	 * Screen-space attachments (Position through SSR in rc_attachments)
 	 * and per-pixel shadow intensities are discarded and must be
 	 * re-created on the next frame.
 	 *
@@ -230,17 +230,17 @@ private:
 	void createAttachment(AttachmentName name, vk::Extent2D extent);
 
 	// --- References (non-owning) ---
-	const vk::raii::Device* m_device;
-	const vk::raii::PhysicalDevice* m_physicalDevice;
+	const vk::raii::Device* rc_device;
+	const vk::raii::PhysicalDevice* rc_physicalDevice;
 
 	// --- State ---
-	std::unordered_map<AttachmentName, Image> m_attachments;
+	std::unordered_map<AttachmentName, Image> rc_attachments;
 
 	// --- Per-light lazy resources (key = light UID as int) ---
-	std::unordered_map<int, Image> m_shadowMaps;
-	std::unique_ptr<Image> m_shadowIntensityArray;
-	std::unordered_map<int, uint32_t> m_shadowIntensityLayerIndex;
-	std::unordered_map<int, Image> m_shadowColorMaps;
+	std::unordered_map<int, Image> rc_shadowMaps;
+	std::unique_ptr<Image> rc_shadowIntensityArray;
+	std::unordered_map<int, uint32_t> rc_shadowIntensityLayerIndex;
+	std::unordered_map<int, Image> rc_shadowColorMaps;
 };
 
 /**

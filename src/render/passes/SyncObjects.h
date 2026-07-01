@@ -56,11 +56,11 @@ public:
 	bool WaitAndReset(uint64_t timeoutNs = kDefaultFenceTimeoutNs);
 
 	/** @brief Returns a const reference to the underlying vk::raii::Fence. */
-	const vk::raii::Fence& handle() const { return m_fence; }
+	const vk::raii::Fence& handle() const { return sync_fence; }
 
 private:
-	const vk::raii::Device* m_device;
-	vk::raii::Fence m_fence;
+	const vk::raii::Device* sync_device;
+	vk::raii::Fence sync_fence;
 };
 
 // ---------------------------------------------------------------------------
@@ -89,11 +89,11 @@ public:
 	Semaphore& operator=(Semaphore&&) noexcept = default;
 
 	/** @brief Returns a const reference to the underlying vk::raii::Semaphore. */
-	const vk::raii::Semaphore& handle() const { return m_semaphore; }
+	const vk::raii::Semaphore& handle() const { return sync_semaphore; }
 
 private:
-	const vk::raii::Device* m_device;
-	vk::raii::Semaphore m_semaphore;
+	const vk::raii::Device* sync_device;
+	vk::raii::Semaphore sync_semaphore;
 };
 
 // ---------------------------------------------------------------------------
@@ -172,25 +172,25 @@ struct FrameSync
 // ---------------------------------------------------------------------------
 
 inline Fence::Fence(const vk::raii::Device& device, vk::FenceCreateFlags flags)
-	: m_device(&device)
-	, m_fence(device, vk::FenceCreateInfo(flags))
+	: sync_device(&device)
+	, sync_fence(device, vk::FenceCreateInfo(flags))
 {
 }
 
 inline bool Fence::WaitAndReset(uint64_t timeoutNs)
 {
-	auto result = m_device->waitForFences(*m_fence, VK_TRUE, timeoutNs);
+	auto result = sync_device->waitForFences(*sync_fence, VK_TRUE, timeoutNs);
 	if (result == vk::Result::eSuccess)
 	{
-		m_device->resetFences(*m_fence);
+		sync_device->resetFences(*sync_fence);
 		return true;
 	}
 	return false;
 }
 
 inline Semaphore::Semaphore(const vk::raii::Device& device)
-	: m_device(&device)
-	, m_semaphore(device, vk::SemaphoreCreateInfo())
+	: sync_device(&device)
+	, sync_semaphore(device, vk::SemaphoreCreateInfo())
 {
 }
 

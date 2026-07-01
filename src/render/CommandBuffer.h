@@ -42,9 +42,9 @@ public:
 	CommandBuffer(const vk::raii::Device& device,
 	              const vk::raii::CommandPool& pool,
 	              vk::CommandBufferLevel level = vk::CommandBufferLevel::ePrimary)
-		: m_cmdBufs(device, vk::CommandBufferAllocateInfo(*pool, level, 1))
+		: cb_cmdBufs(device, vk::CommandBufferAllocateInfo(*pool, level, 1))
 	{
-		m_handle = *m_cmdBufs[0];
+		cb_handle = *cb_cmdBufs[0];
 	}
 
 	~CommandBuffer() = default;
@@ -65,15 +65,15 @@ public:
 	void Begin(vk::CommandBufferUsageFlags flags = {})
 	{
 		vk::CommandBufferBeginInfo beginInfo(flags);
-		m_handle.begin(beginInfo);
-		m_recording = true;
+		cb_handle.begin(beginInfo);
+		cb_recording = true;
 	}
 
 	/** @brief Ends command buffer recording. */
 	void End()
 	{
-		m_handle.end();
-		m_recording = false;
+		cb_handle.end();
+		cb_recording = false;
 	}
 
 	/**
@@ -86,7 +86,7 @@ public:
 	 */
 	void Submit(vk::Queue queue, vk::Fence fence = {})
 	{
-		vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &m_handle, 0, nullptr);
+		vk::SubmitInfo submitInfo(0, nullptr, nullptr, 1, &cb_handle, 0, nullptr);
 		queue.submit(submitInfo, fence);
 	}
 
@@ -105,8 +105,8 @@ public:
 	/** @brief Resets the command buffer to initial state. */
 	void Reset(vk::CommandBufferResetFlags flags = {})
 	{
-		m_handle.reset(flags);
-		m_recording = false;
+		cb_handle.reset(flags);
+		cb_recording = false;
 	}
 
 	// -----------------------------------------------------------------------
@@ -122,7 +122,7 @@ public:
 	void CopyBuffer(vk::Buffer src, vk::Buffer dst,
 	                const vk::ArrayProxy<const vk::BufferCopy>& regions)
 	{
-		m_handle.copyBuffer(src, dst, regions);
+		cb_handle.copyBuffer(src, dst, regions);
 	}
 
 	/**
@@ -135,7 +135,7 @@ public:
 	void CopyBufferToImage(vk::Buffer src, vk::Image dst, vk::ImageLayout dstLayout,
 	                       const vk::ArrayProxy<const vk::BufferImageCopy>& regions)
 	{
-		m_handle.copyBufferToImage(src, dst, dstLayout, regions);
+		cb_handle.copyBufferToImage(src, dst, dstLayout, regions);
 	}
 
 	// -----------------------------------------------------------------------
@@ -158,7 +158,7 @@ public:
 	                     const vk::ArrayProxy<const vk::BufferMemoryBarrier>& bufferBarriers = {},
 	                     const vk::ArrayProxy<const vk::ImageMemoryBarrier>& imageBarriers = {})
 	{
-		m_handle.pipelineBarrier(
+		cb_handle.pipelineBarrier(
 			srcStage, dstStage, depFlags,
 			memoryBarriers, bufferBarriers, imageBarriers);
 	}
@@ -170,7 +170,7 @@ public:
 	/** @brief Binds a pipeline. */
 	void BindPipeline(vk::PipelineBindPoint bindPoint, vk::Pipeline pipeline)
 	{
-		m_handle.bindPipeline(bindPoint, pipeline);
+		cb_handle.bindPipeline(bindPoint, pipeline);
 	}
 
 	/** @brief Binds descriptor sets. */
@@ -179,7 +179,7 @@ public:
 	                        const vk::ArrayProxy<const vk::DescriptorSet>& descriptorSets,
 	                        const vk::ArrayProxy<const uint32_t>& dynamicOffsets = {})
 	{
-		m_handle.bindDescriptorSets(bindPoint, layout, firstSet, descriptorSets, dynamicOffsets);
+		cb_handle.bindDescriptorSets(bindPoint, layout, firstSet, descriptorSets, dynamicOffsets);
 	}
 
 	/** @brief Pushes constants to a pipeline. */
@@ -187,7 +187,7 @@ public:
 	                   uint32_t offset, uint32_t size, const void* data)
 	{
 		auto byteData = static_cast<const uint8_t*>(data);
-		m_handle.pushConstants(layout, stageFlags, offset, vk::ArrayProxy<const uint8_t>(size, byteData));
+		cb_handle.pushConstants(layout, stageFlags, offset, vk::ArrayProxy<const uint8_t>(size, byteData));
 	}
 
 	// -----------------------------------------------------------------------
@@ -198,7 +198,7 @@ public:
 	void Draw(uint32_t vertexCount, uint32_t instanceCount = 1,
 	          uint32_t firstVertex = 0, uint32_t firstInstance = 0)
 	{
-		m_handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+		cb_handle.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 	}
 
 	/** @brief Issues an indexed draw command. */
@@ -206,13 +206,13 @@ public:
 	                 uint32_t firstIndex = 0, int32_t vertexOffset = 0,
 	                 uint32_t firstInstance = 0)
 	{
-		m_handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+		cb_handle.drawIndexed(indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 	}
 
 	/** @brief Issues a compute dispatch command. */
 	void Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 	{
-		m_handle.dispatch(groupCountX, groupCountY, groupCountZ);
+		cb_handle.dispatch(groupCountX, groupCountY, groupCountZ);
 	}
 
 	// -----------------------------------------------------------------------
@@ -223,14 +223,14 @@ public:
 	void SetViewport(uint32_t firstViewport,
 	                 const vk::ArrayProxy<const vk::Viewport>& viewports)
 	{
-		m_handle.setViewport(firstViewport, viewports);
+		cb_handle.setViewport(firstViewport, viewports);
 	}
 
 	/** @brief Sets dynamic scissor state. */
 	void SetScissor(uint32_t firstScissor,
 	                const vk::ArrayProxy<const vk::Rect2D>& scissors)
 	{
-		m_handle.setScissor(firstScissor, scissors);
+		cb_handle.setScissor(firstScissor, scissors);
 	}
 
 	// -----------------------------------------------------------------------
@@ -238,10 +238,10 @@ public:
 	// -----------------------------------------------------------------------
 
 	/** @brief Returns the raw Vulkan command buffer handle. */
-	vk::CommandBuffer handle() const { return m_handle; }
+	vk::CommandBuffer handle() const { return cb_handle; }
 
 	/** @brief Returns true if the command buffer is currently recording. */
-	bool isRecording() const { return m_recording; }
+	bool isRecording() const { return cb_recording; }
 
 	/**
 	 * @brief Provides access to the RAII vector of command buffers.
@@ -249,12 +249,12 @@ public:
 	 * The internal CommandBuffers always contains exactly one element.
 	 * Use handle() for the raw vk::CommandBuffer.
 	 */
-	const vk::raii::CommandBuffers& commandBuffers() const { return m_cmdBufs; }
+	const vk::raii::CommandBuffers& commandBuffers() const { return cb_cmdBufs; }
 
 private:
-	vk::raii::CommandBuffers m_cmdBufs = nullptr;
-	vk::CommandBuffer m_handle = nullptr;
-	bool m_recording = false;
+	vk::raii::CommandBuffers cb_cmdBufs = nullptr;
+	vk::CommandBuffer cb_handle = nullptr;
+	bool cb_recording = false;
 };
 
 } // namespace neurus

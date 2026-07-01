@@ -10,14 +10,14 @@ UIEvents& UIEvents::instance()
 
 QString UIEvents::gpuName() const
 {
-	return m_gpuName;
+	return evt_gpuName;
 }
 
 void UIEvents::setGpuName(const QString& name)
 {
-	if (m_gpuName != name)
+	if (evt_gpuName != name)
 	{
-		m_gpuName = name;
+		evt_gpuName = name;
 		emit gpuNameChanged();
 	}
 }

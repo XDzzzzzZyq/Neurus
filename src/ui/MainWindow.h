@@ -35,21 +35,21 @@ public:
 	MainWindow(const MainWindow&) = delete;
 	MainWindow& operator=(const MainWindow&) = delete;
 
-	const vk::raii::SurfaceKHR& surface() const { return *m_surface; }
-	HWND hwnd() const { return m_hwnd; }
-	void show() { ShowWindow(m_hwnd, SW_SHOW); UpdateWindow(m_hwnd); }
-	int getWidth() const { return m_width; }
-	int getHeight() const { return m_height; }
+	const vk::raii::SurfaceKHR& surface() const { return *win_surface; }
+	HWND hwnd() const { return win_hwnd; }
+	void show() { ShowWindow(win_hwnd, SW_SHOW); UpdateWindow(win_hwnd); }
+	int getWidth() const { return win_width; }
+	int getHeight() const { return win_height; }
 
 private:
-	UIEvents* m_bus = nullptr;
+	UIEvents* win_bus = nullptr;
 
-	std::unique_ptr<vk::raii::SurfaceKHR> m_surface;
-	HWND m_hwnd = nullptr;
+	std::unique_ptr<vk::raii::SurfaceKHR> win_surface;
+	HWND win_hwnd = nullptr;
 
-	int m_width = 800;
-	int m_height = 600;
-	QString m_title = "Neurus";
+	int win_width = 800;
+	int win_height = 600;
+	QString win_title = "Neurus";
 };
 
 } // namespace neurus

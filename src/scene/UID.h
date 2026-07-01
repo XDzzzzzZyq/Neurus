@@ -36,7 +36,7 @@ namespace neurus
 class UID
 {
 private:
-	int m_id;            ///< Unique identifier for this instance
+	int o_id;            ///< Unique identifier for this instance
 	static int s_count;  ///< Global counter for ID generation
 
 public:
@@ -76,7 +76,7 @@ public:
 	 */
 	inline int GetObjectID() const
 	{
-		return m_id;
+		return o_id;
 	}
 
 	/**

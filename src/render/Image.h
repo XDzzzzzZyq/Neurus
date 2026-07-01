@@ -169,10 +169,10 @@ public:
 	// --- Getters ---
 
 	/** @brief Underlying vk::raii::Image handle. */
-	const vk::raii::Image& ImageHandle() const { return m_image; }
+	const vk::raii::Image& ImageHandle() const { return im_image; }
 
 	/** @brief Underlying vk::raii::ImageView handle (default view, always 2D for e2D images). */
-	const vk::raii::ImageView& ImageViewHandle() const { return m_imageView; }
+	const vk::raii::ImageView& ImageViewHandle() const { return im_imageView; }
 
 	/**
 	 * @brief Underlying vk::raii::ImageView handle for 2D_ARRAY access.
@@ -194,25 +194,25 @@ public:
 	const vk::raii::ImageView& ArrayView() const;
 
 	/** @brief Underlying vk::raii::DeviceMemory handle. */
-	const vk::raii::DeviceMemory& DeviceMemoryHandle() const { return m_deviceMemory; }
+	const vk::raii::DeviceMemory& DeviceMemoryHandle() const { return im_deviceMemory; }
 
 	/** @brief Image extent. */
-	vk::Extent2D Extent() const { return m_extent; }
+	vk::Extent2D Extent() const { return im_extent; }
 
 	/** @brief Image format. */
-	vk::Format Format() const { return m_format; }
+	vk::Format Format() const { return im_format; }
 
 	/** @brief Number of mip levels. */
-	uint32_t MipLevels() const { return m_mipLevels; }
+	uint32_t MipLevels() const { return im_mipLevels; }
 
 	/** @brief Number of array layers. */
-	uint32_t ArrayLayers() const { return m_arrayLayers; }
+	uint32_t ArrayLayers() const { return im_arrayLayers; }
 
 	/** @brief Image type. */
-	ImageType Type() const { return m_imageType; }
+	ImageType Type() const { return im_imageType; }
 
 	/** @brief Current logical image state (updated by Barrier::Transition). */
-	ImageState State() const { return m_state; }
+	ImageState State() const { return im_state; }
 
 	// --- Subresource range helpers ---
 
@@ -264,33 +264,33 @@ private:
 	                               vk::MemoryPropertyFlags properties);
 
 	// --- Resources ---
-	vk::raii::Image m_image = nullptr;
-	vk::raii::DeviceMemory m_deviceMemory = nullptr;
-	vk::raii::ImageView m_imageView = nullptr;
+	vk::raii::Image im_image = nullptr;
+	vk::raii::DeviceMemory im_deviceMemory = nullptr;
+	vk::raii::ImageView im_imageView = nullptr;
 
 	// --- Cube-only views ---
-	vk::raii::ImageView m_cubeArrayView = nullptr;
+	vk::raii::ImageView im_cubeArrayView = nullptr;
 
 	// --- 2D_ARRAY view (created when arrayView=true on e2D images) ---
-	vk::raii::ImageView m_arrayImageView = nullptr;
-	bool m_hasArrayView = false;
+	vk::raii::ImageView im_arrayImageView = nullptr;
+	bool im_hasArrayView = false;
 
 	// --- Metadata ---
-	vk::Extent2D m_extent{};
-	vk::Format m_format = vk::Format::eUndefined;
-	vk::ImageUsageFlags m_usage;
-	uint32_t m_mipLevels = 1;
-	uint32_t m_arrayLayers = 1;
-	ImageType m_imageType = ImageType::e2D;
+	vk::Extent2D im_extent{};
+	vk::Format im_format = vk::Format::eUndefined;
+	vk::ImageUsageFlags im_usage;
+	uint32_t im_mipLevels = 1;
+	uint32_t im_arrayLayers = 1;
+	ImageType im_imageType = ImageType::e2D;
 
 	// --- If true, e2D images get a VK_IMAGE_VIEW_TYPE_2D_ARRAY view (for sampler2DArray) ---
-	bool m_arrayView = false;
+	bool im_arrayView = false;
 
 	// --- User-specified array layer count (0/1 = default from ImageType) ---
-	uint32_t m_userArrayLayers = 0;
+	uint32_t im_userArrayLayers = 0;
 
 	// --- State tracking ---
-	ImageState m_state = ImageState::Undefined;
+	ImageState im_state = ImageState::Undefined;
 };
 
 } // namespace neurus

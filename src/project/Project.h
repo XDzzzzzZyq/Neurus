@@ -39,7 +39,7 @@ namespace neurus::project
  * @code
  * {
  *   "project": {
- *     "m_scene": {
+ *     "proj_scene": {
  *       "cam_list": [],
  *       "mesh_list": [],
  *       "light_list": [],
@@ -92,7 +92,7 @@ public:
 	 * @brief Saves the project to the given path as .neurus.json.
 	 * @param path Filesystem path for the output file.
 	 * @throws std::runtime_error if the file cannot be created.
-	 * @note Updates m_filePath and clears the dirty flag on success.
+	 * @note Updates proj_filePath and clears the dirty flag on success.
 	 */
 	void Save(const std::string& path);
 
@@ -108,12 +108,12 @@ public:
 	 * @brief Returns whether the project has unsaved modifications.
 	 * @return true if the scene has been modified since the last save.
 	 */
-	bool IsDirty() const { return m_dirty; }
+	bool IsDirty() const { return proj_dirty; }
 
 	/**
 	 * @brief Marks the project as modified (called by editor controllers).
 	 */
-	void MarkDirty() { m_dirty = true; }
+	void MarkDirty() { proj_dirty = true; }
 
 	// --- Scene access ---
 
@@ -121,13 +121,13 @@ public:
 	 * @brief Returns a mutable reference to the scene.
 	 * @return Reference to the owned Scene.
 	 */
-	Scene& GetScene() { return *m_scene; }
+	Scene& GetScene() { return *proj_scene; }
 
 	/**
 	 * @brief Returns a const reference to the scene.
 	 * @return Const reference to the owned Scene.
 	 */
-	const Scene& GetScene() const { return *m_scene; }
+	const Scene& GetScene() const { return *proj_scene; }
 
 	// --- File path ---
 
@@ -135,7 +135,7 @@ public:
 	 * @brief Returns the current project file path.
 	 * @return The path last used for Open() or Save(), or empty string if never saved.
 	 */
-	const std::string& GetFilePath() const { return m_filePath; }
+	const std::string& GetFilePath() const { return proj_filePath; }
 
 	// --- Cereal serialization ---
 
@@ -148,7 +148,7 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(cereal::make_nvp("m_scene", *m_scene));
+		ar(cereal::make_nvp("m_scene", *proj_scene));
 	}
 
 private:
@@ -161,9 +161,9 @@ private:
 	 */
 	Project();
 
-	std::unique_ptr<Scene> m_scene;   ///< Owned scene container (all scene objects)
-	std::string m_filePath;   ///< Path to the .neurus.json file (empty if never saved)
-	bool m_dirty = false;     ///< Unsaved modifications flag
+	std::unique_ptr<Scene> proj_scene;   ///< Owned scene container (all scene objects)
+	std::string proj_filePath;   ///< Path to the .neurus.json file (empty if never saved)
+	bool proj_dirty = false;     ///< Unsaved modifications flag
 };
 
 } // namespace neurus::project

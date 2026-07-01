@@ -83,8 +83,8 @@ public:
 	DescriptorSetLayout Build(const vk::raii::Device& device);
 
 private:
-	std::vector<vk::DescriptorSetLayoutBinding> m_bindings;
-	std::vector<vk::DescriptorBindingFlags> m_bindingFlags;
+	std::vector<vk::DescriptorSetLayoutBinding> desc_bindings;
+	std::vector<vk::DescriptorBindingFlags> desc_bindingFlags;
 };
 
 /**
@@ -148,18 +148,18 @@ public:
 	/** @brief Underlying vk::raii::DescriptorSetLayout handle. */
 	const vk::raii::DescriptorSetLayout& layout() const
 	{
-		return m_layout;
+		return desc_layout;
 	}
 
 	/** @brief The bindings used to create this layout (for introspection). */
 	const std::vector<vk::DescriptorSetLayoutBinding>& bindings() const
 	{
-		return m_bindings;
+		return desc_bindings;
 	}
 
 private:
-	vk::raii::DescriptorSetLayout m_layout = nullptr;
-	std::vector<vk::DescriptorSetLayoutBinding> m_bindings;
+	vk::raii::DescriptorSetLayout desc_layout = nullptr;
+	std::vector<vk::DescriptorSetLayoutBinding> desc_bindings;
 };
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ public:
 	                    vk::DescriptorType::eCombinedImageSampler);
 
 	/** @brief Raw VkDescriptorSet handle for binding in command recording. */
-	vk::DescriptorSet handle() const { return *m_set; }
+	vk::DescriptorSet handle() const { return *desc_set; }
 
 #ifdef _DEBUG
 	/**
@@ -239,8 +239,8 @@ public:
 #endif
 
 private:
-	vk::raii::DescriptorSet m_set = nullptr;
-	const vk::raii::Device* m_device;
+	vk::raii::DescriptorSet desc_set = nullptr;
+	const vk::raii::Device* desc_device;
 };
 
 // ---------------------------------------------------------------------------
@@ -315,11 +315,11 @@ public:
 		uint32_t multiplier = 1);
 
 	/** @brief Underlying vk::raii::DescriptorPool handle. */
-	const vk::raii::DescriptorPool& pool() const { return m_pool; }
+	const vk::raii::DescriptorPool& pool() const { return desc_pool; }
 
 private:
-	vk::raii::DescriptorPool m_pool = nullptr;
-	const vk::raii::Device* m_device;
+	vk::raii::DescriptorPool desc_pool = nullptr;
+	const vk::raii::Device* desc_device;
 };
 
 } // namespace neurus

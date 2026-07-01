@@ -67,25 +67,25 @@ public:
 	void Present(const vk::raii::Semaphore& waitSemaphore, uint32_t imageIndex, vk::Queue presentQueue);
 
 	/** @brief Current swapchain extent (width × height). */
-	vk::Extent2D extent() const { return m_extent; }
+	vk::Extent2D extent() const { return r_extent; }
 
 	/** @brief Number of images in the swapchain. */
-	uint32_t imageCount() const { return m_imageCount; }
+	uint32_t imageCount() const { return r_imageCount; }
 
 	/** @brief The swapchain image views (indexed by acquired image index). */
-	const std::vector<vk::raii::ImageView>& imageViews() const { return m_imageViews; }
+	const std::vector<vk::raii::ImageView>& imageViews() const { return r_imageViews; }
 
 	/** @brief The swapchain images (VkImage handles, indexed by acquired image index). */
-	const std::vector<vk::Image>& images() const { return m_images; }
+	const std::vector<vk::Image>& images() const { return r_images; }
 
 	/** @brief The swapchain image format. */
-	vk::Format format() const { return m_format; }
+	vk::Format format() const { return r_format; }
 
 	/** @brief The actual image usage flags of swapchain images (may differ from requested). */
-	vk::ImageUsageFlags actualImageUsage() const { return m_actualUsage; }
+	vk::ImageUsageFlags actualImageUsage() const { return r_actualUsage; }
 
 	/** @brief Monotonically increasing generation counter. Incremented on each Recreate(). */
-	uint32_t generation() const { return m_generation; }
+	uint32_t generation() const { return r_generation; }
 
 private:
 	/**
@@ -116,22 +116,22 @@ private:
 	                                                    const vk::raii::SwapchainKHR& swapchain,
 	                                                    vk::Format format);
 
-	const vk::raii::PhysicalDevice& m_physicalDevice;
-	const vk::raii::Device& m_device;
-	const vk::raii::SurfaceKHR& m_surface;
+	const vk::raii::PhysicalDevice& r_physicalDevice;
+	const vk::raii::Device& r_device;
+	const vk::raii::SurfaceKHR& r_surface;
 
-	std::unique_ptr<vk::raii::SwapchainKHR> m_swapchain;
-	std::vector<vk::raii::ImageView> m_imageViews;
-	std::vector<vk::Image> m_images;
+	std::unique_ptr<vk::raii::SwapchainKHR> r_swapchain;
+	std::vector<vk::raii::ImageView> r_imageViews;
+	std::vector<vk::Image> r_images;
 
-	vk::Format m_format = vk::Format::eB8G8R8A8Srgb;
-	vk::Extent2D m_extent = {800, 600};
-	vk::ImageUsageFlags m_actualUsage = {};
-	uint32_t m_imageCount = 0;
-	uint32_t m_generation = 0;
+	vk::Format r_format = vk::Format::eB8G8R8A8Srgb;
+	vk::Extent2D r_extent = {800, 600};
+	vk::ImageUsageFlags r_actualUsage = {};
+	uint32_t r_imageCount = 0;
+	uint32_t r_generation = 0;
 
-	uint32_t m_recreateWidth = 800;
-	uint32_t m_recreateHeight = 600;
+	uint32_t r_recreateWidth = 800;
+	uint32_t r_recreateHeight = 600;
 };
 
 } // namespace neurus

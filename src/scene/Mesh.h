@@ -103,9 +103,9 @@ public:
 	                 vk::Queue queue,
 	                 uint32_t queueFamilyIndex);
 
-	const VertexBuffer* GetVertexBuffer() const { return m_gpuVertices.get(); }
-	const IndexBuffer* GetIndexBuffer() const { return m_gpuIndices.get(); }
-	uint32_t GetGPUIndexCount() const { return m_gpuIndexCount; }
+	const VertexBuffer* GetVertexBuffer() const { return me_gpuVertices.get(); }
+	const IndexBuffer* GetIndexBuffer() const { return me_gpuIndices.get(); }
+	uint32_t GetGPUIndexCount() const { return me_gpuIndexCount; }
 	void ReleaseGPUBuffers();
 
 	void SetObjShader(void* shader);
@@ -120,10 +120,10 @@ public:
 	void* GetTransform() override { return static_cast<Transform*>(this); }
 
 private:
-	std::unique_ptr<VertexBuffer> m_gpuVertices;
-	std::unique_ptr<IndexBuffer> m_gpuIndices;
-	uint32_t m_gpuIndexCount = 0;
-	const vk::raii::Device* m_gpuDevice = nullptr;
+	std::unique_ptr<VertexBuffer> me_gpuVertices;
+	std::unique_ptr<IndexBuffer> me_gpuIndices;
+	uint32_t me_gpuIndexCount = 0;
+	const vk::raii::Device* me_gpuDevice = nullptr;
 };
 
 } // namespace neurus

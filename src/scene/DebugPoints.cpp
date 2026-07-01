@@ -25,13 +25,13 @@ DebugPoints::DebugPoints()
 
 void DebugPoints::PushDebugPoint(const glm::vec3& point)
 {
-	m_points.push_back(point);
+	o_points.push_back(point);
 }
 
 void DebugPoints::PushDebugPoints(const std::vector<glm::vec3>& points)
 {
-	m_points.insert(
-		m_points.end(),
+	o_points.insert(
+		o_points.end(),
 		points.begin(),
 		points.end()
 	);
@@ -39,7 +39,7 @@ void DebugPoints::PushDebugPoints(const std::vector<glm::vec3>& points)
 
 void DebugPoints::ClearPoints()
 {
-	m_points.clear();
+	o_points.clear();
 }
 
 } // namespace neurus

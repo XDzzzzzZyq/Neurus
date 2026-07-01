@@ -111,7 +111,7 @@ Key rules:
 - Plan by tracing the closest existing feature
 - Break into 4 waves: Foundation → Core → Integration → Tests/Docs
 - Verify EVERY wave: build, ctest, VUID check, Python PIL for references
-- Never commit until user approves
+- Never commit until user approves, unless user notified you in advanced.
 
 ## Development Guidelines
 

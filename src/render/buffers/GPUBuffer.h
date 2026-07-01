@@ -85,11 +85,11 @@ public:
 	void Unmap() override;
 
 private:
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
+	vk::Queue b_queue = nullptr;
+	uint32_t b_queueFamilyIndex = 0;
 
 	// Lazily-created staging buffer for Map/Unmap
-	std::unique_ptr<StagingBuffer> m_staging;
+	std::unique_ptr<StagingBuffer> b_staging;
 };
 
 } // namespace neurus

@@ -37,7 +37,7 @@ public:
 	VulkanWidget* getVulkanWidget() const;
 
     /** @brief Returns the viewport dock widget (for layout / restoreState). */
-    ads::CDockWidget* getViewportDock() const { return m_viewportDock; }
+    ads::CDockWidget* getViewportDock() const { return win_viewportDock; }
 
     /**
      * @brief Sets the active scene on the property editor.
@@ -52,10 +52,10 @@ private:
 	void LoadLayout();
 	void RestoreDefaultLayout();
 
-    ads::CDockManager* m_dockManager = nullptr;
-    ads::CDockWidget*  m_viewportDock = nullptr;
-    VulkanWidget*      m_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
-    PropertyEditor*    m_propertyEditor = nullptr;  // Non-owning — Qt parent-child handles cleanup
+    ads::CDockManager* win_dockManager = nullptr;
+    ads::CDockWidget*  win_viewportDock = nullptr;
+    VulkanWidget*      win_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
+    PropertyEditor*    win_propertyEditor = nullptr;  // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus

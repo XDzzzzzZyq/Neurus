@@ -85,7 +85,7 @@ public:
 	 */
 	void* Map() override
 	{
-		return m_memory->mapMemory(0, sizeof(T));
+		return b_memory->mapMemory(0, sizeof(T));
 	}
 
 	/**
@@ -93,7 +93,7 @@ public:
 	 */
 	void Unmap() override
 	{
-		m_memory->unmapMemory();
+		b_memory->unmapMemory();
 	}
 };
 

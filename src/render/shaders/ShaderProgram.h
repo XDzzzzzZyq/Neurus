@@ -41,16 +41,16 @@ public:
 	ShaderProgram& operator=(ShaderProgram&&) noexcept = default;
 
 	/** @brief The graphics pipeline handle. */
-	const vk::raii::Pipeline& pipeline() const { return *m_pipeline; }
+	const vk::raii::Pipeline& pipeline() const { return *sh_pipeline; }
 
 	/** @brief The pipeline layout (describes descriptor set + push constant bindings). */
-	const vk::raii::PipelineLayout& pipelineLayout() const { return *m_pipelineLayout; }
+	const vk::raii::PipelineLayout& pipelineLayout() const { return *sh_pipelineLayout; }
 
 private:
-	std::unique_ptr<vk::raii::ShaderModule> m_vertModule;
-	std::unique_ptr<vk::raii::ShaderModule> m_fragModule;
-	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
-	std::unique_ptr<vk::raii::Pipeline> m_pipeline;
+	std::unique_ptr<vk::raii::ShaderModule> sh_vertModule;
+	std::unique_ptr<vk::raii::ShaderModule> sh_fragModule;
+	std::unique_ptr<vk::raii::PipelineLayout> sh_pipelineLayout;
+	std::unique_ptr<vk::raii::Pipeline> sh_pipeline;
 };
 
 } // namespace neurus

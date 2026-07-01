@@ -24,27 +24,27 @@ void Scene::UpdateSceneStatus(int tar, bool value)
 {
 	if (value)
 	{
-		m_status = static_cast<SceneModifStatus>(static_cast<int>(m_status) | tar);
+		sc_status = static_cast<SceneModifStatus>(static_cast<int>(sc_status) | tar);
 	}
 	else
 	{
-		m_status = static_cast<SceneModifStatus>(static_cast<int>(m_status) & ~tar);
+		sc_status = static_cast<SceneModifStatus>(static_cast<int>(sc_status) & ~tar);
 	}
 }
 
 void Scene::SetSceneStatus(int tar, bool /*value*/)
 {
-	m_status = static_cast<SceneModifStatus>(tar);
+	sc_status = static_cast<SceneModifStatus>(tar);
 }
 
 bool Scene::CheckStatus(SceneModifStatus tar)
 {
-	return (static_cast<int>(m_status) & static_cast<int>(tar)) != 0;
+	return (static_cast<int>(sc_status) & static_cast<int>(tar)) != 0;
 }
 
 void Scene::ResetStatus()
 {
-	m_status = SceneModifStatus::NoChanges;
+	sc_status = SceneModifStatus::NoChanges;
 }
 
 // ---------------------------------------------------------------------------

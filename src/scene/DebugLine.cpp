@@ -25,14 +25,14 @@ DebugLine::DebugLine()
 
 void DebugLine::PushDebugLine(const glm::vec3& start, const glm::vec3& end)
 {
-	m_vertices.push_back(start);
-	m_vertices.push_back(end);
+	o_vertices.push_back(start);
+	o_vertices.push_back(end);
 }
 
 void DebugLine::PushDebugLines(const std::vector<glm::vec3>& vertices)
 {
-	m_vertices.insert(
-		m_vertices.end(),
+	o_vertices.insert(
+		o_vertices.end(),
 		vertices.begin(),
 		vertices.end()
 	);
@@ -40,7 +40,7 @@ void DebugLine::PushDebugLines(const std::vector<glm::vec3>& vertices)
 
 void DebugLine::ClearVertices()
 {
-	m_vertices.clear();
+	o_vertices.clear();
 }
 
 } // namespace neurus

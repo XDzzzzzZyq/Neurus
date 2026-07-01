@@ -252,9 +252,9 @@ public:
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
-		   CEREAL_NVP(m_equirectPath),
-		   CEREAL_NVP(m_intensity),
-		   CEREAL_NVP(m_rotation));
+		   cereal::make_nvp("m_equirectPath", o_equirectPath),
+		   cereal::make_nvp("m_intensity", o_intensity),
+		   cereal::make_nvp("m_rotation", o_rotation));
 	}
 
 private:
@@ -268,13 +268,13 @@ private:
 	static vk::raii::Sampler CreateCubemapSampler(const vk::raii::Device& device,
 	                                               uint32_t mipLevels);
 
-	std::string m_equirectPath;       ///< Source equirectangular HDR file path
-	float       m_intensity = 1.0f;   ///< IBL intensity multiplier
-	float       m_rotation  = 0.0f;   ///< Y-axis rotation in degrees
-	bool        m_dirty     = false;  ///< Dirty flag for GPU resource reload
+	std::string o_equirectPath;       ///< Source equirectangular HDR file path
+	float       o_intensity = 1.0f;   ///< IBL intensity multiplier
+	float       o_rotation  = 0.0f;   ///< Y-axis rotation in degrees
+	bool        o_dirty     = false;  ///< Dirty flag for GPU resource reload
 
-	std::unique_ptr<Texture> m_diffuseTexture;   ///< Diffuse irradiance cubemap (owned)
-	std::unique_ptr<Texture> m_specularTexture;  ///< Specular prefiltered cubemap (owned)
+	std::unique_ptr<Texture> o_diffuseTexture;   ///< Diffuse irradiance cubemap (owned)
+	std::unique_ptr<Texture> o_specularTexture;  ///< Specular prefiltered cubemap (owned)
 };
 
 } // namespace neurus

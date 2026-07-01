@@ -27,29 +27,29 @@ void SelectionController::Select(int objectId)
 	if (objectId < 0) return;
 
 	// If already selected and active, nothing to do
-	if (m_activeId == objectId && m_selection.contains(objectId))
+	if (sel_activeId == objectId && sel_selection.contains(objectId))
 	{
 		return;
 	}
 
 	// If already in selection, just promote to active
-	if (m_selection.contains(objectId))
+	if (sel_selection.contains(objectId))
 	{
-		m_activeId = objectId;
+		sel_activeId = objectId;
 		return;
 	}
 
 	// Single-select mode: clear previous selection, emit deselect events
 	std::set<int> previous;
-	previous.swap(m_selection);
+	previous.swap(sel_selection);
 
 	for (int id : previous)
 	{
 		EventQueue().enqueue(ObjectDeselected{id});
 	}
 
-	m_selection.insert(objectId);
-	m_activeId = objectId;
+	sel_selection.insert(objectId);
+	sel_activeId = objectId;
 
 	EventQueue().enqueue(ObjectSelected{objectId});
 }
@@ -58,15 +58,15 @@ void SelectionController::Deselect(int objectId)
 {
 	if (objectId < 0) return;
 
-	auto it = m_selection.find(objectId);
-	if (it == m_selection.end()) return;
+	auto it = sel_selection.find(objectId);
+	if (it == sel_selection.end()) return;
 
-	m_selection.erase(it);
+	sel_selection.erase(it);
 
-	if (m_activeId == objectId)
+	if (sel_activeId == objectId)
 	{
 		// Active becomes the last remaining, or -1 if empty
-		m_activeId = m_selection.empty() ? -1 : *m_selection.rbegin();
+		sel_activeId = sel_selection.empty() ? -1 : *sel_selection.rbegin();
 	}
 
 	// Emit event
@@ -76,9 +76,9 @@ void SelectionController::Deselect(int objectId)
 void SelectionController::ClearSelection()
 {
 	std::set<int> toRemove;
-	toRemove.swap(m_selection);
+	toRemove.swap(sel_selection);
 
-	m_activeId = -1;
+	sel_activeId = -1;
 
 	// Emit deselect events for every previously selected object
 	for (int id : toRemove)
@@ -89,17 +89,17 @@ void SelectionController::ClearSelection()
 
 const std::set<int>& SelectionController::GetSelection() const
 {
-	return m_selection;
+	return sel_selection;
 }
 
 bool SelectionController::IsSelected(int objectId) const
 {
-	return m_selection.contains(objectId);
+	return sel_selection.contains(objectId);
 }
 
 int SelectionController::GetActiveObject() const
 {
-	return m_activeId;
+	return sel_activeId;
 }
 
 // ---------------------------------------------------------------------------

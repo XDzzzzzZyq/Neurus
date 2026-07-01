@@ -79,9 +79,12 @@ public:
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
-		   CEREAL_NVP(m_color), CEREAL_NVP(m_width), CEREAL_NVP(m_opacity),
-		   CEREAL_NVP(m_stipple), CEREAL_NVP(m_smooth),
-		   CEREAL_NVP(m_vertices));
+		   cereal::make_nvp("m_color", o_color),
+		   cereal::make_nvp("m_width", o_width),
+		   cereal::make_nvp("m_opacity", o_opacity),
+		   cereal::make_nvp("m_stipple", o_stipple),
+		   cereal::make_nvp("m_smooth", o_smooth),
+		   cereal::make_nvp("m_vertices", o_vertices));
 	}
 
 	// Non-copyable (UID semantics)
@@ -121,51 +124,51 @@ public:
 	 * @brief Returns the number of stored vertex positions.
 	 * @return Vertex count.
 	 */
-	int GetVertexCount() const { return static_cast<int>(m_vertices.size()); }
+	int GetVertexCount() const { return static_cast<int>(o_vertices.size()); }
 
 	/**
 	 * @brief Returns a const reference to the vertex storage.
 	 * @return Const reference to vector of vertex positions.
 	 */
-	const std::vector<glm::vec3>& GetVertices() const { return m_vertices; }
+	const std::vector<glm::vec3>& GetVertices() const { return o_vertices; }
 
 	// -----------------------------------------------------------------------
 	// Properties
 	// -----------------------------------------------------------------------
 
 	/** @brief Sets the line color. */
-	void SetColor(const glm::vec4& color) { m_color = color; }
+	void SetColor(const glm::vec4& color) { o_color = color; }
 	/** @brief Returns the line color. */
-	const glm::vec4& GetColor() const { return m_color; }
+	const glm::vec4& GetColor() const { return o_color; }
 
 	/** @brief Sets the line width in pixels. */
-	void SetWidth(float width) { m_width = width; }
+	void SetWidth(float width) { o_width = width; }
 	/** @brief Returns the line width in pixels. */
-	float GetWidth() const { return m_width; }
+	float GetWidth() const { return o_width; }
 
 	/** @brief Sets the opacity (0.0 = fully transparent, 1.0 = fully opaque). */
-	void SetOpacity(float opacity) { m_opacity = opacity; }
+	void SetOpacity(float opacity) { o_opacity = opacity; }
 	/** @brief Returns the opacity value. */
-	float GetOpacity() const { return m_opacity; }
+	float GetOpacity() const { return o_opacity; }
 
 	/** @brief Enables or disables stipple (dashed) rendering. */
-	void SetStipple(bool stipple) { m_stipple = stipple; }
+	void SetStipple(bool stipple) { o_stipple = stipple; }
 	/** @brief Returns whether stipple is enabled. */
-	bool GetStipple() const { return m_stipple; }
+	bool GetStipple() const { return o_stipple; }
 
 	/** @brief Enables or disables smooth (anti-aliased) rendering. */
-	void SetSmooth(bool smooth) { m_smooth = smooth; }
+	void SetSmooth(bool smooth) { o_smooth = smooth; }
 	/** @brief Returns whether smooth rendering is enabled. */
-	bool GetSmooth() const { return m_smooth; }
+	bool GetSmooth() const { return o_smooth; }
 
 private:
-	glm::vec4 m_color{1.0f, 1.0f, 1.0f, 1.0f}; ///< Line RGBA color.
-	float m_width{1.0f};                         ///< Line width in pixels.
-	float m_opacity{1.0f};                       ///< Opacity (0-1).
-	bool m_stipple{false};                       ///< Dashed line flag.
-	bool m_smooth{false};                        ///< Anti-aliased line flag.
+	glm::vec4 o_color{1.0f, 1.0f, 1.0f, 1.0f}; ///< Line RGBA color.
+	float o_width{1.0f};                         ///< Line width in pixels.
+	float o_opacity{1.0f};                       ///< Opacity (0-1).
+	bool o_stipple{false};                       ///< Dashed line flag.
+	bool o_smooth{false};                        ///< Anti-aliased line flag.
 
-	std::vector<glm::vec3> m_vertices;           ///< Line segment vertex positions.
+	std::vector<glm::vec3> o_vertices;           ///< Line segment vertex positions.
 };
 
 } // namespace neurus

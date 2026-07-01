@@ -13,7 +13,7 @@
  * - Subclasses own their compute pipeline, push constants, and any pass-
  *   specific UBOs / SSBOs.
  *
- * @note m_descriptorSetLayout is moved in via the constructor — subclasses
+ * @note p_descriptorSetLayout is moved in via the constructor — subclasses
  *       create their own layout via their static CreateDescriptorSetLayout()
  *       factory before calling this constructor.
  */
@@ -76,7 +76,7 @@ public:
 	 * Called every frame before dispatch.  One set per in-flight frame
 	 * prevents updating a set while the GPU is still reading it.
 	 *
-	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).
 	 */
 	virtual void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) = 0;
 
@@ -106,7 +106,7 @@ protected:
 	 * @brief Creates the descriptor pool, allocates descriptor sets, and
 	 *        assigns debug names (in _DEBUG builds).
 	 *
-	 * Called from the constructor body after m_descriptorSetLayout is set.
+	 * Called from the constructor body after p_descriptorSetLayout is set.
 	 *
 	 * @param numSets Number of descriptor sets to allocate.
 	 */
@@ -149,22 +149,22 @@ protected:
 	// -------------------------------------------------------------------
 
 	/// Physical device (non-owning reference, for format / memory queries).
-	const vk::raii::PhysicalDevice* m_physicalDevice = nullptr;
+	const vk::raii::PhysicalDevice* p_physicalDevice = nullptr;
 
 	/// Nearest-neighbour sampler for G-Buffer reads.
-	vk::raii::Sampler m_sampler = nullptr;
+	vk::raii::Sampler p_sampler = nullptr;
 
 	/// Descriptor set layout (moved in from subclass).
-	DescriptorSetLayout m_descriptorSetLayout;
+	DescriptorSetLayout p_descriptorSetLayout;
 
 	/// Descriptor pool (one per pass, sized for numSets).
-	DescriptorPool m_descriptorPool;
+	DescriptorPool p_descriptorPool;
 
 	/// Descriptor sets (one per in-flight frame).
-	std::vector<DescriptorSet> m_descriptorSets;
+	std::vector<DescriptorSet> p_descriptorSets;
 
 	/// Pipeline builder (must outlive the compute pipeline created by subclass).
-	std::unique_ptr<ComputePipelineBuilder> m_pipelineBuilder;
+	std::unique_ptr<ComputePipelineBuilder> p_pipelineBuilder;
 };
 
 // ===================================================================
@@ -176,12 +176,12 @@ inline ComputePass::ComputePass(const vk::raii::Device& device,
                                 DescriptorSetLayout&& descriptorSetLayout,
                                 uint32_t numSets)
 	: Pass()
-	, m_physicalDevice(&physicalDevice)
-	, m_sampler(CreateSampler(device, physicalDevice))
-	, m_descriptorSetLayout(std::move(descriptorSetLayout))
-	, m_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
+	, p_physicalDevice(&physicalDevice)
+	, p_sampler(CreateSampler(device, physicalDevice))
+	, p_descriptorSetLayout(std::move(descriptorSetLayout))
+	, p_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
 {
-	m_device = &device;
+	p_device = &device;
 	CreateDescriptorSets(numSets);
 }
 
@@ -213,16 +213,16 @@ inline vk::raii::Sampler ComputePass::CreateSampler(
 
 inline void ComputePass::CreateDescriptorSets(uint32_t numSets)
 {
-	m_descriptorPool = DescriptorPool(*m_device,
+	p_descriptorPool = DescriptorPool(*p_device,
 	                                  numSets,
-	                                  DescriptorPool::CalculatePoolSizes({&m_descriptorSetLayout}, numSets));
-	m_descriptorSets = m_descriptorPool.Allocate(m_descriptorSetLayout, numSets);
+	                                  DescriptorPool::CalculatePoolSizes({&p_descriptorSetLayout}, numSets));
+	p_descriptorSets = p_descriptorPool.Allocate(p_descriptorSetLayout, numSets);
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
 	{
 		const std::string dsName = "ComputePass_Set" + std::to_string(i);
-		m_descriptorSets[i].SetDebugName(dsName.c_str());
+		p_descriptorSets[i].SetDebugName(dsName.c_str());
 	}
 #endif
 }

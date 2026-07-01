@@ -78,10 +78,10 @@ namespace neurus {
 Application::Application(int argc, char* argv[])
 {
 	// --- Qt Application ---
-	m_qtApp = std::make_unique<QApplication>(argc, argv);
-	m_renderTimer = std::make_unique<QTimer>();
-	m_qtApp->setApplicationName("Neurus");
-	m_qtApp->setApplicationVersion("0.1.0");
+	app_qtApp = std::make_unique<QApplication>(argc, argv);
+	app_renderTimer = std::make_unique<QTimer>();
+	app_qtApp->setApplicationName("Neurus");
+	app_qtApp->setApplicationVersion("0.1.0");
 }
 
 Application::~Application() = default;
@@ -108,15 +108,15 @@ int Application::Run()
 	InitEditor(std::move(project));
 
 	// Wire scene to Property Editor for object property display
-	m_mainWindow->SetScene(&m_editor->GetScene());
-	m_mainWindow->show();
-	ResizeViewport(m_mainWindow->getViewportWidth(), m_mainWindow->getViewportHeight());
+	app_mainWindow->SetScene(&app_editor->GetScene());
+	app_mainWindow->show();
+	ResizeViewport(app_mainWindow->getViewportWidth(), app_mainWindow->getViewportHeight());
 
 	WireSignals();
 	StartRenderLoop();
 
 	NEURUS_LOG("[Application] Entering event loop");
-	int result = m_qtApp->exec();
+	int result = app_qtApp->exec();
 	return result;
 }
 
@@ -132,21 +132,21 @@ bool Application::InitVulkan()
 	{
 		// Step 1: Create VkInstance
 		auto vkInstance = neurus::VulkanContext::CreateInstance();
-		m_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
+		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
 		// Step 2: Create Qt window with VulkanWidget
-		m_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
+		app_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
 		// VulkanWidget is created internally by NeurusMainWindow constructor
 
 		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
-		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, m_mainWindow->getViewportHwnd());
-		m_surface = std::make_unique<vk::raii::SurfaceKHR>(m_vkContext->instance(), surfaceCreateInfo);
+		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, app_mainWindow->getViewportHwnd());
+		app_surface = std::make_unique<vk::raii::SurfaceKHR>(app_vkContext->instance(), surfaceCreateInfo);
 
 		// Step 4: Create logical device
-		m_vkContext->initDevice(*m_surface);
+		app_vkContext->initDevice(*app_surface);
 
-		uiEvents.setGpuName(QString::fromStdString(m_vkContext->gpuName()));
+		uiEvents.setGpuName(QString::fromStdString(app_vkContext->gpuName()));
 	}
 	catch (const std::exception& e)
 	{
@@ -194,10 +194,10 @@ std::unique_ptr<project::Project> Application::LoadProject()
 	{
 		const QString texPath = resolveResourcePath("tex/BAKED.png");
 		auto bakedTex = neurus::Texture::FromFile(
-			m_vkContext->device(),
-			m_vkContext->physicalDevice(),
-			m_vkContext->graphicsQueue(),
-			m_vkContext->graphicsQueueFamily(),
+			app_vkContext->device(),
+			app_vkContext->physicalDevice(),
+			app_vkContext->graphicsQueue(),
+			app_vkContext->graphicsQueueFamily(),
 			texPath.toStdString().c_str(),
 			vk::Format::eR8G8B8A8Srgb);
 
@@ -210,8 +210,8 @@ std::unique_ptr<project::Project> Application::LoadProject()
 	// --- Upload each Mesh object directly to GPU ---
 	for (const auto& [id, mesh] : scene.mesh_list)
 	{
-		mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-		                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
+		mesh->UploadToGPU(app_vkContext->device(), app_vkContext->physicalDevice(),
+		                  app_vkContext->graphicsQueue(), app_vkContext->graphicsQueueFamily());
 	}
 
 	return project;
@@ -225,14 +225,14 @@ bool Application::InitRenderer(const project::Project& project)
 {
 	try
 	{
-		m_renderer = std::make_unique<neurus::DeferredRenderer>(
-			m_vkContext->device(),
-			m_vkContext->physicalDevice(),
-			m_vkContext->graphicsQueue(),
-			m_vkContext->graphicsQueueFamily(),
-			*m_surface,
-			m_mainWindow->getViewportWidth(),
-			m_mainWindow->getViewportHeight()
+		app_renderer = std::make_unique<neurus::DeferredRenderer>(
+			app_vkContext->device(),
+			app_vkContext->physicalDevice(),
+			app_vkContext->graphicsQueue(),
+			app_vkContext->graphicsQueueFamily(),
+			*app_surface,
+			app_mainWindow->getViewportWidth(),
+			app_mainWindow->getViewportHeight()
 		);
 	}
 	catch (const std::exception& e)
@@ -242,15 +242,15 @@ bool Application::InitRenderer(const project::Project& project)
 	}
 
 	// --- Upload scene lights to GPU (via LightingPass) ---
-	m_renderer->UploadLights(project.GetScene());
+	app_renderer->UploadLights(project.GetScene());
 
 	return true;
 }
 
 void Application::ResizeViewport(int width, int height)
 {
-	m_renderer->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-	m_editor->GetProject().GetScene().GetActiveCamera()->ChangeCamRatio(width, height);
+	app_renderer->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+	app_editor->GetProject().GetScene().GetActiveCamera()->ChangeCamRatio(width, height);
 }
 
 // =========================================================================
@@ -260,9 +260,9 @@ void Application::ResizeViewport(int width, int height)
 void Application::InitEditor(std::unique_ptr<project::Project> project)
 {
 	auto& scene = project->GetScene();  // Grab reference before ownership transfer
-	m_editor = std::make_unique<neurus::Editor>(m_vkContext.get(), m_renderer.get());
-	m_editor->SetProject(std::move(project));
-	m_editor->Initialize(scene);
+	app_editor = std::make_unique<neurus::Editor>(app_vkContext.get(), app_renderer.get());
+	app_editor->SetProject(std::move(project));
+	app_editor->Initialize(scene);
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
 }
 
@@ -278,11 +278,11 @@ void Application::WireSignals()
 	// 3-line newFrame pattern: update input → translate to events → draw
 	QObject::connect(&uiEvents, &neurus::UIEvents::newFrame,
 	                 [this]() {
-	                     if (m_renderer && m_editor)
+	                     if (app_renderer && app_editor)
 	                     {
 	                         Input::UpdateState();
-	                         m_editor->Edit(Input::GetInputState());
-	                         try { m_renderer->DrawFrame(m_editor->GetScene()); }
+	                         app_editor->Edit(Input::GetInputState());
+	                         try { app_renderer->DrawFrame(app_editor->GetScene()); }
 	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
 	                     }
 	                 });
@@ -290,7 +290,7 @@ void Application::WireSignals()
 	// Handle VulkanWidget resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
-	QObject::connect(m_mainWindow->getVulkanWidget(), &neurus::VulkanWidget::resized,
+	QObject::connect(app_mainWindow->getVulkanWidget(), &neurus::VulkanWidget::resized,
 	                 [this](int width, int height) {
 	                     ResizeViewport(width, height);
 	                 });
@@ -299,18 +299,18 @@ void Application::WireSignals()
 	// Handle screenshot requests (F12 / menu action) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotRequested,
 	                 [this]() {
-	                     if (m_renderer)
+	                     if (app_renderer)
 	                     {
-	                         m_renderer->TakeScreenshot();
+	                         app_renderer->TakeScreenshot();
 	                     }
 	                 });
 
 	// Handle attachment dump requests (Ctrl+F12) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotAllRequested,
 	                 [this]() {
-	                     if (m_renderer)
+	                     if (app_renderer)
 	                     {
-	                         m_renderer->TakeScreenshotAllAttachments();
+	                         app_renderer->TakeScreenshotAllAttachments();
 	                     }
 	                 });
 }
@@ -321,12 +321,12 @@ void Application::WireSignals()
 
 void Application::StartRenderLoop()
 {
-	m_renderTimer->setInterval(16);  // ~60 FPS
+	app_renderTimer->setInterval(16);  // ~60 FPS
 	auto& uiEvents = neurus::UIEvents::instance();
-	QObject::connect(m_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
+	QObject::connect(app_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
 		emit uiEvents.newFrame();
 	});
-	m_renderTimer->start();
+	app_renderTimer->start();
 }
 
 } // namespace neurus

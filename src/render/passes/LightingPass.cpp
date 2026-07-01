@@ -42,9 +42,9 @@ LightingPass::LightingPass(const vk::raii::Device& device,
                            size_t compSize)
 	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
-	, m_graphicsQueue(graphicsQueue)
-	, m_queueFamilyIndex(queueFamilyIndex)
-	, m_pipeline(CreatePipeline(device, compSpv, compSize))
+	, p_graphicsQueue(graphicsQueue)
+	, p_queueFamilyIndex(queueFamilyIndex)
+	, p_pipeline(CreatePipeline(device, compSpv, compSize))
 {
 	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets
 	           << " qfi=" << queueFamilyIndex);
@@ -59,16 +59,16 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 		const vk::Extent2D fbExtent{4, 4};
 
 		// --- Fallback diffuse irradiance cubemap ---
-		m_fallbackIrradianceCube = std::make_unique<Image>(
-			*m_device, *m_physicalDevice, fbExtent,
+		p_fallbackIrradianceCube = std::make_unique<Image>(
+			*p_device, *p_physicalDevice, fbExtent,
 			vk::Format::eR32G32B32A32Sfloat,
 			cubeUsage, /*mipLevels=*/1,
 			Image::ImageType::eCube,
 			"Lighting_IrradianceFallback");
 
 		// --- Fallback specular prefiltered cubemap ---
-		m_fallbackPrefilteredCube = std::make_unique<Image>(
-			*m_device, *m_physicalDevice, fbExtent,
+		p_fallbackPrefilteredCube = std::make_unique<Image>(
+			*p_device, *p_physicalDevice, fbExtent,
 			vk::Format::eR32G32B32A32Sfloat,
 			cubeUsage, /*mipLevels=*/1,
 			Image::ImageType::eCube,
@@ -79,25 +79,25 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 		{
 			vk::CommandPoolCreateInfo poolCI(
 				vk::CommandPoolCreateFlagBits::eTransient,
-				m_queueFamilyIndex);
-			vk::raii::CommandPool cmdPool(*m_device, poolCI);
+				p_queueFamilyIndex);
+			vk::raii::CommandPool cmdPool(*p_device, poolCI);
 
 			vk::CommandBufferAllocateInfo allocInfo(
 				*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-			vk::raii::CommandBuffers cmdBufs(*m_device, allocInfo);
+			vk::raii::CommandBuffers cmdBufs(*p_device, allocInfo);
 
 			cmdBufs[0].begin(vk::CommandBufferBeginInfo(
 				vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-			Barrier::Transition(*cmdBufs[0], *m_fallbackIrradianceCube, ImageState::ColorShaderRead);
+			Barrier::Transition(*cmdBufs[0], *p_fallbackIrradianceCube, ImageState::ColorShaderRead);
 
-			Barrier::Transition(*cmdBufs[0], *m_fallbackPrefilteredCube, ImageState::ColorShaderRead);
+			Barrier::Transition(*cmdBufs[0], *p_fallbackPrefilteredCube, ImageState::ColorShaderRead);
 
 			cmdBufs[0].end();
 
 			vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-			m_graphicsQueue.submit(submitInfo);
-			m_graphicsQueue.waitIdle();
+			p_graphicsQueue.submit(submitInfo);
+			p_graphicsQueue.waitIdle();
 		}
 
 		// Sampler for fallback cubemaps (maxLod=0 - only mip 0 exists)
@@ -111,7 +111,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 				0.0f, VK_FALSE, 0.0f, VK_FALSE,
 				vk::CompareOp::eAlways, 0.0f, 0.0f,  // minLod=0, maxLod=0
 				vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
-			m_fallbackCubeSampler = vk::raii::Sampler(*m_device, samplerCI);
+			p_fallbackCubeSampler = vk::raii::Sampler(*p_device, samplerCI);
 		}
 
 		NEURUS_LOG("[LightingPass] Created fallback IBL cubemaps (4×4 black)");
@@ -121,7 +121,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	for (uint32_t i = 0; i < numSets; ++i)
 	{
 		const std::string dsName = "LightingPass_Set" + std::to_string(i);
-		m_descriptorSets[i].SetDebugName(dsName.c_str());
+		p_descriptorSets[i].SetDebugName(dsName.c_str());
 	}
 #endif
 }
@@ -174,11 +174,11 @@ void LightingPass::UploadLights(const Scene& scene,
 	}
 
 	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
-	m_lightCount = newCount;
+	p_lightCount = newCount;
 
 	if (newCount == 0)
 	{
-		m_lightSSBO.reset();
+		p_lightSSBO.reset();
 		NEURUS_LOG("[LightingPass] No point lights in scene - SSBO released (PARTIALLY_BOUND)");
 		return;
 	}
@@ -186,12 +186,12 @@ void LightingPass::UploadLights(const Scene& scene,
 	// Create or re-create the SSBO
 	const vk::DeviceSize bufferSize = newCount * sizeof(PointLightGpu);
 
-	m_lightSSBO = std::make_unique<GPUBuffer>(
-		*m_device, *m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
+	p_lightSSBO = std::make_unique<GPUBuffer>(
+		*p_device, *p_physicalDevice, p_graphicsQueue, p_queueFamilyIndex,
 		bufferSize,
 		vk::BufferUsageFlagBits::eStorageBuffer,
 		"LightSSBO");
-	m_lightSSBO->Upload(gpuLights.data(), bufferSize);
+	p_lightSSBO->Upload(gpuLights.data(), bufferSize);
 
 	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " point lights"
 	           << " (" << bufferSize << " bytes)");
@@ -199,12 +199,12 @@ void LightingPass::UploadLights(const Scene& scene,
 
 const GPUBuffer* LightingPass::GetLightSSBO() const
 {
-	return m_lightSSBO ? m_lightSSBO.get() : nullptr;
+	return p_lightSSBO ? p_lightSSBO.get() : nullptr;
 }
 
 uint32_t LightingPass::GetLightCount() const
 {
-	return m_lightCount;
+	return p_lightCount;
 }
 
 void LightingPass::UploadSunLights(const Scene& scene,
@@ -248,11 +248,11 @@ void LightingPass::UploadSunLights(const Scene& scene,
 	}
 
 	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
-	m_sunLightCount = newCount;
+	p_sunLightCount = newCount;
 
 	if (newCount == 0)
 	{
-		m_sunLightSSBO.reset();
+		p_sunLightSSBO.reset();
 		NEURUS_LOG("[LightingPass] No sun lights in scene - SunLight SSBO released (PARTIALLY_BOUND)");
 		return;
 	}
@@ -260,12 +260,12 @@ void LightingPass::UploadSunLights(const Scene& scene,
 	// Create or re-create the SSBO
 	const vk::DeviceSize bufferSize = newCount * sizeof(SunLightGpu);
 
-	m_sunLightSSBO = std::make_unique<GPUBuffer>(
-		*m_device, *m_physicalDevice, m_graphicsQueue, m_queueFamilyIndex,
+	p_sunLightSSBO = std::make_unique<GPUBuffer>(
+		*p_device, *p_physicalDevice, p_graphicsQueue, p_queueFamilyIndex,
 		bufferSize,
 		vk::BufferUsageFlagBits::eStorageBuffer,
 		"SunLightSSBO");
-	m_sunLightSSBO->Upload(gpuLights.data(), bufferSize);
+	p_sunLightSSBO->Upload(gpuLights.data(), bufferSize);
 
 	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " sun lights"
 	           << " (" << bufferSize << " bytes)");
@@ -273,12 +273,12 @@ void LightingPass::UploadSunLights(const Scene& scene,
 
 const GPUBuffer* LightingPass::GetSunLightSSBO() const
 {
-	return m_sunLightSSBO ? m_sunLightSSBO.get() : nullptr;
+	return p_sunLightSSBO ? p_sunLightSSBO.get() : nullptr;
 }
 
 uint32_t LightingPass::GetSunLightCount() const
 {
-	return m_sunLightCount;
+	return p_sunLightCount;
 }
 
 // ---------------------------------------------------------------------------
@@ -352,9 +352,9 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 		sizeof(LightingPushConstants));  // 176 bytes
 
 	// --- Build compute pipeline ---
-	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+	return p_pipelineBuilder->SetShaderStage(compModule, "main")
 		.SetDebugName("LightingPass")
-		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
+		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();
 }
@@ -365,7 +365,7 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 
 void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
-	DescriptorSet& dstSet = m_descriptorSets[setIndex];
+	DescriptorSet& dstSet = p_descriptorSets[setIndex];
 
 	const std::array<AttachmentName, 4> gBufferInputs = {
 		AttachmentName::Position,
@@ -380,7 +380,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		const auto& attachment = cache.GetAttachment(gBufferInputs[i], extent);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,                              // sampler
+			*p_sampler,                              // sampler
 			*attachment.ImageViewHandle(),           // imageView
 			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 		);
@@ -405,24 +405,24 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 
 	// --- Write light SSBO (skipped when no lights, PARTIALLY_BOUND) ---
 	{
-		if (m_lightSSBO)
+		if (p_lightSSBO)
 		{
 			dstSet.WriteBuffer(5, GetLightSSBO()->GetDescriptorInfo(),
 			                   vk::DescriptorType::eStorageBuffer);
 		}
-		// When m_lightSSBO is nullptr, binding 5 is left un-updated.
+		// When p_lightSSBO is nullptr, binding 5 is left un-updated.
 		// PARTIALLY_BOUND flag makes this safe because lightCount=0
 		// guarantees the shader never accesses binding 5.
 	}
 
 	// --- Write sun light SSBO (skipped when no sun lights, PARTIALLY_BOUND) ---
 	{
-		if (m_sunLightSSBO)
+		if (p_sunLightSSBO)
 		{
 			dstSet.WriteBuffer(6, GetSunLightSSBO()->GetDescriptorInfo(),
 			                   vk::DescriptorType::eStorageBuffer);
 		}
-		// When m_sunLightSSBO is nullptr, PARTIALLY_BOUND makes this safe
+		// When p_sunLightSSBO is nullptr, PARTIALLY_BOUND makes this safe
 		// because sunLightCount=0 guarantees the shader never accesses binding 6.
 	}
 
@@ -431,7 +431,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		const auto& ssao = cache.GetAttachment(AttachmentName::SSAO, extent);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,                              // sampler
+			*p_sampler,                              // sampler
 			*ssao.ImageViewHandle(),                 // imageView
 			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 		);
@@ -446,7 +446,7 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		auto& shadowArray = cache.GetShadowIntensityArray(extent);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,
+			*p_sampler,
 			*shadowArray.ImageViewHandle(),           // 2D_ARRAY view
 			vk::ImageLayout::eShaderReadOnlyOptimal);
 
@@ -472,7 +472,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 
 	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from scene Environment or fallback ---
 	{
-		DescriptorSet& dstSet = m_descriptorSets[frameIndex];
+		DescriptorSet& dstSet = p_descriptorSets[frameIndex];
 		const bool hasEnv = (ctx.scene != nullptr && !ctx.scene->env_list.empty());
 
 		if (hasEnv)
@@ -494,8 +494,8 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			{
 				// Diffuse not ready - use fallback
 				vk::DescriptorImageInfo fbInfo(
-					*m_fallbackCubeSampler,
-					*m_fallbackIrradianceCube->ImageViewHandle(),
+					*p_fallbackCubeSampler,
+					*p_fallbackIrradianceCube->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
 				dstSet.WriteImage(8, fbInfo,
 				                  vk::DescriptorType::eCombinedImageSampler);
@@ -514,8 +514,8 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			{
 				// Specular not ready - use fallback
 				vk::DescriptorImageInfo fbInfo(
-					*m_fallbackCubeSampler,
-					*m_fallbackPrefilteredCube->ImageViewHandle(),
+					*p_fallbackCubeSampler,
+					*p_fallbackPrefilteredCube->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
 				dstSet.WriteImage(9, fbInfo,
 				                  vk::DescriptorType::eCombinedImageSampler);
@@ -525,15 +525,15 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		{
 			// No scene or no environment — bind fallback cubemaps
 			vk::DescriptorImageInfo fbIrradInfo(
-				*m_fallbackCubeSampler,
-				*m_fallbackIrradianceCube->ImageViewHandle(),
+				*p_fallbackCubeSampler,
+				*p_fallbackIrradianceCube->ImageViewHandle(),
 				vk::ImageLayout::eShaderReadOnlyOptimal);
 			dstSet.WriteImage(8, fbIrradInfo,
 			                  vk::DescriptorType::eCombinedImageSampler);
 
 			vk::DescriptorImageInfo fbSpecInfo(
-				*m_fallbackCubeSampler,
-				*m_fallbackPrefilteredCube->ImageViewHandle(),
+				*p_fallbackCubeSampler,
+				*p_fallbackPrefilteredCube->ImageViewHandle(),
 				vk::ImageLayout::eShaderReadOnlyOptimal);
 			dstSet.WriteImage(9, fbSpecInfo,
 			                  vk::DescriptorType::eCombinedImageSampler);
@@ -598,20 +598,20 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	}
 
 	// --- 3. Bind compute pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipeline);
 
 	// --- 4. Bind descriptor set ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          *m_pipelineBuilder->pipelineLayout(),
+	                          *p_pipelineBuilder->pipelineLayout(),
 	                          0,                                    // firstSet
-	                          {m_descriptorSets[frameIndex].handle()},
+	                          {p_descriptorSets[frameIndex].handle()},
 	                          {});
 
 	// --- 5. Push constants ---
 	{
 		LightingPushConstants pc = {};
-		pc.lightCount = static_cast<int32_t>(m_lightCount);
-		pc.sunLightCount = static_cast<int32_t>(m_sunLightCount);
+		pc.lightCount = static_cast<int32_t>(p_lightCount);
+		pc.sunLightCount = static_cast<int32_t>(p_sunLightCount);
 		pc.camX = cameraPos.x;
 		pc.camY = cameraPos.y;
 		pc.camZ = cameraPos.z;
@@ -633,7 +633,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 
 		cmdBuf.pushConstants<LightingPushConstants>(
-			*m_pipelineBuilder->pipelineLayout(),
+			*p_pipelineBuilder->pipelineLayout(),
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pc);

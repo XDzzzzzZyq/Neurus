@@ -105,7 +105,9 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(CEREAL_NVP(m_position), CEREAL_NVP(m_rotation), CEREAL_NVP(m_scale));
+		ar(cereal::make_nvp("m_position", o_position),
+		   cereal::make_nvp("m_rotation", o_rotation),
+		   cereal::make_nvp("m_scale", o_scale));
 	}
 
 	/**
@@ -147,19 +149,19 @@ public:
 	 * @brief Returns the current position.
 	 * @return Const reference to the position vector.
 	 */
-	const glm::vec3& GetPosition() const { return m_position; }
+	const glm::vec3& GetPosition() const { return o_position; }
 
 	/**
 	 * @brief Returns the current rotation in degrees.
 	 * @return Const reference to the rotation vector (pitch=X, yaw=Z, roll=Y).
 	 */
-	const glm::vec3& GetRotation() const { return m_rotation; }
+	const glm::vec3& GetRotation() const { return o_rotation; }
 
 	/**
 	 * @brief Returns the current scale.
 	 * @return Const reference to the scale vector.
 	 */
-	const glm::vec3& GetScale() const { return m_scale; }
+	const glm::vec3& GetScale() const { return o_scale; }
 
 	// -----------------------------------------------------------------------
 	// Matrix computation
@@ -199,11 +201,11 @@ public:
 	glm::mat3 GetNormalMatrix() const;
 
 private:
-	glm::vec3 m_position{0.0f};    ///< World position.
-	glm::vec3 m_rotation{0.0f};    ///< Euler rotation in degrees (pitch=X, yaw=Z, roll=Y).
-	glm::vec3 m_scale{1.0f};       ///< Per-axis scale.
+	glm::vec3 o_position{0.0f};    ///< World position.
+	glm::vec3 o_rotation{0.0f};    ///< Euler rotation in degrees (pitch=X, yaw=Z, roll=Y).
+	glm::vec3 o_scale{1.0f};       ///< Per-axis scale.
 
-	glm::mat4 m_modelMatrix{1.0f}; ///< Model matrix, recomputed eagerly on any setter call.
+	glm::mat4 o_modelMatrix{1.0f}; ///< Model matrix, recomputed eagerly on any setter call.
 };
 
 } // namespa

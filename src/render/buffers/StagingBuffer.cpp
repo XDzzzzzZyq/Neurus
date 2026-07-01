@@ -17,8 +17,8 @@ StagingBuffer::StagingBuffer(const vk::raii::Device& device,
                              uint32_t queueFamilyIndex,
                              vk::DeviceSize size,
                              const char* debugName)
-	: m_queue(queue)
-	, m_queueFamilyIndex(queueFamilyIndex)
+	: b_queue(queue)
+	, b_queueFamilyIndex(queueFamilyIndex)
 {
 	createBuffer(device, physicalDevice,
 	             size,
@@ -33,7 +33,7 @@ StagingBuffer::StagingBuffer(const vk::raii::Device& device,
 
 void StagingBuffer::Upload(const void* data, vk::DeviceSize size)
 {
-	if (size > m_size)
+	if (size > b_size)
 	{
 		throw std::runtime_error("StagingBuffer::Upload: data size exceeds buffer capacity.");
 	}
@@ -51,12 +51,12 @@ void StagingBuffer::Upload(const void* data, vk::DeviceSize size)
 
 void* StagingBuffer::Map()
 {
-	return m_memory->mapMemory(0, m_size);
+	return b_memory->mapMemory(0, b_size);
 }
 
 void StagingBuffer::Unmap()
 {
-	m_memory->unmapMemory();
+	b_memory->unmapMemory();
 }
 
 } // namespace neurus

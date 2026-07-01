@@ -48,13 +48,13 @@ public:
 	 * @brief Sets the active scene.
 	 * @param scene Pointer to the scene to activate (non-owning).
 	 */
-	void UseScene(Scene* scene) { m_activeScene = scene; }
+	void UseScene(Scene* scene) { ctx_activeScene = scene; }
 
 	/**
 	 * @brief Returns the active scene.
 	 * @return Const pointer to the active Scene, or nullptr if none set.
 	 */
-	const Scene* GetActiveScene() const { return m_activeScene; }
+	const Scene* GetActiveScene() const { return ctx_activeScene; }
 
 	/**
 	 * @brief Returns the currently active camera.
@@ -77,7 +77,7 @@ public:
 	std::vector<const ObjectID*> GetObjectIDs() const;
 
 private:
-	Scene* m_activeScene = nullptr; ///< Non-owning pointer to active scene
+	Scene* ctx_activeScene = nullptr; ///< Non-owning pointer to active scene
 };
 
 // ===========================================================================
@@ -136,13 +136,13 @@ public:
 	// --- Dirty tracking ---
 
 	/** @brief Marks editor state as modified. */
-	void MarkDirty() { m_dirty = true; }
+	void MarkDirty() { ctx_dirty = true; }
 
 	/** @brief Returns whether editor state has unsaved modifications. */
-	bool IsDirty() const { return m_dirty; }
+	bool IsDirty() const { return ctx_dirty; }
 
 	/** @brief Clears the dirty flag (after save). */
-	void ClearDirty() { m_dirty = false; }
+	void ClearDirty() { ctx_dirty = false; }
 
 signals:
 	/** @brief Emitted when the scene state changes. UI should refresh. */
@@ -153,8 +153,8 @@ signals:
 
 private:
 	friend class Context;
-	SceneContext* m_sceneCtx = nullptr; ///< Back-pointer to owning Context's SceneContext
-	bool m_dirty = false;               ///< Unsaved editor modifications flag
+	SceneContext* ctx_sceneCtx = nullptr; ///< Back-pointer to owning Context's SceneContext
+	bool ctx_dirty = false;               ///< Unsaved editor modifications flag
 };
 
 // ===========================================================================
@@ -177,16 +177,16 @@ public:
 	 * @brief Sets the render configuration to use.
 	 * @param config Non-owning pointer to RenderConfigs.
 	 */
-	void UseConfig(RenderConfigs* config) { m_config = config; }
+	void UseConfig(RenderConfigs* config) { ctx_config = config; }
 
 	/**
 	 * @brief Returns pointer to render configuration.
 	 * @return Non-owning pointer to RenderConfigs, or nullptr if not set.
 	 */
-	RenderConfigs* GetConfig() const { return m_config; }
+	RenderConfigs* GetConfig() const { return ctx_config; }
 
 private:
-	RenderConfigs* m_config = nullptr; ///< Non-owning pointer to render settings
+	RenderConfigs* ctx_config = nullptr; ///< Non-owning pointer to render settings
 };
 
 // ===========================================================================

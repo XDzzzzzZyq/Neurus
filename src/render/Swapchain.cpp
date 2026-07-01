@@ -11,17 +11,17 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
                      const vk::raii::Device& device,
                      const vk::raii::SurfaceKHR& surface,
                      uint32_t width, uint32_t height)
-	: m_physicalDevice(physicalDevice)
-	, m_device(device)
-	, m_surface(surface)
+	: r_physicalDevice(physicalDevice)
+	, r_device(device)
+	, r_surface(surface)
 {
-	m_recreateWidth = width;
-	m_recreateHeight = height;
+	r_recreateWidth = width;
+	r_recreateHeight = height;
 
 	auto surfaceFormat = chooseSurfaceFormat(physicalDevice, surface);
-	m_format = surfaceFormat.format;
+	r_format = surfaceFormat.format;
 	auto presentMode = choosePresentMode(physicalDevice, surface);
-	m_extent = chooseExtent(physicalDevice, surface, width, height);
+	r_extent = chooseExtent(physicalDevice, surface, width, height);
 
 	// --- Get surface capabilities for image count and supported usage ---
 	auto capabilities = physicalDevice.getSurfaceCapabilitiesKHR(*surface);
@@ -36,17 +36,17 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 	// Determine actual image usage: intersect requested usage with surface-supported usage
 	constexpr vk::ImageUsageFlags kRequestedUsage =
 		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
-	m_actualUsage = kRequestedUsage & capabilities.supportedUsageFlags;
+	r_actualUsage = kRequestedUsage & capabilities.supportedUsageFlags;
 
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo(
 		{},
 		*surface,
 		minImageCount,
-		m_format,
+		r_format,
 		vk::ColorSpaceKHR::eSrgbNonlinear,
-		m_extent,
+		r_extent,
 		1,                                  // Single array layer (no stereo rendering)
-		m_actualUsage,
+		r_actualUsage,
 		vk::SharingMode::eExclusive,        // Single queue family for MVP
 		{},
 		capabilities.currentTransform,      // Use surface's actual transform
@@ -56,21 +56,21 @@ Swapchain::Swapchain(const vk::raii::PhysicalDevice& physicalDevice,
 		nullptr                             // old swapchain (null for initial creation)
 	);
 
-	m_swapchain = std::make_unique<vk::raii::SwapchainKHR>(device, swapchainCreateInfo);
+	r_swapchain = std::make_unique<vk::raii::SwapchainKHR>(device, swapchainCreateInfo);
 
 	// --- Store actual values ---
-	m_extent = swapchainCreateInfo.imageExtent;
-	m_imageCount = minImageCount;
+	r_extent = swapchainCreateInfo.imageExtent;
+	r_imageCount = minImageCount;
 
-	NEURUS_LOG("[Swapchain] " << m_extent.width << "x" << m_extent.height
-	          << " format=" << vk::to_string(m_format)
+	NEURUS_LOG("[Swapchain] " << r_extent.width << "x" << r_extent.height
+	          << " format=" << vk::to_string(r_format)
 	          << " present=" << vk::to_string(presentMode)
-	          << " images=" << m_imageCount
-	          << " usage=" << vk::to_string(m_actualUsage));
+	          << " images=" << r_imageCount
+	          << " usage=" << vk::to_string(r_actualUsage));
 
 	// --- Create image views ---
-	m_images = m_swapchain->getImages();
-	m_imageViews = createImageViews(device, *m_swapchain, m_format);
+	r_images = r_swapchain->getImages();
+	r_imageViews = createImageViews(device, *r_swapchain, r_format);
 }
 
 Swapchain::~Swapchain()
@@ -82,16 +82,16 @@ Swapchain::~Swapchain()
 
 void Swapchain::Recreate(uint32_t width, uint32_t height)
 {
-	m_recreateWidth = width;
-	m_recreateHeight = height;
+	r_recreateWidth = width;
+	r_recreateHeight = height;
 
 	// Get new surface capabilities (window may have changed).
 	// Query surface validity BEFORE destroying the old swapchain so that
-	// a lost surface doesn't leave us with a null m_swapchain.
+	// a lost surface doesn't leave us with a null r_swapchain.
 	auto capabilities = vk::SurfaceCapabilitiesKHR{};
 	try
 	{
-		capabilities = m_physicalDevice.getSurfaceCapabilitiesKHR(*m_surface);
+		capabilities = r_physicalDevice.getSurfaceCapabilitiesKHR(*r_surface);
 	}
 	catch (const vk::SurfaceLostKHRError&)
 	{
@@ -108,11 +108,11 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 	}
 
 	// Destroy old resources **after** confirming the surface is still valid
-	m_imageViews.clear();
-	m_swapchain.reset();
+	r_imageViews.clear();
+	r_swapchain.reset();
 
-	m_extent = chooseExtent(m_physicalDevice, m_surface, width, height);
-	auto presentMode = choosePresentMode(m_physicalDevice, m_surface);
+	r_extent = chooseExtent(r_physicalDevice, r_surface, width, height);
+	auto presentMode = choosePresentMode(r_physicalDevice, r_surface);
 
 	uint32_t minImageCount = capabilities.minImageCount + 1;
 	if (capabilities.maxImageCount > 0 && minImageCount > capabilities.maxImageCount)
@@ -123,17 +123,17 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 	// Determine actual image usage: intersect requested usage with surface-supported usage
 	constexpr vk::ImageUsageFlags kRequestedUsage =
 		vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst;
-	m_actualUsage = kRequestedUsage & capabilities.supportedUsageFlags;
+	r_actualUsage = kRequestedUsage & capabilities.supportedUsageFlags;
 
 	vk::SwapchainCreateInfoKHR swapchainCreateInfo(
 		{},
-		*m_surface,
+		*r_surface,
 		minImageCount,
-		m_format,
+		r_format,
 		vk::ColorSpaceKHR::eSrgbNonlinear,
-		m_extent,
+		r_extent,
 		1,
-		m_actualUsage,
+		r_actualUsage,
 		vk::SharingMode::eExclusive,
 		{},
 		vk::SurfaceTransformFlagBitsKHR::eIdentity,
@@ -143,14 +143,14 @@ void Swapchain::Recreate(uint32_t width, uint32_t height)
 		nullptr
 	);
 
-	m_swapchain = std::make_unique<vk::raii::SwapchainKHR>(m_device, swapchainCreateInfo);
-	m_extent = swapchainCreateInfo.imageExtent;
-	m_imageCount = minImageCount;
+	r_swapchain = std::make_unique<vk::raii::SwapchainKHR>(r_device, swapchainCreateInfo);
+	r_extent = swapchainCreateInfo.imageExtent;
+	r_imageCount = minImageCount;
 
-	m_images = m_swapchain->getImages();
-	m_imageViews = createImageViews(m_device, *m_swapchain, m_format);
+	r_images = r_swapchain->getImages();
+	r_imageViews = createImageViews(r_device, *r_swapchain, r_format);
 
-	++m_generation;
+	++r_generation;
 }
 
 uint32_t Swapchain::AcquireNextImage(const vk::raii::Semaphore& signalSemaphore)
@@ -160,13 +160,13 @@ uint32_t Swapchain::AcquireNextImage(const vk::raii::Semaphore& signalSemaphore)
 		// UINT64_MAX disables the timeout - the call blocks until an image is
 		// available. This is safe because waitForFences (in DrawFrame) uses a
 		// finite timeout and processEvents() keeps the Qt event loop responsive.
-		auto [result, imageIndex] = m_swapchain->acquireNextImage(
+		auto [result, imageIndex] = r_swapchain->acquireNextImage(
 			UINT64_MAX, *signalSemaphore, nullptr);
 
 		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
 		{
 			// Swapchain needs recreation (window resized)
-			Recreate(m_recreateWidth, m_recreateHeight);
+			Recreate(r_recreateWidth, r_recreateHeight);
 			return 0;
 		}
 
@@ -180,7 +180,7 @@ uint32_t Swapchain::AcquireNextImage(const vk::raii::Semaphore& signalSemaphore)
 	catch (const vk::OutOfDateKHRError&)
 	{
 		// vk::raii wrapper may throw instead of returning the error result
-		Recreate(m_recreateWidth, m_recreateHeight);
+		Recreate(r_recreateWidth, r_recreateHeight);
 		return 0;
 	}
 	catch (const vk::SurfaceLostKHRError&)
@@ -196,7 +196,7 @@ void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t image
 	{
 		vk::PresentInfoKHR presentInfo(
 			*waitSemaphore,
-			**m_swapchain,
+			**r_swapchain,
 			imageIndex
 		);
 
@@ -204,12 +204,12 @@ void Swapchain::Present(const vk::raii::Semaphore& waitSemaphore, uint32_t image
 
 		if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR)
 		{
-			Recreate(m_recreateWidth, m_recreateHeight);
+			Recreate(r_recreateWidth, r_recreateHeight);
 		}
 	}
 	catch (const vk::OutOfDateKHRError&)
 	{
-		Recreate(m_recreateWidth, m_recreateHeight);
+		Recreate(r_recreateWidth, r_recreateHeight);
 	}
 	catch (const vk::SurfaceLostKHRError&)
 	{

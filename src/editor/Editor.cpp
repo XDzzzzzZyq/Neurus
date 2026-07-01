@@ -43,31 +43,31 @@ static QString resolveResourcePath(const char* relativePath)
 namespace neurus {
 
 Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer)
-	: m_vkContext(vkCtx)
-	, m_renderer(renderer)
+	: ed_vkContext(vkCtx)
+	, ed_renderer(renderer)
 {
 }
 
 void Editor::SetProject(std::unique_ptr<neurus::project::Project> project)
 {
-	m_project = std::move(project);
+	ed_project = std::move(project);
 }
 
 Editor::~Editor()
 {
 	// Destroy in order: Context (references scene) → Project (owns scene)
-	m_context.reset();
-	m_project.reset();
+	ed_context.reset();
+	ed_project.reset();
 }
 
 void Editor::Initialize(Scene& scene)
 {
 	// Store the scene reference for OnIBLLoad and other operations
-	m_ownerScene = &scene;
+	ed_ownerScene = &scene;
 
 	// Create Context with EventQueue singleton
-	m_context = std::make_unique<Context>(EventQueue());
-	m_context->editor.SetScene(&scene);
+	ed_context = std::make_unique<Context>(EventQueue());
+	ed_context->editor.SetScene(&scene);
 
 	// --- Wire project file signal handlers ---
 	auto& uiEvents = neurus::UIEvents::instance();
@@ -130,12 +130,12 @@ void Editor::Initialize(Scene& scene)
 
 Scene& Editor::GetScene()
 {
-	return m_project->GetScene();
+	return ed_project->GetScene();
 }
 
 neurus::project::Project& Editor::GetProject()
 {
-	return *m_project;
+	return *ed_project;
 }
 
 // --- Project signal handlers ---
@@ -145,33 +145,33 @@ void Editor::OnProjectNew()
 	try
 	{
 		// Drain GPU work before destroying the old project's GPU resources.
-		if (m_renderer)
+		if (ed_renderer)
 		{
-			m_renderer->WaitIdle();
+			ed_renderer->WaitIdle();
 		}
 
-		m_project = std::make_unique<neurus::project::Project>(
+		ed_project = std::make_unique<neurus::project::Project>(
 			neurus::project::Project::New());
 		NEURUS_LOG("[Editor] Created new project.");
 
 		// Update owner scene pointer
-		auto& projectScene = m_project->GetScene();
-		m_ownerScene = &projectScene;
+		auto& projectScene = ed_project->GetScene();
+		ed_ownerScene = &projectScene;
 
 		// Upload scene data to GPU
 		for (const auto& [id, mesh] : projectScene.mesh_list)
 		{
-			mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-			                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
+			mesh->UploadToGPU(ed_vkContext->device(), ed_vkContext->physicalDevice(),
+			                  ed_vkContext->graphicsQueue(), ed_vkContext->graphicsQueueFamily());
 		}
-		if (m_renderer)
+		if (ed_renderer)
 		{
-			m_renderer->UploadLights(projectScene);
+			ed_renderer->UploadLights(projectScene);
 		}
 
-		if (m_context)
+		if (ed_context)
 		{
-			m_context->editor.SetScene(&projectScene);
+			ed_context->editor.SetScene(&projectScene);
 		}
 
 		// Generate IBL for the new environment
@@ -188,34 +188,34 @@ void Editor::OnProjectOpen(const QString& path)
 	try
 	{
 		// Drain any GPU work referencing the old project's resources.
-		if (m_renderer)
+		if (ed_renderer)
 		{
-			m_renderer->WaitIdle();
+			ed_renderer->WaitIdle();
 		}
 
-		m_project = std::make_unique<neurus::project::Project>(
+		ed_project = std::make_unique<neurus::project::Project>(
 			neurus::project::Project::Open(path.toStdString(),
 			                               resolveResourcePath("").toStdString()));
 		NEURUS_LOG("[Editor] Opened project: " << path.toStdString());
 
 		// Update owner scene pointer to the new project's scene
-		auto& projectScene = m_project->GetScene();
-		m_ownerScene = &projectScene;
+		auto& projectScene = ed_project->GetScene();
+		ed_ownerScene = &projectScene;
 
 		// Re-upload scene data to GPU
 		for (const auto& [id, mesh] : projectScene.mesh_list)
 		{
-			mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-			                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
+			mesh->UploadToGPU(ed_vkContext->device(), ed_vkContext->physicalDevice(),
+			                  ed_vkContext->graphicsQueue(), ed_vkContext->graphicsQueueFamily());
 		}
-		if (m_renderer)
+		if (ed_renderer)
 		{
-			m_renderer->UploadLights(projectScene);
+			ed_renderer->UploadLights(projectScene);
 		}
 
-		if (m_context)
+		if (ed_context)
 		{
-			m_context->editor.SetScene(&projectScene);
+			ed_context->editor.SetScene(&projectScene);
 		}
 
 		// Regenerate IBL for the new environment (BuildIBLTextures, load HDR,
@@ -230,18 +230,18 @@ void Editor::OnProjectOpen(const QString& path)
 
 void Editor::OnProjectSave()
 {
-	if (m_project)
+	if (ed_project)
 	{
-		try { m_project->Save(); }
+		try { ed_project->Save(); }
 		catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 	}
 }
 
 void Editor::OnProjectSaveAs(const QString& path)
 {
-	if (m_project)
+	if (ed_project)
 	{
-		try { m_project->Save(path.toStdString()); }
+		try { ed_project->Save(path.toStdString()); }
 		catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 	}
 }
@@ -252,10 +252,10 @@ void Editor::OnMeshImport(const QString& path)
 {
 	try {
 		auto mesh = std::make_shared<neurus::Mesh>(path.toStdString());
-		mesh->UploadToGPU(m_vkContext->device(), m_vkContext->physicalDevice(),
-		                  m_vkContext->graphicsQueue(), m_vkContext->graphicsQueueFamily());
-		m_project->GetScene().UseMesh(mesh);
-		m_project->MarkDirty();
+		mesh->UploadToGPU(ed_vkContext->device(), ed_vkContext->physicalDevice(),
+		                  ed_vkContext->graphicsQueue(), ed_vkContext->graphicsQueueFamily());
+		ed_project->GetScene().UseMesh(mesh);
+		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Imported mesh: " << path.toStdString());
 	}
 	catch (const std::exception& e) {
@@ -269,8 +269,8 @@ void Editor::OnCameraAdd()
 		auto camera = std::make_shared<neurus::Camera>();
 		camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-		m_project->GetScene().UseCamera(camera);
-		m_project->MarkDirty();
+		ed_project->GetScene().UseCamera(camera);
+		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Added camera at (0, -5, 2)");
 	}
 	catch (const std::exception& e) {
@@ -285,12 +285,12 @@ void Editor::OnLightAdd()
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.05f);
-		m_project->GetScene().UseLight(light);
-		if (m_renderer)
+		ed_project->GetScene().UseLight(light);
+		if (ed_renderer)
 		{
-			m_renderer->UploadLights(m_project->GetScene());
+			ed_renderer->UploadLights(ed_project->GetScene());
 		}
-		m_project->MarkDirty();
+		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Added point light at (3, 3, 3)");
 	}
 	catch (const std::exception& e) {
@@ -306,12 +306,12 @@ void Editor::OnSunLightAdd()
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->use_shadow = true;
-		m_project->GetScene().UseLight(light);
-		if (m_renderer)
+		ed_project->GetScene().UseLight(light);
+		if (ed_renderer)
 		{
-			m_renderer->UploadLights(m_project->GetScene());
+			ed_renderer->UploadLights(ed_project->GetScene());
 		}
-		m_project->MarkDirty();
+		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
 	}
 	catch (const std::exception& e) {
@@ -325,7 +325,7 @@ void Editor::OnScreenshotAllRequested() { NEURUS_LOG("[Editor] OnScreenshotAllRe
 
 void Editor::OnIBLLoad()
 {
-	Scene* scene = m_ownerScene;
+	Scene* scene = ed_ownerScene;
 	if (!scene)
 	{
 		NEURUS_ERR("[Editor] OnIBLLoad: no scene available");
@@ -360,16 +360,16 @@ void Editor::OnIBLLoad()
 
 void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 {
-	if (!m_vkContext || !m_renderer)
+	if (!ed_vkContext || !ed_renderer)
 	{
 		NEURUS_ERR("[Editor] GenerateIBL: VulkanContext or Renderer not available");
 		return;
 	}
 
-	auto& device = m_vkContext->device();
-	auto& pd = m_vkContext->physicalDevice();
-	auto queue = m_vkContext->graphicsQueue();
-	uint32_t qfi = m_vkContext->graphicsQueueFamily();
+	auto& device = ed_vkContext->device();
+	auto& pd = ed_vkContext->physicalDevice();
+	auto queue = ed_vkContext->graphicsQueue();
+	uint32_t qfi = ed_vkContext->graphicsQueueFamily();
 
 	// Ensure cubemaps exist (lazily created on first call)
 	env->BuildIBLTextures(device, pd);
@@ -383,7 +383,7 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 	}
 
 	// Generate IBL into cubemaps via DeferredRenderer wrapper (respects layer isolation)
-	m_renderer->GenerateIBL(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
+	ed_renderer->GenerateIBL(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
 }

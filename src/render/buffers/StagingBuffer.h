@@ -73,14 +73,14 @@ public:
 	void Unmap() override;
 
 	/** @brief Borrowed queue reference (for consumers submitting transfers). */
-	vk::Queue queue() const { return m_queue; }
+	vk::Queue queue() const { return b_queue; }
 
 	/** @brief Queue family index (for consumers creating command pools). */
-	uint32_t queueFamilyIndex() const { return m_queueFamilyIndex; }
+	uint32_t queueFamilyIndex() const { return b_queueFamilyIndex; }
 
 private:
-	vk::Queue m_queue = nullptr;
-	uint32_t m_queueFamilyIndex = 0;
+	vk::Queue b_queue = nullptr;
+	uint32_t b_queueFamilyIndex = 0;
 };
 
 } // namespace neurus

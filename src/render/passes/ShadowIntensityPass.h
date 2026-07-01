@@ -107,7 +107,7 @@ public:
 	 *   1: Shadow depth cubemap (combined image sampler, samplerCube)
 	 *   2: Shadow intensity output (storage image, R8_UNORM)
 	 *
-	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).
 	 */
 	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 
@@ -167,32 +167,32 @@ private:
 	 * @brief Writes sun descriptors (gPosition + 2D shadow map + output)
 	 *        into the specified sun descriptor set.
 	 *
-	 * @param setIndex  Index into m_sunDescSets (0 … numSets-1).
+	 * @param setIndex  Index into p_sunDescSets (0 … numSets-1).
 	 * @param extent    Render extent for attachment lookup.
 	 * @param cache     Render cache for shadow map / output access.
 	 */
 	void WriteSunDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache);
 
 	// --- Point-light cubemap pipeline ---
-	vk::raii::Pipeline m_pipeline;
+	vk::raii::Pipeline p_pipeline;
 
 	// --- Sun-light 2D pipeline ---
-	DescriptorSetLayout m_sunDescSetLayout;                       ///< Sun descriptor set layout (sampler2D at binding 1)
-	vk::raii::Pipeline  m_sunPipeline = nullptr;                  ///< Sun compute pipeline (sun_shadow_eval.comp)
-	std::unique_ptr<ComputePipelineBuilder> m_sunPipelineBuilder; ///< Builder owning the sun pipeline layout
-	vk::raii::Sampler   m_sunShadowSampler = nullptr;             ///< Sampler for sun shadow map (clamp-to-border, black)
-	DescriptorPool      m_sunDescPool;                            ///< Descriptor pool for sun descriptor sets
-	std::vector<DescriptorSet> m_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)
+	DescriptorSetLayout p_sunDescSetLayout;                       ///< Sun descriptor set layout (sampler2D at binding 1)
+	vk::raii::Pipeline  p_sunPipeline = nullptr;                  ///< Sun compute pipeline (sun_shadow_eval.comp)
+	std::unique_ptr<ComputePipelineBuilder> p_sunPipelineBuilder; ///< Builder owning the sun pipeline layout
+	vk::raii::Sampler   p_sunShadowSampler = nullptr;             ///< Sampler for sun shadow map (clamp-to-border, black)
+	DescriptorPool      p_sunDescPool;                            ///< Descriptor pool for sun descriptor sets
+	std::vector<DescriptorSet> p_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)
 
 	// --- Push constant values ---
-	float m_bias = 0.0005f; ///< Depth bias for shadow acne prevention
+	float p_bias = 0.0005f; ///< Depth bias for shadow acne prevention
 
 	/// Two descriptor sets per in-flight frame slot so the per-light loop
 	/// can alternate between them without updating a currently-bound set.
 	static constexpr uint32_t kSetsPerFrameSlot = 2;
 
 	// --- Current light UID (set before WriteDescriptors) ---
-	int32_t m_currentLightUID = -1;
+	int32_t p_currentLightUID = -1;
 };
 
 } // namespace neurus

@@ -187,7 +187,7 @@ Texture Texture::ForAttachment(const vk::raii::Device& device,
 
 	try
 	{
-		tex.m_image = std::make_unique<Image>(
+		tex.tex_image = std::make_unique<Image>(
 			device, physicalDevice,
 			extent, format, usage,
 			/*mipLevels=*/1,
@@ -196,7 +196,7 @@ Texture Texture::ForAttachment(const vk::raii::Device& device,
 		// Create sampler only if the image will be sampled
 		if (usage & vk::ImageUsageFlagBits::eSampled)
 		{
-			tex.m_sampler = createSampler(device, config, 1);
+			tex.tex_sampler = createSampler(device, config, 1);
 		}
 	}
 	catch (const std::exception& e)
@@ -220,8 +220,8 @@ Texture Texture::FromImage(std::unique_ptr<Image> image, vk::raii::Sampler sampl
 	}
 
 	Texture tex;
-	tex.m_image = std::move(image);
-	tex.m_sampler = std::move(sampler);
+	tex.tex_image = std::move(image);
+	tex.tex_sampler = std::move(sampler);
 	return tex;
 }
 
@@ -254,7 +254,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		                                  | vk::ImageUsageFlagBits::eTransferSrc
 		                                  | vk::ImageUsageFlagBits::eSampled;
 
-		tex.m_image = std::make_unique<Image>(
+		tex.tex_image = std::make_unique<Image>(
 			device, physicalDevice,
 			vk::Extent2D{width, height}, format, usage,
 			mipLevels,
@@ -282,7 +282,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		cmdBufs[0].begin(beginInfo);
 
 		// --- 4. Transition all levels: UNDEFINED → TRANSFER_DST ---
-		Barrier::Transition(*cmdBufs[0], *tex.m_image, ImageState::TransferDst);
+		Barrier::Transition(*cmdBufs[0], *tex.tex_image, ImageState::TransferDst);
 
 		// --- 5. Copy staging buffer → image (level 0 only) ---
 		const vk::BufferImageCopy copyRegion(
@@ -295,7 +295,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 
 		cmdBufs[0].copyBufferToImage(
 			stagingBuffer.buffer(),
-			tex.m_image->ImageHandle(),
+			tex.tex_image->ImageHandle(),
 			vk::ImageLayout::eTransferDstOptimal,
 			{ copyRegion });
 
@@ -304,12 +304,12 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		// which they are after step 4.
 		if (generateMipmaps && mipLevels > 1)
 		{
-			tex.m_image->GenerateMipmaps(cmdBufs[0]);
+			tex.tex_image->GenerateMipmaps(cmdBufs[0]);
 		}
 		else
 		{
 			// Single mip level: transition directly to SHADER_READ_ONLY
-			Barrier::Transition(*cmdBufs[0], *tex.m_image, ImageState::ColorShaderRead);
+			Barrier::Transition(*cmdBufs[0], *tex.tex_image, ImageState::ColorShaderRead);
 		}
 
 		cmdBufs[0].end();
@@ -320,7 +320,7 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 		queue.waitIdle();
 
 		// --- 8. Create sampler ---
-		tex.m_sampler = createSampler(device, config, mipLevels);
+		tex.tex_sampler = createSampler(device, config, mipLevels);
 	}
 	catch (const std::exception& e)
 	{

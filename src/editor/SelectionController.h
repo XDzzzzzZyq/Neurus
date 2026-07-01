@@ -153,10 +153,10 @@ public:
 
 private:
 	/// Selected object IDs, ordered by insertion.
-	std::set<int> m_selection;
+	std::set<int> sel_selection;
 
 	/// Active (last selected) object ID, -1 if no selection.
-	int m_activeId = -1;
+	int sel_activeId = -1;
 
 	// --- Internal helpers ---
 

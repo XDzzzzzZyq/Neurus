@@ -132,7 +132,7 @@ public:
 	/**
 	 * @brief Returns the camera descriptor set layout (set 0).
 	 */
-	const DescriptorSetLayout& GetCameraLayout() const { return m_cameraLayout; }
+	const DescriptorSetLayout& GetCameraLayout() const { return p_cameraLayout; }
 
 private:
 	/**
@@ -142,7 +142,7 @@ private:
 
 	/**
 	 * @brief Creates the graphics pipeline using PipelineBuilder.
-	 * Sets m_pipelineLayout as a side effect.
+	 * Sets p_pipelineLayout as a side effect.
 	 */
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
 	                                  const uint32_t* vertSpv,
@@ -151,24 +151,24 @@ private:
 	                                  size_t fragSize);
 
 	// --- References (non-owning) ---
-	const vk::raii::PhysicalDevice* m_physicalDevice;
+	const vk::raii::PhysicalDevice* p_physicalDevice;
 
 	// --- Descriptor resources ---
-	DescriptorSetLayout m_cameraLayout;             ///< Set 0 layout definition
+	DescriptorSetLayout p_cameraLayout;             ///< Set 0 layout definition
 
 	// --- Camera UBO (host-visible for per-frame update) ---
-	UniformBuffer<CameraUBOData> m_cameraUBO;
+	UniformBuffer<CameraUBOData> p_cameraUBO;
 
 	// --- Descriptor pool + set for camera UBO ---
-	DescriptorPool m_descriptorPool;
-	DescriptorSet m_cameraDescriptorSet;
+	DescriptorPool p_descriptorPool;
+	DescriptorSet p_cameraDescriptorSet;
 
 	// --- Pipeline ---
-	vk::raii::PipelineLayout m_pipelineLayout;
-	vk::raii::Pipeline m_pipeline;
+	vk::raii::PipelineLayout p_pipelineLayout;
+	vk::raii::Pipeline p_pipeline;
 
 	// --- Vertex input layout ---
-	BufferLayout m_vertexLayout;
+	BufferLayout p_vertexLayout;
 
 	// --- Dynamic rendering (G_BUFFER-specific) ---
 	void BeginPass(vk::CommandBuffer cmdBuf,

@@ -44,16 +44,16 @@ IBLPass::IBLPass(const vk::raii::Device& device,
                  const uint32_t* specularSpv,
                  size_t specularSize)
 	: ComputePass(device, physicalDevice, IBLPass::CreateDescriptorSetLayout(device), 1)
-	, m_graphicsQueue(graphicsQueue)
-	, m_queueFamilyIndex(queueFamilyIndex)
+	, p_graphicsQueue(graphicsQueue)
+	, p_queueFamilyIndex(queueFamilyIndex)
 	// --- Pipeline builders (must outlive pipelines) ---
-	, m_irradiancePipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
-	, m_irradiancePipeline(CreatePipeline(device, irradianceSpv, irradianceSize,
-	                                       m_irradiancePipelineBuilder,
+	, p_irradiancePipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
+	, p_irradiancePipeline(CreatePipeline(device, irradianceSpv, irradianceSize,
+	                                       p_irradiancePipelineBuilder,
 	                                       "IBLPass::Irradiance"))
-	, m_specularPipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
-	, m_specularPipeline(CreatePipeline(device, specularSpv, specularSize,
-	                                     m_specularPipelineBuilder,
+	, p_specularPipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
+	, p_specularPipeline(CreatePipeline(device, specularSpv, specularSize,
+	                                     p_specularPipelineBuilder,
 	                                     "IBLPass::Specular"))
 {
 	NEURUS_LOG("[IBLPass] irradianceSize=" << irradianceSize
@@ -73,7 +73,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 	           << equirectImage.Extent().width << "x" << equirectImage.Extent().height);
 
 	// --- Create local equirect sampler ---
-	vk::raii::Sampler equirectSampler = CreateEquirectSampler(*m_device);
+	vk::raii::Sampler equirectSampler = CreateEquirectSampler(*p_device);
 
 	// --- Create per-mip ImageViews for specular cubemap ---
 	std::vector<vk::raii::ImageView> specularMipViews;
@@ -95,7 +95,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 			vk::ComponentMapping(),
 			subresourceRange);
 
-		specularMipViews.push_back(vk::raii::ImageView(*m_device, viewCI));
+		specularMipViews.push_back(vk::raii::ImageView(*p_device, viewCI));
 	}
 
 	// --- Create 2D_ARRAY view for diffuse cubemap (shader expects image2DArray) ---
@@ -110,16 +110,16 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		vk::Format::eR32G32B32A32Sfloat,
 		vk::ComponentMapping(),
 		diffSubresource);
-	vk::raii::ImageView diffArrayView(*m_device, diffViewCI);
+	vk::raii::ImageView diffArrayView(*p_device, diffViewCI);
 
 	// --- Create transient command pool ---
 	const vk::CommandPoolCreateInfo poolCI(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, m_queueFamilyIndex);
-	vk::raii::CommandPool cmdPool(*m_device, poolCI);
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, p_queueFamilyIndex);
+	vk::raii::CommandPool cmdPool(*p_device, poolCI);
 
 	const vk::CommandBufferAllocateInfo allocInfo(
 		*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-	vk::raii::CommandBuffers cmdBufs(*m_device, allocInfo);
+	vk::raii::CommandBuffers cmdBufs(*p_device, allocInfo);
 
 	// ===================================================================
 	// Pass 1: Diffuse irradiance convolution (1 dispatch)
@@ -147,8 +147,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		const uint32_t groupsZ = 6;  // 6 faces
 
 		dispatchCompute(cmdBufs[0],
-		                m_irradiancePipeline,
-		                *m_irradiancePipelineBuilder->pipelineLayout(),
+		                p_irradiancePipeline,
+		                *p_irradiancePipelineBuilder->pipelineLayout(),
 		                groupsX, groupsY, groupsZ,
 		                /*mipLevel=*/0,
 		                kDefaultIrradianceSteps,
@@ -159,8 +159,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-		m_graphicsQueue.submit(submitInfo);
-		m_graphicsQueue.waitIdle();
+		p_graphicsQueue.submit(submitInfo);
+		p_graphicsQueue.waitIdle();
 
 		NEURUS_LOG("[IBLPass] Diffuse irradiance convolution complete");
 	}
@@ -191,8 +191,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		const uint32_t groupsZ = 6;
 
 		dispatchCompute(cmdBufs[0],
-		                m_specularPipeline,
-		                *m_specularPipelineBuilder->pipelineLayout(),
+		                p_specularPipeline,
+		                *p_specularPipelineBuilder->pipelineLayout(),
 		                groupsX, groupsY, groupsZ,
 		                static_cast<int32_t>(mip),
 		                kDefaultSpecularSteps,
@@ -219,8 +219,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-		m_graphicsQueue.submit(submitInfo);
-		m_graphicsQueue.waitIdle();
+		p_graphicsQueue.submit(submitInfo);
+		p_graphicsQueue.waitIdle();
 	}
 
 	// --- Final: transition cubemaps to SHADER_READ_ONLY_OPTIMAL ---
@@ -236,8 +236,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-		m_graphicsQueue.submit(submitInfo);
-		m_graphicsQueue.waitIdle();
+		p_graphicsQueue.submit(submitInfo);
+		p_graphicsQueue.waitIdle();
 	}
 
 	NEURUS_LOG("[IBLPass] IBL generation complete - diffuse "
@@ -311,7 +311,7 @@ vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
 
 	return outBuilder->SetShaderStage(compModule, "main")
 		.SetDebugName(debugName)
-		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
+		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();
 }
@@ -324,7 +324,7 @@ void IBLPass::WriteDescriptors(const Image& equirectImage,
                                const vk::raii::Sampler& equirectSampler,
                                const vk::raii::ImageView& outputView)
 {
-	auto& dstSet = m_descriptorSets[0];
+	auto& dstSet = p_descriptorSets[0];
 
 	// --- Binding 0: equirect input (combined image sampler) ---
 	{
@@ -368,7 +368,7 @@ void IBLPass::dispatchCompute(vk::CommandBuffer cmdBuf,
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
 	                          pipelineLayout,
 	                          0,
-	                          {m_descriptorSets[0].handle()},
+	                          {p_descriptorSets[0].handle()},
 	                          {});
 
 	IBLPushConstants pc = {};

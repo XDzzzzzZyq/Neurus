@@ -89,10 +89,10 @@ public:
 		vk::DeviceSize range = VK_WHOLE_SIZE) const;
 
 	/** @brief Returns the underlying vk::Buffer handle. */
-	vk::Buffer buffer() const { return *m_buffer; }
+	vk::Buffer buffer() const { return *b_buffer; }
 
 	/** @brief Returns the buffer size in bytes. */
-	vk::DeviceSize size() const { return m_size; }
+	vk::DeviceSize size() const { return b_size; }
 
 protected:
 	/**
@@ -105,7 +105,7 @@ protected:
 	 *        memory, and optionally sets debug names.
 	 *
 	 * Called by derived-class constructors. On failure, throws
-	 * std::runtime_error. On success, m_buffer, m_memory, and m_bufferRaw
+	 * std::runtime_error. On success, b_buffer, b_memory, and b_bufferRaw
 	 * are valid and ready for use.
 	 *
 	 * @param device          Borrowed logical device (must outlive this buffer).
@@ -123,15 +123,15 @@ protected:
 	                  const char* debugName = nullptr);
 
 	// --- Borrowed references (must outlive this object) ---
-	const vk::raii::Device* m_device = nullptr;
-	const vk::raii::PhysicalDevice* m_physicalDevice = nullptr;
+	const vk::raii::Device* b_device = nullptr;
+	const vk::raii::PhysicalDevice* b_physicalDevice = nullptr;
 
-	std::unique_ptr<vk::raii::Buffer> m_buffer;
-	std::unique_ptr<vk::raii::DeviceMemory> m_memory;
-	vk::DeviceSize m_size = 0;
-	vk::BufferUsageFlags m_usageFlags;
-	vk::MemoryPropertyFlags m_memoryProperties;
-	std::string m_debugName;
+	std::unique_ptr<vk::raii::Buffer> b_buffer;
+	std::unique_ptr<vk::raii::DeviceMemory> b_memory;
+	vk::DeviceSize b_size = 0;
+	vk::BufferUsageFlags b_usageFlags;
+	vk::MemoryPropertyFlags b_memoryProperties;
+	std::string b_debugName;
 };
 
 } // namespace neurus

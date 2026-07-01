@@ -115,25 +115,25 @@ public:
 	 */
 	const vk::raii::PipelineLayout& pipelineLayout() const
 	{
-		return *m_pipelineLayout;
+		return *p_pipelineLayout;
 	}
 
 private:
-	const vk::raii::Device& m_device;
+	const vk::raii::Device& p_device;
 
 	// Compute shader stage info - stored before BuildComputePipeline() is called
-	vk::PipelineShaderStageCreateInfo m_stageInfo = {};
-	bool m_stageSet = false;
+	vk::PipelineShaderStageCreateInfo p_stageInfo = {};
+	bool p_stageSet = false;
 
 	// Pipeline layout components
-	std::vector<vk::DescriptorSetLayout> m_descriptorSetLayouts;
-	std::vector<vk::PushConstantRange> m_pushConstantRanges;
+	std::vector<vk::DescriptorSetLayout> p_descriptorSetLayouts;
+	std::vector<vk::PushConstantRange> p_pushConstantRanges;
 
 	// Owned pipeline layout - created in BuildComputePipeline()
-	std::unique_ptr<vk::raii::PipelineLayout> m_pipelineLayout;
+	std::unique_ptr<vk::raii::PipelineLayout> p_pipelineLayout;
 
 	// --- Debug ---
-	std::string m_debugName;
+	std::string p_debugName;
 };
 
 } // namespace neurus

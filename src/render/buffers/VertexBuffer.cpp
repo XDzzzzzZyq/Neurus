@@ -26,8 +26,8 @@ VertexBuffer::VertexBuffer(const vk::raii::Device& device,
 	            size,
 	            vk::BufferUsageFlagBits::eVertexBuffer,
 	            debugName)
-	, m_vertexCount(vertexCount)
-	, m_stride(stride)
+	, b_vertexCount(vertexCount)
+	, b_stride(stride)
 {
 	if (data == nullptr && size > 0)
 	{

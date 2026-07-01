@@ -15,10 +15,10 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBinding(
 	vk::ShaderStageFlags stageFlags,
 	uint32_t count)
 {
-	m_bindings.push_back(
+	desc_bindings.push_back(
 		vk::DescriptorSetLayoutBinding(binding, type, count, stageFlags));
-	// Push a zero-flag entry to keep m_bindingFlags aligned with m_bindings
-	m_bindingFlags.push_back(vk::DescriptorBindingFlags{});
+	// Push a zero-flag entry to keep desc_bindingFlags aligned with desc_bindings
+	desc_bindingFlags.push_back(vk::DescriptorBindingFlags{});
 	return *this;
 }
 
@@ -29,23 +29,23 @@ DescriptorSetLayoutBuilder& DescriptorSetLayoutBuilder::AddBindingWithFlags(
 	vk::DescriptorBindingFlags flags,
 	uint32_t count)
 {
-	m_bindings.push_back(
+	desc_bindings.push_back(
 		vk::DescriptorSetLayoutBinding(binding, type, count, stageFlags));
-	m_bindingFlags.push_back(flags);
+	desc_bindingFlags.push_back(flags);
 	return *this;
 }
 
 std::vector<vk::DescriptorSetLayoutBinding> DescriptorSetLayoutBuilder::Build()
 {
-	m_bindingFlags.clear();
-	return std::move(m_bindings);
+	desc_bindingFlags.clear();
+	return std::move(desc_bindings);
 }
 
 DescriptorSetLayout DescriptorSetLayoutBuilder::Build(const vk::raii::Device& device)
 {
 	// Check if any binding has non-zero flags
 	bool hasFlags = false;
-	for (auto f : m_bindingFlags)
+	for (auto f : desc_bindingFlags)
 	{
 		if (f != vk::DescriptorBindingFlags{})
 		{
@@ -56,11 +56,11 @@ DescriptorSetLayout DescriptorSetLayoutBuilder::Build(const vk::raii::Device& de
 
 	if (hasFlags)
 	{
-		return DescriptorSetLayout(device, std::move(m_bindings), std::move(m_bindingFlags));
+		return DescriptorSetLayout(device, std::move(desc_bindings), std::move(desc_bindingFlags));
 	}
 	else
 	{
-		return DescriptorSetLayout(device, std::move(m_bindings));
+		return DescriptorSetLayout(device, std::move(desc_bindings));
 	}
 }
 
@@ -76,18 +76,18 @@ DescriptorSetLayoutBuilder BuildLayout()
 DescriptorSetLayout::DescriptorSetLayout(
 	const vk::raii::Device& device,
 	const std::vector<vk::DescriptorSetLayoutBinding>& bindings)
-	: m_bindings(bindings)
+	: desc_bindings(bindings)
 {
 	vk::DescriptorSetLayoutCreateInfo createInfo(
 		vk::DescriptorSetLayoutCreateFlags{}, bindings);
-	m_layout = vk::raii::DescriptorSetLayout(device, createInfo);
+	desc_layout = vk::raii::DescriptorSetLayout(device, createInfo);
 }
 
 DescriptorSetLayout::DescriptorSetLayout(
 	const vk::raii::Device& device,
 	const std::vector<vk::DescriptorSetLayoutBinding>& bindings,
 	const std::vector<vk::DescriptorBindingFlags>& bindingFlags)
-	: m_bindings(bindings)
+	: desc_bindings(bindings)
 {
 	assert(bindings.size() == bindingFlags.size()
 	       && "Binding flags vector must match bindings vector size");
@@ -111,7 +111,7 @@ DescriptorSetLayout::DescriptorSetLayout(
 	vk::DescriptorSetLayoutCreateInfo createInfo(layoutFlags, bindings);
 	createInfo.pNext = &flagsInfo;
 
-	m_layout = vk::raii::DescriptorSetLayout(device, createInfo);
+	desc_layout = vk::raii::DescriptorSetLayout(device, createInfo);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ DescriptorSetLayout::DescriptorSetLayout(
 
 DescriptorSet::DescriptorSet(vk::raii::DescriptorSet&& set,
                              const vk::raii::Device* device)
-	: m_set(std::move(set)), m_device(device)
+	: desc_set(std::move(set)), desc_device(device)
 {
 }
 
@@ -129,7 +129,7 @@ void DescriptorSet::WriteBuffer(uint32_t binding,
                                 vk::DescriptorType type)
 {
 	vk::WriteDescriptorSet write(
-		*m_set,       // dstSet
+		*desc_set,       // dstSet
 		binding,      // dstBinding
 		0,            // dstArrayElement
 		1,            // descriptorCount
@@ -139,7 +139,7 @@ void DescriptorSet::WriteBuffer(uint32_t binding,
 		nullptr       // pTexelBufferView
 	);
 
-	m_device->updateDescriptorSets(write, nullptr);
+	desc_device->updateDescriptorSets(write, nullptr);
 }
 
 void DescriptorSet::WriteImage(uint32_t binding,
@@ -147,7 +147,7 @@ void DescriptorSet::WriteImage(uint32_t binding,
                                vk::DescriptorType type)
 {
 	vk::WriteDescriptorSet write(
-		*m_set,       // dstSet
+		*desc_set,       // dstSet
 		binding,      // dstBinding
 		0,            // dstArrayElement
 		1,            // descriptorCount
@@ -157,7 +157,7 @@ void DescriptorSet::WriteImage(uint32_t binding,
 		nullptr       // pTexelBufferView
 	);
 
-	m_device->updateDescriptorSets(write, nullptr);
+	desc_device->updateDescriptorSets(write, nullptr);
 }
 
 #ifdef _DEBUG
@@ -170,9 +170,9 @@ void DescriptorSet::SetDebugName(const char* name)
 
 	const vk::DebugUtilsObjectNameInfoEXT nameInfo(
 		vk::ObjectType::eDescriptorSet,
-		reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(*m_set)),
+		reinterpret_cast<uint64_t>(static_cast<VkDescriptorSet>(*desc_set)),
 		name);
-	m_device->setDebugUtilsObjectNameEXT(nameInfo);
+	desc_device->setDebugUtilsObjectNameEXT(nameInfo);
 }
 #endif
 
@@ -184,7 +184,7 @@ DescriptorPool::DescriptorPool(
 	const vk::raii::Device& device,
 	uint32_t maxSets,
 	const std::vector<vk::DescriptorPoolSize>& poolSizes)
-	: m_device(&device)
+	: desc_device(&device)
 {
 	vk::DescriptorPoolCreateInfo createInfo(
 		vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet |
@@ -192,7 +192,7 @@ DescriptorPool::DescriptorPool(
 		maxSets,
 		poolSizes);
 
-	m_pool = vk::raii::DescriptorPool(device, createInfo);
+	desc_pool = vk::raii::DescriptorPool(device, createInfo);
 }
 
 std::vector<DescriptorSet> DescriptorPool::Allocate(
@@ -208,12 +208,12 @@ std::vector<DescriptorSet> DescriptorPool::Allocate(
 	std::vector<vk::DescriptorSetLayout> rawLayouts(
 		count, *layout.layout());
 
-	vk::DescriptorSetAllocateInfo allocInfo(*m_pool, rawLayouts);
+	vk::DescriptorSetAllocateInfo allocInfo(*desc_pool, rawLayouts);
 
 	std::vector<vk::raii::DescriptorSet> vkSets;
 	try
 	{
-		vkSets = m_device->allocateDescriptorSets(allocInfo);
+		vkSets = desc_device->allocateDescriptorSets(allocInfo);
 	}
 	catch (const std::exception&)
 	{
@@ -227,7 +227,7 @@ std::vector<DescriptorSet> DescriptorPool::Allocate(
 	result.reserve(vkSets.size());
 	for (auto& vkSet : vkSets)
 	{
-		result.emplace_back(std::move(vkSet), m_device);
+		result.emplace_back(std::move(vkSet), desc_device);
 	}
 
 	return result;

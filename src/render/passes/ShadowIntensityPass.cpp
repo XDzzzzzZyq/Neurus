@@ -77,31 +77,31 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	              // invalidate the command buffer — see VUID 00059 et al.).
 	              ShadowIntensityPass::CreateDescriptorSetLayout(device),
 	              numSets * kSetsPerFrameSlot)
-	, m_pipeline(CreatePipeline(device, compSpv, compSize))
-	, m_sunDescSetLayout(CreateSunDescriptorSetLayout(device))
+	, p_pipeline(CreatePipeline(device, compSpv, compSize))
+	, p_sunDescSetLayout(CreateSunDescriptorSetLayout(device))
 {
 	NEURUS_LOG("[ShadowIntensityPass] compSize=" << compSize
 	           << " numSets=" << numSets
 	           << " farPlane=" << Light::point_shadow_far
-	           << " bias=" << m_bias);
+	           << " bias=" << p_bias);
 
 	// --- Sun pipeline builder (owns the sun pipeline layout) ---
-	m_sunPipelineBuilder = std::make_unique<ComputePipelineBuilder>(device);
+	p_sunPipelineBuilder = std::make_unique<ComputePipelineBuilder>(device);
 
 	// --- Sun compute pipeline (sun_shadow_eval.comp) ---
 	const uint32_t sunSetCount = numSets * kSetsPerFrameSlot;
-	m_sunPipeline = CreateSunPipeline(device,
+	p_sunPipeline = CreateSunPipeline(device,
 	                                  sun_shadow_eval_comp_spv,
 	                                  sizeof(sun_shadow_eval_comp_spv));
 
 	// --- Sun shadow sampler (clamp-to-border, black border for out-of-bounds UV) ---
-	m_sunShadowSampler = CreateSunShadowSampler(device, physicalDevice);
+	p_sunShadowSampler = CreateSunShadowSampler(device, physicalDevice);
 
 	// --- Sun descriptor pool + sets ---
-	m_sunDescPool = DescriptorPool(device,
+	p_sunDescPool = DescriptorPool(device,
 	                               sunSetCount,
-	                               DescriptorPool::CalculatePoolSizes({&m_sunDescSetLayout}, sunSetCount));
-	m_sunDescSets = m_sunDescPool.Allocate(m_sunDescSetLayout, sunSetCount);
+	                               DescriptorPool::CalculatePoolSizes({&p_sunDescSetLayout}, sunSetCount));
+	p_sunDescSets = p_sunDescPool.Allocate(p_sunDescSetLayout, sunSetCount);
 
 	NEURUS_LOG("[ShadowIntensityPass] Sun pipeline created, "
 	           << sunSetCount << " sun descriptor sets allocated");
@@ -110,12 +110,12 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	for (uint32_t i = 0; i < numSets * kSetsPerFrameSlot; ++i)
 	{
 		const std::string dsName = "ShadowIntensityPass_Set" + std::to_string(i);
-		m_descriptorSets[i].SetDebugName(dsName.c_str());
+		p_descriptorSets[i].SetDebugName(dsName.c_str());
 	}
 	for (uint32_t i = 0; i < sunSetCount; ++i)
 	{
 		const std::string dsName = "ShadowIntensityPass_SunSet" + std::to_string(i);
-		m_sunDescSets[i].SetDebugName(dsName.c_str());
+		p_sunDescSets[i].SetDebugName(dsName.c_str());
 	}
 #endif
 }
@@ -187,9 +187,9 @@ vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& d
 		6 * sizeof(float));   // 24 bytes
 
 	// --- Build compute pipeline ---
-	return m_pipelineBuilder->SetShaderStage(compModule, "main")
+	return p_pipelineBuilder->SetShaderStage(compModule, "main")
 		.SetDebugName("ShadowIntensityPass")
-		.AddDescriptorSetLayout(*m_descriptorSetLayout.layout())
+		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();
 }
@@ -220,9 +220,9 @@ vk::raii::Pipeline ShadowIntensityPass::CreateSunPipeline(const vk::raii::Device
 		20 * sizeof(float));   // 80 bytes — matches sizeof(SunShadowEvalPushConstants)
 
 	// --- Build sun compute pipeline ---
-	return m_sunPipelineBuilder->SetShaderStage(compModule, "main")
+	return p_sunPipelineBuilder->SetShaderStage(compModule, "main")
 		.SetDebugName("ShadowIntensityPass_Sun")
-		.AddDescriptorSetLayout(*m_sunDescSetLayout.layout())
+		.AddDescriptorSetLayout(*p_sunDescSetLayout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline();
 }
@@ -263,14 +263,14 @@ vk::raii::Sampler ShadowIntensityPass::CreateSunShadowSampler(
 
 void ShadowIntensityPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
-	DescriptorSet& dstSet = m_descriptorSets[setIndex];
+	DescriptorSet& dstSet = p_descriptorSets[setIndex];
 
 	// --- Binding 0: G-Buffer world-space position (combined image sampler) ---
 	{
 		const auto& posAtt = cache.GetAttachment(AttachmentName::Position, extent);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,                              // sampler
+			*p_sampler,                              // sampler
 			*posAtt.ImageViewHandle(),               // imageView
 			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 		);
@@ -281,10 +281,10 @@ void ShadowIntensityPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D exten
 
 	// --- Binding 1: Shadow depth cubemap (combined image sampler, samplerCube) ---
 	{
-		auto& shadowCube = cache.GetShadowMap(m_currentLightUID, LightType::POINTLIGHT);
+		auto& shadowCube = cache.GetShadowMap(p_currentLightUID, LightType::POINTLIGHT);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,                                     // sampler
+			*p_sampler,                                     // sampler
 			*shadowCube.ImageViewHandle(),                  // imageView (cube type, depth aspect)
 			vk::ImageLayout::eDepthStencilReadOnlyOptimal   // imageLayout (matches DepthShaderRead)
 		);
@@ -314,14 +314,14 @@ void ShadowIntensityPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D exten
 
 void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
-	DescriptorSet& dstSet = m_sunDescSets[setIndex];
+	DescriptorSet& dstSet = p_sunDescSets[setIndex];
 
 	// --- Binding 0: G-Buffer world-space position (combined image sampler) ---
 	{
 		const auto& posAtt = cache.GetAttachment(AttachmentName::Position, extent);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sampler,                              // sampler (nearest, clamp-to-edge)
+			*p_sampler,                              // sampler (nearest, clamp-to-edge)
 			*posAtt.ImageViewHandle(),               // imageView
 			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
 		);
@@ -332,10 +332,10 @@ void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D ex
 
 	// --- Binding 1: Sun shadow depth map (combined image sampler, sampler2D) ---
 	{
-		auto& sunShadowMap = cache.GetShadowMap(m_currentLightUID, LightType::SUNLIGHT);
+		auto& sunShadowMap = cache.GetShadowMap(p_currentLightUID, LightType::SUNLIGHT);
 
 		vk::DescriptorImageInfo imageInfo(
-			*m_sunShadowSampler,                             // sampler (nearest, clamp-to-border, black)
+			*p_sunShadowSampler,                             // sampler (nearest, clamp-to-border, black)
 			*sunShadowMap.ImageViewHandle(),                 // imageView (2D, depth aspect)
 			vk::ImageLayout::eDepthStencilReadOnlyOptimal   // imageLayout (matches DepthShaderRead)
 		);
@@ -400,7 +400,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	}
 
 	// --- 3. Bind compute pipeline (once for all lights) ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipeline);
 
 	// --- 4. Dispatch shadow evaluation for each shadow-casting light ---
 	//     Alternates between two descriptor sets per frame slot so that updating
@@ -414,7 +414,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		if (!light || !light->use_shadow) continue;
 		if (light->light_type != LightType::POINTLIGHT) continue;
 
-		m_currentLightUID = uid;
+		p_currentLightUID = uid;
 
 		// --- Transition shadow depth cubemap: post-ShadowDepthPass → DepthShaderRead ---
 		{
@@ -430,9 +430,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		// --- Bind descriptor set ---
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                          *m_pipelineBuilder->pipelineLayout(),
+		                          *p_pipelineBuilder->pipelineLayout(),
 		                          0,
-		                          {m_descriptorSets[setIdx].handle()},
+		                          {p_descriptorSets[setIdx].handle()},
 		                          {});
 
 		// --- Push constants ---
@@ -453,11 +453,11 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.lightPosY  = pos.y;
 			pc.lightPosZ  = pos.z;
 			pc.farPlane   = Light::point_shadow_far;
-			pc.bias       = m_bias;
+			pc.bias       = p_bias;
 			pc.layerIndex = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
-				*m_pipelineBuilder->pipelineLayout(),
+				*p_pipelineBuilder->pipelineLayout(),
 				vk::ShaderStageFlagBits::eCompute,
 				0,
 				pc);
@@ -480,7 +480,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		if (!light || !light->use_shadow) continue;
 		if (light->light_type != LightType::SUNLIGHT) continue;
 
-		m_currentLightUID = uid;
+		p_currentLightUID = uid;
 
 		// --- Transition sun shadow depth map: post-ShadowDepthPass → DepthShaderRead ---
 		{
@@ -495,11 +495,11 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		WriteSunDescriptors(setIdx, renderExtent, cache);
 
 		// --- Bind sun pipeline + descriptor set ---
-		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *m_sunPipeline);
+		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_sunPipeline);
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                          *m_sunPipelineBuilder->pipelineLayout(),
+		                          *p_sunPipelineBuilder->pipelineLayout(),
 		                          0,
-		                          {m_sunDescSets[setIdx].handle()},
+		                          {p_sunDescSets[setIdx].handle()},
 		                          {});
 
 		// --- Sun push constants (mat4 lightViewProj + bias + layerIndex) ---
@@ -531,11 +531,11 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 			SunShadowEvalPushConstants pc = {};
 			pc.lightViewProj = lightViewProj;
-			pc.bias          = m_bias;
+			pc.bias          = p_bias;
 			pc.layerIndex    = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(
-				*m_sunPipelineBuilder->pipelineLayout(),
+				*p_sunPipelineBuilder->pipelineLayout(),
 				vk::ShaderStageFlagBits::eCompute,
 				0,
 				pc);

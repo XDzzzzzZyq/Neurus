@@ -84,10 +84,10 @@ public:
 	static uint32_t GetFormatSize(vk::Format format);
 
 	/** @brief Number of attributes currently registered. */
-	size_t GetAttributeCount() const { return m_attributes.size(); }
+	size_t GetAttributeCount() const { return b_attributes.size(); }
 
 private:
-	std::vector<vk::VertexInputAttributeDescription> m_attributes;
+	std::vector<vk::VertexInputAttributeDescription> b_attributes;
 };
 
 } // namespace neurus

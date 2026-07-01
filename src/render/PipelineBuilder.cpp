@@ -16,14 +16,14 @@ PipelineBuilder& PipelineBuilder::AddShaderStage(
 	vk::ShaderStageFlagBits stage,
 	const char* entryPoint)
 {
-	m_stages.push_back(module.GetStageInfo(stage, entryPoint));
+	p_stages.push_back(module.GetStageInfo(stage, entryPoint));
 	return *this;
 }
 
 PipelineBuilder& PipelineBuilder::AddShaderStage(
 	const vk::PipelineShaderStageCreateInfo& stageInfo)
 {
-	m_stages.push_back(stageInfo);
+	p_stages.push_back(stageInfo);
 	return *this;
 }
 
@@ -33,36 +33,36 @@ PipelineBuilder& PipelineBuilder::AddShaderStage(
 
 PipelineBuilder& PipelineBuilder::SetVertexInput(const BufferLayout& layout)
 {
-	m_vertexBindings.clear();
-	m_vertexAttributes.clear();
+	p_vertexBindings.clear();
+	p_vertexAttributes.clear();
 
-	m_vertexBindings.push_back(layout.GetBindingDescription());
-	m_vertexAttributes = layout.GetAttributeDescriptions();
+	p_vertexBindings.push_back(layout.GetBindingDescription());
+	p_vertexAttributes = layout.GetAttributeDescriptions();
 
-	m_vertexInput = vk::PipelineVertexInputStateCreateInfo(
+	p_vertexInput = vk::PipelineVertexInputStateCreateInfo(
 		{},
-		m_vertexBindings,
-		m_vertexAttributes);
-	m_vertexInputSet = true;
+		p_vertexBindings,
+		p_vertexAttributes);
+	p_vertexInputSet = true;
 	return *this;
 }
 
 PipelineBuilder& PipelineBuilder::SetVertexInput()
 {
-	m_vertexBindings.clear();
-	m_vertexAttributes.clear();
-	m_vertexInput = vk::PipelineVertexInputStateCreateInfo({}, {}, {});
-	m_vertexInputSet = true;
+	p_vertexBindings.clear();
+	p_vertexAttributes.clear();
+	p_vertexInput = vk::PipelineVertexInputStateCreateInfo({}, {}, {});
+	p_vertexInputSet = true;
 	return *this;
 }
 
 PipelineBuilder& PipelineBuilder::SetVertexInput(
 	const vk::PipelineVertexInputStateCreateInfo& vertexInput)
 {
-	m_vertexBindings.clear();
-	m_vertexAttributes.clear();
-	m_vertexInput = vertexInput;
-	m_vertexInputSet = true;
+	p_vertexBindings.clear();
+	p_vertexAttributes.clear();
+	p_vertexInput = vertexInput;
+	p_vertexInputSet = true;
 	return *this;
 }
 
@@ -74,7 +74,7 @@ PipelineBuilder& PipelineBuilder::SetInputAssembly(
 	vk::PrimitiveTopology topology,
 	bool primitiveRestart)
 {
-	m_inputAssembly = vk::PipelineInputAssemblyStateCreateInfo(
+	p_inputAssembly = vk::PipelineInputAssemblyStateCreateInfo(
 		{}, topology, primitiveRestart ? VK_TRUE : VK_FALSE);
 	return *this;
 }
@@ -85,7 +85,7 @@ PipelineBuilder& PipelineBuilder::SetInputAssembly(
 
 PipelineBuilder& PipelineBuilder::SetViewMask(uint32_t viewMask)
 {
-	m_viewMask = viewMask;
+	p_viewMask = viewMask;
 	return *this;
 }
 
@@ -95,7 +95,7 @@ PipelineBuilder& PipelineBuilder::SetRasterization(
 	vk::FrontFace frontFace,
 	float lineWidth)
 {
-	m_rasterizer = vk::PipelineRasterizationStateCreateInfo(
+	p_rasterizer = vk::PipelineRasterizationStateCreateInfo(
 		{},
 		VK_FALSE,  // depthClampEnable
 		VK_FALSE,  // rasterizerDiscardEnable
@@ -119,7 +119,7 @@ PipelineBuilder& PipelineBuilder::SetMultisampling(
 	bool sampleShadingEnable,
 	float minSampleShading)
 {
-	m_multisample = vk::PipelineMultisampleStateCreateInfo(
+	p_multisample = vk::PipelineMultisampleStateCreateInfo(
 		{},
 		samples,
 		sampleShadingEnable ? VK_TRUE : VK_FALSE,
@@ -144,7 +144,7 @@ PipelineBuilder& PipelineBuilder::SetDepthStencil(
 		vk::CompareOp::eAlways,
 		0, 0, 0);
 
-	m_depthStencil = vk::PipelineDepthStencilStateCreateInfo(
+	p_depthStencil = vk::PipelineDepthStencilStateCreateInfo(
 		{},
 		depthTest ? VK_TRUE : VK_FALSE,
 		depthWrite ? VK_TRUE : VK_FALSE,
@@ -159,7 +159,7 @@ PipelineBuilder& PipelineBuilder::SetDepthStencil(
 
 PipelineBuilder& PipelineBuilder::ClearDepthStencil()
 {
-	m_depthStencil.reset();
+	p_depthStencil.reset();
 	return *this;
 }
 
@@ -170,7 +170,7 @@ PipelineBuilder& PipelineBuilder::ClearDepthStencil()
 PipelineBuilder& PipelineBuilder::AddColorBlendAttachment(
 	const vk::PipelineColorBlendAttachmentState& attachment)
 {
-	m_colorBlendAttachments.push_back(attachment);
+	p_colorBlendAttachments.push_back(attachment);
 	return *this;
 }
 
@@ -188,14 +188,14 @@ PipelineBuilder& PipelineBuilder::SetColorBlendAttachment()
 		vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
 		vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA;
 
-	m_colorBlendAttachments.clear();
-	m_colorBlendAttachments.push_back(attachment);
+	p_colorBlendAttachments.clear();
+	p_colorBlendAttachments.push_back(attachment);
 	return *this;
 }
 
 PipelineBuilder& PipelineBuilder::ClearColorBlendAttachments()
 {
-	m_colorBlendAttachments.clear();
+	p_colorBlendAttachments.clear();
 	return *this;
 }
 
@@ -205,7 +205,7 @@ PipelineBuilder& PipelineBuilder::ClearColorBlendAttachments()
 
 PipelineBuilder& PipelineBuilder::AddDynamicState(vk::DynamicState state)
 {
-	m_dynamicStates.push_back(state);
+	p_dynamicStates.push_back(state);
 	return *this;
 }
 
@@ -216,7 +216,7 @@ PipelineBuilder& PipelineBuilder::AddDynamicState(vk::DynamicState state)
 PipelineBuilder& PipelineBuilder::SetDescriptorSetLayouts(
 	const std::vector<vk::DescriptorSetLayout>& layouts)
 {
-	m_descriptorSetLayouts = layouts;
+	p_descriptorSetLayouts = layouts;
 	return *this;
 }
 
@@ -227,7 +227,7 @@ PipelineBuilder& PipelineBuilder::SetDescriptorSetLayouts(
 PipelineBuilder& PipelineBuilder::SetPushConstantRanges(
 	const std::vector<vk::PushConstantRange>& ranges)
 {
-	m_pushConstantRanges = ranges;
+	p_pushConstantRanges = ranges;
 	return *this;
 }
 
@@ -237,7 +237,7 @@ PipelineBuilder& PipelineBuilder::SetPushConstantRanges(
 
 PipelineBuilder& PipelineBuilder::SetPipelineCache(const vk::raii::PipelineCache* cache)
 {
-	m_pipelineCache = cache ? **cache : VK_NULL_HANDLE;
+	p_pipelineCache = cache ? **cache : VK_NULL_HANDLE;
 	return *this;
 }
 
@@ -247,19 +247,19 @@ PipelineBuilder& PipelineBuilder::SetPipelineCache(const vk::raii::PipelineCache
 
 PipelineBuilder& PipelineBuilder::SetColorFormats(const std::vector<vk::Format>& formats)
 {
-	m_colorFormats = formats;
+	p_colorFormats = formats;
 	return *this;
 }
 
 PipelineBuilder& PipelineBuilder::SetDepthFormat(vk::Format format)
 {
-	m_depthFormat = format;
+	p_depthFormat = format;
 	return *this;
 }
 
 PipelineBuilder& PipelineBuilder::SetStencilFormat(vk::Format format)
 {
-	m_stencilFormat = format;
+	p_stencilFormat = format;
 	return *this;
 }
 
@@ -269,7 +269,7 @@ PipelineBuilder& PipelineBuilder::SetStencilFormat(vk::Format format)
 
 PipelineBuilder& PipelineBuilder::SetDebugName(const char* name)
 {
-	m_debugName = name ? name : "";
+	p_debugName = name ? name : "";
 	return *this;
 }
 
@@ -280,14 +280,14 @@ PipelineBuilder& PipelineBuilder::SetDebugName(const char* name)
 vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device& device)
 {
 	// --- Validate required fields ---
-	if (m_stages.empty())
+	if (p_stages.empty())
 	{
 		throw std::runtime_error(
 			"PipelineBuilder::BuildGraphicsPipeline: "
 			"no shader stages added - call AddShaderStage() at least once.");
 	}
 
-	if (m_colorFormats.empty() && !m_depthFormat.has_value())
+	if (p_colorFormats.empty() && !p_depthFormat.has_value())
 	{
 		throw std::runtime_error(
 			"PipelineBuilder::BuildGraphicsPipeline: "
@@ -298,59 +298,59 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 	vk::PipelineViewportStateCreateInfo viewportState({}, 1, nullptr, 1, nullptr);
 
 	// --- Dynamic state ---
-	m_dynamicState = vk::PipelineDynamicStateCreateInfo({}, m_dynamicStates);
+	p_dynamicState = vk::PipelineDynamicStateCreateInfo({}, p_dynamicStates);
 
 	// --- Color blend state ---
 	// If attachments were added, build the state; otherwise, use empty
-	if (!m_colorBlendAttachments.empty())
+	if (!p_colorBlendAttachments.empty())
 	{
-		m_colorBlend = vk::PipelineColorBlendStateCreateInfo(
+		p_colorBlend = vk::PipelineColorBlendStateCreateInfo(
 			{}, VK_FALSE,
 			vk::LogicOp::eCopy,
-			m_colorBlendAttachments);
+			p_colorBlendAttachments);
 	}
 	else
 	{
 		// Empty color blend (no attachments)
-		m_colorBlend = vk::PipelineColorBlendStateCreateInfo({}, VK_FALSE,
+		p_colorBlend = vk::PipelineColorBlendStateCreateInfo({}, VK_FALSE,
 			vk::LogicOp::eCopy, nullptr);
 	}
 
 	// --- Pipeline layout ---
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo(
 		{},
-		m_descriptorSetLayouts,
-		m_pushConstantRanges);
+		p_descriptorSetLayouts,
+		p_pushConstantRanges);
 
 	vk::raii::PipelineLayout pipelineLayout(device, pipelineLayoutCreateInfo);
 
 	// --- Dynamic rendering pipeline create info ---
 	vk::PipelineRenderingCreateInfo renderingCreateInfo(
-		m_viewMask,
-		m_colorFormats,
-		m_depthFormat.value_or(vk::Format::eUndefined),
-		m_stencilFormat.value_or(vk::Format::eUndefined));
+		p_viewMask,
+		p_colorFormats,
+		p_depthFormat.value_or(vk::Format::eUndefined),
+		p_stencilFormat.value_or(vk::Format::eUndefined));
 
 	// --- Pointers to optional state structs ---
 	const vk::PipelineVertexInputStateCreateInfo* pVertexInput =
-		m_vertexInputSet ? &m_vertexInput : nullptr;
+		p_vertexInputSet ? &p_vertexInput : nullptr;
 
 	const vk::PipelineDepthStencilStateCreateInfo* pDepthStencil =
-		m_depthStencil.has_value() ? &m_depthStencil.value() : nullptr;
+		p_depthStencil.has_value() ? &p_depthStencil.value() : nullptr;
 
 	// --- Assemble graphics pipeline ---
 	vk::GraphicsPipelineCreateInfo pipelineCreateInfo(
 		{},
-		m_stages,
+		p_stages,
 		pVertexInput,
-		&m_inputAssembly,
+		&p_inputAssembly,
 		nullptr,       // No tessellation
 		&viewportState,
-		&m_rasterizer,
-		&m_multisample,
+		&p_rasterizer,
+		&p_multisample,
 		pDepthStencil,
-		&m_colorBlend,
-		&m_dynamicState,
+		&p_colorBlend,
+		&p_dynamicState,
 		*pipelineLayout,
 		nullptr,       // No render pass (dynamic rendering)
 		0,             // Subpass index (unused)
@@ -361,12 +361,12 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 	auto pipeline = vk::raii::Pipeline(device, nullptr, pipelineCreateInfo);
 
 #ifdef _DEBUG
-	if (!m_debugName.empty())
+	if (!p_debugName.empty())
 	{
 		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
 			vk::ObjectType::ePipeline,
 			reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*pipeline)),
-			m_debugName.c_str()));
+			p_debugName.c_str()));
 	}
 #endif
 

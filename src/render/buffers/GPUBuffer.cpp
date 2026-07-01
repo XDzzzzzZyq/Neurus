@@ -18,23 +18,23 @@ GPUBuffer::GPUBuffer(const vk::raii::Device& device,
                      vk::DeviceSize size,
                      vk::BufferUsageFlags usageFlags,
                      const char* debugName)
-	: m_queue(queue)
-	, m_queueFamilyIndex(queueFamilyIndex)
+	: b_queue(queue)
+	, b_queueFamilyIndex(queueFamilyIndex)
 {
 	createBuffer(device, physicalDevice,
 	             size,
 	             usageFlags | vk::BufferUsageFlagBits::eTransferDst,
 	             vk::MemoryPropertyFlagBits::eDeviceLocal,
 	             debugName);
-	m_staging = std::make_unique<StagingBuffer>(*m_device,
-		                                        *m_physicalDevice,
-		                                        m_queue,
-		                                        m_queueFamilyIndex,
-		                                        m_size,
-		                                        m_debugName.empty() ? nullptr
-		                                                            : (m_debugName + "_Staging").c_str());
+	b_staging = std::make_unique<StagingBuffer>(*b_device,
+		                                        *b_physicalDevice,
+		                                        b_queue,
+		                                        b_queueFamilyIndex,
+		                                        b_size,
+		                                        b_debugName.empty() ? nullptr
+		                                                            : (b_debugName + "_Staging").c_str());
 
-	NEURUS_LOG("[GPUBuffer::Map] created staging buffer, size=" << m_size);
+	NEURUS_LOG("[GPUBuffer::Map] created staging buffer, size=" << b_size);
 }
 
 // ---------------------------------------------------------------------------
@@ -43,7 +43,7 @@ GPUBuffer::GPUBuffer(const vk::raii::Device& device,
 
 void GPUBuffer::Upload(const void* data, vk::DeviceSize size)
 {
-	if (size > m_size)
+	if (size > b_size)
 	{
 		throw std::runtime_error("GPUBuffer::Upload: data size exceeds buffer capacity.");
 	}
@@ -59,7 +59,7 @@ void GPUBuffer::Upload(const void* data, vk::DeviceSize size)
 
 void* GPUBuffer::Map()
 {
-	return m_staging->Map();
+	return b_staging->Map();
 }
 
 // ---------------------------------------------------------------------------
@@ -68,23 +68,23 @@ void* GPUBuffer::Map()
 
 void GPUBuffer::Unmap()
 {
-	m_staging->Unmap();
+	b_staging->Unmap();
 
 	// --- Create transient command pool and one-shot command buffer ---
 	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
-	                                 m_queueFamilyIndex);
-	vk::raii::CommandPool cmdPool(*m_device, poolCI);
+	                                 b_queueFamilyIndex);
+	vk::raii::CommandPool cmdPool(*b_device, poolCI);
 
 	vk::CommandBufferAllocateInfo allocInfo(*cmdPool,
 	                                        vk::CommandBufferLevel::ePrimary, 1);
-	vk::raii::CommandBuffers cmdBufs(*m_device, allocInfo);
+	vk::raii::CommandBuffers cmdBufs(*b_device, allocInfo);
 
 	// --- Record copy ---
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBufs[0].begin(beginInfo);
 
-	vk::BufferCopy copyRegion(0, 0, m_size);
-	cmdBufs[0].copyBuffer(m_staging->buffer(), this->buffer(), copyRegion);
+	vk::BufferCopy copyRegion(0, 0, b_size);
+	cmdBufs[0].copyBuffer(b_staging->buffer(), this->buffer(), copyRegion);
 
 	// Memory barrier to ensure transfer writes are visible to all
 	// subsequent GPU operations on this buffer.
@@ -101,10 +101,10 @@ void GPUBuffer::Unmap()
 
 	// --- Submit and wait for completion ---
 	vk::SubmitInfo submitInfo({}, {}, *cmdBufs[0]);
-	m_queue.submit(submitInfo);
-	m_queue.waitIdle();
+	b_queue.submit(submitInfo);
+	b_queue.waitIdle();
 
-	NEURUS_LOG("[GPUBuffer::Unmap] " << m_size << " bytes transferred to GPU");
+	NEURUS_LOG("[GPUBuffer::Unmap] " << b_size << " bytes transferred to GPU");
 }
 
 } // namespace neurus

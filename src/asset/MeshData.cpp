@@ -187,27 +187,27 @@ void MeshData::AddFace(const std::vector<std::string>& faceTokens,
 
 			MeshData::VertexKey key{ pi, ui, ni };
 
-			auto it = m_vertexMap.find(key);
-			if (it != m_vertexMap.end())
+			auto it = me_vertexMap.find(key);
+			if (it != me_vertexMap.end())
 			{
 				// Reuse existing vertex
-				m_meshData.indexArray.push_back(it->second);
+				me_meshData.indexArray.push_back(it->second);
 			}
 			else
 			{
 				// Create new vertex
-				uint32_t newIdx = m_nextIndex++;
-				m_vertexMap[key] = newIdx;
+				uint32_t newIdx = me_nextIndex++;
+				me_vertexMap[key] = newIdx;
 
 				glm::vec3 pos = positions[pi];
 				glm::vec3 norm = (ni >= 0) ? normals[ni] : glm::vec3(0.0f);
 				glm::vec2 uv = (ui >= 0) ? texCoords[ui] : glm::vec2(0.0f);
 
-				WriteVertex(m_meshData.dataArray, pos, norm, uv,
+				WriteVertex(me_meshData.dataArray, pos, norm, uv,
 				            glm::vec3(0.0f),   // tangent - computed later
 				            glm::vec3(0.0f));  // bitangent - computed later
 
-				m_meshData.indexArray.push_back(newIdx);
+				me_meshData.indexArray.push_back(newIdx);
 			}
 		}
 	}
@@ -215,14 +215,14 @@ void MeshData::AddFace(const std::vector<std::string>& faceTokens,
 
 void MeshData::ComputeFaceNormals()
 {
-	const size_t indexCount = m_meshData.indexArray.size();
-	auto& data = m_meshData.dataArray;
+	const size_t indexCount = me_meshData.indexArray.size();
+	auto& data = me_meshData.dataArray;
 
 	for (size_t i = 0; i + 2 < indexCount; i += 3)
 	{
-		uint32_t i0 = m_meshData.indexArray[i];
-		uint32_t i1 = m_meshData.indexArray[i + 1];
-		uint32_t i2 = m_meshData.indexArray[i + 2];
+		uint32_t i0 = me_meshData.indexArray[i];
+		uint32_t i1 = me_meshData.indexArray[i + 1];
+		uint32_t i2 = me_meshData.indexArray[i + 2];
 
 		glm::vec3 p0(data[i0 * 14 + 0], data[i0 * 14 + 1], data[i0 * 14 + 2]);
 		glm::vec3 p1(data[i1 * 14 + 0], data[i1 * 14 + 1], data[i1 * 14 + 2]);
@@ -235,7 +235,7 @@ void MeshData::ComputeFaceNormals()
 		// Assign to all three vertices of the triangle
 		for (size_t corner = 0; corner < 3; ++corner)
 		{
-			uint32_t vi = m_meshData.indexArray[i + corner];
+			uint32_t vi = me_meshData.indexArray[i + corner];
 			data[vi * 14 + 3] = faceNormal.x;
 			data[vi * 14 + 4] = faceNormal.y;
 			data[vi * 14 + 5] = faceNormal.z;
@@ -245,14 +245,14 @@ void MeshData::ComputeFaceNormals()
 
 void MeshData::ComputeTangents()
 {
-	const size_t indexCount = m_meshData.indexArray.size();
-	auto& data = m_meshData.dataArray;
+	const size_t indexCount = me_meshData.indexArray.size();
+	auto& data = me_meshData.dataArray;
 
 	for (size_t i = 0; i + 2 < indexCount; i += 3)
 	{
-		uint32_t i0 = m_meshData.indexArray[i];
-		uint32_t i1 = m_meshData.indexArray[i + 1];
-		uint32_t i2 = m_meshData.indexArray[i + 2];
+		uint32_t i0 = me_meshData.indexArray[i];
+		uint32_t i1 = me_meshData.indexArray[i + 1];
+		uint32_t i2 = me_meshData.indexArray[i + 2];
 
 		// Positions
 		glm::vec3 p0(data[i0 * 14 + 0], data[i0 * 14 + 1], data[i0 * 14 + 2]);
@@ -292,7 +292,7 @@ void MeshData::ComputeTangents()
 		// Compute bitangent from normal and tangent
 		for (size_t corner = 0; corner < 3; ++corner)
 		{
-			uint32_t vi = m_meshData.indexArray[i + corner];
+			uint32_t vi = me_meshData.indexArray[i + corner];
 			glm::vec3 normal(data[vi * 14 + 3], data[vi * 14 + 4], data[vi * 14 + 5]);
 			glm::vec3 bitangent = glm::cross(normal, tangent);
 
@@ -308,18 +308,18 @@ void MeshData::ComputeTangents()
 
 void MeshData::ComputeCenter()
 {
-	if (m_rawPositions.empty())
+	if (me_rawPositions.empty())
 	{
-		m_meshData.center = glm::vec3(0.0f);
+		me_meshData.center = glm::vec3(0.0f);
 		return;
 	}
 
 	glm::vec3 sum(0.0f);
-	for (const auto& p : m_rawPositions)
+	for (const auto& p : me_rawPositions)
 	{
 		sum += p;
 	}
-	m_meshData.center = sum / static_cast<float>(m_rawPositions.size());
+	me_meshData.center = sum / static_cast<float>(me_rawPositions.size());
 }
 
 // --- Public API ---
@@ -338,7 +338,7 @@ bool MeshData::LoadObj(const std::string& path)
 	bool ok = LoadObjFromString(buffer.str());
 	if (ok)
 	{
-		NEURUS_LOG("[MeshData] loaded '" << m_meshData.name
+		NEURUS_LOG("[MeshData] loaded '" << me_meshData.name
 		          << "' from " << path
 		          << " - " << GetVertexCount() << " verts, "
 		          << GetIndexCount() << " indices");
@@ -349,10 +349,10 @@ bool MeshData::LoadObj(const std::string& path)
 bool MeshData::LoadObjFromString(const std::string& objContent)
 {
 	// --- Reset state ---
-	m_meshData = ByteArray{};
-	m_vertexMap.clear();
-	m_rawPositions.clear();
-	m_nextIndex = 0;
+	me_meshData = ByteArray{};
+	me_vertexMap.clear();
+	me_rawPositions.clear();
+	me_nextIndex = 0;
 
 	// --- Temporary storage for OBJ data ---
 	std::vector<glm::vec3> positions;
@@ -390,7 +390,7 @@ bool MeshData::LoadObjFromString(const std::string& objContent)
 			if (!lineStream.fail())
 			{
 				positions.push_back(glm::vec3(x, y, z));
-				m_rawPositions.push_back(glm::vec3(x, y, z));
+				me_rawPositions.push_back(glm::vec3(x, y, z));
 			}
 			else
 			{
@@ -402,7 +402,7 @@ bool MeshData::LoadObjFromString(const std::string& objContent)
 				if (!lineStream.fail())
 				{
 					positions.push_back(glm::vec3(x, y, z));
-					m_rawPositions.push_back(glm::vec3(x, y, z));
+					me_rawPositions.push_back(glm::vec3(x, y, z));
 				}
 			}
 		}
@@ -467,7 +467,7 @@ bool MeshData::LoadObjFromString(const std::string& objContent)
 					fullName += " ";
 				fullName += namePart;
 			}
-			m_meshData.name = fullName;
+			me_meshData.name = fullName;
 		}
 		// Other prefixes (s, g, usemtl, mtllib, etc.) are silently ignored
 	}
@@ -486,37 +486,37 @@ bool MeshData::LoadObjFromString(const std::string& objContent)
 	// Compute bounding box center
 	ComputeCenter();
 
-	NEURUS_LOG("[MeshData] parsed '" << m_meshData.name
+	NEURUS_LOG("[MeshData] parsed '" << me_meshData.name
 	          << "' - " << GetVertexCount() << " verts, "
 	          << GetIndexCount() << " indices, "
-	          << "center=(" << m_meshData.center.x << ", "
-	          << m_meshData.center.y << ", " << m_meshData.center.z << ")");
+	          << "center=(" << me_meshData.center.x << ", "
+	          << me_meshData.center.y << ", " << me_meshData.center.z << ")");
 	return true;
 }
 
 const MeshData::ByteArray& MeshData::GetMeshData() const
 {
-	return m_meshData;
+	return me_meshData;
 }
 
 glm::vec3 MeshData::GetMeshCenter() const
 {
-	return m_meshData.center;
+	return me_meshData.center;
 }
 
 std::string MeshData::GetMeshName() const
 {
-	return m_meshData.name;
+	return me_meshData.name;
 }
 
 size_t MeshData::GetVertexCount() const
 {
-	return m_meshData.dataArray.size() / 14;
+	return me_meshData.dataArray.size() / 14;
 }
 
 size_t MeshData::GetIndexCount() const
 {
-	return m_meshData.indexArray.size();
+	return me_meshData.indexArray.size();
 }
 
 } // namespace neurus

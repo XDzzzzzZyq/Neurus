@@ -35,26 +35,26 @@ public:
 	VulkanContext(VulkanContext&&) noexcept = default;
 	VulkanContext& operator=(VulkanContext&&) noexcept = default;
 
-	const vk::raii::Instance& instance() const { return *m_instance; }
-	const vk::raii::Device& device() const { return *m_device; }
-	const vk::raii::PhysicalDevice& physicalDevice() const { return m_physicalDevices[m_selectedDeviceIndex]; }
-	uint32_t graphicsQueueFamily() const { return m_graphicsQueueFamily; }
-	vk::Queue graphicsQueue() const { return m_graphicsQueue; }
-	const std::string& gpuName() const { return m_gpuName; }
+	const vk::raii::Instance& instance() const { return *ctx_instance; }
+	const vk::raii::Device& device() const { return *ctx_device; }
+	const vk::raii::PhysicalDevice& physicalDevice() const { return ctx_physicalDevices[ctx_selectedDeviceIndex]; }
+	uint32_t graphicsQueueFamily() const { return ctx_graphicsQueueFamily; }
+	vk::Queue graphicsQueue() const { return ctx_graphicsQueue; }
+	const std::string& gpuName() const { return ctx_gpuName; }
 
 private:
 	static vk::raii::Instance createInstanceInternal();
 	uint32_t selectPhysicalDeviceIndex();
 	uint32_t findGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface);
 
-	std::unique_ptr<vk::raii::Instance> m_instance;
-	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
-	uint32_t m_selectedDeviceIndex = 0;
-	std::unique_ptr<vk::raii::Device> m_device;
+	std::unique_ptr<vk::raii::Instance> ctx_instance;
+	vk::raii::PhysicalDevices ctx_physicalDevices = nullptr;
+	uint32_t ctx_selectedDeviceIndex = 0;
+	std::unique_ptr<vk::raii::Device> ctx_device;
 
-	uint32_t m_graphicsQueueFamily = 0;
-	vk::Queue m_graphicsQueue = nullptr;
-	std::string m_gpuName;
+	uint32_t ctx_graphicsQueueFamily = 0;
+	vk::Queue ctx_graphicsQueue = nullptr;
+	std::string ctx_gpuName;
 };
 
 } // namespace neurus

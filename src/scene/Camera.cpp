@@ -34,13 +34,13 @@ Camera::Camera()
 
 void Camera::RecomputeMatrices()
 {
-	m_cachedView = glm::lookAt(GetPosition(), cam_tar, glm::vec3(0.0f, 0.0f, 1.0f)); // Z-up
+	o_cachedView = glm::lookAt(GetPosition(), cam_tar, glm::vec3(0.0f, 0.0f, 1.0f)); // Z-up
 
 	const float aspect = cam_w / cam_h;
 	glm::mat4 projection = glm::perspective(
 			glm::radians(cam_pers), aspect, cam_near, cam_far);
 	projection[1][1] *= -1.0f;   // Flip Y for Vulkan NDC (Y=-1 at top)
-	m_cachedProj = projection;
+	o_cachedProj = projection;
 }
 
 // -----------------------------------------------------------------------
@@ -49,12 +49,12 @@ void Camera::RecomputeMatrices()
 
 glm::mat4 Camera::GetViewMatrix() const
 {
-	return m_cachedView;
+	return o_cachedView;
 }
 
 glm::mat4 Camera::GetProjectionMatrix() const
 {
-	return m_cachedProj;
+	return o_cachedProj;
 }
 
 // -----------------------------------------------------------------------

@@ -149,7 +149,7 @@ public:
 
 	/**
 	 * @brief Writes all descriptors (image + buffer) into the specified set.
-	 * @param setIndex  Index into m_descriptorSets (0 … numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).
 	 */
 	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 
@@ -197,19 +197,19 @@ private:
 	static std::array<NoiseEntryGpu, kNoiseEntryCount> GenerateNoise();
 
 	// --- Pipeline ---
-	vk::raii::Pipeline m_pipeline;
+	vk::raii::Pipeline p_pipeline;
 
 	// --- Owned UBOs ---
-	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> m_paramsUBO;   ///< SSAO params (camera + kernel), host-visible
-	std::unique_ptr<GPUBuffer> m_noiseUBO;    ///< Noise rotation vectors, device-local
+	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> p_paramsUBO;   ///< SSAO params (camera + kernel), host-visible
+	std::unique_ptr<GPUBuffer> p_noiseUBO;    ///< Noise rotation vectors, device-local
 
 	// --- Kernel samples (persistent across frames) ---
-	std::array<KernelSampleGpu, kMaxKernelSamples> m_kernelSamples{};
+	std::array<KernelSampleGpu, kMaxKernelSamples> p_kernelSamples{};
 
 	// --- Push constant data ---
-	int32_t m_kernelLength = kDefaultKernelLength;
-	float   m_radius       = 0.15f;
-	int32_t m_noiseSize    = kNoiseSize;
+	int32_t p_kernelLength = kDefaultKernelLength;
+	float   p_radius       = 0.15f;
+	int32_t p_noiseSize    = kNoiseSize;
 };
 
 } // namespace neurus
