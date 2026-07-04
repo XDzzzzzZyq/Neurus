@@ -11,6 +11,7 @@ namespace vk::raii { class SurfaceKHR; }
 namespace neurus {
 
 class VulkanContext;
+class Screenshot;
 class DeferredRenderer;
 class Editor;
 class NeurusMainWindow;
@@ -24,7 +25,7 @@ namespace project { class Project; }
  * Editor subsystems, wires signals, and enters the event loop.  The
  * destructor relies on C++ reverse-order member destruction to tear
  * down GPU resources in the required order:
- *   renderer → editor → surface → mainWindow → vkContext
+ *   renderer → editor → screenshot → surface → mainWindow → vkContext
  *
  * Usage:
  * @code
@@ -69,11 +70,13 @@ private:
 	std::unique_ptr<QTimer>               app_renderTimer;
 
 	// --- GPU / UI stack (destroyed in REVERSE order: renderer first, vkContext last) ---
-	std::unique_ptr<VulkanContext>        app_vkContext;       // 1st declared → destroyed 5th (LAST)
-	std::unique_ptr<NeurusMainWindow>     app_mainWindow;      // 2nd declared → destroyed 4th
-	std::unique_ptr<vk::raii::SurfaceKHR> app_surface;         // 3rd declared → destroyed 3rd
-	std::unique_ptr<Editor>               app_editor;          // 4th declared → destroyed 2nd
-	std::unique_ptr<DeferredRenderer>     app_renderer;        // 5th declared → destroyed 1st (FIRST)
+	// Screenshot holds refs to RenderCache (owned by DeferredRenderer) — must be destroyed BEFORE renderer.
+	std::unique_ptr<VulkanContext>        app_vkContext;       // 1st declared → destroyed 6th (LAST)
+	std::unique_ptr<NeurusMainWindow>     app_mainWindow;      // 2nd declared → destroyed 5th
+	std::unique_ptr<vk::raii::SurfaceKHR> app_surface;         // 3rd declared → destroyed 4th
+	std::unique_ptr<Screenshot>           app_screenshot;      // 4th declared → destroyed 3rd
+	std::unique_ptr<Editor>               app_editor;          // 5th declared → destroyed 2nd
+	std::unique_ptr<DeferredRenderer>     app_renderer;        // 6th declared → destroyed 1st (FIRST)
 };
 
 } // namespace neurus

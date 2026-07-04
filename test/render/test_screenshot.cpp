@@ -201,6 +201,9 @@ TEST_F(ScreenshotTest, NonCopyable)
 	              "Screenshot must not be copy-constructible");
 	static_assert(!std::is_copy_assignable_v<Screenshot>,
 	              "Screenshot must not be copy-assignable");
-	// Screenshot is also non-movable (deleted constructor)
+	static_assert(!std::is_move_constructible_v<Screenshot>,
+	              "Screenshot must not be move-constructible (stores references)");
+	static_assert(!std::is_move_assignable_v<Screenshot>,
+	              "Screenshot must not be move-assignable (stores references)");
 	SUCCEED();
 }

@@ -150,7 +150,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	Image& ssaoAttachment = m_renderCache->GetAttachment(AttachmentName::SSAO, {kRenderWidth, kRenderHeight});
 	const bool captured = Screenshot::CaptureAttachment(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
-		ssaoAttachment, tmpPath, false);  // not signed, so no remap
+		ssaoAttachment, tmpPath);
 
 	ASSERT_TRUE(captured) << "Failed to capture SSAO attachment";
 

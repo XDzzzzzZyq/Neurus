@@ -6,6 +6,13 @@
 #include "render/Barrier.h"
 #include "Log.h"
 
+#include "c2e.comp.h"
+#include "ComputePipelineBuilder.h"
+#include "DescriptorManager.h"
+#include "shaders/ShaderModule.h"
+#include "scene/Light.h"
+
+#include <algorithm>
 #include <chrono>
 #include <cstring>
 #include <ctime>
@@ -13,6 +20,336 @@
 #include <sstream>
 
 namespace neurus {
+
+// ===========================================================================
+// Constructor
+// ===========================================================================
+
+Screenshot::Screenshot(const vk::raii::Device& device,
+                       const vk::raii::PhysicalDevice& physicalDevice,
+                       vk::Queue queue,
+                       uint32_t queueFamilyIndex)
+	: m_device(device)
+	, m_physicalDevice(physicalDevice)
+	, m_queue(queue)
+	, m_queueFamilyIndex(queueFamilyIndex)
+{
+}
+
+// ===========================================================================
+// Instance method: TakeScreenshot
+// ===========================================================================
+
+bool Screenshot::TakeScreenshot(vk::Image swapchainImage,
+                                vk::Format swapchainFormat,
+                                vk::Extent2D swapchainExtent)
+{
+	const std::string path = Screenshot::timestampedFilename("screenshots/swapchain", ".png");
+
+	return Screenshot::CaptureSwapchain(m_device, m_physicalDevice,
+	                                     m_queue, m_queueFamilyIndex,
+	                                     swapchainImage, swapchainFormat,
+	                                     swapchainExtent, path);
+}
+
+// ===========================================================================
+// Instance method: TakeScreenshotAllAttachments
+// ===========================================================================
+
+int Screenshot::TakeScreenshotAllAttachments(RenderCache& renderCache,
+                                             vk::Extent2D extent,
+                                             uint32_t cubemapResolution)
+{
+	int count = 0;
+
+	count = Screenshot::CaptureAllAttachments(m_device, m_physicalDevice,
+	                                           m_queue, m_queueFamilyIndex,
+	                                           renderCache,
+	                                           extent,
+	                                           "screenshots/gbuffer");
+
+	// --- Export shadow maps: cubemaps → equirect, 2D → direct depth readback ---
+	{
+		const auto shadowUIDs = renderCache.GetShadowMapUIDs();
+		for (int lightUID : shadowUIDs)
+		{
+			// Try cubemap→equirect (point lights) — returns empty for non-cubemaps
+			{
+				const std::string result = ExportShadowDepthEquirect(
+					renderCache, lightUID, "screenshots/shadow_cubemap", cubemapResolution);
+				if (!result.empty())
+				{
+					++count;
+				}
+			}
+			// Try 2D depth export (sun lights) — returns empty for cubemaps
+			{
+				const std::string result = ExportShadowDepth(
+					renderCache, lightUID, "screenshots/sun_shadow");
+				if (!result.empty())
+				{
+					++count;
+				}
+			}
+		}
+	}
+
+	// --- Export shadow intensity array layers ---
+	{
+		Image* intensityArray = renderCache.GetShadowIntensityArray();
+		if (intensityArray)
+		{
+			const auto shadowUIDs = renderCache.GetShadowMapUIDs();
+			for (int lightUID : shadowUIDs)
+			{
+				const uint32_t layer = renderCache.GetShadowIntensityLayerIndex(lightUID);
+				const std::string path = Screenshot::timestampedFilename(
+					"screenshots/shadow_intensity_Light" + std::to_string(lightUID), ".png");
+				if (Screenshot::CaptureImageLayer(m_device, m_physicalDevice,
+				                                   m_queue, m_queueFamilyIndex,
+				                                   *intensityArray, layer, path))
+				{
+					++count;
+				}
+			}
+		}
+	}
+
+	return count;
+}
+
+// ===========================================================================
+// C2E — Shadow cubemap → Equirectangular export
+// ===========================================================================
+
+std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
+                                                  const int lightUID,
+                                                  const std::string& filenamePrefix,
+                                                  const uint32_t cubemapResolution)
+{
+	auto& cubemap = renderCache.GetShadowMap(lightUID, LightType::POINTLIGHT);
+
+	// This method only handles cubemaps; 2D shadow maps are handled by ExportShadowDepth.
+	if (cubemap.Type() != Image::ImageType::eCube)
+	{
+		return {};
+	}
+
+	const uint32_t cubeRes = cubemapResolution;
+	const uint32_t equiWidth = cubeRes * 2;
+	const uint32_t equiHeight = cubeRes;
+
+	// --- 1. Create temporary equirect output image (rgba32f) ---
+	Image equirectImage(m_device, m_physicalDevice,
+	                    vk::Extent2D{equiWidth, equiHeight},
+	                    vk::Format::eR32G32B32A32Sfloat,
+	                    vk::ImageUsageFlagBits::eStorage |
+	                        vk::ImageUsageFlagBits::eTransferSrc,
+	                    1u, Image::ImageType::e2D,
+	                    "ShadowEquirectTemp");
+
+	// --- 2. Create sampler for depth cubemap ---
+	vk::SamplerCreateInfo samplerCI(
+		{}, vk::Filter::eNearest, vk::Filter::eNearest,
+		vk::SamplerMipmapMode::eNearest,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		0.0f, VK_FALSE, 0.0f, VK_FALSE,
+		vk::CompareOp::eAlways,
+		0.0f, 0.0f, vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+	vk::raii::Sampler cubeSampler(m_device, samplerCI);
+
+	// --- 3. Descriptor set layout (2 bindings) ---
+	DescriptorSetLayout c2eLayout = BuildLayout()
+		.AddBinding(0, vk::DescriptorType::eCombinedImageSampler,
+		            vk::ShaderStageFlagBits::eCompute)
+		.AddBinding(1, vk::DescriptorType::eStorageImage,
+		            vk::ShaderStageFlagBits::eCompute)
+		.Build(m_device);
+
+	DescriptorPool c2ePool(m_device, 1,
+		DescriptorPool::CalculatePoolSizes({&c2eLayout}, 1));
+	auto c2eSet = std::move(c2ePool.Allocate(c2eLayout, 1).front());
+
+	// Write descriptors
+	{
+		vk::DescriptorImageInfo cubeInfo(cubeSampler, *cubemap.ImageViewHandle(),
+		                                  vk::ImageLayout::eShaderReadOnlyOptimal);
+		c2eSet.WriteImage(0, cubeInfo, vk::DescriptorType::eCombinedImageSampler);
+
+		vk::DescriptorImageInfo equiInfo(nullptr, *equirectImage.ImageViewHandle(),
+		                                  vk::ImageLayout::eGeneral);
+		c2eSet.WriteImage(1, equiInfo, vk::DescriptorType::eStorageImage);
+	}
+
+	// --- 4. Create compute pipeline ---
+	auto compModule = ShaderModule::FromEmbedded(m_device,
+		c2e_comp_spv, sizeof(c2e_comp_spv));
+
+	ComputePipelineBuilder c2eBuilder(m_device);
+	c2eBuilder.SetShaderStage(compModule, "main");
+	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
+	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
+
+	auto c2ePipeline = c2eBuilder.BuildComputePipeline();
+	vk::PipelineLayout c2ePipelineLayout = *c2eBuilder.pipelineLayout();
+
+	// --- 5. Record & dispatch ---
+	{
+		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
+		                                  m_queueFamilyIndex);
+		vk::raii::CommandPool cmdPool(m_device, poolCI);
+		vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+		vk::raii::CommandBuffers cmdBufs(m_device, allocInfo);
+
+		auto& cmd = cmdBufs[0];
+		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+
+		// Transition cubemap → SHADER_READ_ONLY
+		{
+			Barrier::Transition(*cmd, cubemap, ImageState::ColorShaderRead);
+		}
+
+		// Transition equirect → GENERAL
+		{
+			Barrier::Transition(*cmd, equirectImage, ImageState::ShaderWrite);
+		}
+
+		// Bind and dispatch
+		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *c2ePipeline);
+		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+		                       c2ePipelineLayout, 0,
+		                       {c2eSet.handle()}, {});
+
+		uint32_t gx = (equiWidth  + 15) / 16;
+		uint32_t gy = (equiHeight + 15) / 16;
+		cmd.dispatch(gx, gy, 1);
+
+		// Transition equirect → TRANSFER_SRC for readback
+		{
+			Barrier::Transition(*cmd, equirectImage, ImageState::TransferSrc);
+		}
+
+		cmd.end();
+
+		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmd));
+		m_queue.submit(submitInfo);
+		m_queue.waitIdle();
+	}
+
+	// --- 6. Read back equirect as grayscale PNG ---
+	auto equirectData = equirectImage.ReadImageData(
+		m_device, m_physicalDevice, m_queue, m_queueFamilyIndex);
+
+	if (!equirectData.IsValid())
+	{
+		NEURUS_ERR("[ExportShadowDepthEquirect] Readback failed for lightUID=" << lightUID);
+		return {};
+	}
+
+	const auto& rawPixelData = equirectData.GetPixelData();
+	const size_t pixelCount = static_cast<size_t>(equiWidth) * equiHeight;
+	std::vector<uint8_t> grayPixels(pixelCount);
+
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		float r;
+		std::memcpy(&r, &rawPixelData[i * 16], sizeof(float));
+		r = std::max(0.0f, std::min(1.0f, r));
+		grayPixels[i] = static_cast<uint8_t>(r * 255.0f + 0.5f);
+	}
+
+	const std::string path = Screenshot::timestampedFilename(
+		filenamePrefix + "_Light" + std::to_string(lightUID), ".png");
+
+	ImageData grayImg(grayPixels.data(), equiWidth, equiHeight, vk::Format::eR8Unorm);
+	const bool saved = grayImg.SavePNG(path);
+
+	if (saved)
+	{
+		NEURUS_LOG("[ExportShadowDepthEquirect] Saved " << path
+		           << " (" << equiWidth << "x" << equiHeight << ")");
+		return path;
+	}
+	return {};
+}
+
+// ===========================================================================
+// ExportShadowDepth — 2D sun light shadow depth map → grayscale PNG
+// ===========================================================================
+
+std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
+                                          const int lightUID,
+                                          const std::string& filenamePrefix)
+{
+	// Sun light shadow map is a 2D D32_SFLOAT image — read back depth
+	// values, normalise to [0,1] grayscale, and save as PNG.
+	auto& depthMap = renderCache.GetShadowMap(lightUID, LightType::POINTLIGHT);
+
+	if (depthMap.Type() == Image::ImageType::eCube)
+	{
+		return {}; // This method only handles 2D depth maps
+	}
+
+	const vk::Extent2D extent = depthMap.Extent();
+	const auto originalState = depthMap.State();
+
+	auto depthData = depthMap.ReadImageData(
+		m_device, m_physicalDevice, m_queue, m_queueFamilyIndex);
+
+	if (!depthData.IsValid())
+	{
+		NEURUS_ERR("[ExportShadowDepth] Readback failed for 2D sun shadow lightUID=" << lightUID);
+		return {};
+	}
+
+	// Convert D32 float depth → R8 grayscale
+	const auto& rawPixels = depthData.GetPixelData();
+	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
+	std::vector<uint8_t> grayPixels(pixelCount);
+
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		float d;
+		std::memcpy(&d, &rawPixels[i * sizeof(float)], sizeof(float));
+		d = std::max(0.0f, std::min(1.0f, d));
+		grayPixels[i] = static_cast<uint8_t>(d * 255.0f + 0.5f);
+	}
+
+	const std::string path = Screenshot::timestampedFilename(
+		filenamePrefix + "_Light" + std::to_string(lightUID), ".png");
+
+	ImageData grayImg(grayPixels.data(), extent.width, extent.height,
+	                   vk::Format::eR8Unorm);
+	const bool saved = grayImg.SavePNG(path);
+
+	// Restore original layout — ReadImageData transitions to TransferSrc.
+	if (saved && depthMap.State() != originalState)
+	{
+		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
+		                                  m_queueFamilyIndex);
+		vk::raii::CommandPool cmdPool(m_device, poolCI);
+		vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+		vk::raii::CommandBuffers cmdBufs(m_device, allocInfo);
+
+		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+		Barrier::Transition(*cmdBufs[0], depthMap, originalState);
+		cmdBufs[0].end();
+
+		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+		m_queue.submit(submitInfo);
+		m_queue.waitIdle();
+	}
+
+	if (saved)
+	{
+		NEURUS_LOG("[ExportShadowDepth] Saved " << path
+		           << " (" << extent.width << "x" << extent.height << ")");
+		return path;
+	}
+	return {};
+}
 
 // ===========================================================================
 // Timestamp helper
@@ -214,8 +551,7 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
                                     vk::Queue queue,
                                     uint32_t queueFamilyIndex,
                                      Image& vulkanImage,
-                                    const std::string& path,
-                                    bool remapSigned)
+                                    const std::string& path)
 {
 	if (ImageData::PixelByteSize(vulkanImage.Format()) == 0)
 	{
@@ -225,7 +561,7 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
 	// All GPU operations (layout transitions, readback) and CPU operations
 	// (format conversion, PNG write) are handled by Texture::SaveImage.
 	return Texture::SaveImage(vulkanImage, device, physicalDevice,
-	                               queue, queueFamilyIndex, path, remapSigned);
+	                               queue, queueFamilyIndex, path);
 }
 
 // ===========================================================================
@@ -238,13 +574,16 @@ bool Screenshot::CaptureImageLayer(const vk::raii::Device& device,
                                     uint32_t queueFamilyIndex,
                                     Image& vulkanImage,
                                     uint32_t layerIndex,
-                                    const std::string& path,
-                                    bool remapSigned)
+                                    const std::string& path)
 {
 	if (ImageData::PixelByteSize(vulkanImage.Format()) == 0)
 	{
 		return false;
 	}
+
+	// Save original layout — ReadImageData transitions the image to
+	// TRANSFER_SRC_OPTIMAL for readback and does not restore it.
+	const auto originalState = vulkanImage.State();
 
 	// Read back the specified layer using the Layer() subresource range.
 	// ReadImageData handles layout transition, copy-to-buffer, submit, and wait.
@@ -258,7 +597,29 @@ bool Screenshot::CaptureImageLayer(const vk::raii::Device& device,
 		return false;
 	}
 
-	return imageData.SavePNG(path, remapSigned);
+	const bool saved = imageData.SavePNG(path);
+
+	// Restore original layout so rendering can continue without validation errors.
+	// ReadImageData transitions to TransferSrc but the image must be returned
+	// to its original state (e.g., ShaderRead for ShadowIntensityArray).
+	if (saved && vulkanImage.State() != originalState)
+	{
+		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
+		                                  queueFamilyIndex);
+		vk::raii::CommandPool cmdPool(device, poolCI);
+		vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
+		vk::raii::CommandBuffers cmdBufs(device, allocInfo);
+
+		cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+		Barrier::Transition(*cmdBufs[0], vulkanImage, originalState);
+		cmdBufs[0].end();
+
+		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
+		queue.submit(submitInfo);
+		queue.waitIdle();
+	}
+
+	return saved;
 }
 
 // ===========================================================================
@@ -307,9 +668,8 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 		const std::string fileName = timestampedFilename(
 			prefix + "_" + AttachmentNameToString(name), ".png");
 
-		const bool remapSigned = (name == AttachmentName::Normal);
 		if (CaptureAttachment(device, physicalDevice, queue, queueFamilyIndex,
-		                      image, fileName, remapSigned))
+		                      image, fileName))
 		{
 			++capturedCount;
 		}

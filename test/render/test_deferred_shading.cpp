@@ -191,8 +191,6 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	for (int i = 0; i < kReferenceAttachmentCount; ++i)
 	{
 		const AttachmentName name = kReferenceAttachments[i];
-		const bool isNormal = (name == AttachmentName::Normal);
-
 		const std::string refPath = neurus::test::ReferencePath::Make(
 			std::string("deferred/") + AttachmentNameToString(name) + ".png");
 		const std::string tmpPath = refPath + ".tmp";
@@ -200,7 +198,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 		Image& attachment = m_renderCache->GetAttachment(name, {kRenderWidth, kRenderHeight});
 		const bool captured = Screenshot::CaptureAttachment(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			attachment, tmpPath, isNormal);
+			attachment, tmpPath);
 
 		ASSERT_TRUE(captured) << "Failed to capture attachment: "
 		                      << AttachmentNameToString(name);

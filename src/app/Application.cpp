@@ -15,7 +15,7 @@
  *  10. QTimer-driven render loop - ~60 FPS
  *
  * Cleanup: C++ member destruction in reverse declaration order handles
- *   renderer → editor → surface → mainWindow → vkContext automatically.
+ *   renderer → editor → screenshot → surface → mainWindow → vkContext automatically.
  */
 
 // Must define platform before including any Vulkan headers
@@ -46,6 +46,8 @@
 #include "ui/VulkanWidget.h"
 #include "VulkanContext.h"
 #include "render/DeferredRenderer.h"
+#include "render/RenderCache.h"
+#include "render/Screenshot.h"
 #include "render/Texture.h"
 #include "asset/MeshData.h"
 #include "scene/Scene.h"
@@ -244,6 +246,13 @@ bool Application::InitRenderer(const project::Project& project)
 	// --- Upload scene lights to GPU (via LightingPass) ---
 	app_renderer->UploadLights(project.GetScene());
 
+	// --- Create screenshot helper (needs Vulkan handles; RenderCache passed per-call) ---
+	app_screenshot = std::make_unique<neurus::Screenshot>(
+		app_vkContext->device(),
+		app_vkContext->physicalDevice(),
+		app_vkContext->graphicsQueue(),
+		app_vkContext->graphicsQueueFamily());
+
 	return true;
 }
 
@@ -295,22 +304,26 @@ void Application::WireSignals()
 	                     ResizeViewport(width, height);
 	                 });
 
-	// TODO: decouple screenshot from DeferredRenderer, Isolate by Editor, Use EventBus as bridge.
 	// Handle screenshot requests (F12 / menu action) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotRequested,
 	                 [this]() {
-	                     if (app_renderer)
+	                     if (app_screenshot && app_renderer)
 	                     {
-	                         app_renderer->TakeScreenshot();
+	                         app_screenshot->TakeScreenshot(
+	                             app_renderer->GetLastSwapchainImage(),
+	                             app_renderer->GetSwapchainFormat(),
+	                             app_renderer->GetExtent());
 	                     }
 	                 });
 
 	// Handle attachment dump requests (Ctrl+F12) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotAllRequested,
 	                 [this]() {
-	                     if (app_renderer)
+	                     if (app_screenshot && app_renderer)
 	                     {
-	                         app_renderer->TakeScreenshotAllAttachments();
+	                         app_screenshot->TakeScreenshotAllAttachments(
+	                             app_renderer->GetRenderCache(),
+	                             app_renderer->GetExtent(), 1024);
 	                     }
 	                 });
 }

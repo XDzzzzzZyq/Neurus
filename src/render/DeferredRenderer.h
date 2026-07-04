@@ -137,24 +137,26 @@ public:
 	vk::Extent2D GetExtent() const { return r_swapchain ? r_swapchain->extent() : vk::Extent2D{800, 600}; }
 
 	/**
-	 * @brief Captures the current swapchain image to a timestamped PNG file.
+	 * @brief Returns the last acquired swapchain image for screenshot capture.
 	 *
-	 * Uses the last acquired swapchain image index. Safe to call after a
-	 * frame has been rendered. Blocks until GPU work completes.
+	 * The returned image is in PRESENT_SRC layout from the most recent frame.
+	 * Caller must wait for GPU idle before using the image for readback.
 	 *
-	 * @return true if the screenshot was successfully written.
+	 * @return vk::Image handle (VK_NULL_HANDLE if swapchain not available or
+	 *         image index is invalid).
 	 */
-	bool TakeScreenshot();
+	vk::Image GetLastSwapchainImage() const;
+
+	/** @brief Returns the current swapchain image format. */
+	vk::Format GetSwapchainFormat() const;
 
 	/**
-	 * @brief Captures all G-Buffer attachments to timestamped PNG files.
+	 * @brief Returns a reference to the RenderCache for external access.
 	 *
-	 * Dumps Position, Normal, Albedo, MetallicRoughness, and post-FX
-	 * attachments to individual PNGs with timestamp in filename.
-	 *
-	 * @return Number of attachments successfully captured.
+	 * Used by the Screenshot class to enumerate and capture attachments,
+	 * shadow maps, and shadow intensity arrays.
 	 */
-	int TakeScreenshotAllAttachments();
+	RenderCache& GetRenderCache() { return *r_renderCache; }
 
 	/**
 	 * @brief Handles window resize by proactively recreating swapchain and
@@ -184,18 +186,6 @@ public:
 	 * @param specularOut    Pre-created specular prefiltered cubemap.
 	 */
 	void GenerateIBL(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
-
-	/**
-	 * @brief Converts the shadow depth cubemap to an equirectangular grayscale PNG.
-	 *
-	 * Creates a temporary rgba32f equirect image, dispatches c2e.comp,
-	 * reads back the depth channel as grayscale, and writes a PNG.
-	 *
-	 * @param lightUID       The light UID whose shadow cubemap to export.
-	 * @param filenamePrefix Prefix for the output PNG filename.
-	 * @return The output file path on success, empty string on failure.
-	 */
-	std::string ExportShadowDepthEquirect(int lightUID, const std::string& filenamePrefix);
 
 private:
 	/**
@@ -269,7 +259,7 @@ private:
 	uint32_t r_currentFrame = 0;
 	uint32_t r_swapchainGeneration = 0;
 
-	// --- Last acquired swapchain image index (for screenshot) ---
+	// --- Last acquired swapchain image index ---
 	uint32_t r_lastImageIndex = 0;
 
 };

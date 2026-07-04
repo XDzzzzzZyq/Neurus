@@ -79,6 +79,9 @@ output/
 tmp/
 temp/
 
+# Screen shots
+screenshots/
+
 # Plan drafts and metafiles
 .omo/
 .ocx/

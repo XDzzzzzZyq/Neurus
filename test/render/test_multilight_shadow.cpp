@@ -218,7 +218,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	const bool captured = Screenshot::CaptureAttachment(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
-		hdrAttachment, tmpPath, /*remapSigned=*/false);
+		hdrAttachment, tmpPath);
 
 	ASSERT_TRUE(captured) << "Failed to capture HDRColor attachment to " << tmpPath;
 
@@ -742,7 +742,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 
 	const bool captured = Screenshot::CaptureAttachment(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
-		hdrAttachment, tmpPath, /*remapSigned=*/false);
+		hdrAttachment, tmpPath);
 
 	ASSERT_TRUE(captured) << "Failed to capture HDRColor attachment to " << tmpPath;
 

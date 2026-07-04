@@ -313,7 +313,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	Image& hdrColor = m_renderCache->GetAttachment(AttachmentName::HDRColor, {kRenderWidth, kRenderHeight});
 	const bool captured = Screenshot::CaptureAttachment(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
-		hdrColor, tmpPath, false);
+		hdrColor, tmpPath);
 
 	ASSERT_TRUE(captured) << "Failed to capture HDRColor attachment";
 

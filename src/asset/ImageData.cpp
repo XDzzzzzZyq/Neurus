@@ -129,8 +129,8 @@ std::vector<uint8_t> ImageData::ConvertHalfToU8(const void* data,
 
 	for (size_t i = 0; i < pixelCount; ++i)
 	{
-		const bool isBackground = remapSigned
-			&& (src[i * 4 + 0] == 0)
+		// Background pixels: clear value (0, 0, 0, 0) — leave transparent.
+		const bool isBackground = (src[i * 4 + 0] == 0)
 			&& (src[i * 4 + 1] == 0)
 			&& (src[i * 4 + 2] == 0);
 
@@ -143,7 +143,7 @@ std::vector<uint8_t> ImageData::ConvertHalfToU8(const void* data,
 			val = (val < 0.0f) ? 0.0f : ((val > 1.0f) ? 1.0f : val);
 			result[i * 4 + c] = static_cast<uint8_t>(val * 255.0f + 0.5f);
 		}
-		if (remapSigned && !isBackground)
+		if (!isBackground)
 			result[i * 4 + 3] = 255;
 	}
 	return result;
