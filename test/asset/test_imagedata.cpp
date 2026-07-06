@@ -110,11 +110,11 @@ TEST(ImageDataTest, ConvertHalfToU8_Unmapped)
 	EXPECT_EQ(result[6], 255);
 	EXPECT_EQ(result[7], 255);
 
-	// Pixel 2: (0.25, 0.75, 0.0, 0.5) → (64, 191, 0, 128)
+	// Pixel 2: (0.25, 0.75, 0.0, 0.5) → (64, 191, 0, 255) — non-background, alpha forced opaque
 	EXPECT_EQ(result[8], 64);
 	EXPECT_EQ(result[9], 191);
 	EXPECT_EQ(result[10], 0);
-	EXPECT_EQ(result[11], 128);
+	EXPECT_EQ(result[11], 255);
 
 	// Pixel 3: (0.0, 0.0, 0.0, 0.0) → (0, 0, 0, 0)
 	EXPECT_EQ(result[12], 0);

@@ -117,7 +117,7 @@ Key rules:
 
 Follow Karpathy Guidelines. For each task:
 
-1. Think and plan. System design should be highly decoupled and elegant.
+1. Think and plan. System design should be highly decoupled and elegant. Also, do not assume user is always correct, ask question if you have any concerns, confusions, or better design.
 2. Implement. Do not hide errors, expose them directly. Use debug printing and
    logging. Wire every feature **IMMEDIATELY** into the renderer and program.
 3. Test and Verify. 
