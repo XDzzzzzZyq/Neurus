@@ -14,8 +14,13 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 
 std::vector<std::string> ShaderStruct::type_table = {
-	"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube"
+	"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"
 };
+
+void ShaderStruct::ResetTypeTable()
+{
+	type_table = {"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"};
+}
 
 // ---------------------------------------------------------------------------
 // ParseType — ParaType ↔ string
@@ -184,10 +189,11 @@ void ShaderStruct::SetUB(std::string type, std::string name, const Args& args)
 	ubuffer_list.emplace_back(std::move(def));
 }
 
-void ShaderStruct::SetUni(ParaType type, int count, const std::string& name)
+void ShaderStruct::SetUni(ParaType type, int count, const std::string& name, int binding,
+                          const std::string& qualifiers, const std::string& actualType)
 {
 	is_struct_changed = true;
-	uniform_list.emplace_back(name, type, count);
+	uniform_list.push_back({name, type, count, binding, qualifiers, actualType});
 }
 
 void ShaderStruct::SetInp(ParaType type, int count, const std::string& name)
@@ -250,6 +256,12 @@ void ShaderStruct::SetPushConstant(const std::string& name, uint32_t offset, uin
 	push_constants.push_back({name, offset, size, typeName});
 }
 
+void ShaderStruct::SetPushConstantVar(const std::string& var)
+{
+	is_struct_changed = true;
+	push_constants_var = var;
+}
+
 void ShaderStruct::SetLocalSize(uint32_t x, uint32_t y, uint32_t z)
 {
 	is_struct_changed = true;
@@ -300,6 +312,7 @@ void ShaderStruct::Reset()
 	Main.clear();
 
 	push_constants.clear();
+	push_constants_var.clear();
 	spec_constants.clear();
 	extensions.clear();
 
@@ -396,7 +409,7 @@ std::string ShaderStruct::GenerateShader()
 			{
 				result << "\t" << ParseType(field.type) << " " << field.name << ";\n";
 			}
-			result << "};\n\n";
+	result << "} " << (push_constants_var.empty() ? "" : push_constants_var + " ") << ";\n\n";
 		}
 	}
 
@@ -427,8 +440,15 @@ std::string ShaderStruct::GenerateShader()
 			{
 				result << "\t" << ParseType(field.type) << " " << field.name << ";\n";
 			}
-			// Emit variable / instance name (fall back to block name if empty)
-			result << "} " << (ub.varName.empty() ? ub.name : ub.varName) << ";\n";
+		// Emit variable / instance name only when explicitly set (e.g. "camera" in "} camera;")
+		if (ub.varName.empty())
+		{
+			result << "};\n";
+		}
+		else
+		{
+			result << "} " << ub.varName << ";\n";
+		}
 		}
 		result << "\n";
 	}
@@ -439,9 +459,16 @@ std::string ShaderStruct::GenerateShader()
 		result << "layout(push_constant) uniform PushConstants\n{\n";
 		for (const auto& pc : push_constants)
 		{
-			result << "\t" << pc.typeName << " " << pc.name << ";\n";
+			result << "\tlayout(offset = " << pc.offset << ") " << pc.typeName << " " << pc.name << ";\n";
 		}
-		result << "} pc;\n\n";
+		if (!push_constants_var.empty())
+		{
+			result << "} " << push_constants_var << ";\n\n";
+		}
+		else
+		{
+			result << "};\n\n";
+		}
 	}
 
 	// 9. spec_constants — layout(constant_id = B) const type name = defaultVal;
@@ -456,13 +483,33 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 10. uniform_list — uniform type name[N];
+	// 10. uniform_list — layout(binding=N) uniform [qualifiers] type name[N]; or uniform type name[N];
 	if (!uniform_list.empty())
 	{
 		for (const auto& u : uniform_list)
 		{
-			result << "uniform " << ParseType(u.type) << " " << u.name
-			       << ParseCount(u.count) << ";\n";
+			// Binding qualifier
+			if (u.binding >= 0)
+			{
+				result << "layout(binding = " << u.binding << ") ";
+			}
+			// Uniform keyword
+			result << "uniform ";
+			// Qualifiers (e.g. "writeonly", "readonly")
+			if (!u.qualifiers.empty())
+			{
+				result << u.qualifiers << " ";
+			}
+			// Type name (use actualType if set, else convert ParaType)
+			if (!u.actualType.empty())
+			{
+				result << u.actualType;
+			}
+			else
+			{
+				result << ParseType(u.type);
+			}
+			result << " " << u.name << ParseCount(u.count) << ";\n";
 		}
 		result << "\n";
 	}

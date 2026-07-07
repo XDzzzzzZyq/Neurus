@@ -516,10 +516,22 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					out.SetPushConstant(word, currentOffset, size, typeName);
 					currentOffset += size;
 				}
-				while (true);
+			while (true);
 
-				continue;
+			// Extract variable name from closing line (e.g. "} pc;" or "};")
+			{
+				size_t closeBrace = line.find('}');
+				size_t semi        = line.find(';');
+				if (closeBrace != std::string::npos && semi != std::string::npos
+				    && semi > closeBrace + 1)
+				{
+					out.SetPushConstantVar(
+						TrimWhitespace(line.substr(closeBrace + 1, semi - closeBrace - 1)));
+				}
 			}
+
+			continue;
+		}
 
 		// --- Uniform block: layout(...) uniform BlockType { ... } varName; ---
 		// Distinguish from standalone uniforms by checking for '{' (same/next line)
@@ -615,29 +627,40 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			}
 		}
 
-		out.SetUB(blockType, ubVarName.empty() ? blockType : ubVarName, argsCache);
+		out.SetUB(blockType, ubVarName, argsCache);
 		argsCache.clear();
 		continue;
 	}
 
-			// --- Standalone uniform with layout: layout(binding=N) uniform type name; ---
-			if (afterLayout.find("uniform") != std::string::npos && afterLayout.find('{') == std::string::npos)
+		// --- Standalone uniform with layout: layout(binding=N) uniform type name; ---
+		if (afterLayout.find("uniform") != std::string::npos && afterLayout.find('{') == std::string::npos)
+		{
+			// Capture qualifiers ("writeonly", "readonly") before stripping
+			std::string qualifiers;
+			if (afterLayout.find("writeonly") != std::string::npos)
 			{
-				// Strip qualifiers like "writeonly", "readonly"
-				std::string decl = afterLayout;
-				for (const auto& qualifier : {"writeonly", "readonly", "uniform"})
-				{
-					size_t qpos = decl.find(qualifier);
-					if (qpos != std::string::npos)
-					{
-						decl = decl.substr(qpos + std::strlen(qualifier));
-						break;
-					}
-				}
-				decl = TrimWhitespace(decl);
+				qualifiers = "writeonly";
+			}
+			else if (afterLayout.find("readonly") != std::string::npos)
+			{
+				qualifiers = "readonly";
+			}
 
-				std::istringstream iss(decl);
-				std::string typeName;
+			// Strip qualifiers like "writeonly", "readonly", "uniform"
+			std::string decl = afterLayout;
+			for (const auto& qualifier : {"writeonly", "readonly", "uniform"})
+			{
+				size_t qpos = decl.find(qualifier);
+				if (qpos != std::string::npos)
+				{
+					decl = decl.substr(qpos + std::strlen(qualifier));
+					break;
+				}
+			}
+			decl = TrimWhitespace(decl);
+
+			std::istringstream iss(decl);
+			std::string typeName;
 				iss >> typeName;
 				iss >> word;
 
@@ -647,9 +670,16 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					word.pop_back();
 				}
 
-				ParaType pType = ShaderStruct::ParseType(typeName);
-				out.SetUni(pType, 1, word);
-				continue;
+		ParaType pType = ShaderStruct::ParseType(typeName);
+			int binding = ExtractIntFromLayout(layoutStr, "binding");
+			// Pass actualType for custom types like "image2D" that ParseType may lose
+			std::string actualType;
+			if (!qualifiers.empty() || typeName.find("image") == 0)
+			{
+				actualType = typeName;
+			}
+			out.SetUni(pType, 1, word, binding, qualifiers, actualType);
+			continue;
 			}
 
 			// --- layout(location=N) in type name; → vertex attributes / fragment inputs ---
@@ -831,10 +861,40 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 			ShaderStruct::ADD_TYPE(structName);
 
-			// Determine if '{' is on this line or the next
-			bool foundOpenBrace = (fullLine.find('{') != std::string::npos);
+		// Determine if '{' is on this line or the next
+		bool foundOpenBrace = (fullLine.find('{') != std::string::npos);
+		size_t closeBraceOnLine = fullLine.find('}');
 
+		// Single-line struct: "struct Name { type member; };"
+		if (foundOpenBrace && closeBraceOnLine != std::string::npos
+		    && closeBraceOnLine > fullLine.find('{'))
+		{
+			size_t braceOpen  = fullLine.find('{');
+			size_t braceClose = closeBraceOnLine;
+			std::string body = TrimWhitespace(
+				fullLine.substr(braceOpen + 1, braceClose - braceOpen - 1));
+			if (!body.empty())
+			{
+				// Parse member: "type name;"
+				std::istringstream mstr(body);
+				std::string typeName, memberName;
+				mstr >> typeName >> memberName;
+				if (!memberName.empty() && memberName.back() == ';')
+				{
+					memberName.pop_back();
+				}
+				if (!typeName.empty() && !memberName.empty())
+				{
+					ParaType pType = ShaderStruct::ParseType(typeName);
+					argsCache.emplace_back(pType, memberName);
+				}
+			}
+			out.DefStruct(structName, argsCache);
 			argsCache.clear();
+			continue;
+		}
+
+		argsCache.clear();
 
 		do
 		{
@@ -909,41 +969,72 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
-		// "const type name = value;" → constant declaration
-		// ---------------------------------------------------------------
-		if (fullLine.find("const") != std::string::npos)
+	// ---------------------------------------------------------------
+	// "const type name = value;" → constant declaration
+	// (Only matches lines that START with "const " — not "const" in identifiers.)
+	// ---------------------------------------------------------------
+	if (fullLine.find("const ") == 0)
+	{
+		std::istringstream iss(fullLine);
+		std::string word;
+		iss >> word; // "const"
+		iss >> word; // type
+
+		ParaType paraType = ShaderStruct::ParseType(word);
+		iss >> word; // name
+
+		// Strip trailing ';' if present (may already be gone)
+		if (!word.empty() && word.back() == ';')
 		{
-			std::istringstream iss(fullLine);
-			std::string word;
-			iss >> word; // "const"
-			iss >> word; // type
-
-			ParaType paraType = ShaderStruct::ParseType(word);
-			iss >> word; // name
-
-			// Strip trailing ';' if present (may already be gone)
-			if (!word.empty() && word.back() == ';')
-			{
-				word.pop_back();
-			}
-
-			// Extract the value: everything after "= " until ";"
-			std::string name = word;
-			size_t eqPos = fullLine.find('=');
-			size_t semiPos = fullLine.find(';');
-			std::string value = "0";
-
-			if (eqPos != std::string::npos)
-			{
-				size_t valStart = eqPos + 1;
-				size_t valEnd = (semiPos != std::string::npos) ? semiPos : fullLine.size();
-				value = TrimWhitespace(fullLine.substr(valStart, valEnd - valStart));
-			}
-
-			out.SetConst(paraType, name, value);
-			continue;
+			word.pop_back();
 		}
+
+		// Extract the value: everything after "= " until ";", or emit multi-line skip
+		std::string name = word;
+		size_t eqPos = fullLine.find('=');
+		size_t semiPos = fullLine.find(';');
+		std::string value = "0";
+
+		if (eqPos != std::string::npos)
+		{
+			size_t valStart = eqPos + 1;
+			// Multi-line initializer: read until "};" and capture full text
+			if (semiPos == std::string::npos
+			    && fullLine.find('{', eqPos) != std::string::npos)
+			{
+				std::string multiValue = TrimWhitespace(
+					fullLine.substr(valStart)) + "\n";
+				do
+				{
+					if (!std::getline(stream, line))
+					{
+						NEURUS_ERR("ShaderParser: unexpected EOF while "
+						           "parsing const initializer");
+						return false;
+					}
+					line = StripComments(line, inBlockComment);
+					if (line.find('}') != std::string::npos
+					    && line.find(';') != std::string::npos)
+					{
+						// Capture up to and including ';' on closing line
+				size_t semi = line.find(';');
+					multiValue += line.substr(0, semi); // capture up to ';' (exclusive)
+					break;
+					}
+					multiValue += line + "\n";
+				}
+				while (true);
+
+				out.SetConst(paraType, name, multiValue);
+				continue;
+			}
+			size_t valEnd = (semiPos != std::string::npos) ? semiPos : fullLine.size();
+			value = TrimWhitespace(fullLine.substr(valStart, valEnd - valStart));
+		}
+
+		out.SetConst(paraType, name, value);
+		continue;
+	}
 
 		// ---------------------------------------------------------------
 		// "void main() { ... }" → main entry-point body

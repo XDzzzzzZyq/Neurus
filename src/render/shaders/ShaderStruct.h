@@ -65,9 +65,12 @@ struct S_StructDef
  */
 struct S_Uniform
 {
-	std::string name; ///< Variable name
-	ParaType type;    ///< GLSL type
-	int count;        ///< Array count (1 = scalar)
+	std::string name;       ///< Variable name
+	ParaType type;          ///< GLSL type (may be NONE when qualifiers/actualType are used)
+	int count;              ///< Array count (1 = scalar)
+	int binding = -1;       ///< Descriptor-set binding point (-1 = no layout qualifier)
+	std::string qualifiers; ///< Qualifiers (e.g. "writeonly", "readonly"; empty = none)
+	std::string actualType; ///< Original GLSL type string (e.g. "image2D"; empty → use ParseType(type))
 };
 
 /**
@@ -190,6 +193,7 @@ public:
 	// -------------------------------------------------------------------
 
 	std::vector<S_PushConstant> push_constants; ///< Push-constant block members
+	std::string                push_constants_var; ///< Variable name after closing '}' (empty = none)
 	std::vector<S_SpecConstant> spec_constants; ///< Specialisation constants
 	uint32_t                    local_size_x = 0; ///< Compute workgroup X dimension (0 = not a compute shader)
 	uint32_t                    local_size_y = 0; ///< Compute workgroup Y dimension
@@ -254,7 +258,8 @@ public:
 	/** @brief Register a uniform-buffer block declaration. */
 	void SetUB(std::string type, std::string name, const Args& args);
 	/** @brief Register a bare uniform variable. */
-	void SetUni(ParaType type, int count, const std::string& name);
+	void SetUni(ParaType type, int count, const std::string& name, int binding = -1,
+	            const std::string& qualifiers = "", const std::string& actualType = "");
 	/** @brief Register a shader-stage input variable. */
 	void SetInp(ParaType type, int count, const std::string& name);
 	/** @brief Register a shader-stage output variable. */
@@ -277,6 +282,8 @@ public:
 	/** @brief Register a push-constant block member (offset, size, and GLSL type). */
 	void SetPushConstant(const std::string& name, uint32_t offset, uint32_t size,
 	                     const std::string& typeName);
+	/** @brief Set the push-constant block variable name (e.g. "pc" in "} pc;"). */
+	void SetPushConstantVar(const std::string& var);
 	/** @brief Set the compute-shader workgroup size. */
 	void SetLocalSize(uint32_t x, uint32_t y, uint32_t z);
 	/** @brief Set the GLSL #version value. */
@@ -320,6 +327,9 @@ public:
 	 *         (@c "#version 450 core\\nvoid main() {}") when IsEmpty().
 	 */
 	std::string GenerateShader();
+
+	/** @brief Reset the static type registration table. Call between independent parse sessions. */
+	static void ResetTypeTable();
 };
 
 } // namespace neurus

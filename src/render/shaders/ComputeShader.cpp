@@ -13,6 +13,7 @@
 
 #include <shaderc/shaderc.hpp>
 
+#include <algorithm>
 #include <fstream>
 #include <sstream>
 
@@ -147,16 +148,29 @@ bool ComputeShader::Recompile(ShaderCompiler& compiler)
 
 void ComputeShader::SetDefault(const std::string& name, int value)
 {
+	// Remove existing entry with the same name, then append (overwrite semantics)
+	m_defaults.erase(
+		std::remove_if(m_defaults.begin(), m_defaults.end(),
+			[&](const Default& d) { return d.name == name; }),
+		m_defaults.end());
 	m_defaults.push_back({name, "int", std::to_string(value)});
 }
 
 void ComputeShader::SetDefault(const std::string& name, float value)
 {
+	m_defaults.erase(
+		std::remove_if(m_defaults.begin(), m_defaults.end(),
+			[&](const Default& d) { return d.name == name; }),
+		m_defaults.end());
 	m_defaults.push_back({name, "float", std::to_string(value)});
 }
 
 void ComputeShader::SetDefault(const std::string& name, bool value)
 {
+	m_defaults.erase(
+		std::remove_if(m_defaults.begin(), m_defaults.end(),
+			[&](const Default& d) { return d.name == name; }),
+		m_defaults.end());
 	m_defaults.push_back({name, "bool", value ? "true" : "false"});
 }
 

@@ -187,12 +187,15 @@ void ExpectStructurallyEquivalent(const ShaderStruct& a, const ShaderStruct& b,
         EXPECT_EQ(a.struct_def_list[i].fields.size(), b.struct_def_list[i].fields.size()) << "struct_def_list[" << i << "].fields.size";
     }
 
-    // --- uniform_list: (name, type, count) ---
+    // --- uniform_list: (name, type, count, binding, qualifiers, actualType) ---
     for (size_t i = 0; i < std::min(a.uniform_list.size(), b.uniform_list.size()); ++i)
     {
-        EXPECT_EQ(a.uniform_list[i].name,  b.uniform_list[i].name)  << "uniform_list[" << i << "].name";
-        EXPECT_EQ(a.uniform_list[i].type,  b.uniform_list[i].type)  << "uniform_list[" << i << "].type";
-        EXPECT_EQ(a.uniform_list[i].count, b.uniform_list[i].count) << "uniform_list[" << i << "].count";
+        EXPECT_EQ(a.uniform_list[i].name,       b.uniform_list[i].name)       << "uniform_list[" << i << "].name";
+        EXPECT_EQ(a.uniform_list[i].type,       b.uniform_list[i].type)       << "uniform_list[" << i << "].type";
+        EXPECT_EQ(a.uniform_list[i].count,      b.uniform_list[i].count)      << "uniform_list[" << i << "].count";
+        EXPECT_EQ(a.uniform_list[i].binding,    b.uniform_list[i].binding)    << "uniform_list[" << i << "].binding";
+        EXPECT_EQ(a.uniform_list[i].qualifiers, b.uniform_list[i].qualifiers) << "uniform_list[" << i << "].qualifiers";
+        EXPECT_EQ(a.uniform_list[i].actualType, b.uniform_list[i].actualType) << "uniform_list[" << i << "].actualType";
     }
 
     // --- push_constants: (name, offset, size, typeName) ---
@@ -203,6 +206,7 @@ void ExpectStructurallyEquivalent(const ShaderStruct& a, const ShaderStruct& b,
         EXPECT_EQ(a.push_constants[i].size,     b.push_constants[i].size)     << "push_constants[" << i << "].size";
         EXPECT_EQ(a.push_constants[i].typeName, b.push_constants[i].typeName) << "push_constants[" << i << "].typeName";
     }
+    EXPECT_EQ(a.push_constants_var, b.push_constants_var) << "push_constants_var";
 
     // --- spec_constants: (binding, name, type, defaultVal) ---
     for (size_t i = 0; i < std::min(a.spec_constants.size(), b.spec_constants.size()); ++i)
@@ -927,6 +931,7 @@ TEST_F(ShaderParserTest, GenerateShader_Idempotent_AllFiles)
 {
     for (const char* relPath : AllShaderPaths())
     {
+        ShaderStruct::ResetTypeTable();  // Prevent cross-file type leakage
         const std::string path = ResolveShaderPath(relPath);
         ASSERT_FALSE(path.empty()) << "Shader file not found: " << relPath;
 
