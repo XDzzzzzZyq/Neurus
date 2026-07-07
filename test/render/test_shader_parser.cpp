@@ -655,8 +655,9 @@ TEST_F(ShaderParserTest, ParseFile_GbufferFrag_HasInputList)
     const auto& s = ParseSuccessfully("res/shaders/render/gbuffer.frag");
 
     // gbuffer.frag has 3 inputs: fragWorldPos(0), fragNormalVS(1), fragUV(2)
-    EXPECT_EQ(s.input_list.size(), 3u)
-        << "gbuffer.frag should have 3 inter-stage inputs";
+    // layout(location=N) in → stored in AB_list (not input_list)
+    EXPECT_EQ(s.AB_list.size(), 3u)
+        << "gbuffer.frag should have 3 inter-stage inputs in AB_list";
 }
 
 // ===========================================================================

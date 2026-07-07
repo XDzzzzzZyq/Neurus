@@ -195,7 +195,7 @@ public:
 	uint32_t                    local_size_y = 0; ///< Compute workgroup Y dimension
 	uint32_t                    local_size_z = 0; ///< Compute workgroup Z dimension
 	std::vector<std::string>    extensions;     ///< Required GLSL extensions (e.g. "GL_GOOGLE_include_directive")
-	int                         version = 450;  ///< GLSL #version (default: 450 for Vulkan)
+	int                         version = 0;    ///< GLSL #version (0 = unset; GenerateShader() defaults to 450)
 
 	// -------------------------------------------------------------------
 	// State flag

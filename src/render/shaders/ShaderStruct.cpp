@@ -306,7 +306,7 @@ void ShaderStruct::Reset()
 	local_size_x = 0;
 	local_size_y = 0;
 	local_size_z = 0;
-	version = 450;
+	version = 0;
 
 	is_struct_changed = true;
 }
@@ -332,7 +332,9 @@ bool ShaderStruct::IsEmpty() const
 	    && Main.empty()
 	    && push_constants.empty()
 	    && spec_constants.empty()
-	    && extensions.empty();
+	    && extensions.empty()
+	    && version == 0
+	    && local_size_x == 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +352,7 @@ std::string ShaderStruct::GenerateShader()
 	std::ostringstream result;
 
 	// 1. Version
-	result << "#version " << version << " core\n\n";
+	result << "#version " << (version > 0 ? version : 450) << " core\n\n";
 
 	// 2. Extension directives
 	if (!extensions.empty())
@@ -539,7 +541,20 @@ std::string ShaderStruct::GenerateShader()
 	}
 
 	// 18. main() entry point
-	result << "void main()\n{\n" << Main << "\n}\n";
+	// Strip trailing newline from Main (accumulator always adds one after each line)
+	std::string mainBody = Main;
+	if (!mainBody.empty() && mainBody.back() == '\n')
+	{
+		mainBody.pop_back();
+	}
+	if (mainBody.empty())
+	{
+		result << "void main()\n{\n}\n";
+	}
+	else
+	{
+		result << "void main()\n{\n" << mainBody << "\n}\n";
+	}
 
 	is_struct_changed = false;
 	return result.str();

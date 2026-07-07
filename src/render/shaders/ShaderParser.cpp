@@ -521,59 +521,104 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				continue;
 			}
 
-			// --- Uniform block: layout(...) uniform BlockType { ... } varName; ---
-			if (afterLayout.find("uniform") != std::string::npos && afterLayout.find('{') != std::string::npos)
-			{
-				// Extract block type name
-				size_t uniPos = afterLayout.find("uniform ");
-				std::string blockDecl = afterLayout.substr(uniPos + 8);
-				std::istringstream iss(blockDecl);
-				std::string blockType;
-				iss >> blockType;
+		// --- Uniform block: layout(...) uniform BlockType { ... } varName; ---
+		// Distinguish from standalone uniforms by checking for '{' (same/next line)
+		// or absence of ';' (standalone uniforms have ';' on the same line).
+		if (afterLayout.find("uniform") != std::string::npos
+		    && (afterLayout.find('{') != std::string::npos
+		        || afterLayout.find(';') == std::string::npos))
+		{
+			// Find the actual block type name from afterLayout or the next line,
+			// then look for '{' which may be on this line or a subsequent line.
+			size_t uniPos = afterLayout.find("uniform ");
+			std::string blockDecl = afterLayout.substr(uniPos + 8);
+			std::istringstream iss(blockDecl);
+			std::string blockType;
+			iss >> blockType;
 
-				// Read members until "};"
-				argsCache.clear();
+			// Look for opening brace (may be on this line or a later line)
+			bool foundOpenBrace = (afterLayout.find('{') != std::string::npos);
 
-			do
+			while (!foundOpenBrace)
 			{
 				if (!std::getline(stream, line))
 				{
-					NEURUS_ERR("ShaderParser: unexpected EOF while parsing uniform block members");
+					NEURUS_ERR("ShaderParser: unexpected EOF while parsing uniform block");
 					return false;
 				}
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
-
-			if (line.find('}') != std::string::npos && line.find(';') != std::string::npos)
-			{
-				break;
+				if (line.empty())
+				{
+					continue;
+				}
+				if (line.find('{') != std::string::npos)
+				{
+					foundOpenBrace = true;
+				}
+				else
+				{
+					// It might be the block type name on its own line
+					blockType = line;
+				}
 			}
 
-			if (line.empty() || line == "{" || line == "}")
+			// Read members until "};"
+			argsCache.clear();
+
+		do
+		{
+			if (!std::getline(stream, line))
 			{
-				continue;
+				NEURUS_ERR("ShaderParser: unexpected EOF while parsing uniform block members");
+				return false;
 			}
+			line = StripComments(line, inBlockComment);
+			line = TrimWhitespace(line);
 
-			// Parse member: "type name;"
-			std::istringstream mstr(line);
-			std::string typeName;
-			mstr >> typeName;
-			mstr >> word;
-
-			if (!word.empty() && word.back() == ';')
-			{
-				word.pop_back();
-			}
-
-			ParaType pType = ShaderStruct::ParseType(typeName);
-			argsCache.emplace_back(pType, word);
+		if (line.find('}') != std::string::npos && line.find(';') != std::string::npos)
+		{
+			break;
 		}
-		while (true);
 
-				out.SetUB(blockType, blockType, argsCache);
-				argsCache.clear();
-				continue;
+		if (line.empty() || line == "{" || line == "}")
+		{
+			continue;
+		}
+
+		// Parse member: "type name;"
+		std::istringstream mstr(line);
+		std::string typeName;
+		mstr >> typeName;
+		mstr >> word;
+
+		if (!word.empty() && word.back() == ';')
+		{
+			word.pop_back();
+		}
+
+		ParaType pType = ShaderStruct::ParseType(typeName);
+		argsCache.emplace_back(pType, word);
+	}
+	while (true);
+
+		// Extract variable name from closing line (e.g. "} camera;" or "};")
+		std::string ubVarName;
+		{
+			size_t closeBrace = line.find('}');
+			size_t semi        = line.find(';');
+			if (closeBrace != std::string::npos && semi != std::string::npos
+			    && semi > closeBrace + 1)
+			{
+				ubVarName = TrimWhitespace(
+					line.substr(closeBrace + 1, semi - closeBrace - 1));
 			}
+		}
+
+		out.SetUB(blockType, ubVarName.empty() ? blockType : ubVarName, argsCache);
+		argsCache.clear();
+		continue;
+	}
 
 			// --- Standalone uniform with layout: layout(binding=N) uniform type name; ---
 			if (afterLayout.find("uniform") != std::string::npos && afterLayout.find('{') == std::string::npos)
