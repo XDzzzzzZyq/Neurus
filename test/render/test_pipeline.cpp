@@ -6,10 +6,8 @@
 #include "render/PipelineBuilder.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/shaders/ShaderModule.h"
-#include "render/shaders/ShaderLib.h"
-
-#include <triangle.vert.h>
-#include <triangle.frag.h>
+#include "render/shaders/ShaderLibrary.h"
+#include "render/shaders/RenderShader.h"
 
 using namespace neurus;
 
@@ -35,6 +33,16 @@ protected:
 			if (m_hasVulkan)
 			{
 				m_device = std::make_unique<vk::raii::Device>(createHeadlessDevice());
+
+				// Load triangle shader via ShaderLibrary and create modules
+				m_shader = std::static_pointer_cast<RenderShader>(
+					ShaderLibrary::LoadRenderShader("triangle_pipeline",
+					                                "res/shaders/render/triangle.vert",
+					                                "res/shaders/render/triangle.frag"));
+				if (m_shader)
+				{
+					m_shader->SetDevice(*m_device);
+				}
 			}
 		}
 		catch (...)
@@ -45,8 +53,8 @@ protected:
 
 	void TearDown() override
 	{
-		// ShaderLib cache must be cleared before device destruction
-		ShaderLib::Clear();
+		// ShaderLibrary cache must be cleared before device destruction
+		ShaderLibrary::Clear();
 	}
 
 	/**
@@ -97,6 +105,7 @@ protected:
 	vk::raii::Instance m_instance = nullptr;
 	vk::raii::PhysicalDevices m_physicalDevices = nullptr;
 	std::unique_ptr<vk::raii::Device> m_device;
+	std::shared_ptr<RenderShader> m_shader;
 };
 
 // ---------------------------------------------------------------------------
@@ -110,16 +119,15 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_CreatesValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// Load shaders from embedded SPIR-V
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	ASSERT_NE(m_shader, nullptr);
+	ASSERT_TRUE(m_shader->IsValid());
+	auto vertModule = m_shader->GetVertexModule();
+	auto fragModule = m_shader->GetFragmentModule();
 
 	// Build a simple triangle pipeline
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()                               // No vertex buffers
 		.SetInputAssembly()                             // TriangleList
 		.SetRasterization()                             // Fill, no cull
@@ -143,10 +151,8 @@ TEST_F(PipelineBuilderTest, SetVertexInput_FromBufferLayout_ValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	// Build a vertex layout with position + color
 	BufferLayout layout;
@@ -154,8 +160,8 @@ TEST_F(PipelineBuilderTest, SetVertexInput_FromBufferLayout_ValidPipeline)
 	layout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // float3 color
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput(layout)
 		.SetInputAssembly()
 		.SetRasterization()
@@ -179,14 +185,12 @@ TEST_F(PipelineBuilderTest, SetDepthStencil_WithDepthTest_ValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -211,14 +215,12 @@ TEST_F(PipelineBuilderTest, SetRasterization_Wireframe_CullBack)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization(
@@ -245,14 +247,12 @@ TEST_F(PipelineBuilderTest, SetInputAssembly_LineStrip_ValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly(vk::PrimitiveTopology::eLineStrip)
 		.SetRasterization()
@@ -276,10 +276,8 @@ TEST_F(PipelineBuilderTest, SetDescriptorSetLayouts_ValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	// Create a simple descriptor set layout with one UBO binding
 	vk::DescriptorSetLayoutBinding uboBinding(
@@ -294,8 +292,8 @@ TEST_F(PipelineBuilderTest, SetDescriptorSetLayouts_ValidPipeline)
 	std::vector<vk::DescriptorSetLayout> layouts = { *descriptorSetLayout };
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -320,10 +318,8 @@ TEST_F(PipelineBuilderTest, SetPushConstantRanges_ValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eVertex,
@@ -331,8 +327,8 @@ TEST_F(PipelineBuilderTest, SetPushConstantRanges_ValidPipeline)
 		sizeof(float) * 16);  // Typical 4x4 matrix
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -357,16 +353,14 @@ TEST_F(PipelineBuilderTest, SetPipelineCache_CreatesValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	vk::raii::PipelineCache cache(*m_device, vk::PipelineCacheCreateInfo());
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -417,16 +411,14 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_NoColorFormats_Throws)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	EXPECT_THROW(
 		{
 			PipelineBuilder()
-				.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-				.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+				.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+				.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 				.SetVertexInput()
 				.SetInputAssembly()
 				.SetRasterization()
@@ -450,14 +442,12 @@ TEST_F(PipelineBuilderTest, DepthOnly_NoColorAttachments_ValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto vertModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_vert_spv, triangle_vert_spv_size);
-	auto fragModule = ShaderModule::FromEmbedded(
-		*m_device, triangle_frag_spv, triangle_frag_spv_size);
+	auto vertModule = m_shader->GetShaderModule(ShaderType::VERTEX);
+	auto fragModule = m_shader->GetShaderModule(ShaderType::FRAGMENT);
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(*vertModule, vk::ShaderStageFlagBits::eVertex)
+		.AddShaderStage(*fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()

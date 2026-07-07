@@ -65,7 +65,6 @@ target_link_libraries(neurus_test PRIVATE
 	neurus_editor
 	neurus_ui
 	neurus_asset
-	shader_headers
 	gtest
 	Vulkan::Vulkan
 	Qt6::Core
@@ -77,7 +76,6 @@ target_link_libraries(neurus_test PRIVATE
 target_include_directories(neurus_test PRIVATE
 	${CMAKE_SOURCE_DIR}/src
 	${CMAKE_SOURCE_DIR}/test
-	${CMAKE_BINARY_DIR}/generated/shaders
 )
 
 target_compile_definitions(neurus_test PRIVATE

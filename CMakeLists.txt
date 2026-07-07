@@ -62,11 +62,12 @@ set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
 set(SHADERC_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SHADERC_SKIP_INSTALL ON CACHE BOOL "" FORCE)
 set(SHADERC_ENABLE_HLSL OFF CACHE BOOL "" FORCE)
-# Override glslang install OFF — shaderc's generator expression for
-# GLSLANG_ENABLE_INSTALL is not evaluated at CMake time and leaks as
-# a truthy literal, triggering install-export errors from glslang's
-# SPIRV/SPIRV-Tools-opt target dependency.
-set(GLSLANG_ENABLE_INSTALL OFF CACHE BOOL "Enable glslang installation" FORCE)
+# Shaderc's third_party CMake sets GLSLANG_ENABLE_INSTALL via a generator
+# expression ($<NOT:...>) that leaks as a truthy literal at config time,
+# causing glslang's install(EXPORT) to run and fail because SPIRV-Tools-opt
+# is not in the export set. Disable ENABLE_OPT to drop the SPIRV-Tools-opt
+# link (we don't need spirv-opt for ShaderLibrary's runtime compilation).
+set(ENABLE_OPT OFF CACHE BOOL "Enable spirv-opt capability" FORCE)
 add_subdirectory(dep/shaderc)
 
 # Qt6 (window, QML, EventBus)
@@ -82,14 +83,7 @@ if(WIN32)
 	message(STATUS "Found windeployqt: ${WINDEPLOYQT}")
 endif()
 
-# ---------------------------------------------------------------------------
-# Shader Compilation (GLSL → SPIR-V → C header)
-#
-# Shaders are auto-discovered via GLOB_RECURSE in CompileShaders.cmake.
-# Place new .vert / .frag / .comp files anywhere under res/shaders/ and
-# they will be compiled to SPIR-V + C header at configure time.
-# ---------------------------------------------------------------------------
-include(cmake/CompileShaders.cmake)
+
 
 # ---------------------------------------------------------------------------
 # Output Directories

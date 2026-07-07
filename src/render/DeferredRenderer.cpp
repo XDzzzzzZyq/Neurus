@@ -24,15 +24,7 @@
 
 #include "scene/Light.h"
 
-// Generated SPIR-V shader headers
-#include "gbuffer.vert.h"
-#include "gbuffer.frag.h"
-#include "pbr_lighting.comp.h"
-#include "ssao.comp.h"
-#include "irradiance_conv.comp.h"
-#include "importance_samp.comp.h"
-#include "shadow_depth.frag.h"
-#include "shadow_eval.comp.h"
+
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -82,9 +74,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 3. Create geometry pass ---
 	{
 		auto geoPass = std::make_unique<GeometryPass>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			device, physicalDevice, graphicsQueue, queueFamilyIndex);
 		r_geometryPass = geoPass.get();
 		r_passes.push_back(std::move(geoPass));
 	}
@@ -94,8 +84,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto lightPass = std::make_unique<LightingPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			r_graphicsQueue, r_queueFamilyIndex,
-			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+			r_graphicsQueue, r_queueFamilyIndex);
 		r_lightingPass = lightPass.get();
 		r_passes.push_back(std::move(lightPass));
 	}
@@ -105,8 +94,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto ssaoPass = std::make_unique<SSAOPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			r_graphicsQueue, r_queueFamilyIndex,
-			ssao_comp_spv, sizeof(ssao_comp_spv));
+			r_graphicsQueue, r_queueFamilyIndex);
 		r_ssaoPass = ssaoPass.get();
 		r_passes.push_back(std::move(ssaoPass));
 	}
@@ -115,9 +103,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto iblPass = std::make_unique<IBLPass>(
 			device, physicalDevice,
-			r_graphicsQueue, r_queueFamilyIndex,
-			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
-			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
+			r_graphicsQueue, r_queueFamilyIndex);
 		r_iblPass = iblPass.get();
 		r_passes.push_back(std::move(iblPass));
 		NEURUS_LOG("[DeferredRenderer] IBLPass created");

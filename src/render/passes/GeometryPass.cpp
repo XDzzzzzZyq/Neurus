@@ -9,7 +9,8 @@
 #include "RenderCache.h"
 #include "render/Barrier.h"
 #include "PipelineBuilder.h"
-#include "shaders/ShaderModule.h"
+#include "shaders/ShaderLibrary.h"
+#include "shaders/RenderShader.h"
 
 #include "Log.h"
 
@@ -26,11 +27,7 @@ namespace neurus {
 GeometryPass::GeometryPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            vk::Queue queue,
-                           uint32_t queueFamilyIndex,
-                           const uint32_t* vertSpv,
-                           size_t vertSize,
-                           const uint32_t* fragSpv,
-                           size_t fragSize)
+                           uint32_t queueFamilyIndex)
 	: p_physicalDevice(&physicalDevice)
 	// --- Descriptor set layout ---
 	, p_cameraLayout(CreateCameraLayout(device))
@@ -45,8 +42,16 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	      p_descriptorPool.Allocate(p_cameraLayout, 1).front()))
 	, p_pipelineLayout(nullptr)
 	, p_pipeline(nullptr)
+	// --- Self-load shaders via ShaderLibrary ---
+	, p_renderShader(std::static_pointer_cast<RenderShader>(
+		ShaderLibrary::LoadRenderShader("GeometryPass",
+		                                "res/shaders/render/gbuffer.vert",
+		                                "res/shaders/render/gbuffer.frag")))
 {
 	p_device = &device;
+
+	// --- Set device on loaded shader (creates ShaderModules from SPIR-V) ---
+	if (p_renderShader) { p_renderShader->SetDevice(device); }
 
 	// --- Write camera UBO to descriptor set ---
 	p_cameraDescriptorSet.WriteBuffer(0, p_cameraUBO.GetDescriptorInfo(),
@@ -61,11 +66,10 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	p_vertexLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // normal @ 12
 	p_vertexLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // uv @ 24
 
-	// --- Create graphics pipeline ---
-	p_pipeline = CreatePipeline(device, vertSpv, vertSize, fragSpv, fragSize);
+	// --- Create graphics pipeline from self-loaded shader ---
+	p_pipeline = CreatePipeline(device);
 
-	NEURUS_LOG("[GeometryPass] vertSize=" << vertSize
-	          << " fragSize=" << fragSize
+	NEURUS_LOG("[GeometryPass] shader=" << (p_renderShader ? "OK" : "FAIL")
 	          << " colorAttachments=4"
 	          << " depthAttachments=1"
 	          << " vertexStride=" << p_vertexLayout.GetStride());
@@ -88,15 +92,17 @@ DescriptorSetLayout GeometryPass::CreateCameraLayout(const vk::raii::Device& dev
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device,
-                                                const uint32_t* vertSpv,
-                                                size_t vertSize,
-                                                const uint32_t* fragSpv,
-                                                size_t fragSize)
+vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device)
 {
-	// --- Create shader modules from embedded SPIR-V ---
-	auto vertModule = ShaderModule::FromEmbedded(device, vertSpv, vertSize);
-	auto fragModule = ShaderModule::FromEmbedded(device, fragSpv, fragSize);
+	// --- Guard: shader must be valid ---
+	if (!p_renderShader || !p_renderShader->IsValid())
+	{
+		throw std::runtime_error("GeometryPass: Render shader not loaded or invalid");
+	}
+
+	// --- Use self-loaded shader modules ---
+	auto& vertModule = *p_renderShader->GetVertexModule();
+	auto& fragModule = *p_renderShader->GetFragmentModule();
 
 	// --- G-Buffer colour attachment formats ---
 	std::vector<vk::Format> colorFormats = {

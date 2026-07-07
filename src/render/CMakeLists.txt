@@ -31,8 +31,6 @@ add_library(neurus_render STATIC
 	shaders/RenderShader.cpp
 	shaders/ComputeShader.h
 	shaders/ComputeShader.cpp
-	shaders/ShaderProgram.h
-	shaders/ShaderProgram.cpp
 	shaders/ShaderModule.h
 	shaders/ShaderModule.cpp
 	shaders/ShaderLib.h
@@ -77,7 +75,3 @@ target_compile_definitions(neurus_render PRIVATE
 	NEURUS_SHADER_DIR="${CMAKE_SOURCE_DIR}/res/shaders/"
 )
 
-target_include_directories(neurus_render PRIVATE ${CMAKE_BINARY_DIR}/generated/shaders)
-
-# Ensure generated shader headers exist before compiling DeferredRenderer.cpp
-add_dependencies(neurus_render shader_headers)

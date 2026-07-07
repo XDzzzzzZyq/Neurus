@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 
 #include "render/shaders/ShaderModule.h"
-#include "render/shaders/ShaderLib.h"
+#include "render/shaders/ShaderLibrary.h"
+#include "render/shaders/ComputeShader.h"
 #include "app/VulkanContext.h"
 
-#include <triangle.vert.h>
-
 using namespace neurus;
+
+// Minimal valid SPIR-V header (4 words, no instructions)
+static const uint32_t kMinimalSpirv[] = {0x07230203, 0x00010000, 0x00000000, 0x00000000};
+static const size_t kMinimalSpirvSize = sizeof(kMinimalSpirv);
 
 /**
  * @brief Tests for ShaderModule and ShaderLib.
@@ -41,9 +44,9 @@ protected:
 
 	void TearDown() override
 	{
-		// ShaderLib cache must be cleared before the device is destroyed,
+		// ShaderLibrary cache must be cleared before the device is destroyed,
 		// otherwise cached ShaderModules outlive their Vulkan device.
-		ShaderLib::Clear();
+		ShaderLibrary::Clear();
 	}
 
 	/**
@@ -96,7 +99,7 @@ TEST_F(ShaderModuleTest, FromEmbedded_CreatesValidModule)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto module = ShaderModule::FromEmbedded(*m_device, triangle_vert_spv, triangle_vert_spv_size);
+	auto module = ShaderModule::FromEmbedded(*m_device, kMinimalSpirv, kMinimalSpirvSize);
 
 	// Verify the handle contains a valid VkShaderModule (not VK_NULL_HANDLE)
 	EXPECT_NE(*module.handle(), VK_NULL_HANDLE);
@@ -110,8 +113,8 @@ TEST_F(ShaderModuleTest, Constructor_CreatesValidModule)
 	}
 
 	std::vector<uint32_t> spirv(
-		triangle_vert_spv,
-		triangle_vert_spv + (triangle_vert_spv_size / sizeof(uint32_t)));
+		kMinimalSpirv,
+		kMinimalSpirv + (kMinimalSpirvSize / sizeof(uint32_t)));
 
 	ShaderModule module(*m_device, spirv);
 
@@ -126,8 +129,8 @@ TEST_F(ShaderModuleTest, MoveConstructor_TransfersOwnership)
 	}
 
 	std::vector<uint32_t> spirv(
-		triangle_vert_spv,
-		triangle_vert_spv + (triangle_vert_spv_size / sizeof(uint32_t)));
+		kMinimalSpirv,
+		kMinimalSpirv + (kMinimalSpirvSize / sizeof(uint32_t)));
 
 	ShaderModule original(*m_device, spirv);
 	EXPECT_NE(*original.handle(), VK_NULL_HANDLE);
@@ -141,10 +144,10 @@ TEST_F(ShaderModuleTest, MoveConstructor_TransfersOwnership)
 }
 
 // ---------------------------------------------------------------------------
-// ShaderLib tests
+// ShaderLibrary cache tests
 // ---------------------------------------------------------------------------
 
-TEST_F(ShaderModuleTest, ShaderLib_LoadShader_CachesAndReturns)
+TEST_F(ShaderModuleTest, ShaderLibrary_LoadShader_CachesAndReturns)
 {
 	if (!m_hasVulkan)
 	{
@@ -152,53 +155,62 @@ TEST_F(ShaderModuleTest, ShaderLib_LoadShader_CachesAndReturns)
 	}
 
 	// Clear any previous cache state
-	ShaderLib::Clear();
+	ShaderLibrary::Clear();
 
-	auto first = ShaderLib::LoadShader(*m_device, "triangle_vert", triangle_vert_spv, triangle_vert_spv_size);
+	auto first = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_shader",
+		                                "res/shaders/compute/dummy.comp"));
 	ASSERT_NE(first, nullptr);
-	EXPECT_NE(*first->handle(), VK_NULL_HANDLE);
+	first->CreateModule(*m_device);
+	EXPECT_TRUE(first->IsValid());
+	EXPECT_NE(*first->GetShaderModule(ShaderType::COMPUTE)->handle(), VK_NULL_HANDLE);
 
 	// Second load with same name should return the cached instance
-	auto second = ShaderLib::LoadShader(*m_device, "triangle_vert", triangle_vert_spv, triangle_vert_spv_size);
+	auto second = ShaderLibrary::LoadComputeShader("dummy_shader",
+	                                               "res/shaders/compute/dummy.comp");
 	ASSERT_NE(second, nullptr);
 
 	// Same shared_ptr (same pointer, not just same handle)
 	EXPECT_EQ(first.get(), second.get());
 }
 
-TEST_F(ShaderModuleTest, ShaderLib_LoadDifferentShaders_AreDistinct)
+TEST_F(ShaderModuleTest, ShaderLibrary_LoadDifferentShaders_AreDistinct)
 {
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderLib::Clear();
+	ShaderLibrary::Clear();
 
-	auto vert = ShaderLib::LoadShader(*m_device, "vertex", triangle_vert_spv, triangle_vert_spv_size);
-	auto frag = ShaderLib::LoadShader(*m_device, "fragment", triangle_vert_spv, triangle_vert_spv_size);
+	auto first = ShaderLibrary::LoadComputeShader("shader_a",
+	                                              "res/shaders/compute/dummy.comp");
+	auto second = ShaderLibrary::LoadComputeShader("shader_b",
+	                                               "res/shaders/compute/dummy.comp");
 
-	ASSERT_NE(vert, nullptr);
-	ASSERT_NE(frag, nullptr);
-	EXPECT_NE(vert.get(), frag.get());
+	ASSERT_NE(first, nullptr);
+	ASSERT_NE(second, nullptr);
+	EXPECT_NE(first.get(), second.get());
 }
 
-TEST_F(ShaderModuleTest, ShaderLib_Clear_RemovesAll)
+TEST_F(ShaderModuleTest, ShaderLibrary_Clear_RemovesAll)
 {
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderLib::Clear();
+	ShaderLibrary::Clear();
 
-	auto shader = ShaderLib::LoadShader(*m_device, "test_shader", triangle_vert_spv, triangle_vert_spv_size);
+	auto shader = ShaderLibrary::LoadComputeShader("test_shader",
+	                                               "res/shaders/compute/dummy.comp");
 	ASSERT_NE(shader, nullptr);
 
-	ShaderLib::Clear();
+	ShaderLibrary::Clear();
 
 	// Reload after clear should create a new instance
-	auto reloaded = ShaderLib::LoadShader(*m_device, "test_shader", triangle_vert_spv, triangle_vert_spv_size);
+	auto reloaded = ShaderLibrary::LoadComputeShader("test_shader",
+	                                                 "res/shaders/compute/dummy.comp");
 	ASSERT_NE(reloaded, nullptr);
 
 	// Should be different pointer after clear

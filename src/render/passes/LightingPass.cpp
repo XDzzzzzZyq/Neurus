@@ -10,7 +10,8 @@
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
-#include "shaders/ShaderModule.h"
+#include "shaders/ShaderLibrary.h"
+#include "shaders/ComputeShader.h"
 #include "Texture.h"
 
 #include "Log.h"
@@ -37,17 +38,25 @@ LightingPass::LightingPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            uint32_t numSets,
                            vk::Queue graphicsQueue,
-                           uint32_t queueFamilyIndex,
-                           const uint32_t* compSpv,
-                           size_t compSize)
+                           uint32_t queueFamilyIndex)
 	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
 	, p_graphicsQueue(graphicsQueue)
 	, p_queueFamilyIndex(queueFamilyIndex)
-	, p_pipeline(CreatePipeline(device, compSpv, compSize))
+	, p_pipeline(nullptr)
+	// --- Self-load compute shader via ShaderLibrary ---
+	, p_computeShader(std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("pbr_lighting",
+		                                "res/shaders/compute/pbr_lighting.comp")))
 {
-	NEURUS_LOG("[LightingPass] compSize=" << compSize << " numSets=" << numSets
-	           << " qfi=" << queueFamilyIndex);
+	// --- Create module from self-loaded shader ---
+	if (p_computeShader) { p_computeShader->CreateModule(device); }
+
+	// --- Create pipeline from self-loaded shader ---
+	p_pipeline = CreatePipeline(device);
+
+	NEURUS_LOG("[LightingPass] numSets=" << numSets << " qfi=" << queueFamilyIndex
+	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
 
 	// --- Create fallback IBL cubemaps (4×4 black) for bindings 7-8 ---
 	//     These ensure the descriptor bindings are always valid even when
@@ -338,12 +347,16 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
-                                                 const uint32_t* compSpv,
-                                                 size_t compSize)
+vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device)
 {
-	// --- Create compute shader module from embedded SPIR-V ---
-	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
+	// --- Guard: shader must be valid ---
+	if (!p_computeShader || !p_computeShader->IsValid())
+	{
+		throw std::runtime_error("LightingPass: Compute shader not loaded or invalid");
+	}
+
+	// --- Use self-loaded compute shader module ---
+	auto compModule = p_computeShader->GetShaderModule(ShaderType::COMPUTE);
 
 	// --- Push constant range ---
 	vk::PushConstantRange pushRange(
@@ -352,7 +365,7 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device,
 		sizeof(LightingPushConstants));  // 176 bytes
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->SetShaderStage(compModule, "main")
+	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
 		.SetDebugName("LightingPass")
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)

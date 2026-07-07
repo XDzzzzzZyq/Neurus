@@ -2,10 +2,10 @@
 
 #include "render/ComputePipelineBuilder.h"
 #include "render/shaders/ShaderModule.h"
+#include "render/shaders/ShaderLibrary.h"
+#include "render/shaders/ComputeShader.h"
 #include "render/DescriptorManager.h"
 #include "app/VulkanContext.h"
-
-#include <dummy.comp.h>
 
 using namespace neurus;
 
@@ -87,11 +87,14 @@ TEST_F(ComputePipelineTest, Build_ReturnsValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// Create a compute shader module from embedded SPIR-V
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	// Load compute shader via ShaderLibrary
+	auto cs = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_pipeline",
+		                                "res/shaders/compute/dummy.comp"));
+	ASSERT_NE(cs, nullptr);
+	cs->CreateModule(*m_device);
+	ASSERT_TRUE(cs->IsValid());
+	auto& shader = *cs->GetShaderModule(ShaderType::COMPUTE);
 
 	// Build the compute pipeline
 	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
@@ -112,10 +115,13 @@ TEST_F(ComputePipelineTest, WithDescriptorSetLayout_BuildsSuccessfully)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	auto cs = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_layout",
+		                                "res/shaders/compute/dummy.comp"));
+	ASSERT_NE(cs, nullptr);
+	cs->CreateModule(*m_device);
+	ASSERT_TRUE(cs->IsValid());
+	auto& shader = *cs->GetShaderModule(ShaderType::COMPUTE);
 
 	// Create a descriptor set layout with a storage buffer binding
 	auto layout = BuildLayout()
@@ -142,10 +148,12 @@ TEST_F(ComputePipelineTest, WithPushConstants_BuildsSuccessfully)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	auto cs = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_push",
+		                                "res/shaders/compute/dummy.comp"));
+	ASSERT_NE(cs, nullptr);
+	cs->CreateModule(*m_device);
+	auto& shader = *cs->GetShaderModule(ShaderType::COMPUTE);
 
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute, 0, 16);
@@ -169,10 +177,12 @@ TEST_F(ComputePipelineTest, WithLayoutAndPushConstants_BuildsSuccessfully)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	auto cs = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_both",
+		                                "res/shaders/compute/dummy.comp"));
+	ASSERT_NE(cs, nullptr);
+	cs->CreateModule(*m_device);
+	auto& shader = *cs->GetShaderModule(ShaderType::COMPUTE);
 
 	auto layout = BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
@@ -202,15 +212,19 @@ TEST_F(ComputePipelineTest, TwoBuilds_BothProduceValidPipelines)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shaderA(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	auto csA = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_a",
+		                                "res/shaders/compute/dummy.comp"));
+	ASSERT_NE(csA, nullptr);
+	csA->CreateModule(*m_device);
+	auto& shaderA = *csA->GetShaderModule(ShaderType::COMPUTE);
 
-	ShaderModule shaderB(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	auto csB = std::static_pointer_cast<ComputeShader>(
+		ShaderLibrary::LoadComputeShader("dummy_b",
+		                                "res/shaders/compute/dummy.comp"));
+	ASSERT_NE(csB, nullptr);
+	csB->CreateModule(*m_device);
+	auto& shaderB = *csB->GetShaderModule(ShaderType::COMPUTE);
 
 	vk::raii::Pipeline pipelineA = ComputePipelineBuilder(*m_device)
 		.SetShaderStage(shaderA)

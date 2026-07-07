@@ -23,11 +23,6 @@
 #include "render/passes/SSAOPass.h"
 #include "render/Screenshot.h"
 
-// --- Embedded shaders ---
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-#include <ssao.comp.h>
-
 #include "shared/TestReferenceImage.h"
 
 #include <algorithm>
@@ -62,16 +57,13 @@ protected:
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 		// --- SSAO pass ---
 		m_ssaoPass = std::make_unique<SSAOPass>(
 			*m_device, pd,
 			1u,   // one descriptor set for single-frame test
-			m_queue, m_graphicsQueueFamily,
-			ssao_comp_spv, sizeof(ssao_comp_spv));
+			m_queue, m_graphicsQueueFamily);
 	}
 
 	void TearDown() override

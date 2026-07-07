@@ -25,9 +25,8 @@
 #include "render/Image.h"
 #include "render/shaders/ShaderModule.h"
 
-// --- Embedded shaders ---
-#include <e2c.comp.h>
-#include <c2e.comp.h>
+#include "render/shaders/ShaderLibrary.h"
+#include "render/shaders/ComputeShader.h"
 
 #include <algorithm>
 #include <array>
@@ -134,9 +133,13 @@ protected:
 		m_e2cPool = std::make_unique<DescriptorPool>(dev, 1, poolSizes);
 		m_e2cSets = m_e2cPool->Allocate(*m_e2cSetLayout, 1);
 
-		auto compModule = ShaderModule::FromEmbedded(dev, e2c_comp_spv, sizeof(e2c_comp_spv));
+		auto e2cShader = std::static_pointer_cast<ComputeShader>(
+			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp"));
+		ASSERT_NE(e2cShader, nullptr);
+		e2cShader->CreateModule(dev);
+		auto compModule = e2cShader->GetShaderModule(ShaderType::COMPUTE);
 		m_e2cBuilder = std::make_unique<ComputePipelineBuilder>(dev);
-		m_e2cPipeline = m_e2cBuilder->SetShaderStage(compModule, "main")
+		m_e2cPipeline = m_e2cBuilder->SetShaderStage(*compModule, "main")
 			.AddDescriptorSetLayout(*m_e2cSetLayout->layout())
 			.BuildComputePipeline();
 	}
@@ -155,9 +158,13 @@ protected:
 		m_c2ePool = std::make_unique<DescriptorPool>(dev, 1, poolSizes);
 		m_c2eSets = m_c2ePool->Allocate(*m_c2eSetLayout, 1);
 
-		auto compModule = ShaderModule::FromEmbedded(dev, c2e_comp_spv, sizeof(c2e_comp_spv));
+		auto c2eShader = std::static_pointer_cast<ComputeShader>(
+			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp"));
+		ASSERT_NE(c2eShader, nullptr);
+		c2eShader->CreateModule(dev);
+		auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
 		m_c2eBuilder = std::make_unique<ComputePipelineBuilder>(dev);
-		m_c2ePipeline = m_c2eBuilder->SetShaderStage(compModule, "main")
+		m_c2ePipeline = m_c2eBuilder->SetShaderStage(*compModule, "main")
 			.AddDescriptorSetLayout(*m_c2eSetLayout->layout())
 			.BuildComputePipeline();
 	}

@@ -41,13 +41,6 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
-// --- Embedded shaders ---
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-#include <pbr_lighting.comp.h>
-#include <irradiance_conv.comp.h>
-#include <importance_samp.comp.h>
-
 #include "shared/TestReferenceImage.h"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -140,23 +133,18 @@ protected:
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			dev, pd, m_queue, m_graphicsQueueFamily,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			dev, pd, m_queue, m_graphicsQueueFamily);
 
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			dev, pd,
 			1u,  // single frame
-			m_queue, m_graphicsQueueFamily,
-			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+			m_queue, m_graphicsQueueFamily);
 
 		// --- IBL pass ---
 		m_iblPass = std::make_unique<IBLPass>(
 			dev, pd,
-			m_queue, m_graphicsQueueFamily,
-			irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
-			importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
+			m_queue, m_graphicsQueueFamily);
 
 		// --- Create Environment + Build IBL textures (cubemap Images + samplers) ---
 		m_env = std::make_shared<Environment>();
@@ -455,19 +443,14 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	m_renderCache = std::make_unique<RenderCache>(dev, pd);
 
 	m_geometryPass = std::make_unique<GeometryPass>(
-		dev, pd, m_queue, m_graphicsQueueFamily,
-		gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-		gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+		dev, pd, m_queue, m_graphicsQueueFamily);
 
 	m_lightingPass = std::make_unique<LightingPass>(
 		dev, pd, 1u,
-		m_queue, m_graphicsQueueFamily,
-		pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+		m_queue, m_graphicsQueueFamily);
 
 	m_iblPass = std::make_unique<IBLPass>(
-		dev, pd, m_queue, m_graphicsQueueFamily,
-		irradiance_conv_comp_spv, sizeof(irradiance_conv_comp_spv),
-		importance_samp_comp_spv, sizeof(importance_samp_comp_spv));
+		dev, pd, m_queue, m_graphicsQueueFamily);
 
 	// 2f. Re-create Environment + build IBL textures (cubemap Images + samplers).
 	SCOPED_TRACE("Recreate IBL resources");

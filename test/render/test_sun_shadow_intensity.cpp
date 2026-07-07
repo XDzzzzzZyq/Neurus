@@ -44,10 +44,7 @@
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
-// --- Embedded shaders ---
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-#include <shadow_eval.comp.h>
+
 
 #include "shared/TestReferenceImage.h"
 
@@ -81,9 +78,7 @@ protected:
 		auto& pd = PhysicalDevice();
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			*m_device, pd, m_queue, m_graphicsQueueFamily);
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			ShadowDepthPass::kSunResolution);

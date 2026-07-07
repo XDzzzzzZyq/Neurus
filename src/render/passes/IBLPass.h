@@ -22,6 +22,8 @@
 #pragma once
 
 #include "../DescriptorManager.h"
+#include "../shaders/ShaderLibrary.h"
+#include "../shaders/ComputeShader.h"
 #include "ComputePass.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -58,6 +60,7 @@ public:
 	 * @brief Constructs the IBL pass - creates samplers, descriptor sets,
 	 *        and compute pipelines.
 	 *
+	 * Shaders are self-loaded via ShaderLibrary from GLSL source files.
 	 * Does NOT create cubemap Images - the caller provides those to
 	 * Generate().
 	 *
@@ -65,19 +68,11 @@ public:
 	 * @param physicalDevice  Physical device for memory/sampler queries.
 	 * @param graphicsQueue   Graphics queue for one-shot command submits.
 	 * @param queueFamilyIndex Queue family index for transient cmd pools.
-	 * @param irradianceSpv   Embedded SPIR-V for irrandiance_conv.comp.
-	 * @param irradianceSize  SPIR-V byte size.
-	 * @param specularSpv     Embedded SPIR-V for importance_samp.comp.
-	 * @param specularSize    SPIR-V byte size.
 	 */
 	IBLPass(const vk::raii::Device& device,
 	        const vk::raii::PhysicalDevice& physicalDevice,
 	        vk::Queue graphicsQueue,
-	        uint32_t queueFamilyIndex,
-	        const uint32_t* irradianceSpv,
-	        size_t irradianceSize,
-	        const uint32_t* specularSpv,
-	        size_t specularSize);
+	        uint32_t queueFamilyIndex);
 
 	~IBLPass();
 
@@ -124,8 +119,7 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
-	                                  const uint32_t* compSpv,
-	                                  size_t compSize,
+	                                  std::shared_ptr<ComputeShader> computeShader,
 	                                  std::unique_ptr<ComputePipelineBuilder>& outBuilder,
 	                                  const char* debugName);
 
@@ -147,6 +141,10 @@ private:
 	// --- References (non-owning) ---
 	vk::Queue p_graphicsQueue;
 	uint32_t p_queueFamilyIndex;
+
+	// --- Self-loaded compute shaders (via ShaderLibrary) ---
+	std::shared_ptr<ComputeShader> p_irradianceShader;
+	std::shared_ptr<ComputeShader> p_specularShader;
 
 	// --- Pipelines ---
 	std::unique_ptr<ComputePipelineBuilder> p_irradiancePipelineBuilder;
