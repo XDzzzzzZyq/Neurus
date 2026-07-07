@@ -110,8 +110,9 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.vert",
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag")))
 	, m_debugShader(
-		ShaderLibrary::LoadComputeShader("DepthToColor",
-		                                 NEURUS_SHADER_DIR "render/depth_to_color.frag"))
+		ShaderLibrary::LoadRenderShader("DepthToColor",
+		                                NEURUS_SHADER_DIR "render/fullscreen.vert",
+		                                NEURUS_SHADER_DIR "render/depth_to_color.frag"))
 {
 	p_device = &device;
 	p_physicalDevice = &physicalDevice;
