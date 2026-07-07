@@ -26,10 +26,13 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <memory>
+
 namespace neurus {
 
 // --- Forward declarations ---
 class RenderCache;
+class Shader;
 
 /**
  * @brief Point-light shadow intensity compute pass.
@@ -48,23 +51,22 @@ public:
 	/**
 	 * @brief Constructs the shadow intensity pass and creates all GPU resources.
 	 *
+	 * Loads both compute shaders (point-light cubemap and sun-light 2D)
+	 * via ShaderLibrary::LoadComputeShader() and creates the dual pipeline.
+	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for sampler creation).
 	 * @param numSets           Number of descriptor sets (one per in-flight frame).
 	 * @param graphicsQueue     Graphics queue (unused, kept for API symmetry).
 	 * @param queueFamilyIndex  Queue family index (unused, kept for API symmetry).
-	 * @param compSpv           Embedded compute shader SPIR-V data.
-	 * @param compSize          Compute shader SPIR-V size in bytes.
 	 *
-	 * @throws std::runtime_error if shader or pipeline creation fails.
+	 * @throws std::runtime_error if shader loading or pipeline creation fails.
 	 */
 	ShadowIntensityPass(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice,
 	                    uint32_t numSets,
 	                    vk::Queue graphicsQueue,
-	                    uint32_t queueFamilyIndex,
-	                    const uint32_t* compSpv,
-	                    size_t compSize);
+	                    uint32_t queueFamilyIndex);
 
 	// -------------------------------------------------------------------
 	// Recording
@@ -124,10 +126,10 @@ private:
 
 	/**
 	 * @brief Creates the point-light cubemap compute pipeline via ComputePipelineBuilder.
+	 *
+	 * Uses the ShaderModule from p_pointLightShader loaded via ShaderLibrary.
 	 */
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
-	                                  const uint32_t* compSpv,
-	                                  size_t compSize);
+	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);
 
 	// -------------------------------------------------------------------
 	// Sun (directional) shadow evaluation — second descriptor set + pipeline
@@ -149,10 +151,10 @@ private:
 	 *
 	 * Push constant range: 80 bytes — matches sizeof(SunShadowEvalPushConstants)
 	 * (72B GLSL layout + 8B C++ alignment padding after mat4).
+	 *
+	 * Uses the ShaderModule from p_sunLightShader loaded via ShaderLibrary.
 	 */
-	vk::raii::Pipeline CreateSunPipeline(const vk::raii::Device& device,
-	                                     const uint32_t* compSpv,
-	                                     size_t compSize);
+	vk::raii::Pipeline CreateSunPipeline(const vk::raii::Device& device);
 
 	/**
 	 * @brief Creates a clamp-to-border sampler for sun shadow map reads.
@@ -174,7 +176,7 @@ private:
 	void WriteSunDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache);
 
 	// --- Point-light cubemap pipeline ---
-	vk::raii::Pipeline p_pipeline;
+	std::unique_ptr<vk::raii::Pipeline> p_pipeline;             ///< Point-light compute pipeline (shadow_eval.comp)
 
 	// --- Sun-light 2D pipeline ---
 	DescriptorSetLayout p_sunDescSetLayout;                       ///< Sun descriptor set layout (sampler2D at binding 1)
@@ -186,6 +188,10 @@ private:
 
 	// --- Push constant values ---
 	float p_bias = 0.0005f; ///< Depth bias for shadow acne prevention
+
+	/// Compute shaders loaded via ShaderLibrary.
+	std::shared_ptr<Shader> p_pointLightShader;  ///< Point-light cubemap eval (shadow_eval.comp)
+	std::shared_ptr<Shader> p_sunLightShader;    ///< Sun-light 2D eval (sun_shadow_eval.comp)
 
 	/// Two descriptor sets per in-flight frame slot so the per-light loop
 	/// can alternate between them without updating a currently-bound set.

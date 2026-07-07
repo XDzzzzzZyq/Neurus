@@ -138,8 +138,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto shadowIntensity = std::make_unique<ShadowIntensityPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			graphicsQueue, queueFamilyIndex,
-			shadow_eval_comp_spv, sizeof(shadow_eval_comp_spv));
+			graphicsQueue, queueFamilyIndex);
 		r_shadowIntensityPass = shadowIntensity.get();
 		r_passes.push_back(std::move(shadowIntensity));
 		NEURUS_LOG("[DeferredRenderer] ShadowIntensityPass created");

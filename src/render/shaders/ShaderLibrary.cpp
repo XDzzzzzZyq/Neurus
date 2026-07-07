@@ -3,9 +3,8 @@
 #include "Shader.h"
 #include "ShaderCompiler.h"
 
-// TODO(Tasks 11/12): Uncomment when RenderShader and ComputeShader exist
-// #include "RenderShader.h"
-// #include "ComputeShader.h"
+#include "RenderShader.h"
+#include "ComputeShader.h"
 
 #include "core/Log.h"
 
@@ -127,17 +126,12 @@ std::shared_ptr<Shader> ShaderLibrary::LoadRenderShader(
 	const std::string& fragPath)
 {
 	return GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
-		// TODO(Task 11): Replace placeholder with real RenderShader creation.
-		//
-		// Expected implementation:
-		//   auto shader = std::make_shared<RenderShader>(name, vertPath, fragPath);
-		//   if (!shader->Compile(GetCompilerInstance()))
-		//       return nullptr;
-		//   return shader;
-
-		NEURUS_LOG("[ShaderLibrary] RenderShader '"
-			<< name << "' not yet implemented (Task 11 placeholder)");
-		return nullptr;
+		auto shader = std::make_shared<RenderShader>(name, vertPath, fragPath);
+		if (!shader->Compile(GetCompilerInstance()))
+		{
+			return nullptr;
+		}
+		return shader;
 	});
 }
 
@@ -146,17 +140,12 @@ std::shared_ptr<Shader> ShaderLibrary::LoadComputeShader(
 	const std::string& compPath)
 {
 	return GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
-		// TODO(Task 12): Replace placeholder with real ComputeShader creation.
-		//
-		// Expected implementation:
-		//   auto shader = std::make_shared<ComputeShader>(name, compPath);
-		//   if (!shader->Compile(GetCompilerInstance()))
-		//       return nullptr;
-		//   return shader;
-
-		NEURUS_LOG("[ShaderLibrary] ComputeShader '"
-			<< name << "' not yet implemented (Task 12 placeholder)");
-		return nullptr;
+		auto shader = std::make_shared<ComputeShader>(name, compPath);
+		if (!shader->Compile(GetCompilerInstance()))
+		{
+			return nullptr;
+		}
+		return shader;
 	});
 }
 

@@ -89,8 +89,7 @@ protected:
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			ShadowDepthPass::kDefaultResolution);
 		m_shadowIntensityPass = std::make_unique<ShadowIntensityPass>(
-			*m_device, pd, 1u, m_queue, m_graphicsQueueFamily,
-			shadow_eval_comp_spv, sizeof(shadow_eval_comp_spv));
+			*m_device, pd, 1u, m_queue, m_graphicsQueueFamily);
 	}
 	void TearDown() override { VulkanTestShared::TearDown(); }
 

@@ -26,16 +26,11 @@
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"
+#include "../shaders/ShaderLibrary.h"
+#include "../shaders/RenderShader.h"
 
 #include "scene/Light.h"
 #include "scene/Scene.h"
-
-#include "shadow_depth.frag.h"
-#include "shadow_depth_multiview.vert.h"
-#include "depth_to_color.frag.h"
-
-#include "sun_shadow_depth.vert.h"
-#include "sun_shadow_depth.frag.h"
 
 #include "Log.h"
 
@@ -105,9 +100,25 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	, p_resolution(resolution)
 	, p_pipelineLayout(nullptr)
 	, p_pipeline(nullptr)
+	// --- Self-load shaders via ShaderLibrary ---
+	, m_multiviewShader(std::static_pointer_cast<RenderShader>(
+		ShaderLibrary::LoadRenderShader("ShadowDepthMultiview",
+		                                NEURUS_SHADER_DIR "render/shadow_depth_multiview.vert",
+		                                NEURUS_SHADER_DIR "render/shadow_depth.frag")))
+	, m_sunShader(std::static_pointer_cast<RenderShader>(
+		ShaderLibrary::LoadRenderShader("ShadowDepthSun",
+		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.vert",
+		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag")))
+	, m_debugShader(
+		ShaderLibrary::LoadComputeShader("DepthToColor",
+		                                 NEURUS_SHADER_DIR "render/depth_to_color.frag"))
 {
 	p_device = &device;
 	p_physicalDevice = &physicalDevice;
+
+	// --- Set device on loaded shaders (creates ShaderModules from SPIR-V) ---
+	if (m_multiviewShader) { m_multiviewShader->SetDevice(device); }
+	if (m_sunShader)       { m_sunShader->SetDevice(device); }
 
 	p_vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
 	p_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
@@ -119,7 +130,10 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " faceVPSize=" << kFaceVPSize
-	           << " staticFarPlane=" << kStaticFarPlane);
+	           << " staticFarPlane=" << kStaticFarPlane
+	           << " multiviewShader=" << (m_multiviewShader ? "OK" : "FAIL")
+	           << " sunShader=" << (m_sunShader ? "OK" : "FAIL")
+	           << " debugShader=" << (m_debugShader ? "OK" : "FAIL"));
 }
 
 // ===========================================================================
@@ -164,10 +178,15 @@ void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
 
 void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 {
-	auto vertModule = ShaderModule::FromEmbedded(device,
-		shadow_depth_multiview_vert_spv, sizeof(shadow_depth_multiview_vert_spv));
-	auto fragModule = ShaderModule::FromEmbedded(device,
-		depth_to_color_frag_spv, sizeof(depth_to_color_frag_spv));
+	// --- Guard: shader must be valid ---
+	if (!m_multiviewShader || !m_multiviewShader->IsValid())
+	{
+		throw std::runtime_error("ShadowDepthPass: Multiview shader not loaded or invalid");
+	}
+
+	// --- Use self-loaded shader modules ---
+	auto& vertModule = *m_multiviewShader->GetVertexModule();
+	auto& fragModule = *m_multiviewShader->GetFragmentModule();
 
 	// Push constant range: 80 bytes (lightPos+farPlane at offset 0, model at offset 16)
 	// Accessible by both vertex (full struct) and fragment (light data only).
@@ -218,10 +237,15 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 
 void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
 {
-	auto vertModule = ShaderModule::FromEmbedded(device,
-		sun_shadow_depth_vert_spv, sizeof(sun_shadow_depth_vert_spv));
-	auto fragModule = ShaderModule::FromEmbedded(device,
-		sun_shadow_depth_frag_spv, sizeof(sun_shadow_depth_frag_spv));
+	// --- Guard: shader must be valid ---
+	if (!m_sunShader || !m_sunShader->IsValid())
+	{
+		throw std::runtime_error("ShadowDepthPass: Sun shader not loaded or invalid");
+	}
+
+	// --- Use self-loaded shader modules ---
+	auto& vertModule = *m_sunShader->GetVertexModule();
+	auto& fragModule = *m_sunShader->GetFragmentModule();
 
 	// Push constant range: 64 bytes (mat4 lightViewProj)
 	std::vector<vk::PushConstantRange> pushRanges = {
