@@ -55,6 +55,18 @@ set(BUILD_EXAMPLES OFF)
 set(BUILD_STATIC ON)       # Static library - no DLL deployment needed
 add_subdirectory(dep/qtadvanceddocking)
 
+# Shaderc (shader compilation library — git submodule)
+set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SHADERC_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_INSTALL ON CACHE BOOL "" FORCE)
+set(SHADERC_ENABLE_HLSL OFF CACHE BOOL "" FORCE)
+# Override glslang install OFF — shaderc's generator expression for
+# GLSLANG_ENABLE_INSTALL is not evaluated at CMake time and leaks as
+# a truthy literal, triggering install-export errors from glslang's
+# SPIRV/SPIRV-Tools-opt target dependency.
+set(GLSLANG_ENABLE_INSTALL OFF CACHE BOOL "Enable glslang installation" FORCE)
+add_subdirectory(dep/shaderc)
+
 # Qt6 (window, QML, EventBus)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate Quick Qml Widgets Test)
 

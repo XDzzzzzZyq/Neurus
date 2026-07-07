@@ -16,3 +16,6 @@
 [submodule "dep/cereal"]
 	path = dep/cereal
 	url = https://github.com/USCiLab/cereal.git
+[submodule "dep/shaderc"]
+	path = dep/shaderc
+	url = https://github.com/google/shaderc

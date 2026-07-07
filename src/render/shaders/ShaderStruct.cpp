@@ -1,0 +1,336 @@
+/**
+ * @file ShaderStruct.cpp
+ * @brief Implementation of ShaderStruct — Reset(), static helpers, and setters.
+ */
+
+#include "ShaderStruct.h"
+
+#include <sstream>
+
+namespace neurus {
+
+// ---------------------------------------------------------------------------
+// Static type table — maps ParaType indices and custom types to GLSL strings
+// ---------------------------------------------------------------------------
+
+std::vector<std::string> ShaderStruct::type_table = {
+	"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube"
+};
+
+// ---------------------------------------------------------------------------
+// ParseType — ParaType ↔ string
+// ---------------------------------------------------------------------------
+
+std::string ShaderStruct::ParseType(ParaType type)
+{
+	// Fast path: built-in types from the enum
+	if (static_cast<int>(type) >= 0 && static_cast<size_t>(type) < type_table.size())
+	{
+		return type_table[static_cast<int>(type)];
+	}
+	return neurus::ToString(type);
+}
+
+ParaType ShaderStruct::ParseType(const std::string& type)
+{
+	// Search the type table first (handles dynamic custom types)
+	for (size_t i = 0; i < type_table.size(); ++i)
+	{
+		if (type_table[i] == type)
+		{
+			return static_cast<ParaType>(i);
+		}
+	}
+
+	// Fall back to Parameters.h for built-in types
+	ParaType result = neurus::FromString(type);
+	if (result != ParaType::NONE)
+	{
+		return result;
+	}
+
+	// Unknown type — register it as a custom type
+	ADD_TYPE(type);
+	return ParaType::CUSTOM;
+}
+
+// ---------------------------------------------------------------------------
+// ParseCount — array suffix
+// ---------------------------------------------------------------------------
+
+std::string ShaderStruct::ParseCount(int count)
+{
+	return count > 1 ? "[" + std::to_string(count) + "]" : "";
+}
+
+// ---------------------------------------------------------------------------
+// ParseArgs — function arguments ↔ GLSL string
+// ---------------------------------------------------------------------------
+
+std::string ShaderStruct::ParseArgs(const Args& args)
+{
+	std::string result = "(";
+
+	if (!args.empty())
+	{
+		for (const auto& [type, name] : args)
+		{
+			result += ParseType(type) + " " + name + ", ";
+		}
+		// Remove trailing ", "
+		result.erase(result.end() - 2, result.end());
+	}
+
+	return result + ")";
+}
+
+Args ShaderStruct::ParseArgs(const std::string& args)
+{
+	Args result;
+	std::istringstream str(args);
+	std::string word;
+
+	while (str >> word)
+	{
+		ParaType type = ParseType(word);
+		str >> word;
+		// Remove trailing comma or closing parenthesis
+		if (!word.empty() && (word.back() == ',' || word.back() == ')'))
+		{
+			word.pop_back();
+		}
+		result.emplace_back(type, word);
+	}
+
+	return result;
+}
+
+// ---------------------------------------------------------------------------
+// IsAvailType — type lookup
+// ---------------------------------------------------------------------------
+
+bool ShaderStruct::IsAvailType(const std::string& type)
+{
+	for (const auto& t : type_table)
+	{
+		if (t == type)
+		{
+			return true;
+		}
+	}
+	return neurus::IsKnownType(type);
+}
+
+// ---------------------------------------------------------------------------
+// ADD_TYPE — register a custom type
+// ---------------------------------------------------------------------------
+
+void ShaderStruct::ADD_TYPE(const std::string& name)
+{
+	// Only add if not already present among custom types (index >= TEXTURE)
+	// type_table indices 0-9 are reserved for ParaType enum values
+	static constexpr size_t kBuiltinCount = 11; // float through samplerCube
+
+	for (size_t i = kBuiltinCount; i < type_table.size(); ++i)
+	{
+		if (type_table[i] == name)
+		{
+			return; // Already registered
+		}
+	}
+	type_table.emplace_back(name);
+}
+
+// ---------------------------------------------------------------------------
+// Setters — OpenGL-ported (each sets is_struct_changed = true)
+// ---------------------------------------------------------------------------
+
+void ShaderStruct::SetAB(int loc, ParaType type, const std::string& name)
+{
+	is_struct_changed = true;
+	AB_list.emplace_back(loc, name, type);
+}
+
+void ShaderStruct::SetPass(int loc, ParaType type, const std::string& name)
+{
+	is_struct_changed = true;
+	pass_list.emplace_back(loc, name, type);
+}
+
+void ShaderStruct::SetSB(int loc, const std::string& name, const Args& args)
+{
+	is_struct_changed = true;
+	S_StructDef def;
+	def.binding = loc;
+	def.name = name;
+	for (const auto& [argType, argName] : args)
+	{
+		def.fields.emplace_back(0, argName, argType);
+	}
+	SB_list.emplace_back(std::move(def));
+}
+
+void ShaderStruct::SetUB(std::string type, std::string name, const Args& args)
+{
+	is_struct_changed = true;
+	S_StructDef def;
+	def.binding = 0; // Binding will be assigned by the descriptor-layout builder
+	def.name = std::move(type);
+	for (const auto& [argType, argName] : args)
+	{
+		def.fields.emplace_back(0, argName, argType);
+	}
+	ubuffer_list.emplace_back(std::move(def));
+}
+
+void ShaderStruct::SetUni(ParaType type, int count, const std::string& name)
+{
+	is_struct_changed = true;
+	uniform_list.emplace_back(name, type, count);
+}
+
+void ShaderStruct::SetInp(ParaType type, int count, const std::string& name)
+{
+	is_struct_changed = true;
+	input_list.emplace_back(name, type, count);
+}
+
+void ShaderStruct::SetOut(ParaType type, int count, const std::string& name)
+{
+	is_struct_changed = true;
+	output_list.emplace_back(name, type, count);
+}
+
+void ShaderStruct::SetGlob(ParaType type, float defult, const std::string& name)
+{
+	is_struct_changed = true;
+	glob_list.emplace_back(name, type, defult);
+}
+
+void ShaderStruct::DefStruct(const std::string& name, const Args& args)
+{
+	is_struct_changed = true;
+	S_StructDef def;
+	def.binding = 0; // Bare struct — no binding
+	def.name = name;
+	for (const auto& [argType, argName] : args)
+	{
+		def.fields.emplace_back(0, argName, argType);
+	}
+	struct_def_list.emplace_back(std::move(def));
+}
+
+void ShaderStruct::DefFunc(ParaType type, std::string name, const std::string& content, const Args& args)
+{
+	is_struct_changed = true;
+	func_list.emplace_back(type, std::move(name), content, args);
+}
+
+void ShaderStruct::SetConst(ParaType type, const std::string& name, const std::string& content)
+{
+	is_struct_changed = true;
+	const_list.emplace_back(type, name, content, Args{});
+}
+
+void ShaderStruct::SetVar(const std::string& typeName, const std::string& name, int count)
+{
+	is_struct_changed = true;
+	vari_list.emplace_back(typeName, name, count);
+}
+
+// ---------------------------------------------------------------------------
+// Vulkan-specific setters
+// ---------------------------------------------------------------------------
+
+void ShaderStruct::SetPushConstant(const std::string& name, uint32_t offset, uint32_t size)
+{
+	is_struct_changed = true;
+	push_constants.push_back({name, offset, size});
+}
+
+void ShaderStruct::SetLocalSize(uint32_t x, uint32_t y, uint32_t z)
+{
+	is_struct_changed = true;
+	local_size_x = x;
+	local_size_y = y;
+	local_size_z = z;
+}
+
+void ShaderStruct::SetVersion(int v)
+{
+	is_struct_changed = true;
+	version = v;
+}
+
+void ShaderStruct::AddExtension(const std::string& ext)
+{
+	is_struct_changed = true;
+	// Deduplicate
+	for (const auto& existing : extensions)
+	{
+		if (existing == ext)
+		{
+			return;
+		}
+	}
+	extensions.push_back(ext);
+}
+
+// ---------------------------------------------------------------------------
+// Reset — clears ALL containers to default/empty state
+// ---------------------------------------------------------------------------
+
+void ShaderStruct::Reset()
+{
+	AB_list.clear();
+	pass_list.clear();
+	SB_list.clear();
+	ubuffer_list.clear();
+	struct_def_list.clear();
+	uniform_list.clear();
+	input_list.clear();
+	output_list.clear();
+	const_list.clear();
+	glob_list.clear();
+	vari_list.clear();
+	func_list.clear();
+
+	Main.clear();
+
+	push_constants.clear();
+	spec_constants.clear();
+	extensions.clear();
+
+	local_size_x = 0;
+	local_size_y = 0;
+	local_size_z = 0;
+	version = 450;
+
+	is_struct_changed = true;
+}
+
+// ---------------------------------------------------------------------------
+// IsEmpty — true when no data has been set
+// ---------------------------------------------------------------------------
+
+bool ShaderStruct::IsEmpty() const
+{
+	return AB_list.empty()
+	    && pass_list.empty()
+	    && SB_list.empty()
+	    && ubuffer_list.empty()
+	    && struct_def_list.empty()
+	    && uniform_list.empty()
+	    && input_list.empty()
+	    && output_list.empty()
+	    && const_list.empty()
+	    && glob_list.empty()
+	    && vari_list.empty()
+	    && func_list.empty()
+	    && Main.empty()
+	    && push_constants.empty()
+	    && spec_constants.empty()
+	    && extensions.empty();
+}
+
+} // namespace neurus

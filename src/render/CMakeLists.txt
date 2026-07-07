@@ -31,6 +31,12 @@ add_library(neurus_render STATIC
 	shaders/ShaderModule.cpp
 	shaders/ShaderLib.h
 	shaders/ShaderLib.cpp
+	shaders/ShaderStruct.h
+	shaders/ShaderStruct.cpp
+	shaders/ShaderCompiler.h
+	shaders/ShaderCompiler.cpp
+	shaders/ShaderLibrary.h
+	shaders/ShaderLibrary.cpp
 	Texture.h
 	Texture.cpp
 	PipelineBuilder.h
@@ -54,6 +60,7 @@ target_link_libraries(neurus_render PUBLIC
 	neurus_core
 	neurus_scene
 	neurus_render_passes
+	shaderc_combined
 )
 
 target_include_directories(neurus_render PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
