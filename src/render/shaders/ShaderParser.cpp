@@ -371,32 +371,32 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
 
-				if (line == "};" || line.find("};") != std::string::npos)
-				{
-					break;
-				}
-
-				if (line.empty() || line == "{" || line == "}")
-				{
-					continue;
-				}
-
-				// Parse member: "type name;" or "type name[SIZE];"
-				std::istringstream mstr(line);
-				std::string typeName;
-				mstr >> typeName;
-				mstr >> word;
-
-				// Strip trailing semicolon
-				if (!word.empty() && word.back() == ';')
-				{
-					word.pop_back();
-				}
-
-				ParaType pType = ShaderStruct::ParseType(typeName);
-				argsCache.emplace_back(pType, word);
+			if (line.find('}') != std::string::npos && line.find(';') != std::string::npos)
+			{
+				break;
 			}
-			while (true);
+
+			if (line.empty() || line == "{" || line == "}")
+			{
+				continue;
+			}
+
+			// Parse member: "type name;" or "type name[SIZE];"
+			std::istringstream mstr(line);
+			std::string typeName;
+			mstr >> typeName;
+			mstr >> word;
+
+			// Strip trailing semicolon
+			if (!word.empty() && word.back() == ';')
+			{
+				word.pop_back();
+			}
+
+			ParaType pType = ShaderStruct::ParseType(typeName);
+			argsCache.emplace_back(pType, word);
+		}
+		while (true);
 
 				int binding = ExtractIntFromLayout(layoutStr, "binding");
 				if (binding < 0)
@@ -447,17 +447,17 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
 
-				if (line == "};" || line.find("};") != std::string::npos)
-				{
-					break;
-				}
+			if (line.find('}') != std::string::npos && line.find(';') != std::string::npos)
+			{
+				break;
+			}
 
-				if (line.empty() || line == "{" || line == "}")
-				{
-					continue;
-				}
+			if (line.empty() || line == "{" || line == "}")
+			{
+				continue;
+			}
 
-				// Handle explicit layout(offset=N) inside push constant blocks
+			// Handle explicit layout(offset=N) inside push constant blocks
 				uint32_t explicitOffset = UINT32_MAX;
 				if (line.find("layout") == 0 && line.find("offset") != std::string::npos)
 					{
@@ -544,31 +544,31 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
 
-				if (line == "};" || line.find("};") != std::string::npos)
-				{
-					break;
-				}
-
-				if (line.empty() || line == "{" || line == "}")
-				{
-					continue;
-				}
-
-				// Parse member: "type name;"
-				std::istringstream mstr(line);
-				std::string typeName;
-				mstr >> typeName;
-				mstr >> word;
-
-				if (!word.empty() && word.back() == ';')
-				{
-					word.pop_back();
-				}
-
-				ParaType pType = ShaderStruct::ParseType(typeName);
-				argsCache.emplace_back(pType, word);
+			if (line.find('}') != std::string::npos && line.find(';') != std::string::npos)
+			{
+				break;
 			}
-			while (true);
+
+			if (line.empty() || line == "{" || line == "}")
+			{
+				continue;
+			}
+
+			// Parse member: "type name;"
+			std::istringstream mstr(line);
+			std::string typeName;
+			mstr >> typeName;
+			mstr >> word;
+
+			if (!word.empty() && word.back() == ';')
+			{
+				word.pop_back();
+			}
+
+			ParaType pType = ShaderStruct::ParseType(typeName);
+			argsCache.emplace_back(pType, word);
+		}
+		while (true);
 
 				out.SetUB(blockType, blockType, argsCache);
 				argsCache.clear();
@@ -821,7 +821,8 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			line = StripComments(line, inBlockComment);
 			line = TrimWhitespace(line);
 
-			if (line == "};" || line.find("};") != std::string::npos)
+			// Block ends with "};" or "} varName;" (e.g. push constant / uniform blocks)
+			if (line.find('}') != std::string::npos && line.find(';') != std::string::npos)
 			{
 				break;
 			}
