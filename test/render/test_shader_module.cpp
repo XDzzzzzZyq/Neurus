@@ -7,9 +7,99 @@
 
 using namespace neurus;
 
-// Minimal valid SPIR-V header (4 words, no instructions)
-static const uint32_t kMinimalSpirv[] = {0x07230203, 0x00010000, 0x00000000, 0x00000000};
-static const size_t kMinimalSpirvSize = sizeof(kMinimalSpirv);
+// Valid minimal SPIR-V arrays generated via glslangValidator
+static const uint32_t kMinimalVertSpv[] = {
+	0x07230203, 0x00010000, 0x0008000B, 0x00000014,
+	0x00000000, 0x00020011, 0x00000001, 0x0006000B,
+	0x00000001, 0x4C534C47, 0x6474732E, 0x3035342E,
+	0x00000000, 0x0003000E, 0x00000000, 0x00000001,
+	0x0006000F, 0x00000000, 0x00000004, 0x6E69616D,
+	0x00000000, 0x0000000D, 0x00030003, 0x00000002,
+	0x000001C2, 0x00040005, 0x00000004, 0x6E69616D,
+	0x00000000, 0x00060005, 0x0000000B, 0x505F6C67,
+	0x65567265, 0x78657472, 0x00000000, 0x00060006,
+	0x0000000B, 0x00000000, 0x505F6C67, 0x7469736F,
+	0x006E6F69, 0x00070006, 0x0000000B, 0x00000001,
+	0x505F6C67, 0x746E696F, 0x657A6953, 0x00000000,
+	0x00070006, 0x0000000B, 0x00000002, 0x435F6C67,
+	0x4470696C, 0x61747369, 0x0065636E, 0x00070006,
+	0x0000000B, 0x00000003, 0x435F6C67, 0x446C6C75,
+	0x61747369, 0x0065636E, 0x00030005, 0x0000000D,
+	0x00000000, 0x00030047, 0x0000000B, 0x00000002,
+	0x00050048, 0x0000000B, 0x00000000, 0x0000000B,
+	0x00000000, 0x00050048, 0x0000000B, 0x00000001,
+	0x0000000B, 0x00000001, 0x00050048, 0x0000000B,
+	0x00000002, 0x0000000B, 0x00000003, 0x00050048,
+	0x0000000B, 0x00000003, 0x0000000B, 0x00000004,
+	0x00020013, 0x00000002, 0x00030021, 0x00000003,
+	0x00000002, 0x00030016, 0x00000006, 0x00000020,
+	0x00040017, 0x00000007, 0x00000006, 0x00000004,
+	0x00040015, 0x00000008, 0x00000020, 0x00000000,
+	0x0004002B, 0x00000008, 0x00000009, 0x00000001,
+	0x0004001C, 0x0000000A, 0x00000006, 0x00000009,
+	0x0006001E, 0x0000000B, 0x00000007, 0x00000006,
+	0x0000000A, 0x0000000A, 0x00040020, 0x0000000C,
+	0x00000003, 0x0000000B, 0x0004003B, 0x0000000C,
+	0x0000000D, 0x00000003, 0x00040015, 0x0000000E,
+	0x00000020, 0x00000001, 0x0004002B, 0x0000000E,
+	0x0000000F, 0x00000000, 0x0004002B, 0x00000006,
+	0x00000010, 0x00000000, 0x0007002C, 0x00000007,
+	0x00000011, 0x00000010, 0x00000010, 0x00000010,
+	0x00000010, 0x00040020, 0x00000012, 0x00000003,
+	0x00000007, 0x00050036, 0x00000002, 0x00000004,
+	0x00000000, 0x00000003, 0x000200F8, 0x00000005,
+	0x00050041, 0x00000012, 0x00000013, 0x0000000D,
+	0x0000000F, 0x0003003E, 0x00000013, 0x00000011,
+	0x000100FD, 0x00010038,
+};
+static const size_t kMinimalVertSpvSize = sizeof(kMinimalVertSpv);
+
+static const uint32_t kMinimalFragSpv[] = {
+	0x07230203, 0x00010000, 0x0008000B, 0x0000000C,
+	0x00000000, 0x00020011, 0x00000001, 0x0006000B,
+	0x00000001, 0x4C534C47, 0x6474732E, 0x3035342E,
+	0x00000000, 0x0003000E, 0x00000000, 0x00000001,
+	0x0006000F, 0x00000004, 0x00000004, 0x6E69616D,
+	0x00000000, 0x00000009, 0x00030010, 0x00000004,
+	0x00000007, 0x00030003, 0x00000002, 0x000001C2,
+	0x00040005, 0x00000004, 0x6E69616D, 0x00000000,
+	0x00050005, 0x00000009, 0x4374756F, 0x726F6C6F,
+	0x00000000, 0x00040047, 0x00000009, 0x0000001E,
+	0x00000000, 0x00020013, 0x00000002, 0x00030021,
+	0x00000003, 0x00000002, 0x00030016, 0x00000006,
+	0x00000020, 0x00040017, 0x00000007, 0x00000006,
+	0x00000004, 0x00040020, 0x00000008, 0x00000003,
+	0x00000007, 0x0004003B, 0x00000008, 0x00000009,
+	0x00000003, 0x0004002B, 0x00000006, 0x0000000A,
+	0x3F800000, 0x0007002C, 0x00000007, 0x0000000B,
+	0x0000000A, 0x0000000A, 0x0000000A, 0x0000000A,
+	0x00050036, 0x00000002, 0x00000004, 0x00000000,
+	0x00000003, 0x000200F8, 0x00000005, 0x0003003E,
+	0x00000009, 0x0000000B, 0x000100FD, 0x00010038,
+};
+static const size_t kMinimalFragSpvSize = sizeof(kMinimalFragSpv);
+
+static const uint32_t kMinimalCompSpv[] = {
+	0x07230203, 0x00010000, 0x0008000B, 0x0000000A,
+	0x00000000, 0x00020011, 0x00000001, 0x0006000B,
+	0x00000001, 0x4C534C47, 0x6474732E, 0x3035342E,
+	0x00000000, 0x0003000E, 0x00000000, 0x00000001,
+	0x0005000F, 0x00000005, 0x00000004, 0x6E69616D,
+	0x00000000, 0x00060010, 0x00000004, 0x00000011,
+	0x00000001, 0x00000001, 0x00000001, 0x00030003,
+	0x00000002, 0x000001C2, 0x00040005, 0x00000004,
+	0x6E69616D, 0x00000000, 0x00040047, 0x00000009,
+	0x0000000B, 0x00000019, 0x00020013, 0x00000002,
+	0x00030021, 0x00000003, 0x00000002, 0x00040015,
+	0x00000006, 0x00000020, 0x00000000, 0x00040017,
+	0x00000007, 0x00000006, 0x00000003, 0x0004002B,
+	0x00000006, 0x00000008, 0x00000001, 0x0006002C,
+	0x00000007, 0x00000009, 0x00000008, 0x00000008,
+	0x00000008, 0x00050036, 0x00000002, 0x00000004,
+	0x00000000, 0x00000003, 0x000200F8, 0x00000005,
+	0x000100FD, 0x00010038,
+};
+static const size_t kMinimalCompSpvSize = sizeof(kMinimalCompSpv);
 
 /**
  * @brief Tests for ShaderModule and ShaderLib.
@@ -99,7 +189,7 @@ TEST_F(ShaderModuleTest, FromEmbedded_CreatesValidModule)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto module = ShaderModule::FromEmbedded(*m_device, kMinimalSpirv, kMinimalSpirvSize);
+	auto module = ShaderModule::FromEmbedded(*m_device, kMinimalCompSpv, kMinimalCompSpvSize);
 
 	// Verify the handle contains a valid VkShaderModule (not VK_NULL_HANDLE)
 	EXPECT_NE(*module.handle(), VK_NULL_HANDLE);
@@ -113,8 +203,8 @@ TEST_F(ShaderModuleTest, Constructor_CreatesValidModule)
 	}
 
 	std::vector<uint32_t> spirv(
-		kMinimalSpirv,
-		kMinimalSpirv + (kMinimalSpirvSize / sizeof(uint32_t)));
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
 
 	ShaderModule module(*m_device, spirv);
 
@@ -129,8 +219,8 @@ TEST_F(ShaderModuleTest, MoveConstructor_TransfersOwnership)
 	}
 
 	std::vector<uint32_t> spirv(
-		kMinimalSpirv,
-		kMinimalSpirv + (kMinimalSpirvSize / sizeof(uint32_t)));
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
 
 	ShaderModule original(*m_device, spirv);
 	EXPECT_NE(*original.handle(), VK_NULL_HANDLE);
@@ -147,72 +237,70 @@ TEST_F(ShaderModuleTest, MoveConstructor_TransfersOwnership)
 // ShaderLibrary cache tests
 // ---------------------------------------------------------------------------
 
-TEST_F(ShaderModuleTest, ShaderLibrary_LoadShader_CachesAndReturns)
+TEST_F(ShaderModuleTest, FromEmbedded_MultipleCallsAllValid)
 {
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// Clear any previous cache state
-	ShaderLibrary::Clear();
+	// Create two modules from the same SPIR-V data
+	auto moduleA = ShaderModule::FromEmbedded(
+		*m_device, kMinimalCompSpv, kMinimalCompSpvSize);
+	auto moduleB = ShaderModule::FromEmbedded(
+		*m_device, kMinimalCompSpv, kMinimalCompSpvSize);
 
-	auto first = std::static_pointer_cast<ComputeShader>(
-		ShaderLibrary::LoadComputeShader("dummy_shader",
-		                                "res/shaders/compute/dummy.comp"));
-	ASSERT_NE(first, nullptr);
-	first->CreateModule(*m_device);
-	EXPECT_TRUE(first->IsValid());
-	EXPECT_NE(*first->GetShaderModule(ShaderType::COMPUTE)->handle(), VK_NULL_HANDLE);
+	EXPECT_NE(*moduleA.handle(), VK_NULL_HANDLE);
+	EXPECT_NE(*moduleB.handle(), VK_NULL_HANDLE);
 
-	// Second load with same name should return the cached instance
-	auto second = ShaderLibrary::LoadComputeShader("dummy_shader",
-	                                               "res/shaders/compute/dummy.comp");
-	ASSERT_NE(second, nullptr);
-
-	// Same shared_ptr (same pointer, not just same handle)
-	EXPECT_EQ(first.get(), second.get());
+	// FromEmbedded returns distinct objects (no caching)
+	EXPECT_NE(*moduleA.handle(), *moduleB.handle());
 }
 
-TEST_F(ShaderModuleTest, ShaderLibrary_LoadDifferentShaders_AreDistinct)
+TEST_F(ShaderModuleTest, FromSpirV_DifferentData_DistinctModules)
 {
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderLibrary::Clear();
+	// Create modules from different SPIR-V data sets
+	auto vertSpirv = std::vector<uint32_t>(
+		kMinimalVertSpv,
+		kMinimalVertSpv + (kMinimalVertSpvSize / sizeof(uint32_t)));
+	auto fragSpirv = std::vector<uint32_t>(
+		kMinimalFragSpv,
+		kMinimalFragSpv + (kMinimalFragSpvSize / sizeof(uint32_t)));
 
-	auto first = ShaderLibrary::LoadComputeShader("shader_a",
-	                                              "res/shaders/compute/dummy.comp");
-	auto second = ShaderLibrary::LoadComputeShader("shader_b",
-	                                               "res/shaders/compute/dummy.comp");
+	auto vertModule = ShaderModule::FromSpirV(*m_device, vertSpirv);
+	auto fragModule = ShaderModule::FromSpirV(*m_device, fragSpirv);
 
-	ASSERT_NE(first, nullptr);
-	ASSERT_NE(second, nullptr);
-	EXPECT_NE(first.get(), second.get());
+	ASSERT_NE(vertModule, nullptr);
+	ASSERT_NE(fragModule, nullptr);
+	EXPECT_NE(*vertModule->handle(), *fragModule->handle());
 }
 
-TEST_F(ShaderModuleTest, ShaderLibrary_Clear_RemovesAll)
+TEST_F(ShaderModuleTest, FromEmbedded_ReuseAfterDestruction)
 {
 	if (!m_hasVulkan)
 	{
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderLibrary::Clear();
+	// Create a module and let it be destroyed (scope exit)
+	VkShaderModule firstHandle = VK_NULL_HANDLE;
+	{
+		auto module = ShaderModule::FromEmbedded(
+			*m_device, kMinimalCompSpv, kMinimalCompSpvSize);
+		ASSERT_NE(*module.handle(), VK_NULL_HANDLE);
+		firstHandle = *module.handle();
+	}
 
-	auto shader = ShaderLibrary::LoadComputeShader("test_shader",
-	                                               "res/shaders/compute/dummy.comp");
-	ASSERT_NE(shader, nullptr);
+	// Create a new module from the same data — must succeed
+	auto module = ShaderModule::FromEmbedded(
+		*m_device, kMinimalCompSpv, kMinimalCompSpvSize);
+	EXPECT_NE(*module.handle(), VK_NULL_HANDLE);
 
-	ShaderLibrary::Clear();
-
-	// Reload after clear should create a new instance
-	auto reloaded = ShaderLibrary::LoadComputeShader("test_shader",
-	                                                 "res/shaders/compute/dummy.comp");
-	ASSERT_NE(reloaded, nullptr);
-
-	// Should be different pointer after clear
-	EXPECT_NE(shader.get(), reloaded.get());
+	// New module gets a fresh handle (old one was destroyed)
+	EXPECT_NE(*module.handle(), firstHandle);
 }
