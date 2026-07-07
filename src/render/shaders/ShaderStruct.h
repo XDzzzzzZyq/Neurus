@@ -55,6 +55,7 @@ struct S_StructDef
 	int binding;              ///< Descriptor-set binding point (0 for bare structs)
 	std::string name;         ///< Struct / block type name
 	std::vector<S_IO> fields; ///< Member fields (location unused for struct members)
+	std::string varName;      ///< Variable / instance name (used for ubuffer_list; empty for others)
 };
 
 /**
@@ -119,9 +120,10 @@ struct S_Var
  */
 struct S_PushConstant
 {
-	std::string name;  ///< Member name within the push-constant block
-	uint32_t offset;   ///< Byte offset from the start of the push-constant block
-	uint32_t size;     ///< Byte size of this member
+	std::string name;     ///< Member name within the push-constant block
+	uint32_t offset;      ///< Byte offset from the start of the push-constant block
+	uint32_t size;        ///< Byte size of this member
+	std::string typeName; ///< GLSL type of this member (e.g. "mat4", "vec4", "float")
 };
 
 /**
@@ -272,8 +274,9 @@ public:
 	// Vulkan-specific setters
 	// -------------------------------------------------------------------
 
-	/** @brief Register a push-constant block member (offset and size in bytes). */
-	void SetPushConstant(const std::string& name, uint32_t offset, uint32_t size);
+	/** @brief Register a push-constant block member (offset, size, and GLSL type). */
+	void SetPushConstant(const std::string& name, uint32_t offset, uint32_t size,
+	                     const std::string& typeName);
 	/** @brief Set the compute-shader workgroup size. */
 	void SetLocalSize(uint32_t x, uint32_t y, uint32_t z);
 	/** @brief Set the GLSL #version value. */
@@ -299,6 +302,24 @@ public:
 	 * Used to detect an uninitialised / freshly-reset ShaderStruct.
 	 */
 	bool IsEmpty() const;
+
+	/**
+	 * @brief Generates a complete, valid Vulkan GLSL source string from the
+	 *        current IR state with deterministic section ordering.
+	 *
+	 * Sections are emitted in Vulkan-specific order:
+	 *   #version → extensions → AB_list → pass_list → struct_def_list →
+	 *   SB_list → ubuffer_list → push_constants → spec_constants →
+	 *   uniform_list → input_list → output_list → glob_list →
+	 *   const_list → vari_list → func_list → local_size → main()
+	 *
+	 * Each section is gated by @c if (!list.empty()).
+	 * Sets @c is_struct_changed to false after successful generation.
+	 *
+	 * @return Valid Vulkan GLSL source code.  Returns a minimal stub
+	 *         (@c "#version 450 core\\nvoid main() {}") when IsEmpty().
+	 */
+	std::string GenerateShader();
 };
 
 } // namespace neurus

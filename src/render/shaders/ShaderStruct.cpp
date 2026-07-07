@@ -176,6 +176,7 @@ void ShaderStruct::SetUB(std::string type, std::string name, const Args& args)
 	S_StructDef def;
 	def.binding = 0; // Binding will be assigned by the descriptor-layout builder
 	def.name = std::move(type);
+	def.varName = std::move(name);
 	for (const auto& [argType, argName] : args)
 	{
 		def.fields.emplace_back(0, argName, argType);
@@ -242,10 +243,11 @@ void ShaderStruct::SetVar(const std::string& typeName, const std::string& name, 
 // Vulkan-specific setters
 // ---------------------------------------------------------------------------
 
-void ShaderStruct::SetPushConstant(const std::string& name, uint32_t offset, uint32_t size)
+void ShaderStruct::SetPushConstant(const std::string& name, uint32_t offset, uint32_t size,
+                                 const std::string& typeName)
 {
 	is_struct_changed = true;
-	push_constants.push_back({name, offset, size});
+	push_constants.push_back({name, offset, size, typeName});
 }
 
 void ShaderStruct::SetLocalSize(uint32_t x, uint32_t y, uint32_t z)
@@ -331,6 +333,216 @@ bool ShaderStruct::IsEmpty() const
 	    && push_constants.empty()
 	    && spec_constants.empty()
 	    && extensions.empty();
+}
+
+// ---------------------------------------------------------------------------
+// GenerateShader — produces valid Vulkan GLSL from the current IR state
+// ---------------------------------------------------------------------------
+
+std::string ShaderStruct::GenerateShader()
+{
+	// Empty shader → minimal stub
+	if (IsEmpty())
+	{
+		return "#version 450 core\nvoid main() {}\n";
+	}
+
+	std::ostringstream result;
+
+	// 1. Version
+	result << "#version " << version << " core\n\n";
+
+	// 2. Extension directives
+	if (!extensions.empty())
+	{
+		for (const auto& ext : extensions)
+		{
+			result << "#extension " << ext << " : require\n";
+		}
+		result << "\n";
+	}
+
+	// 3. AB_list — vertex inputs: layout(location = N) in type name;
+	if (!AB_list.empty())
+	{
+		for (const auto& io : AB_list)
+		{
+			result << "layout(location = " << io.location << ") in "
+			       << ParseType(io.type) << " " << io.name << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 4. pass_list — render outputs: layout(location = N) out type name;
+	if (!pass_list.empty())
+	{
+		for (const auto& io : pass_list)
+		{
+			result << "layout(location = " << io.location << ") out "
+			       << ParseType(io.type) << " " << io.name << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 5. struct_def_list — bare struct definitions
+	if (!struct_def_list.empty())
+	{
+		for (const auto& def : struct_def_list)
+		{
+			result << "struct " << def.name << "\n{\n";
+			for (const auto& field : def.fields)
+			{
+				result << "\t" << ParseType(field.type) << " " << field.name << ";\n";
+			}
+			result << "};\n\n";
+		}
+	}
+
+	// 6. SB_list — storage buffers: layout(std430, set=0, binding=B) readonly buffer BName { ... };
+	if (!SB_list.empty())
+	{
+		for (const auto& sb : SB_list)
+		{
+			result << "layout(std430, set = 0, binding = " << sb.binding
+			       << ") readonly buffer " << sb.name << "\n{\n";
+			for (const auto& field : sb.fields)
+			{
+				result << "\t" << ParseType(field.type) << " " << field.name << ";\n";
+			}
+			result << "};\n";
+		}
+		result << "\n";
+	}
+
+	// 7. ubuffer_list — uniform buffers: layout(std140, set=0, binding=B) uniform UName { ... } var;
+	if (!ubuffer_list.empty())
+	{
+		for (const auto& ub : ubuffer_list)
+		{
+			result << "layout(std140, set = 0, binding = " << ub.binding
+			       << ") uniform " << ub.name << "\n{\n";
+			for (const auto& field : ub.fields)
+			{
+				result << "\t" << ParseType(field.type) << " " << field.name << ";\n";
+			}
+			// Emit variable / instance name (fall back to block name if empty)
+			result << "} " << (ub.varName.empty() ? ub.name : ub.varName) << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 8. push_constants — layout(push_constant) uniform PushConstants { ... } pc;
+	if (!push_constants.empty())
+	{
+		result << "layout(push_constant) uniform PushConstants\n{\n";
+		for (const auto& pc : push_constants)
+		{
+			result << "\t" << pc.typeName << " " << pc.name << ";\n";
+		}
+		result << "} pc;\n\n";
+	}
+
+	// 9. spec_constants — layout(constant_id = B) const type name = defaultVal;
+	if (!spec_constants.empty())
+	{
+		for (const auto& sc : spec_constants)
+		{
+			result << "layout(constant_id = " << sc.binding << ") const "
+			       << ParseType(sc.type) << " " << sc.name << " = "
+			       << sc.defaultVal << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 10. uniform_list — uniform type name[N];
+	if (!uniform_list.empty())
+	{
+		for (const auto& u : uniform_list)
+		{
+			result << "uniform " << ParseType(u.type) << " " << u.name
+			       << ParseCount(u.count) << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 11. input_list — in type name[N];
+	if (!input_list.empty())
+	{
+		for (const auto& in : input_list)
+		{
+			result << "in " << ParseType(in.type) << " " << in.name
+			       << ParseCount(in.count) << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 12. output_list — out type name[N];
+	if (!output_list.empty())
+	{
+		for (const auto& out : output_list)
+		{
+			result << "out " << ParseType(out.type) << " " << out.name
+			       << ParseCount(out.count) << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 13. glob_list — type name = type(default);
+	if (!glob_list.empty())
+	{
+		for (const auto& g : glob_list)
+		{
+			result << ParseType(g.type) << " " << g.name << " = "
+			       << ParseType(g.type) << "(" << g.defaultVal << ");\n";
+		}
+		result << "\n";
+	}
+
+	// 14. const_list — const type name = value;
+	if (!const_list.empty())
+	{
+		for (const auto& c : const_list)
+		{
+			result << "const " << ParseType(c.returnType) << " " << c.name
+			       << " = " << c.body << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 15. vari_list — typeName name[N];
+	if (!vari_list.empty())
+	{
+		for (const auto& v : vari_list)
+		{
+			result << v.typeName << " " << v.name << ParseCount(v.count) << ";\n";
+		}
+		result << "\n";
+	}
+
+	// 16. func_list — returnType name(args) { body }
+	if (!func_list.empty())
+	{
+		for (const auto& f : func_list)
+		{
+			result << ParseType(f.returnType) << " " << f.name
+			       << ParseArgs(f.args) << "\n{\n"
+			       << f.body << "\n}\n\n";
+		}
+	}
+
+	// 17. Compute workgroup size (only for compute shaders)
+	if (local_size_x > 0)
+	{
+		result << "layout(local_size_x = " << local_size_x
+		       << ", local_size_y = " << local_size_y
+		       << ", local_size_z = " << local_size_z << ") in;\n\n";
+	}
+
+	// 18. main() entry point
+	result << "void main()\n{\n" << Main << "\n}\n";
+
+	is_struct_changed = false;
+	return result.str();
 }
 
 } // namespace neurus

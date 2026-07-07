@@ -10,6 +10,7 @@ add_executable(neurus_test
 	asset/test_meshdata.cpp
 	asset/test_imagedata.cpp
 	render/test_shader_module.cpp
+	render/test_shader_parser.cpp
 	render/test_syncobjects.cpp
 	render/test_image.cpp
 	render/test_descriptor.cpp
