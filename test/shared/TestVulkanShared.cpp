@@ -7,6 +7,7 @@
 
 #include "render/Image.h"
 #include "render/Barrier.h"
+#include "render/shaders/ShaderLibrary.h"
 
 #include <iostream>
 
@@ -131,6 +132,9 @@ void VulkanTestShared::TearDown()
 	{
 		m_device->waitIdle();
 	}
+	// Clear ShaderLibrary cache between tests — each test has its own vk::Device.
+	// Cached ShaderModule handles from a previous test's device are invalid here.
+	ShaderLibrary::Clear();
 }
 
 // ===========================================================================
