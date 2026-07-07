@@ -9,6 +9,7 @@
 #include "core/Log.h"
 
 #include <shared_mutex>
+#include <filesystem>
 
 namespace neurus {
 
@@ -117,6 +118,55 @@ static const std::unordered_map<std::string, S_Const>& GetBuildInConstantsInstan
 }
 
 // =========================================================================
+// File-static helpers
+// =========================================================================
+
+/**
+ * @brief Resolves a potentially relative shader path to an accessible absolute path.
+ *
+ * Tries, in order:
+ *   1. Already absolute → return as-is
+ *   2. Relative to NEURUS_SHADER_DIR (the compile-time cmake define)
+ *   3. Multiple "../" prefixes (for GPU tests that run from build/debug/test/)
+ *   4. Return the original path — let the caller fail with a clear error
+ */
+static std::string ResolveShaderPath(const std::string& path)
+{
+	// Already absolute? (Unix /, Windows \, or X: drive)
+	if (!path.empty()
+		&& (path[0] == '/' || path[0] == '\\'
+			|| (path.size() > 1 && path[1] == ':')))
+	{
+		return path;
+	}
+
+	// Try relative to the compile-time shader directory
+	{
+		std::string resolved = NEURUS_SHADER_DIR + path;
+		if (std::filesystem::exists(resolved))
+		{
+			NEURUS_LOG("[ShaderLibrary] Resolved '" << path << "' -> '" << resolved << "'");
+			return resolved;
+		}
+	}
+
+	// Fallback: walk up directories (tests run from build/debug/test/)
+	for (const auto& prefix : {"../../../", "../../", "../", ""})
+	{
+		std::string resolved = std::string(prefix) + path;
+		if (std::filesystem::exists(resolved))
+		{
+			NEURUS_LOG("[ShaderLibrary] Resolved '" << path << "' -> '" << resolved << "'");
+			return resolved;
+		}
+	}
+
+	// Could not resolve — return original and let the constructor fail with a clear error
+	NEURUS_LOG("[ShaderLibrary] Could NOT resolve shader path '" << path << "'");
+	return path;
+}
+
+// =========================================================================
 // Public API
 // =========================================================================
 
@@ -125,8 +175,11 @@ std::shared_ptr<Shader> ShaderLibrary::LoadRenderShader(
 	const std::string& vertPath,
 	const std::string& fragPath)
 {
+	const std::string resolvedVert = ResolveShaderPath(vertPath);
+	const std::string resolvedFrag = ResolveShaderPath(fragPath);
+
 	return GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
-		auto shader = std::make_shared<RenderShader>(name, vertPath, fragPath);
+		auto shader = std::make_shared<RenderShader>(name, resolvedVert, resolvedFrag);
 		if (!shader->Compile(GetCompilerInstance()))
 		{
 			return nullptr;
@@ -139,8 +192,10 @@ std::shared_ptr<Shader> ShaderLibrary::LoadComputeShader(
 	const std::string& name,
 	const std::string& compPath)
 {
+	const std::string resolvedComp = ResolveShaderPath(compPath);
+
 	return GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
-		auto shader = std::make_shared<ComputeShader>(name, compPath);
+		auto shader = std::make_shared<ComputeShader>(name, resolvedComp);
 		if (!shader->Compile(GetCompilerInstance()))
 		{
 			return nullptr;
