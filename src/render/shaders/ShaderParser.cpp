@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -231,6 +232,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 	std::istringstream stream(source);
 	std::string line;
+	std::string word;      // Temporary word buffer reused across parsing branches
 	std::string cache;     // Accumulates function body text
 	Args argsCache;        // Accumulates (type, name) pairs for block/struct members
 	bool inBlockComment = false;
@@ -459,6 +461,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					std::istringstream mstr(line);
 					std::string typeName;
 					mstr >> typeName;
+					std::string word;
 					mstr >> word;
 
 					// Strip trailing semicolon
@@ -492,7 +495,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 						}
 					}
 
-					out.SetPushConstant(word, currentOffset, size);
+					out.SetPushConstant(word, currentOffset, size, typeName);
 					currentOffset += size;
 				}
 				while (true);

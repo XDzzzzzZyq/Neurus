@@ -25,6 +25,12 @@ add_library(neurus_render STATIC
 	CommandBuffer.h
 	Swapchain.h
 	Swapchain.cpp
+	shaders/Shader.h
+	shaders/Shader.cpp
+	shaders/RenderShader.h
+	shaders/RenderShader.cpp
+	shaders/ComputeShader.h
+	shaders/ComputeShader.cpp
 	shaders/ShaderProgram.h
 	shaders/ShaderProgram.cpp
 	shaders/ShaderModule.h
@@ -33,6 +39,8 @@ add_library(neurus_render STATIC
 	shaders/ShaderLib.cpp
 	shaders/ShaderStruct.h
 	shaders/ShaderStruct.cpp
+	shaders/ShaderParser.h
+	shaders/ShaderParser.cpp
 	shaders/ShaderCompiler.h
 	shaders/ShaderCompiler.cpp
 	shaders/ShaderLibrary.h

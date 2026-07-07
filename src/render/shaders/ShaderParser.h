@@ -69,7 +69,7 @@ public:
 private:
 	// --- Internal helpers (defined in .cpp) ---
 
-	/** @brief Strips // and /* */ comments from a single line. */
+	/** @brief Strips single-line and block comments from a line of GLSL source. */
 	static std::string StripComments(const std::string& line, bool& inBlockComment);
 
 	/** @brief Trims leading and trailing whitespace. */

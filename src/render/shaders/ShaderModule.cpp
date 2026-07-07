@@ -42,6 +42,13 @@ ShaderModule ShaderModule::FromFile(const vk::raii::Device& device, const std::s
 	return ShaderModule(device, spirv);
 }
 
+std::shared_ptr<ShaderModule> ShaderModule::FromSpirV(
+	const vk::raii::Device& device,
+	const std::vector<uint32_t>& spirv)
+{
+	return std::make_shared<ShaderModule>(device, spirv);
+}
+
 ShaderModule ShaderModule::FromEmbedded(const vk::raii::Device& device, const uint32_t* data, size_t size)
 {
 	const size_t numWords = size / sizeof(uint32_t);
