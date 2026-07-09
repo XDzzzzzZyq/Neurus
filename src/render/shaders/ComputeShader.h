@@ -89,9 +89,9 @@ public:
 	 */
 	ComputeShader(const std::string& name, const std::string& compPath);
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Shader interface (override)
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Parses, generates, and compiles the compute shader to SPIR-V.
@@ -119,9 +119,9 @@ public:
 	 */
 	ShaderType GetType() const override { return ShaderType::COMPUTE; }
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Compute-specific API
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Returns a mutable reference to the parsed ShaderStruct IR.
@@ -182,9 +182,9 @@ public:
 	 */
 	bool Recompile(ShaderCompiler& compiler);
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Default uniform configurations (ported from OpenGL ComputeShader)
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Sets a default value for a uniform parameter (int overload).

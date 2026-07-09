@@ -36,7 +36,7 @@ ComputeShader::ComputeShader(const std::string& name, const std::string& compPat
 
 bool ComputeShader::Compile(ShaderCompiler& compiler)
 {
-	// --- Step 1: Read and parse the GLSL source file ---
+	// -- Step 1: Read and parse the GLSL source file --
 	m_struct.Reset();
 
 	if (!ShaderParser::ParseShaderFile(m_compPath, ShaderType::COMPUTE, m_struct))
@@ -46,11 +46,11 @@ bool ComputeShader::Compile(ShaderCompiler& compiler)
 		return false;
 	}
 
-	// --- Step 2: Generate Vulkan GLSL from the IR ---
+	// -- Step 2: Generate Vulkan GLSL from the IR --
 	m_generatedSource = m_struct.GenerateShader();
 	m_source = m_generatedSource; // Update base class source
 
-	// --- Step 3: Compile GLSL to SPIR-V ---
+	// -- Step 3: Compile GLSL to SPIR-V --
 	m_spirv = compiler.CompileGlslToSpv(
 		m_generatedSource,
 		shaderc_glsl_compute_shader,
@@ -92,7 +92,7 @@ bool ComputeShader::CreateModule(const vk::raii::Device& device)
 {
 	if (m_spirv.empty())
 	{
-		m_errorMessage = "Cannot create ShaderModule: SPIR-V is empty -- call Compile() first";
+		m_errorMessage = "Cannot create ShaderModule: SPIR-V is empty - call Compile() first";
 		NEURUS_ERR("[ComputeShader] " << m_errorMessage);
 		return false;
 	}
@@ -132,7 +132,7 @@ bool ComputeShader::Recompile(ShaderCompiler& compiler)
 		return false;
 	}
 
-	// If a module was already created, it's now stale -- clear it.
+	// If a module was already created, it's now stale - clear it.
 	// The caller must call CreateModule() again to recreate it.
 	m_modules.erase(ShaderType::COMPUTE);
 

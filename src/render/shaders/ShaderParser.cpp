@@ -43,7 +43,7 @@ std::string ShaderParser::StripComments(const std::string& line, bool& inBlockCo
 		{
 			if (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/')
 			{
-				// Line comment ---discard rest of line.
+				// Line comment --discard rest of line.
 				break;
 			}
 			if (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '*')
@@ -72,7 +72,7 @@ std::string ShaderParser::TrimWhitespace(const std::string& s)
 	size_t end = s.size();
 	while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1])))
 	{
-		--end;
+		-end;
 	}
 
 	return s.substr(start, end - start);
@@ -110,7 +110,7 @@ int ShaderParser::ExtractIntFromLayout(const std::string& layoutStr, const std::
 			return std::stoi(num);
 		}
 
-		// Not a match (e.g. key is a substring of another word) ---keep looking
+		// Not a match (e.g. key is a substring of another word) --keep looking
 	}
 
 	return -1;
@@ -151,31 +151,31 @@ bool ShaderParser::HasLayoutKeyword(const std::string& layoutStr, const std::str
 
 std::pair<uint32_t, uint32_t> ShaderParser::GetStd140Layout(const std::string& typeName)
 {
-	// Scalars ---4 bytes, aligned to 4
+	// Scalars --4 bytes, aligned to 4
 	if (typeName == "float" || typeName == "int" || typeName == "uint" || typeName == "bool")
 	{
 		return {4, 4};
 	}
 
-	// 2-component vectors ---8 bytes, aligned to 8
+	// 2-component vectors --8 bytes, aligned to 8
 	if (typeName == "vec2" || typeName == "ivec2" || typeName == "uvec2")
 	{
 		return {8, 8};
 	}
 
-	// 3-component vectors ---std140 pads to vec4 alignment (16)
+	// 3-component vectors --std140 pads to vec4 alignment (16)
 	if (typeName == "vec3" || typeName == "ivec3" || typeName == "uvec3")
 	{
 		return {12, 16};
 	}
 
-	// 4-component vectors ---16 bytes
+	// 4-component vectors --16 bytes
 	if (typeName == "vec4" || typeName == "ivec4" || typeName == "uvec4")
 	{
 		return {16, 16};
 	}
 
-	// Matrices ---column vectors of vec4
+	// Matrices --column vectors of vec4
 	// mat3: 3 vec4 columns = 48 bytes
 	if (typeName == "mat3")
 	{
@@ -194,7 +194,7 @@ std::pair<uint32_t, uint32_t> ShaderParser::GetStd140Layout(const std::string& t
 		return {48, 16};
 	}
 
-	// Unknown ---caller must handle
+	// Unknown --caller must handle
 	return {0, 0};
 }
 
@@ -223,7 +223,7 @@ bool ShaderParser::ParseShaderFile(const std::string& filepath, ShaderType type,
 }
 
 // ============================================================================
-// ParseShaderCode ---main line-by-line parser
+// ParseShaderCode --main line-by-line parser
 // ============================================================================
 
 bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*/, ShaderStruct& out)
@@ -240,7 +240,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 	while (std::getline(stream, line))
 	{
-		// --- Strip comments and whitespace ---
+		// -- Strip comments and whitespace --
 		line = StripComments(line, inBlockComment);
 		line = TrimWhitespace(line);
 
@@ -249,9 +249,9 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
-		// #version ---Vulkan GLSL requires #version 450 minimum
-		// ---------------------------------------------------------------
+		// --------------------------------
+		// #version --Vulkan GLSL requires #version 450 minimum
+		// --------------------------------
 		if (line.compare(0, 8, "#version") == 0)
 		{
 			std::istringstream iss(line);
@@ -267,9 +267,9 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// #extension NAME : require/enable/warn/disable
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (line.compare(0, 10, "#extension") == 0)
 		{
 			std::istringstream iss(line);
@@ -280,11 +280,11 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
-		// layout(...) ---the big one.  Handle compute local_size,
+		// --------------------------------
+		// layout(...) --the big one.  Handle compute local_size,
 		// push_constant blocks, uniform blocks, storage buffers,
 		// vertex/fragment inputs/outputs, standalone sampler uniforms.
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (line.find("layout") == 0)
 		{
 			// Extract the layout qualifier substring between "layout(" and ")"
@@ -300,7 +300,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			std::string layoutStr = line.substr(parenOpen + 1, parenClose - parenOpen - 1);
 			std::string afterLayout = TrimWhitespace(line.substr(parenClose + 1));
 
-			// --- Compute shader local_size: layout(local_size_x=X, ...) in; ---
+			// -- Compute shader local_size: layout(local_size_x=X, ...) in; --
 			if (afterLayout.find("in;") != std::string::npos)
 			{
 				int lx = ExtractIntFromLayout(layoutStr, "local_size_x");
@@ -317,7 +317,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				continue;
 			}
 
-			// --- Storage buffer: layout(...) buffer BlockName { ... } varName; ---
+			// -- Storage buffer: layout(...) buffer BlockName { ... } varName; --
 			if (afterLayout.find("buffer") == 0 || (afterLayout.find("readonly") == 0 && afterLayout.find("buffer") != std::string::npos))
 			{
 				// Move past buffer/readonly keyword
@@ -409,7 +409,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				continue;
 			}
 
-			// --- Push constant block: layout(push_constant) uniform BlockName { ... } varName; ---
+			// -- Push constant block: layout(push_constant) uniform BlockName { ... } varName; --
 			if (HasLayoutKeyword(layoutStr, "push_constant"))
 			{
 				// Read until opening brace
@@ -434,7 +434,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 			}
 
-				// Read block members ---track std140 offsets
+				// Read block members --track std140 offsets
 				uint32_t currentOffset = 0;
 
 			do
@@ -492,7 +492,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 					if (size == 0 && align == 0)
 					{
-						// Unknown type ---try treating all non-trivial types as 16-byte aligned
+						// Unknown type --try treating all non-trivial types as 16-byte aligned
 						if (!typeName.empty())
 						{
 							size = 4;
@@ -533,7 +533,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// --- Uniform block: layout(...) uniform BlockType { ... } varName; ---
+		// -- Uniform block: layout(...) uniform BlockType { ... } varName; --
 		// Distinguish from standalone uniforms by checking for '{' (same/next line)
 		// or absence of ';' (standalone uniforms have ';' on the same line).
 		if (afterLayout.find("uniform") != std::string::npos
@@ -633,7 +633,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 		continue;
 	}
 
-		// --- Standalone uniform with layout: layout(binding=N) uniform type name; ---
+		// -- Standalone uniform with layout: layout(binding=N) uniform type name; --
 		if (afterLayout.find("uniform") != std::string::npos && afterLayout.find('{') == std::string::npos)
 		{
 			// Capture qualifiers ("writeonly", "readonly") before stripping
@@ -683,7 +683,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 			}
 
-			// --- layout(location=N) in type name; ???vertex attributes / fragment inputs ---
+			// -- layout(location=N) in type name; ???vertex attributes / fragment inputs --
 			if (afterLayout.find("in ") != std::string::npos && afterLayout.find("in;") == std::string::npos)
 			{
 				int location = ExtractIntFromLayout(layoutStr, "location");
@@ -710,7 +710,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				continue;
 			}
 
-			// --- layout(location=N) out type name; ???render-pass outputs ---
+			// -- layout(location=N) out type name; ???render-pass outputs --
 			if (afterLayout.find("out ") != std::string::npos)
 			{
 				int location = ExtractIntFromLayout(layoutStr, "location");
@@ -737,13 +737,13 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				continue;
 			}
 
-			// Unrecognised layout qualifier ---skip
+			// Unrecognised layout qualifier --skip
 			continue;
 		} // end layout(...)
 
-		// ---------------------------------------------------------------
-		// Stacked lines (multi-line declarations) ---merge with cache
-		// ---------------------------------------------------------------
+		// --------------------------------
+		// Stacked lines (multi-line declarations) --merge with cache
+		// --------------------------------
 		std::string fullLine = line;
 
 		// If the line ends with '{' but not with '}', read the full block
@@ -753,9 +753,9 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			// We'll handle it in the branches below.
 		}
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// Bare "out type name;" ???inter-stage output (auto-link)
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (fullLine.find("out ") != std::string::npos && fullLine.find("layout") == std::string::npos)
 		{
 			std::istringstream iss(fullLine);
@@ -776,9 +776,9 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// Bare "in type name;" ???inter-stage input
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (fullLine.find("in ") != std::string::npos && fullLine.find("layout") == std::string::npos)
 		{
 			// In the OpenGL parser, bare "in" is skipped because inputs are
@@ -801,9 +801,9 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// "uniform type name[count];" ???standalone uniform (no layout)
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (fullLine.find("uniform") != std::string::npos && fullLine.find("layout") == std::string::npos)
 		{
 			std::istringstream iss(fullLine);
@@ -812,7 +812,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 			if (word != "uniform")
 			{
-				// Not a uniform declaration ---might be a function return
+				// Not a uniform declaration --might be a function return
 				goto checkFunction;
 			}
 
@@ -840,9 +840,9 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 	checkFunction:
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// "struct Name { ... };" ???struct definition
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (fullLine.find("struct") != std::string::npos && fullLine.find('=') == std::string::npos)
 		{
 			std::string structName;
@@ -970,10 +970,10 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-	// ---------------------------------------------------------------
+	// --------------------------------
 	// "const type name = value;" ???constant declaration
-	// (Only matches lines that START with "const " ---not "const" in identifiers.)
-	// ---------------------------------------------------------------
+	// (Only matches lines that START with "const " --not "const" in identifiers.)
+	// --------------------------------
 	if (fullLine.find("const ") == 0)
 	{
 		std::istringstream iss(fullLine);
@@ -1037,12 +1037,12 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 		continue;
 	}
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// "void main() { ... }" ???main entry-point body
-		// ---------------------------------------------------------------
+		// --------------------------------
 		if (fullLine.find("void main") != std::string::npos)
 		{
-			// -- Check for single-line main body: "void main() { body }" --
+			// - Check for single-line main body: "void main() { body }" -
 			size_t openBrace  = fullLine.find('{');
 			size_t closeBrace = fullLine.find('}');
 
@@ -1060,7 +1060,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				continue;
 			}
 
-			// -- Multi-line body: brace-balanced line-by-line walk --
+			// - Multi-line body: brace-balanced line-by-line walk -
 			int  braceDepth     = (openBrace != std::string::npos) ? 1 : 0;
 			bool skipFirstBrace = (braceDepth == 0);
 			parsed = true;
@@ -1074,7 +1074,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					return false;
 				}
 				line = StripComments(line, inBlockComment);
-				// Do NOT trim ---we need the original indentation for the body
+				// Do NOT trim --we need the original indentation for the body
 
 				if (line.find('{') != std::string::npos)
 				{
@@ -1082,7 +1082,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 				if (line.find('}') != std::string::npos)
 				{
-					--braceDepth;
+					-braceDepth;
 				}
 
 				// Skip the standalone opening brace line
@@ -1103,10 +1103,10 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 		}
 
-		// ---------------------------------------------------------------
+		// --------------------------------
 		// Fallback: check if line starts with a known type
 		// ???function definition or variable declaration
-		// ---------------------------------------------------------------
+		// --------------------------------
 		{
 			std::istringstream iss(fullLine);
 			std::string firstWord;
@@ -1114,7 +1114,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 			if (ShaderStruct::IsAvailType(firstWord) || firstWord == "void")
 			{
-				// --- Function definition: "type funcName(args) { body }" ---
+				// -- Function definition: "type funcName(args) { body }" --
 				if (fullLine.find('(') != std::string::npos)
 				{
 					size_t leftParen = fullLine.find('(');
@@ -1157,7 +1157,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					}
 					if (line.find('}') != std::string::npos)
 					{
-						--braceDepth;
+						-braceDepth;
 					}
 				}
 				while (braceDepth != 0);
@@ -1182,7 +1182,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					continue;
 				}
 
-				// --- Variable declaration: "type name;" or "type name = value;" ---
+				// -- Variable declaration: "type name;" or "type name = value;" --
 				{
 					std::string typeName = firstWord;
 					std::string varName;
@@ -1236,7 +1236,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			}
 			else if (!firstWord.empty() && firstWord != "//" && firstWord[0] != '#')
 			{
-				// Unrecognised line ---skip silently (may be a comment, blank, or GLSL
+				// Unrecognised line --skip silently (may be a comment, blank, or GLSL
 				// construct the parser doesn't understand yet).
 			}
 		}

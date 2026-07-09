@@ -6,7 +6,7 @@ namespace neurus {
 
 ShaderCompiler::ShaderCompiler()
 {
-	// --- Default compile options ---
+	// -- Default compile options --
 
 	// Target Vulkan 1.3 + SPIR-V 1.6
 	m_options.SetTargetEnvironment(shaderc_target_env_vulkan,
@@ -50,7 +50,7 @@ std::vector<uint32_t> ShaderCompiler::CompileGlslToSpv(
 		return {};
 	}
 
-	// Success -- copy SPIR-V words into a vector
+	// Success - copy SPIR-V words into a vector
 	std::vector<uint32_t> spirv;
 	spirv.assign(result.cbegin(), result.cend());
 	return spirv;

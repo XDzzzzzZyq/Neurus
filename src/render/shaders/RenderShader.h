@@ -1,6 +1,6 @@
 /**
  * @file RenderShader.h
- * @brief Render shader -- vertex+fragment pipeline with parse->generate->compile flow.
+ * @brief Render shader - vertex+fragment pipeline with parse->generate->compile flow.
  *
  * RenderShader owns ShaderStruct IR representations for both vertex and fragment
  * stages, generated GLSL source code, and compiled ShaderModule objects (stored
@@ -11,7 +11,7 @@
  *   - Vulkan:   ShaderCompiler -> CompileGlslToSpv() -> ShaderModule (vk::raii)
  *
  * Architecture:
- *   - Inherits Shader (Task 6) -- base class with m_modules cache.
+ *   - Inherits Shader (Task 6) - base class with m_modules cache.
  *   - Uses ShaderParser (Task 7) to populate ShaderStruct IRs.
  *   - Uses ShaderStruct::GenerateShader() (Task 8) to emit GLSL.
  *   - Uses ShaderCompiler (Task 4) for GLSL->SPIR-V compilation.
@@ -81,9 +81,9 @@ public:
 	RenderShader(RenderShader&&) noexcept = default;
 	RenderShader& operator=(RenderShader&&) noexcept = default;
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Shader interface (override)
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Parses both shader files, generates GLSL, and compiles to SPIR-V.
@@ -117,9 +117,9 @@ public:
 	 */
 	ShaderType GetType() const override { return ShaderType::VERTEX; }
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// RenderShader-specific API
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Returns a mutable reference to the ShaderStruct IR for a stage.
@@ -196,9 +196,9 @@ private:
 	 */
 	std::shared_ptr<ShaderModule> CreateModuleFromSpirv(const std::vector<uint32_t>& spirv);
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Members
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	ShaderStruct m_vertStruct; ///< Parsed vertex shader IR
 	ShaderStruct m_fragStruct; ///< Parsed fragment shader IR

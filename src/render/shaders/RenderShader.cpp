@@ -1,6 +1,6 @@
 /**
  * @file RenderShader.cpp
- * @brief Implementation of RenderShader -- vertex+fragment shader compilation pipeline.
+ * @brief Implementation of RenderShader - vertex+fragment shader compilation pipeline.
  *
  * Implements the full parse->generate->compile flow ported from the OpenGL
  * RenderShader, adapted for Vulkan via ShaderParser, ShaderStruct::GenerateShader(),
@@ -17,7 +17,7 @@
 
 namespace neurus {
 
-// File-static helper -- keeps shaderc dependency out of the header
+// File-static helper - keeps shaderc dependency out of the header
 namespace {
 
 shaderc_shader_kind ToShadercKind(ShaderType type)
@@ -50,7 +50,7 @@ RenderShader::RenderShader(const std::string& name,
 }
 
 // =========================================================================
-// Shader interface -- Compile
+// Shader interface - Compile
 // =========================================================================
 
 bool RenderShader::Compile(ShaderCompiler& compiler)
@@ -63,19 +63,19 @@ bool RenderShader::Compile(ShaderCompiler& compiler)
 	m_modules.clear();
 	m_errorMessage.clear();
 
-	// --- Compile vertex stage ---
+	// -- Compile vertex stage --
 	if (!CompileStage(compiler, ShaderType::VERTEX, m_vertPath, m_vertStruct, m_vertSpirv))
 	{
 		return false;
 	}
 
-	// --- Compile fragment stage ---
+	// -- Compile fragment stage --
 	if (!CompileStage(compiler, ShaderType::FRAGMENT, m_fragPath, m_fragStruct, m_fragSpirv))
 	{
 		return false;
 	}
 
-	// --- Create ShaderModules if device is already set ---
+	// -- Create ShaderModules if device is already set --
 	if (m_device)
 	{
 		auto vertMod = CreateModuleFromSpirv(m_vertSpirv);
@@ -102,7 +102,7 @@ bool RenderShader::Compile(ShaderCompiler& compiler)
 }
 
 // =========================================================================
-// Shader interface -- IsValid / GetType
+// Shader interface - IsValid / GetType
 // =========================================================================
 
 bool RenderShader::IsValid() const
@@ -112,7 +112,7 @@ bool RenderShader::IsValid() const
 }
 
 // =========================================================================
-// RenderShader-specific -- GetStruct
+// RenderShader-specific - GetStruct
 // =========================================================================
 
 ShaderStruct& RenderShader::GetStruct(ShaderType type)
@@ -126,7 +126,7 @@ ShaderStruct& RenderShader::GetStruct(ShaderType type)
 }
 
 // =========================================================================
-// RenderShader-specific -- Module access
+// RenderShader-specific - Module access
 // =========================================================================
 
 std::shared_ptr<ShaderModule> RenderShader::GetVertexModule()
@@ -173,7 +173,7 @@ std::shared_ptr<ShaderModule> RenderShader::GetFragmentModule()
 }
 
 // =========================================================================
-// RenderShader-specific -- Recompile
+// RenderShader-specific - Recompile
 // =========================================================================
 
 bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
@@ -193,14 +193,14 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 	std::string&     filepath     = (type == ShaderType::FRAGMENT) ? m_fragPath  : m_vertPath;
 	std::vector<uint32_t>& spirv = (type == ShaderType::FRAGMENT) ? m_fragSpirv : m_vertSpirv;
 
-	// --- Re-generate GLSL if the struct has changed ---
+	// -- Re-generate GLSL if the struct has changed --
 	if (shaderStruct.is_struct_changed)
 	{
 		shaderStruct.GenerateShader();
 		// is_struct_changed is now false (cleared by GenerateShader)
 	}
 
-	// --- Re-parse from file (always re-read for live editing) ---
+	// -- Re-parse from file (always re-read for live editing) --
 	if (!ShaderParser::ParseShaderFile(filepath, type, shaderStruct))
 	{
 		m_errorMessage = "Failed to parse shader file: " + filepath;
@@ -208,10 +208,10 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 		return false;
 	}
 
-	// --- Generate GLSL ---
+	// -- Generate GLSL --
 	std::string glsl = shaderStruct.GenerateShader();
 
-	// --- Compile GLSL to SPIR-V ---
+	// -- Compile GLSL to SPIR-V --
 	spirv = compiler.CompileGlslToSpv(
 		glsl,
 		ToShadercKind(type),
@@ -226,7 +226,7 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 		return false;
 	}
 
-	// --- Swap ShaderModule if device is set ---
+	// -- Swap ShaderModule if device is set --
 	if (m_device)
 	{
 		auto newMod = CreateModuleFromSpirv(spirv);
@@ -290,7 +290,7 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 {
 	const std::string stageName = Shader::TypeToString(type);
 
-	// --- 1. Parse GLSL source file into ShaderStruct IR ---
+	// -- 1. Parse GLSL source file into ShaderStruct IR --
 	if (!ShaderParser::ParseShaderFile(filepath, type, shaderStruct))
 	{
 		m_errorMessage = "Failed to parse shader file: " + filepath;
@@ -298,7 +298,7 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 		return false;
 	}
 
-	// --- 2. Generate Vulkan GLSL from the IR ---
+	// -- 2. Generate Vulkan GLSL from the IR --
 	std::string glsl = shaderStruct.GenerateShader();
 
 	if (glsl.empty())
@@ -308,7 +308,7 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 		return false;
 	}
 
-	// --- 3. Compile GLSL to SPIR-V via shaderc ---
+	// -- 3. Compile GLSL to SPIR-V via shaderc --
 	outSpirv = compiler.CompileGlslToSpv(
 		glsl,
 		ToShadercKind(type),

@@ -1,6 +1,6 @@
 /**
  * @file ShaderParser.h
- * @brief Vulkan-aware GLSL parser -- reads GLSL source line-by-line, classifies
+ * @brief Vulkan-aware GLSL parser - reads GLSL source line-by-line, classifies
  *        by keyword, and populates a ShaderStruct IR.
  *
  * Ported from OpenGL project's RenderShader::ParseShaderStream(), adapted for
@@ -8,7 +8,7 @@
  * multiview detection).
  *
  * Architecture:
- * - Static-only class -- ParseShaderCode() / ParseShaderFile() are the entry points.
+ * - Static-only class - ParseShaderCode() / ParseShaderFile() are the entry points.
  * - Populates ShaderStruct (Task 3) which is consumed by code generation (Task 8).
  * - Handles both render (vertex + fragment) and compute shaders.
  *
@@ -59,7 +59,7 @@ public:
 	 * setter on `out`.
 	 *
 	 * @param source GLSL source text (null-terminated or newline-delimited).
-	 * @param type   Shader stage -- used to disambiguate layout(input) vs layout(output) semantics.
+	 * @param type   Shader stage - used to disambiguate layout(input) vs layout(output) semantics.
 	 * @param out    [out] ShaderStruct to populate.  Reset() is called first.
 	 * @return true on successful parse (even if some lines were skipped),
 	 *         false if a structural parse error was encountered.
@@ -67,7 +67,7 @@ public:
 	static bool ParseShaderCode(const std::string& source, ShaderType type, ShaderStruct& out);
 
 private:
-	// --- Internal helpers (defined in .cpp) ---
+	// -- Internal helpers (defined in .cpp) --
 
 	/** @brief Strips single-line and block comments from a line of GLSL source. */
 	static std::string StripComments(const std::string& line, bool& inBlockComment);

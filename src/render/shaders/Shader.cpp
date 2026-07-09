@@ -8,9 +8,9 @@
 
 namespace neurus {
 
-// ---------------------------------------------------------------------------
-// Constructor -- initialises name and source; m_modules starts empty
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// Constructor - initialises name and source; m_modules starts empty
+// --------------------------------------
 
 Shader::Shader(std::string name, std::string source)
 	: m_name(std::move(name))
@@ -18,9 +18,9 @@ Shader::Shader(std::string name, std::string source)
 {
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------
 // Module lookup
-// ---------------------------------------------------------------------------
+// --------------------------------------
 
 std::shared_ptr<ShaderModule> Shader::GetShaderModule(ShaderType type) const
 {
@@ -28,9 +28,9 @@ std::shared_ptr<ShaderModule> Shader::GetShaderModule(ShaderType type) const
 	return (it != m_modules.end()) ? it->second : nullptr;
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------
 // Type -> string conversion
-// ---------------------------------------------------------------------------
+// --------------------------------------
 
 std::string Shader::TypeToString(ShaderType type)
 {

@@ -8,7 +8,7 @@
  * containers; GenerateShader() reads them to emit a valid Vulkan GLSL string.
  *
  * Architecture:
- * - Independent of Shader base class (Task 6) -- no inheritance relationship.
+ * - Independent of Shader base class (Task 6) - no inheritance relationship.
  * - Uses ParaType from core/Parameters.h (Task 2) for type metadata.
  * - Named structs replace OpenGL's std::tuple patterns for clarity.
  * - Vulkan extensions: push constants, specialization constants, local size,
@@ -28,9 +28,9 @@
 
 namespace neurus {
 
-// ---------------------------------------------------------------------------
-// Named type aliases -- replace OpenGL std::tuple patterns
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// Named type aliases - replace OpenGL std::tuple patterns
+// --------------------------------------
 
 /**
  * @brief Input/Output binding descriptor for layout(location=X) declarations.
@@ -147,13 +147,13 @@ struct S_SpecConstant
 	float defaultVal;    ///< Default value (float for simplicity)
 };
 
-// ---------------------------------------------------------------------------
-// Convenience alias -- matches OpenGL ShaderLib.h
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// Convenience alias - matches OpenGL ShaderLib.h
+// --------------------------------------
 
-// ---------------------------------------------------------------------------
-// ShaderStruct -- the IR data model
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// ShaderStruct - the IR data model
+// --------------------------------------
 
 /**
  * @brief Intermediate Representation for a single GLSL shader stage.
@@ -170,9 +170,9 @@ class ShaderStruct
 public:
 	// clang-format off
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Ported from OpenGL ShaderLib.h
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	std::vector<S_IO>        AB_list;           ///< Vertex-attribute locations  (layout(location=X) in)
 	std::vector<S_IO>        pass_list;         ///< Render-pass output locations (layout(location=X) out)
@@ -189,9 +189,9 @@ public:
 
 	std::string              Main;              ///< Body of the main() entry point
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Vulkan-specific extensions
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	std::vector<S_PushConstant> push_constants; ///< Push-constant block members
 	std::string                push_constants_var; ///< Variable name after closing '}' (empty = none)
@@ -202,9 +202,9 @@ public:
 	std::vector<std::string>    extensions;     ///< Required GLSL extensions (e.g. "GL_GOOGLE_include_directive")
 	int                         version = 0;    ///< GLSL #version (0 = unset; GenerateShader() defaults to 450)
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// State flag
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Set to true by every setter; cleared by GenerateShader() (Task 8).
@@ -215,11 +215,11 @@ public:
 
 	// clang-format on
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Static type-system helpers (ported from OpenGL, backed by Parameters.h)
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
-	/** @brief Dynamic type table -- maps ParaType values and custom types to GLSL strings. */
+	/** @brief Dynamic type table - maps ParaType values and custom types to GLSL strings. */
 	static std::vector<std::string> type_table;
 
 	/**
@@ -246,9 +246,9 @@ public:
 	/** @brief Registers a custom type name in the type table. */
 	static void ADD_TYPE(const std::string& name);
 
-	// -------------------------------------------------------------------
-	// Setters -- each marks is_struct_changed = true (ported from OpenGL)
-	// -------------------------------------------------------------------
+	// ----------------------------------
+	// Setters - each marks is_struct_changed = true (ported from OpenGL)
+	// ----------------------------------
 
 	/** @brief Register a vertex-attribute / input-location binding. */
 	void SetAB(int loc, ParaType type, const std::string& name);
@@ -276,9 +276,9 @@ public:
 	/** @brief Register a variable with a string type name (supports custom types). */
 	void SetVar(const std::string& typeName, const std::string& name, int count);
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Vulkan-specific setters
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/** @brief Register a push-constant block member (offset, size, and GLSL type). */
 	void SetPushConstant(const std::string& name, uint32_t offset, uint32_t size,
@@ -292,9 +292,9 @@ public:
 	/** @brief Add a required GLSL extension string. */
 	void AddExtension(const std::string& ext);
 
-	// -------------------------------------------------------------------
+	// ----------------------------------
 	// Utility
-	// -------------------------------------------------------------------
+	// ----------------------------------
 
 	/**
 	 * @brief Resets ALL containers and Vulkan fields to default/empty state.

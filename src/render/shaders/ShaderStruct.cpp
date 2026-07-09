@@ -1,6 +1,6 @@
 /**
  * @file ShaderStruct.cpp
- * @brief Implementation of ShaderStruct -- Reset(), static helpers, and setters.
+ * @brief Implementation of ShaderStruct - Reset(), static helpers, and setters.
  */
 
 #include "ShaderStruct.h"
@@ -9,9 +9,9 @@
 
 namespace neurus {
 
-// ---------------------------------------------------------------------------
-// Static type table -- maps ParaType indices and custom types to GLSL strings
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// Static type table - maps ParaType indices and custom types to GLSL strings
+// --------------------------------------
 
 std::vector<std::string> ShaderStruct::type_table = {
 	"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"
@@ -22,9 +22,9 @@ void ShaderStruct::ResetTypeTable()
 	type_table = {"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"};
 }
 
-// ---------------------------------------------------------------------------
-// ParseType -- ParaType ??? string
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// ParseType - ParaType ??? string
+// --------------------------------------
 
 std::string ShaderStruct::ParseType(ParaType type)
 {
@@ -60,23 +60,23 @@ ParaType ShaderStruct::ParseType(const std::string& type)
 		return result;
 	}
 
-	// Unknown type -- register it as a custom type
+	// Unknown type - register it as a custom type
 	ADD_TYPE(type);
 	return ParaType::CUSTOM;
 }
 
-// ---------------------------------------------------------------------------
-// ParseCount -- array suffix
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// ParseCount - array suffix
+// --------------------------------------
 
 std::string ShaderStruct::ParseCount(int count)
 {
 	return count > 1 ? "[" + std::to_string(count) + "]" : "";
 }
 
-// ---------------------------------------------------------------------------
-// ParseArgs -- function arguments ??? GLSL string
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// ParseArgs - function arguments ??? GLSL string
+// --------------------------------------
 
 std::string ShaderStruct::ParseArgs(const Args& args)
 {
@@ -117,9 +117,9 @@ Args ShaderStruct::ParseArgs(const std::string& args)
 	return result;
 }
 
-// ---------------------------------------------------------------------------
-// IsAvailType -- type lookup
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// IsAvailType - type lookup
+// --------------------------------------
 
 bool ShaderStruct::IsAvailType(const std::string& type)
 {
@@ -133,9 +133,9 @@ bool ShaderStruct::IsAvailType(const std::string& type)
 	return neurus::IsKnownType(type);
 }
 
-// ---------------------------------------------------------------------------
-// ADD_TYPE -- register a custom type
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// ADD_TYPE - register a custom type
+// --------------------------------------
 
 void ShaderStruct::ADD_TYPE(const std::string& name)
 {
@@ -153,9 +153,9 @@ void ShaderStruct::ADD_TYPE(const std::string& name)
 	type_table.emplace_back(name);
 }
 
-// ---------------------------------------------------------------------------
-// Setters -- OpenGL-ported (each sets is_struct_changed = true)
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// Setters - OpenGL-ported (each sets is_struct_changed = true)
+// --------------------------------------
 
 void ShaderStruct::SetAB(int loc, ParaType type, const std::string& name)
 {
@@ -227,7 +227,7 @@ void ShaderStruct::DefStruct(const std::string& name, const Args& args)
 {
 	is_struct_changed = true;
 	S_StructDef def;
-	def.binding = 0; // Bare struct -- no binding
+	def.binding = 0; // Bare struct - no binding
 	def.name = name;
 	for (const auto& [argType, argName, argTypeName] : args)
 	{
@@ -255,9 +255,9 @@ void ShaderStruct::SetVar(const std::string& typeName, const std::string& name, 
 	vari_list.emplace_back(typeName, name, count);
 }
 
-// ---------------------------------------------------------------------------
+// --------------------------------------
 // Vulkan-specific setters
-// ---------------------------------------------------------------------------
+// --------------------------------------
 
 void ShaderStruct::SetPushConstant(const std::string& name, uint32_t offset, uint32_t size,
                                  const std::string& typeName)
@@ -300,9 +300,9 @@ void ShaderStruct::AddExtension(const std::string& ext)
 	extensions.push_back(ext);
 }
 
-// ---------------------------------------------------------------------------
-// Reset -- clears ALL containers to default/empty state
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// Reset - clears ALL containers to default/empty state
+// --------------------------------------
 
 void ShaderStruct::Reset()
 {
@@ -334,9 +334,9 @@ void ShaderStruct::Reset()
 	is_struct_changed = true;
 }
 
-// ---------------------------------------------------------------------------
-// IsEmpty -- true when no data has been set
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// IsEmpty - true when no data has been set
+// --------------------------------------
 
 bool ShaderStruct::IsEmpty() const
 {
@@ -360,9 +360,9 @@ bool ShaderStruct::IsEmpty() const
 	    && local_size_x == 0;
 }
 
-// ---------------------------------------------------------------------------
-// GenerateShader -- produces valid Vulkan GLSL from the current IR state
-// ---------------------------------------------------------------------------
+// --------------------------------------
+// GenerateShader - produces valid Vulkan GLSL from the current IR state
+// --------------------------------------
 
 std::string ShaderStruct::GenerateShader()
 {
@@ -387,7 +387,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 3. AB_list -- vertex inputs: layout(location = N) in type name;
+	// 3. AB_list - vertex inputs: layout(location = N) in type name;
 	if (!AB_list.empty())
 	{
 		for (const auto& io : AB_list)
@@ -398,7 +398,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 4. pass_list -- render outputs: layout(location = N) out type name;
+	// 4. pass_list - render outputs: layout(location = N) out type name;
 	if (!pass_list.empty())
 	{
 		for (const auto& io : pass_list)
@@ -409,7 +409,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 5. struct_def_list -- bare struct definitions
+	// 5. struct_def_list - bare struct definitions
 	if (!struct_def_list.empty())
 	{
 		for (const auto& def : struct_def_list)
@@ -426,7 +426,7 @@ std::string ShaderStruct::GenerateShader()
 		}
 	}
 
-	// 6. SB_list -- storage buffers: layout(std430, set=0, binding=B) readonly buffer BName { ... };
+	// 6. SB_list - storage buffers: layout(std430, set=0, binding=B) readonly buffer BName { ... };
 	if (!SB_list.empty())
 	{
 		for (const auto& sb : SB_list)
@@ -445,7 +445,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 7. ubuffer_list -- uniform buffers: layout(std140, set=0, binding=B) uniform UName { ... } var;
+	// 7. ubuffer_list - uniform buffers: layout(std140, set=0, binding=B) uniform UName { ... } var;
 	if (!ubuffer_list.empty())
 	{
 		for (const auto& ub : ubuffer_list)
@@ -472,7 +472,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 8. push_constants -- layout(push_constant) uniform PushConstants { ... } pc;
+	// 8. push_constants - layout(push_constant) uniform PushConstants { ... } pc;
 	if (!push_constants.empty())
 	{
 		result << "layout(push_constant) uniform PushConstants\n{\n";
@@ -490,7 +490,7 @@ std::string ShaderStruct::GenerateShader()
 		}
 	}
 
-	// 9. spec_constants -- layout(constant_id = B) const type name = defaultVal;
+	// 9. spec_constants - layout(constant_id = B) const type name = defaultVal;
 	if (!spec_constants.empty())
 	{
 		for (const auto& sc : spec_constants)
@@ -502,7 +502,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 10. uniform_list -- layout(binding=N) uniform [qualifiers] type name[N]; or uniform type name[N];
+	// 10. uniform_list - layout(binding=N) uniform [qualifiers] type name[N]; or uniform type name[N];
 	if (!uniform_list.empty())
 	{
 		for (const auto& u : uniform_list)
@@ -533,7 +533,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 11. input_list -- in type name[N];
+	// 11. input_list - in type name[N];
 	if (!input_list.empty())
 	{
 		for (const auto& in : input_list)
@@ -544,7 +544,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 12. output_list -- out type name[N];
+	// 12. output_list - out type name[N];
 	if (!output_list.empty())
 	{
 		for (const auto& out : output_list)
@@ -555,7 +555,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 13. glob_list -- type name = type(default);
+	// 13. glob_list - type name = type(default);
 	if (!glob_list.empty())
 	{
 		for (const auto& g : glob_list)
@@ -566,7 +566,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 14. const_list -- const type name = value;
+	// 14. const_list - const type name = value;
 	if (!const_list.empty())
 	{
 		for (const auto& c : const_list)
@@ -577,7 +577,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 15. vari_list -- typeName name[N];
+	// 15. vari_list - typeName name[N];
 	if (!vari_list.empty())
 	{
 		for (const auto& v : vari_list)
@@ -587,7 +587,7 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
-	// 16. func_list -- returnType name(args) { body }
+	// 16. func_list - returnType name(args) { body }
 	if (!func_list.empty())
 	{
 		for (const auto& f : func_list)
