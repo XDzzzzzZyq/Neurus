@@ -72,7 +72,7 @@ std::string ShaderParser::TrimWhitespace(const std::string& s)
 	size_t end = s.size();
 	while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1])))
 	{
-		-end;
+		--end;
 	}
 
 	return s.substr(start, end - start);
@@ -238,8 +238,14 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 	bool inBlockComment = false;
 	bool parsed = false; // Set to true when any recognised construct is processed
 
+	int dbgLineCount = 0;
 	while (std::getline(stream, line))
 	{
+		if (++dbgLineCount > 500)
+		{
+			NEURUS_ERR("ShaderParser: INFINITE LOOP DETECTED, exceeded 500 lines at: '" << line << "'");
+			return false;
+		}
 		// -- Strip comments and whitespace --
 		line = StripComments(line, inBlockComment);
 		line = TrimWhitespace(line);
@@ -1082,7 +1088,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 				if (line.find('}') != std::string::npos)
 				{
-					-braceDepth;
+					--braceDepth;
 				}
 
 				// Skip the standalone opening brace line
@@ -1157,7 +1163,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					}
 					if (line.find('}') != std::string::npos)
 					{
-						-braceDepth;
+						--braceDepth;
 					}
 				}
 				while (braceDepth != 0);
