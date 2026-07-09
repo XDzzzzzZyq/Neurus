@@ -8,6 +8,7 @@
 
 #include "core/Log.h"
 
+#include <mutex>
 #include <shared_mutex>
 #include <filesystem>
 
@@ -27,10 +28,6 @@ static ShaderCompiler& GetCompilerInstance()
 	static ShaderCompiler s_compiler;
 	return s_compiler;
 }
-
-// Suppress C4505 until Tasks 11/12 wire Load*Shader to the compiler.
-// Remove this when the placeholder implementations are replaced.
-namespace { auto _suppress_unused = &GetCompilerInstance; }
 
 /**
  * @brief Returns the thread-safe shader cache.
@@ -140,9 +137,24 @@ static std::string ResolveShaderPath(const std::string& path)
 		return path;
 	}
 
+	// Strip a leading "res/shaders/" prefix if present, so that paths like
+	// "res/shaders/compute/foo.comp" resolve correctly against NEURUS_SHADER_DIR
+	// (which already points to .../res/shaders/).  Without this, concatenation
+	// produces a doubled ".../res/shaders/res/shaders/..." path.
+	std::string relPath = path;
+	{
+		constexpr const char* kShaderPrefix = "res/shaders/";
+		constexpr size_t kShaderPrefixLen = 12;
+		if (relPath.size() > kShaderPrefixLen
+			&& relPath.compare(0, kShaderPrefixLen, kShaderPrefix) == 0)
+		{
+			relPath.erase(0, kShaderPrefixLen);
+		}
+	}
+
 	// Try relative to the compile-time shader directory
 	{
-		std::string resolved = NEURUS_SHADER_DIR + path;
+		std::string resolved = NEURUS_SHADER_DIR + relPath;
 		if (std::filesystem::exists(resolved))
 		{
 			NEURUS_LOG("[ShaderLibrary] Resolved '" << path << "' -> '" << resolved << "'");
@@ -170,7 +182,7 @@ static std::string ResolveShaderPath(const std::string& path)
 // Public API
 // =========================================================================
 
-std::shared_ptr<Shader> ShaderLibrary::LoadRenderShader(
+std::shared_ptr<RenderShader> ShaderLibrary::LoadRenderShader(
 	const std::string& name,
 	const std::string& vertPath,
 	const std::string& fragPath)
@@ -178,30 +190,34 @@ std::shared_ptr<Shader> ShaderLibrary::LoadRenderShader(
 	const std::string resolvedVert = ResolveShaderPath(vertPath);
 	const std::string resolvedFrag = ResolveShaderPath(fragPath);
 
-	return GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
-		auto shader = std::make_shared<RenderShader>(name, resolvedVert, resolvedFrag);
-		if (!shader->Compile(GetCompilerInstance()))
+	auto shader = GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
+		auto rs = std::make_shared<RenderShader>(name, resolvedVert, resolvedFrag);
+		if (!rs->Compile(GetCompilerInstance()))
 		{
 			return nullptr;
 		}
-		return shader;
+		return rs;
 	});
+	// Safe cast: LoadRenderShader only ever stores RenderShader instances.
+	return std::static_pointer_cast<RenderShader>(shader);
 }
 
-std::shared_ptr<Shader> ShaderLibrary::LoadComputeShader(
+std::shared_ptr<ComputeShader> ShaderLibrary::LoadComputeShader(
 	const std::string& name,
 	const std::string& compPath)
 {
 	const std::string resolvedComp = ResolveShaderPath(compPath);
 
-	return GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
-		auto shader = std::make_shared<ComputeShader>(name, resolvedComp);
-		if (!shader->Compile(GetCompilerInstance()))
+	auto shader = GetOrCreate(name, [&]() -> std::shared_ptr<Shader> {
+		auto cs = std::make_shared<ComputeShader>(name, resolvedComp);
+		if (!cs->Compile(GetCompilerInstance()))
 		{
 			return nullptr;
 		}
-		return shader;
+		return cs;
 	});
+	// Safe cast: LoadComputeShader only ever stores ComputeShader instances.
+	return std::static_pointer_cast<ComputeShader>(shader);
 }
 
 void ShaderLibrary::Clear()

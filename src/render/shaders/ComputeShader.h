@@ -155,7 +155,7 @@ public:
 	 * @param device Logical device for shader module creation.
 	 * @return true if the module was created successfully.
 	 */
-	bool CreateModule(const vk::raii::Device& device);
+	bool CreateModule(const vk::raii::Device& device) override;
 
 	/**
 	 * @brief Retrieves the compute workgroup size from the parsed GLSL.

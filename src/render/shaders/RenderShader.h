@@ -20,12 +20,12 @@
  * Lifecycle:
  *   1. Construct: RenderShader(name, vertPath, fragPath)
  *   2. Compile:   Compile(compiler) -> parse -> generate GLSL -> compile to SPIR-V
- *   3. Finalize:  SetDevice(device) -> create ShaderModule objects in m_modules
+ *   3. Finalize:  CreateModule(device) -> create ShaderModule objects in m_modules
  *   4. Use:       GetVertexModule() / GetFragmentModule() for pipeline creation
  *   5. Recompile: Recompile(compiler, type) -> regenerate single stage, swap module
  *
  * @note ShaderModule creation is deferred until a device is available via
- *       SetDevice().  IsValid() returns true when SPIR-V compilation succeeded
+ *       CreateModule().  IsValid() returns true when SPIR-V compilation succeeded
  *       (SPIR-V vectors non-empty), even if ShaderModules haven't been created yet.
  */
 #pragma once
@@ -53,7 +53,7 @@ namespace neurus {
  * @code
  *   RenderShader shader("PBR", "pbr.vert", "pbr.frag");
  *   shader.Compile(compiler);
- *   shader.SetDevice(device);
+ *   shader.CreateModule(device);
  *   auto vertMod = shader.GetVertexModule();
  *   auto fragMod = shader.GetFragmentModule();
  * @endcode
@@ -97,7 +97,7 @@ public:
 	 *      -> produces SPIR-V binary vectors (stored in m_vertSpirv / m_fragSpirv).
 	 *
 	 * ShaderModule objects are NOT created here (requires vk::raii::Device).
-	 * Call SetDevice() after Compile() to populate m_modules.
+	 * Call CreateModule() after Compile() to populate m_modules.
 	 *
 	 * @param compiler ShaderCompiler instance for GLSL->SPIR-V compilation.
 	 * @return true if both stages compiled successfully, false on parse/compile error.
@@ -108,7 +108,7 @@ public:
 	 * @brief Returns true when both SPIR-V vectors are non-empty.
 	 *
 	 * Compilation success is indicated by non-empty SPIR-V vectors.
-	 * ShaderModule objects may not yet be created (see SetDevice()).
+	 * ShaderModule objects may not yet be created (see CreateModule()).
 	 */
 	bool IsValid() const override;
 
@@ -131,13 +131,13 @@ public:
 
 	/**
 	 * @brief Returns the compiled vertex ShaderModule from m_modules.
-	 * @return Shared pointer, or nullptr if not yet created (call SetDevice() first).
+	 * @return Shared pointer, or nullptr if not yet created (call CreateModule() first).
 	 */
 	std::shared_ptr<ShaderModule> GetVertexModule();
 
 	/**
 	 * @brief Returns the compiled fragment ShaderModule from m_modules.
-	 * @return Shared pointer, or nullptr if not yet created (call SetDevice() first).
+	 * @return Shared pointer, or nullptr if not yet created (call CreateModule() first).
 	 */
 	std::shared_ptr<ShaderModule> GetFragmentModule();
 
@@ -156,17 +156,17 @@ public:
 	bool Recompile(ShaderCompiler& compiler, ShaderType type);
 
 	/**
-	 * @brief Sets the Vulkan device used to create ShaderModule objects.
+	 * @brief Creates ShaderModule objects from compiled SPIR-V.
 	 *
 	 * Must be called after Compile() to materialise the SPIR-V vectors
 	 * into vk::raii::ShaderModule wrappers stored in m_modules.
-	 *
-	 * If modules already exist they are not re-created; call SetDevice()
-	 * once before accessing modules.
+	 * Stores the device pointer for lazy module creation in
+	 * GetVertexModule()/GetFragmentModule().
 	 *
 	 * @param device Logical device that will own the ShaderModules.
+	 * @return true if both vertex and fragment modules were created successfully.
 	 */
-	void SetDevice(const vk::raii::Device& device);
+	bool CreateModule(const vk::raii::Device& device) override;
 
 	/** @brief Returns the vertex shader file path. */
 	const std::string& GetVertPath() const { return m_vertPath; }

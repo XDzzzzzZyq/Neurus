@@ -44,12 +44,12 @@ IBLPass::IBLPass(const vk::raii::Device& device,
 	, p_graphicsQueue(graphicsQueue)
 	, p_queueFamilyIndex(queueFamilyIndex)
 	// --- Self-load compute shaders via ShaderLibrary ---
-	, p_irradianceShader(std::static_pointer_cast<ComputeShader>(
+	, p_irradianceShader(
 		ShaderLibrary::LoadComputeShader("irradiance_conv",
-		                                "res/shaders/compute/irradiance_conv.comp")))
-	, p_specularShader(std::static_pointer_cast<ComputeShader>(
+		                                "res/shaders/compute/irradiance_conv.comp"))
+	, p_specularShader(
 		ShaderLibrary::LoadComputeShader("importance_samp",
-		                                 "res/shaders/compute/importance_samp.comp")))
+		                                 "res/shaders/compute/importance_samp.comp"))
 	// --- Pipeline builders (must outlive pipelines) ---
 	, p_irradiancePipelineBuilder(nullptr)
 	, p_irradiancePipeline(nullptr)

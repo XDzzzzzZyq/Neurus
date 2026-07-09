@@ -133,8 +133,8 @@ protected:
 		m_e2cPool = std::make_unique<DescriptorPool>(dev, 1, poolSizes);
 		m_e2cSets = m_e2cPool->Allocate(*m_e2cSetLayout, 1);
 
-		auto e2cShader = std::static_pointer_cast<ComputeShader>(
-			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp"));
+		auto e2cShader =
+			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
 		ASSERT_NE(e2cShader, nullptr);
 		e2cShader->CreateModule(dev);
 		auto compModule = e2cShader->GetShaderModule(ShaderType::COMPUTE);
@@ -158,8 +158,8 @@ protected:
 		m_c2ePool = std::make_unique<DescriptorPool>(dev, 1, poolSizes);
 		m_c2eSets = m_c2ePool->Allocate(*m_c2eSetLayout, 1);
 
-		auto c2eShader = std::static_pointer_cast<ComputeShader>(
-			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp"));
+		auto c2eShader =
+			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
 		ASSERT_NE(c2eShader, nullptr);
 		c2eShader->CreateModule(dev);
 		auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);

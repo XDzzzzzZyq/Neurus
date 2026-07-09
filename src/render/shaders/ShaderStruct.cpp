@@ -28,11 +28,12 @@ void ShaderStruct::ResetTypeTable()
 
 std::string ShaderStruct::ParseType(ParaType type)
 {
-	// Fast path: built-in types from the enum
-	if (static_cast<int>(type) >= 0 && static_cast<size_t>(type) < type_table.size())
-	{
-		return type_table[static_cast<int>(type)];
-	}
+	// Delegate to Parameters.h for all known ParaType values.
+	// The type_table is only used for custom/extended type lookups
+	// (samplerCube, image2D, user-defined types) via ParseType(string).
+	// Direct indexing into type_table by enum value is incorrect because
+	// the refactored ParaType enum (NONE=-1, STRING=3, CUSTOM=10) no longer
+	// aligns with the legacy type_table layout.
 	return neurus::ToString(type);
 }
 
@@ -86,8 +87,10 @@ std::string ShaderStruct::ParseArgs(const Args& args)
 	{
 		for (const auto& [type, name, typeName] : args)
 		{
-			(void)typeName;
-			result += ParseType(type) + " " + name + ", ";
+			// Use the original type name for CUSTOM types; otherwise convert ParaType.
+			const std::string typeStr = (type == ParaType::CUSTOM && !typeName.empty())
+				? typeName : ParseType(type);
+			result += typeStr + " " + name + ", ";
 		}
 		// Remove trailing ", "
 		result.erase(result.end() - 2, result.end());
@@ -160,13 +163,13 @@ void ShaderStruct::ADD_TYPE(const std::string& name)
 void ShaderStruct::SetAB(int loc, ParaType type, const std::string& name)
 {
 	is_struct_changed = true;
-	AB_list.emplace_back(loc, name, type);
+	AB_list.push_back({loc, name, type});
 }
 
 void ShaderStruct::SetPass(int loc, ParaType type, const std::string& name)
 {
 	is_struct_changed = true;
-	pass_list.emplace_back(loc, name, type);
+	pass_list.push_back({loc, name, type});
 }
 
 void ShaderStruct::SetSB(int loc, const std::string& name, const Args& args)
@@ -208,19 +211,19 @@ void ShaderStruct::SetUni(ParaType type, int count, const std::string& name, int
 void ShaderStruct::SetInp(ParaType type, int count, const std::string& name)
 {
 	is_struct_changed = true;
-	input_list.emplace_back(name, type, count);
+	input_list.push_back({name, type, count});
 }
 
 void ShaderStruct::SetOut(ParaType type, int count, const std::string& name)
 {
 	is_struct_changed = true;
-	output_list.emplace_back(name, type, count);
+	output_list.push_back({name, type, count});
 }
 
 void ShaderStruct::SetGlob(ParaType type, float defult, const std::string& name)
 {
 	is_struct_changed = true;
-	glob_list.emplace_back(name, type, defult);
+	glob_list.push_back({name, type, defult});
 }
 
 void ShaderStruct::DefStruct(const std::string& name, const Args& args)
@@ -240,19 +243,19 @@ void ShaderStruct::DefStruct(const std::string& name, const Args& args)
 void ShaderStruct::DefFunc(ParaType type, std::string name, const std::string& content, const Args& args)
 {
 	is_struct_changed = true;
-	func_list.emplace_back(type, std::move(name), content, args);
+	func_list.push_back({type, std::move(name), content, args});
 }
 
 void ShaderStruct::SetConst(ParaType type, const std::string& name, const std::string& content)
 {
 	is_struct_changed = true;
-	const_list.emplace_back(type, name, content, Args{});
+	const_list.push_back({type, name, content, Args{}});
 }
 
 void ShaderStruct::SetVar(const std::string& typeName, const std::string& name, int count)
 {
 	is_struct_changed = true;
-	vari_list.emplace_back(typeName, name, count);
+	vari_list.push_back({typeName, name, count});
 }
 
 // --------------------------------------

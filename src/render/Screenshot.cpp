@@ -184,9 +184,9 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 	}
 
 	// --- 4. Load compute shader via ShaderLibrary ---
-	auto c2eShader = std::static_pointer_cast<ComputeShader>(
+	auto c2eShader =
 		ShaderLibrary::LoadComputeShader("c2e_export",
-		                                "res/shaders/convert/c2e.comp"));
+		                                "res/shaders/convert/c2e.comp");
 	if (!c2eShader || !c2eShader->IsValid())
 	{
 		throw std::runtime_error("[Screenshot] Failed to load c2e compute shader");

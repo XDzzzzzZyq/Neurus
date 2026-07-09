@@ -45,9 +45,9 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	, p_queueFamilyIndex(queueFamilyIndex)
 	, p_pipeline(nullptr)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, p_computeShader(std::static_pointer_cast<ComputeShader>(
+	, p_computeShader(
 		ShaderLibrary::LoadComputeShader("pbr_lighting",
-		                                "res/shaders/compute/pbr_lighting.comp")))
+		                                "res/shaders/compute/pbr_lighting.comp"))
 {
 	// --- Create module from self-loaded shader ---
 	if (p_computeShader) { p_computeShader->CreateModule(device); }

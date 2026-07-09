@@ -12,6 +12,8 @@ namespace neurus {
 // Forward declarations - full includes only needed in .cpp
 class Shader;
 class ShaderCompiler;
+class RenderShader;
+class ComputeShader;
 
 /**
  * @brief Central shader registry that owns a ShaderCompiler internally.
@@ -30,10 +32,12 @@ class ShaderCompiler;
  *   - Build-in constants (PI, Pix_UV_ratio, Gamma, FilmicF, FilmicV4)
  *     ported from the OpenGL ShaderBuildIn.cpp reference.
  *
- * @note RenderShader (Task 11) and ComputeShader (Task 12) are forward-
- *       declared - the Load* methods return std::shared_ptr&lt;Shader&gt;
- *       base-class pointers.  Consumers downcast via std::static_pointer_cast.
- *       Placeholder implementations exist until Tasks 11/12 are complete.
+ * @note Load* methods return typed shared_ptr<RenderShader> /
+ *       shared_ptr<ComputeShader> directly - no downcasting needed
+ *       by callers.  The internal cache stores shared_ptr<Shader>
+ *       and casts on retrieval (safe: LoadComputeShader only stores
+ *       ComputeShader instances, LoadRenderShader only stores
+ *       RenderShader instances).
  */
 class ShaderLibrary
 {
@@ -57,10 +61,9 @@ public:
 	 * @param name     Unique shader name (cache key), e.g. "GeometryPass".
 	 * @param vertPath Path to vertex shader GLSL source file.
 	 * @param fragPath Path to fragment shader GLSL source file.
-	 * @return Shared pointer to the compiled shader, or nullptr on failure
-	 *         (currently a placeholder - see Tasks 11/12).
+	 * @return Shared pointer to the compiled RenderShader, or nullptr on failure.
 	 */
-	static std::shared_ptr<Shader> LoadRenderShader(
+	static std::shared_ptr<RenderShader> LoadRenderShader(
 		const std::string& name,
 		const std::string& vertPath,
 		const std::string& fragPath);
@@ -74,10 +77,9 @@ public:
 	 *
 	 * @param name     Unique shader name (cache key), e.g. "SSAO".
 	 * @param compPath Path to compute shader GLSL source file.
-	 * @return Shared pointer to the compiled shader, or nullptr on failure
-	 *         (currently a placeholder - see Tasks 11/12).
+	 * @return Shared pointer to the compiled ComputeShader, or nullptr on failure.
 	 */
-	static std::shared_ptr<Shader> LoadComputeShader(
+	static std::shared_ptr<ComputeShader> LoadComputeShader(
 		const std::string& name,
 		const std::string& compPath);
 

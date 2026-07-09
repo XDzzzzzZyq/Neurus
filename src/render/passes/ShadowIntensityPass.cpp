@@ -87,8 +87,10 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 		throw std::runtime_error("[ShadowIntensityPass] Failed to load 'shadow_eval' compute shader");
 	}
 
-	auto* ptCs = static_cast<ComputeShader*>(p_pointLightShader.get());
-	ptCs->CreateModule(device);
+	if (!p_pointLightShader->CreateModule(device))
+	{
+		throw std::runtime_error("[ShadowIntensityPass] Failed to create compute shader module for 'shadow_eval'");
+	}
 
 	// --- Create point-light pipeline ---
 	p_pipeline = std::make_unique<vk::raii::Pipeline>(CreatePipeline(device));
@@ -102,8 +104,10 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 		throw std::runtime_error("[ShadowIntensityPass] Failed to load 'sun_shadow_eval' compute shader");
 	}
 
-	auto* sunCs = static_cast<ComputeShader*>(p_sunLightShader.get());
-	sunCs->CreateModule(device);
+	if (!p_sunLightShader->CreateModule(device))
+	{
+		throw std::runtime_error("[ShadowIntensityPass] Failed to create compute shader module for 'sun_shadow_eval'");
+	}
 
 	NEURUS_LOG("[ShadowIntensityPass] numSets=" << numSets
 	           << " farPlane=" << Light::point_shadow_far

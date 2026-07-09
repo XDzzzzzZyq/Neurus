@@ -4,6 +4,10 @@
 #include <string>
 #include <unordered_map>
 
+// Forward-declare Vulkan device type for CreateModule() parameter.
+// Must be outside namespace neurus to match the global ::vk namespace.
+namespace vk { namespace raii { class Device; } }
+
 namespace neurus {
 
 // Forward declarations - no heavy includes in this header
@@ -67,6 +71,17 @@ public:
 	 * @return true if all stages compiled successfully, false otherwise.
 	 */
 	virtual bool Compile(ShaderCompiler& compiler) = 0;
+
+	/**
+	 * @brief Creates ShaderModule(s) from compiled SPIR-V using the given device.
+	 *
+	 * Must be called after Compile() and before GetShaderModule().
+	 * Derived classes implement stage-specific module creation.
+	 *
+	 * @param device Logical device for shader module creation.
+	 * @return true if all modules were created successfully.
+	 */
+	virtual bool CreateModule(const vk::raii::Device& device) = 0;
 
 	/**
 	 * @brief Checks whether the shader is in a valid, compiled state.

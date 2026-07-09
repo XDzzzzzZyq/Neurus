@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file test_shader_classes.cpp
  * @brief TDD unit tests for RenderShader, ComputeShader, and ShaderLibrary (Task 14).
  *
@@ -16,8 +16,8 @@
  *     Clear flushes, Reload force-recompiles, thread safety
  *
  * Lifecycle (matching actual API):
- *   RenderShader:  Construct → Compile(compiler) → SetDevice(device) → GetVertexModule/GetFragmentModule
- *   ComputeShader: Construct → Compile(compiler) → CreateModule(device) → GetModule
+ *   RenderShader:  Construct -> Compile(compiler) -> CreateModule(device) -> GetVertexModule/GetFragmentModule
+ *   ComputeShader: Construct -> Compile(compiler) -> CreateModule(device) -> GetModule
  *
  * @note Test fixture: ShaderClassesTest (inherits VulkanTestShared).
  * @note Shader file paths resolved via ResolveAssetPath().
@@ -42,7 +42,7 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
-// ShaderClassesTest — VulkanTestShared fixture with ShaderLibrary cleanup
+// ShaderClassesTest 鈥?VulkanTestShared fixture with ShaderLibrary cleanup
 // ---------------------------------------------------------------------------
 
 class ShaderClassesTest : public VulkanTestShared
@@ -103,8 +103,8 @@ TEST_F(ShaderClassesTest, RenderShader_CompileSucceeds)
 	RenderShader shader("GbufferPass", vertPath, fragPath);
 	ShaderCompiler compiler;
 
-	// Compile does GLSL parse → generate → SPIR-V compilation
-	// ShaderModule objects are deferred until SetDevice()
+	// Compile does GLSL parse 鈫?generate 鈫?SPIR-V compilation
+	// ShaderModule objects are deferred until CreateModule()
 	EXPECT_TRUE(shader.Compile(compiler))
 		<< "Compile should succeed for valid GLSL vertex + fragment shaders";
 }
@@ -180,17 +180,17 @@ TEST_F(ShaderClassesTest, RenderShader_GetVertexModule_NonNull)
 	ShaderCompiler compiler;
 	ASSERT_TRUE(shader.Compile(compiler));
 
-	// Before SetDevice: modules are null (deferred creation)
+	// Before CreateModule: modules are null (deferred creation)
 	auto noMod = shader.GetVertexModule();
 	EXPECT_EQ(noMod, nullptr)
-		<< "Vertex module should be null before SetDevice()";
+		<< "Vertex module should be null before CreateModule()";
 
 	// Create modules from SPIR-V using Vulkan device
-	shader.SetDevice(*m_device);
+	shader.CreateModule(*m_device);
 
 	auto vertMod = shader.GetVertexModule();
 	ASSERT_NE(vertMod, nullptr)
-		<< "Vertex module should not be null after SetDevice()";
+		<< "Vertex module should not be null after CreateModule()";
 	EXPECT_NE(*vertMod->handle(), VK_NULL_HANDLE);
 }
 
@@ -209,11 +209,11 @@ TEST_F(ShaderClassesTest, RenderShader_GetFragmentModule_NonNull)
 	RenderShader shader("GbufferPass", vertPath, fragPath);
 	ShaderCompiler compiler;
 	ASSERT_TRUE(shader.Compile(compiler));
-	shader.SetDevice(*m_device);
+	shader.CreateModule(*m_device);
 
 	auto fragMod = shader.GetFragmentModule();
 	ASSERT_NE(fragMod, nullptr)
-		<< "Fragment module should not be null after SetDevice()";
+		<< "Fragment module should not be null after CreateModule()";
 	EXPECT_NE(*fragMod->handle(), VK_NULL_HANDLE);
 }
 
@@ -513,7 +513,7 @@ TEST_F(ShaderClassesTest, ShaderLibrary_LoadRenderShader_CacheHit)
 	ASSERT_NE(second, nullptr)
 		<< "Second LoadRenderShader should return a valid shader";
 
-	// Same name → same cached instance (same shared_ptr)
+	// Same name 鈫?same cached instance (same shared_ptr)
 	EXPECT_EQ(first.get(), second.get())
 		<< "Same shader name should return same cached instance";
 }
@@ -538,7 +538,7 @@ TEST_F(ShaderClassesTest, ShaderLibrary_LoadComputeShader_CacheHit)
 	ASSERT_NE(second, nullptr)
 		<< "Second LoadComputeShader should return a valid shader";
 
-	// Same name → same cached instance
+	// Same name 鈫?same cached instance
 	EXPECT_EQ(first.get(), second.get())
 		<< "Same shader name should return same cached instance";
 }
@@ -565,8 +565,8 @@ TEST_F(ShaderClassesTest, ShaderLibrary_RenderAndCompute_CachesAreDistinct)
 	ASSERT_NE(render, nullptr);
 	ASSERT_NE(compute, nullptr);
 
-	// Different names → different cached instances
-	EXPECT_NE(render.get(), compute.get())
+	// Different names -> different cached instances
+	EXPECT_NE(static_cast<const void*>(render.get()), static_cast<const void*>(compute.get()))
 		<< "Render and compute shaders with different names should be distinct";
 }
 
@@ -655,7 +655,7 @@ TEST_F(ShaderClassesTest, ShaderLibrary_ThreadSafety_ConcurrentLoads)
 	// The shared_mutex in GetOrCreate() ensures the cache itself is safe, but
 	// passing the same Vulkan device to two threads for simultaneous compilation
 	// is undefined behaviour. The ShaderLibrary singleton properly serialises
-	// cache access via double-checked locking — this test checks concurrent
+	// cache access via double-checked locking 鈥?this test checks concurrent
 	// compilation, not cache contention, and is skipped accordingly.
 	GTEST_SUCCEED() << "Skipped: ShaderLibrary cache is thread-safe, but concurrent"
 		<< " compilation from multiple threads is not supported (single-threaded arch).";
@@ -693,14 +693,14 @@ TEST_F(ShaderClassesTest, ShaderLibrary_ThreadSafety_DifferentNames)
 	ASSERT_NE(result1, nullptr);
 	ASSERT_NE(result2, nullptr);
 
-	// Different names → different instances
+	// Different names 鈫?different instances
 	EXPECT_NE(result1.get(), result2.get())
 		<< "Different shader names should produce different instances even when loaded concurrently";
 }
 
 TEST_F(ShaderClassesTest, ShaderLibrary_GetBuildInConstant_ExistingName)
 {
-	// No GPU needed — this is a pure CPU cache lookup
+	// No GPU needed 鈥?this is a pure CPU cache lookup
 	const S_Const* pi = ShaderLibrary::GetBuildInConstant("B_PI");
 	EXPECT_NE(pi, nullptr)
 		<< "B_PI should be a registered build-in constant";

@@ -43,15 +43,15 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	, p_pipelineLayout(nullptr)
 	, p_pipeline(nullptr)
 	// --- Self-load shaders via ShaderLibrary ---
-	, p_renderShader(std::static_pointer_cast<RenderShader>(
+	, p_renderShader(
 		ShaderLibrary::LoadRenderShader("GeometryPass",
 		                                "res/shaders/render/gbuffer.vert",
-		                                "res/shaders/render/gbuffer.frag")))
+		                                "res/shaders/render/gbuffer.frag"))
 {
 	p_device = &device;
 
-	// --- Set device on loaded shader (creates ShaderModules from SPIR-V) ---
-	if (p_renderShader) { p_renderShader->SetDevice(device); }
+	// --- Create modules from self-loaded shader (creates ShaderModules from SPIR-V) ---
+	if (p_renderShader) { p_renderShader->CreateModule(device); }
 
 	// --- Write camera UBO to descriptor set ---
 	p_cameraDescriptorSet.WriteBuffer(0, p_cameraUBO.GetDescriptorInfo(),

@@ -299,7 +299,8 @@ public:
 	/**
 	 * @brief Resets ALL containers and Vulkan fields to default/empty state.
 	 *
-	 * Clears all 16+ containers, zeros local_size_*, resets version to 450,
+	 * Clears all 16+ containers, zeros local_size_*, resets version to 0
+	 * (unset; GenerateShader() defaults to 450 when version == 0),
 	 * and empties extensions / push_constants / spec_constants.
 	 */
 	void Reset();

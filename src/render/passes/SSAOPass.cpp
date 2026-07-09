@@ -86,9 +86,9 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
 	, p_pipeline(nullptr)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, p_computeShader(std::static_pointer_cast<ComputeShader>(
+	, p_computeShader(
 		ShaderLibrary::LoadComputeShader("ssao",
-		                                "res/shaders/compute/ssao.comp")))
+		                                "res/shaders/compute/ssao.comp"))
 {
 	// --- Create module from self-loaded shader ---
 	if (p_computeShader) { p_computeShader->CreateModule(device); }

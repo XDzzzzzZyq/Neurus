@@ -251,10 +251,10 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 }
 
 // =========================================================================
-// SetDevice
+// CreateModule - create ShaderModules from compiled SPIR-V
 // =========================================================================
 
-void RenderShader::SetDevice(const vk::raii::Device& device)
+bool RenderShader::CreateModule(const vk::raii::Device& device)
 {
 	m_device = &device;
 	NEURUS_LOG("[RenderShader] Device set for '" << m_name << "'");
@@ -270,12 +270,18 @@ void RenderShader::SetDevice(const vk::raii::Device& device)
 			m_modules[ShaderType::VERTEX]   = std::move(vertMod);
 			m_modules[ShaderType::FRAGMENT] = std::move(fragMod);
 			NEURUS_LOG("[RenderShader] Modules created for '" << m_name << "'");
+			return true;
 		}
 		else
 		{
 			NEURUS_ERR("[RenderShader] Failed to create modules for '" << m_name << "'");
+			return false;
 		}
 	}
+
+	// SPIR-V not yet compiled - modules will be created lazily by
+	// GetVertexModule()/GetFragmentModule() after Compile() runs.
+	return true;
 }
 
 // =========================================================================

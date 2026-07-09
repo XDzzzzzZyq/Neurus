@@ -45,7 +45,7 @@ namespace {
 } // anon
 
 // ===========================================================================
-// Static helpers �?6 cubemap face view-projection matrices from origin
+// Static helpers - 6 cubemap face view-projection matrices from origin
 // ===========================================================================
 
 namespace {
@@ -101,21 +101,21 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	, p_pipelineLayout(nullptr)
 	, p_pipeline(nullptr)
 	// --- Self-load shaders via ShaderLibrary ---
-	, m_multiviewShader(std::static_pointer_cast<RenderShader>(
+	, m_multiviewShader(
 		ShaderLibrary::LoadRenderShader("ShadowDepthMultiview",
 		                                NEURUS_SHADER_DIR "render/shadow_depth_multiview.vert",
-		                                NEURUS_SHADER_DIR "render/shadow_depth.frag")))
-	, m_sunShader(std::static_pointer_cast<RenderShader>(
+		                                NEURUS_SHADER_DIR "render/shadow_depth.frag"))
+	, m_sunShader(
 		ShaderLibrary::LoadRenderShader("ShadowDepthSun",
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.vert",
-		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag")))
+		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag"))
 {
 	p_device = &device;
 	p_physicalDevice = &physicalDevice;
 
-	// --- Set device on loaded shaders (creates ShaderModules from SPIR-V) ---
-	if (m_multiviewShader) { m_multiviewShader->SetDevice(device); }
-	if (m_sunShader)       { m_sunShader->SetDevice(device); }
+	// --- Create modules from self-loaded shaders (creates ShaderModules from SPIR-V) ---
+	if (m_multiviewShader) { m_multiviewShader->CreateModule(device); }
+	if (m_sunShader)       { m_sunShader->CreateModule(device); }
 
 	p_vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
 	p_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
@@ -133,7 +133,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 }
 
 // ===========================================================================
-// createSSBOResources �?SSBO, descriptor pool & set
+// createSSBOResources - SSBO, descriptor pool & set
 // ===========================================================================
 
 void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
@@ -169,7 +169,7 @@ void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
 }
 
 // ===========================================================================
-// createPipeline �?multiview colour+depth pipeline (all 6 faces in single pass)
+// createPipeline - multiview colour+depth pipeline (all 6 faces in single pass)
 // ===========================================================================
 
 void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
@@ -228,7 +228,7 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 }
 
 // ===========================================================================
-// createSunPipeline �?non-multiview depth-only pipeline (mat4 lightViewProj push)
+// createSunPipeline - non-multiview depth-only pipeline (mat4 lightViewProj push)
 // ===========================================================================
 
 void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
@@ -256,13 +256,13 @@ void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
 		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput(p_vtxLayout)
 		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		// No SetViewMask �?single view (non-multiview)
+		// No SetViewMask - single view (non-multiview)
 		.SetRasterization(vk::PolygonMode::eFill,
 		                  vk::CullModeFlagBits::eNone,
 		                  vk::FrontFace::eClockwise)
 		.SetMultisampling()
 		.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
-		// No color attachments �?depth-only
+		// No color attachments - depth-only
 		.SetDepthFormat(kDepthFmt)
 		.SetPushConstantRanges(pushRanges)
 		.BuildGraphicsPipeline(device);
@@ -360,7 +360,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		vk::RenderingInfo renderInfo(
 			{}, {{0, 0}, {p_resolution, p_resolution}},
-			kShadowFaceCount, 0x3Fu, colorAtt, &depthAtt, nullptr);
+			1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
 
 		cmdBuf.beginRendering(renderInfo);
 
@@ -392,7 +392,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	}
 
 	// =========================================================================
-	// Sun light pass �?orthographic depth-only (non-multiview)
+	// Sun light pass - orthographic depth-only (non-multiview)
 	// =========================================================================
 
 	{
