@@ -110,6 +110,16 @@ if(WIN32 AND WINDEPLOYQT)
 	)
 endif()
 
+# Deploy shaderc_shared.dll alongside the test executable
+if(TARGET shaderc_shared)
+	add_custom_command(TARGET neurus_test POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			$<TARGET_FILE:shaderc_shared>
+			$<TARGET_FILE_DIR:neurus_test>
+		COMMENT "Copying shaderc_shared.dll for runtime access"
+	)
+endif()
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(neurus_test
