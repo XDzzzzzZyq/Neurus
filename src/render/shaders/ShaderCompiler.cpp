@@ -50,7 +50,7 @@ std::vector<uint32_t> ShaderCompiler::CompileGlslToSpv(
 		return {};
 	}
 
-	// Success — copy SPIR-V words into a vector
+	// Success -- copy SPIR-V words into a vector
 	std::vector<uint32_t> spirv;
 	spirv.assign(result.cbegin(), result.cend());
 	return spirv;

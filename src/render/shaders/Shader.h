@@ -63,7 +63,7 @@ public:
 	 * compute, etc.) and populate the m_modules map with resulting ShaderModule
 	 * objects.
 	 *
-	 * @param compiler ShaderCompiler instance for GLSL→SPIR-V compilation.
+	 * @param compiler ShaderCompiler instance for GLSL->SPIR-V compilation.
 	 * @return true if all stages compiled successfully, false otherwise.
 	 */
 	virtual bool Compile(ShaderCompiler& compiler) = 0;

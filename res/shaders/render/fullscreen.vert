@@ -9,7 +9,9 @@
 
 layout(push_constant) uniform PushConstants
 {
-	mat4 invProjView;  // inverse(proj * view) to reconstruct worldPos from clipPos
+	layout(offset = 0) vec3 unused1;    // lightWorldPos (unused by VS)
+	layout(offset = 12) float unused2;  // farPlane (unused by VS)
+	layout(offset = 16) mat4 invProjView;  // inverse(proj * view) to reconstruct worldPos from clipPos
 } pc;
 
 layout(location = 0) out vec3 fragWorldPos;

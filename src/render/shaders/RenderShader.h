@@ -1,28 +1,28 @@
 /**
  * @file RenderShader.h
- * @brief Render shader — vertex+fragment pipeline with parse→generate→compile flow.
+ * @brief Render shader -- vertex+fragment pipeline with parse->generate->compile flow.
  *
  * RenderShader owns ShaderStruct IR representations for both vertex and fragment
  * stages, generated GLSL source code, and compiled ShaderModule objects (stored
  * in the base-class m_modules map).
  *
  * Ported from OpenGL project's RenderShader, adapted for Vulkan:
- *   - OpenGL:   CompileShaderCode() → glCreateShader → glCompileShader → GLuint
- *   - Vulkan:   ShaderCompiler → CompileGlslToSpv() → ShaderModule (vk::raii)
+ *   - OpenGL:   CompileShaderCode() -> glCreateShader -> glCompileShader -> GLuint
+ *   - Vulkan:   ShaderCompiler -> CompileGlslToSpv() -> ShaderModule (vk::raii)
  *
  * Architecture:
- *   - Inherits Shader (Task 6) — base class with m_modules cache.
+ *   - Inherits Shader (Task 6) -- base class with m_modules cache.
  *   - Uses ShaderParser (Task 7) to populate ShaderStruct IRs.
  *   - Uses ShaderStruct::GenerateShader() (Task 8) to emit GLSL.
- *   - Uses ShaderCompiler (Task 4) for GLSL→SPIR-V compilation.
+ *   - Uses ShaderCompiler (Task 4) for GLSL->SPIR-V compilation.
  *   - Uses ShaderModule (Task 5) to wrap vk::raii::ShaderModule.
  *
  * Lifecycle:
  *   1. Construct: RenderShader(name, vertPath, fragPath)
- *   2. Compile:   Compile(compiler) → parse → generate GLSL → compile to SPIR-V
- *   3. Finalize:  SetDevice(device) → create ShaderModule objects in m_modules
+ *   2. Compile:   Compile(compiler) -> parse -> generate GLSL -> compile to SPIR-V
+ *   3. Finalize:  SetDevice(device) -> create ShaderModule objects in m_modules
  *   4. Use:       GetVertexModule() / GetFragmentModule() for pipeline creation
- *   5. Recompile: Recompile(compiler, type) → regenerate single stage, swap module
+ *   5. Recompile: Recompile(compiler, type) -> regenerate single stage, swap module
  *
  * @note ShaderModule creation is deferred until a device is available via
  *       SetDevice().  IsValid() returns true when SPIR-V compilation succeeded
@@ -90,16 +90,16 @@ public:
 	 *
 	 * Flow:
 	 *   1. ShaderParser::ParseShaderFile() for both vertex and fragment files
-	 *      → populates m_vertStruct and m_fragStruct IRs.
+	 *      -> populates m_vertStruct and m_fragStruct IRs.
 	 *   2. m_vertStruct.GenerateShader() and m_fragStruct.GenerateShader()
-	 *      → produces complete Vulkan GLSL source strings.
+	 *      -> produces complete Vulkan GLSL source strings.
 	 *   3. compiler.CompileGlslToSpv() for each stage
-	 *      → produces SPIR-V binary vectors (stored in m_vertSpirv / m_fragSpirv).
+	 *      -> produces SPIR-V binary vectors (stored in m_vertSpirv / m_fragSpirv).
 	 *
 	 * ShaderModule objects are NOT created here (requires vk::raii::Device).
 	 * Call SetDevice() after Compile() to populate m_modules.
 	 *
-	 * @param compiler ShaderCompiler instance for GLSL→SPIR-V compilation.
+	 * @param compiler ShaderCompiler instance for GLSL->SPIR-V compilation.
 	 * @return true if both stages compiled successfully, false on parse/compile error.
 	 */
 	bool Compile(ShaderCompiler& compiler) override;

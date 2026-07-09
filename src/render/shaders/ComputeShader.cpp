@@ -1,6 +1,6 @@
 /**
  * @file ComputeShader.cpp
- * @brief Implementation of the full parse→generate→compile pipeline for compute shaders.
+ * @brief Implementation of the full parse->generate->compile pipeline for compute shaders.
  */
 
 #include "ComputeShader.h"
@@ -92,7 +92,7 @@ bool ComputeShader::CreateModule(const vk::raii::Device& device)
 {
 	if (m_spirv.empty())
 	{
-		m_errorMessage = "Cannot create ShaderModule: SPIR-V is empty — call Compile() first";
+		m_errorMessage = "Cannot create ShaderModule: SPIR-V is empty -- call Compile() first";
 		NEURUS_ERR("[ComputeShader] " << m_errorMessage);
 		return false;
 	}
@@ -132,7 +132,7 @@ bool ComputeShader::Recompile(ShaderCompiler& compiler)
 		return false;
 	}
 
-	// If a module was already created, it's now stale — clear it.
+	// If a module was already created, it's now stale -- clear it.
 	// The caller must call CreateModule() again to recreate it.
 	m_modules.erase(ShaderType::COMPUTE);
 

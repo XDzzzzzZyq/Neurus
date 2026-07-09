@@ -8,7 +8,7 @@
  * containers; GenerateShader() reads them to emit a valid Vulkan GLSL string.
  *
  * Architecture:
- * - Independent of Shader base class (Task 6) — no inheritance relationship.
+ * - Independent of Shader base class (Task 6) -- no inheritance relationship.
  * - Uses ParaType from core/Parameters.h (Task 2) for type metadata.
  * - Named structs replace OpenGL's std::tuple patterns for clarity.
  * - Vulkan extensions: push constants, specialization constants, local size,
@@ -29,7 +29,7 @@
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Named type aliases — replace OpenGL std::tuple patterns
+// Named type aliases -- replace OpenGL std::tuple patterns
 // ---------------------------------------------------------------------------
 
 /**
@@ -39,10 +39,14 @@ namespace neurus {
  */
 struct S_IO
 {
-	int location;     ///< GLSL layout location qualifier
-	std::string name; ///< Variable name
-	ParaType type;    ///< GLSL type of the variable
+	int location;         ///< GLSL layout location qualifier
+	std::string name;     ///< Variable name
+	ParaType type;        ///< GLSL type of the variable
+	std::string typeName; ///< Original type name string for custom types (empty -> use ParseType(type))
 };
+
+/** @brief Ordered parameter list: (type, name, originalTypeName) triples. */
+using Args = std::vector<std::tuple<ParaType, std::string, std::string>>;
 
 /**
  * @brief Struct or buffer-block definition.
@@ -70,7 +74,7 @@ struct S_Uniform
 	int count;              ///< Array count (1 = scalar)
 	int binding = -1;       ///< Descriptor-set binding point (-1 = no layout qualifier)
 	std::string qualifiers; ///< Qualifiers (e.g. "writeonly", "readonly"; empty = none)
-	std::string actualType; ///< Original GLSL type string (e.g. "image2D"; empty → use ParseType(type))
+	std::string actualType; ///< Original GLSL type string (e.g. "image2D"; empty -> use ParseType(type))
 };
 
 /**
@@ -84,7 +88,7 @@ struct S_Func
 	ParaType returnType;                                 ///< Return type (or const type)
 	std::string name;                                    ///< Function / const name
 	std::string body;                                    ///< Function body or const value
-	std::vector<std::pair<ParaType, std::string>> args;  ///< Parameter list
+	Args args;  ///< Parameter list
 };
 
 /** @brief Alias: const values share the same structure as functions. */
@@ -144,14 +148,11 @@ struct S_SpecConstant
 };
 
 // ---------------------------------------------------------------------------
-// Convenience alias — matches OpenGL ShaderLib.h
+// Convenience alias -- matches OpenGL ShaderLib.h
 // ---------------------------------------------------------------------------
 
-/** @brief Ordered parameter list: (type, name) pairs. */
-using Args = std::vector<std::pair<ParaType, std::string>>;
-
 // ---------------------------------------------------------------------------
-// ShaderStruct — the IR data model
+// ShaderStruct -- the IR data model
 // ---------------------------------------------------------------------------
 
 /**
@@ -218,7 +219,7 @@ public:
 	// Static type-system helpers (ported from OpenGL, backed by Parameters.h)
 	// -------------------------------------------------------------------
 
-	/** @brief Dynamic type table — maps ParaType values and custom types to GLSL strings. */
+	/** @brief Dynamic type table -- maps ParaType values and custom types to GLSL strings. */
 	static std::vector<std::string> type_table;
 
 	/**
@@ -246,7 +247,7 @@ public:
 	static void ADD_TYPE(const std::string& name);
 
 	// -------------------------------------------------------------------
-	// Setters — each marks is_struct_changed = true (ported from OpenGL)
+	// Setters -- each marks is_struct_changed = true (ported from OpenGL)
 	// -------------------------------------------------------------------
 
 	/** @brief Register a vertex-attribute / input-location binding. */
@@ -256,7 +257,7 @@ public:
 	/** @brief Register a storage-buffer block declaration. */
 	void SetSB(int loc, const std::string& name, const Args& args);
 	/** @brief Register a uniform-buffer block declaration. */
-	void SetUB(std::string type, std::string name, const Args& args);
+	void SetUB(std::string type, std::string name, const Args& args, int binding = 0);
 	/** @brief Register a bare uniform variable. */
 	void SetUni(ParaType type, int count, const std::string& name, int binding = -1,
 	            const std::string& qualifiers = "", const std::string& actualType = "");
@@ -315,10 +316,10 @@ public:
 	 *        current IR state with deterministic section ordering.
 	 *
 	 * Sections are emitted in Vulkan-specific order:
-	 *   #version → extensions → AB_list → pass_list → struct_def_list →
-	 *   SB_list → ubuffer_list → push_constants → spec_constants →
-	 *   uniform_list → input_list → output_list → glob_list →
-	 *   const_list → vari_list → func_list → local_size → main()
+	 *   #version -> extensions -> AB_list -> pass_list -> struct_def_list ->
+	 *   SB_list -> ubuffer_list -> push_constants -> spec_constants ->
+	 *   uniform_list -> input_list -> output_list -> glob_list ->
+	 *   const_list -> vari_list -> func_list -> local_size -> main()
 	 *
 	 * Each section is gated by @c if (!list.empty()).
 	 * Sets @c is_struct_changed to false after successful generation.

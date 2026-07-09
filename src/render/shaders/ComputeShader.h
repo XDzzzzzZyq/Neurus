@@ -1,12 +1,12 @@
 /**
  * @file ComputeShader.h
- * @brief Compute shader implementation using the full parse→generate→compile pipeline.
+ * @brief Compute shader implementation using the full parse->generate->compile pipeline.
  *
  * Unlike the OpenGL version which bypasses parsing, Neurus ComputeShader uses
  * the complete dynamic shader pipeline:
- *   1. Parse GLSL source → ShaderStruct IR
- *   2. GenerateShader() → regenerated Vulkan GLSL with local_size layout
- *   3. CompileGlslToSpv() → SPIR-V bytecode
+ *   1. Parse GLSL source -> ShaderStruct IR
+ *   2. GenerateShader() -> regenerated Vulkan GLSL with local_size layout
+ *   3. CompileGlslToSpv() -> SPIR-V bytecode
  *
  * Architecture:
  *   - Owns a ShaderStruct for the parsed IR (single struct for compute stage).
@@ -47,8 +47,8 @@ class ShaderModule;
  *
  * Lifecycle:
  *   1. Construct with name + GLSL file path.
- *   2. Call Compile(compiler) → parse → generate → SPIR-V.
- *   3. Call CreateModule(device) → ShaderModule from SPIR-V.
+ *   2. Call Compile(compiler) -> parse -> generate -> SPIR-V.
+ *   3. Call CreateModule(device) -> ShaderModule from SPIR-V.
  *   4. Access via GetModule() for pipeline creation.
  *   5. Recompile(compiler) to re-parse and regenerate after IR changes.
  *
@@ -98,11 +98,11 @@ public:
 	 *
 	 * Pipeline:
 	 *   1. ShaderParser::ParseShaderFile(compPath, COMPUTE, m_struct)
-	 *   2. m_struct.GenerateShader() → regenerated GLSL source
+	 *   2. m_struct.GenerateShader() -> regenerated GLSL source
 	 *   3. compiler.CompileGlslToSpv(source, shaderc_glsl_compute_shader, "main", name)
 	 *   4. Store resulting SPIR-V bytecode
 	 *
-	 * @param compiler ShaderCompiler instance for GLSL→SPIR-V compilation.
+	 * @param compiler ShaderCompiler instance for GLSL->SPIR-V compilation.
 	 * @return true if all steps succeeded, false on parse/generation/compile error.
 	 */
 	bool Compile(ShaderCompiler& compiler) override;
@@ -177,7 +177,7 @@ public:
 	 * modified via GetStruct() since the last compile) and recompiles to
 	 * SPIR-V. The existing SPIR-V is replaced on success.
 	 *
-	 * @param compiler ShaderCompiler instance for GLSL→SPIR-V compilation.
+	 * @param compiler ShaderCompiler instance for GLSL->SPIR-V compilation.
 	 * @return true if regeneration and recompilation succeeded.
 	 */
 	bool Recompile(ShaderCompiler& compiler);

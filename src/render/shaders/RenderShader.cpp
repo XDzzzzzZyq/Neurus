@@ -1,8 +1,8 @@
 /**
  * @file RenderShader.cpp
- * @brief Implementation of RenderShader — vertex+fragment shader compilation pipeline.
+ * @brief Implementation of RenderShader -- vertex+fragment shader compilation pipeline.
  *
- * Implements the full parse→generate→compile flow ported from the OpenGL
+ * Implements the full parse->generate->compile flow ported from the OpenGL
  * RenderShader, adapted for Vulkan via ShaderParser, ShaderStruct::GenerateShader(),
  * ShaderCompiler::CompileGlslToSpv(), and ShaderModule.
  */
@@ -17,7 +17,7 @@
 
 namespace neurus {
 
-// File-static helper — keeps shaderc dependency out of the header
+// File-static helper -- keeps shaderc dependency out of the header
 namespace {
 
 shaderc_shader_kind ToShadercKind(ShaderType type)
@@ -50,7 +50,7 @@ RenderShader::RenderShader(const std::string& name,
 }
 
 // =========================================================================
-// Shader interface — Compile
+// Shader interface -- Compile
 // =========================================================================
 
 bool RenderShader::Compile(ShaderCompiler& compiler)
@@ -102,7 +102,7 @@ bool RenderShader::Compile(ShaderCompiler& compiler)
 }
 
 // =========================================================================
-// Shader interface — IsValid / GetType
+// Shader interface -- IsValid / GetType
 // =========================================================================
 
 bool RenderShader::IsValid() const
@@ -112,7 +112,7 @@ bool RenderShader::IsValid() const
 }
 
 // =========================================================================
-// RenderShader-specific — GetStruct
+// RenderShader-specific -- GetStruct
 // =========================================================================
 
 ShaderStruct& RenderShader::GetStruct(ShaderType type)
@@ -126,7 +126,7 @@ ShaderStruct& RenderShader::GetStruct(ShaderType type)
 }
 
 // =========================================================================
-// RenderShader-specific — Module access
+// RenderShader-specific -- Module access
 // =========================================================================
 
 std::shared_ptr<ShaderModule> RenderShader::GetVertexModule()
@@ -173,7 +173,7 @@ std::shared_ptr<ShaderModule> RenderShader::GetFragmentModule()
 }
 
 // =========================================================================
-// RenderShader-specific — Recompile
+// RenderShader-specific -- Recompile
 // =========================================================================
 
 bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)

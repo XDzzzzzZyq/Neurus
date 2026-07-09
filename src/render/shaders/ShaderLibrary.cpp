@@ -14,7 +14,7 @@
 namespace neurus {
 
 // =========================================================================
-// Meyer's singleton — internal state via function-local statics
+// Meyer's singleton -- internal state via function-local statics
 // =========================================================================
 
 /**
@@ -84,7 +84,7 @@ static const std::unordered_map<std::string, S_Const>& GetBuildInConstantsInstan
 			}
 		},
 
-		// Colour-space / tone-mapping functions (placeholders — bodies populated
+		// Colour-space / tone-mapping functions (placeholders -- bodies populated
 		// by the shader code generator or configured at initialisation time)
 		{
 			"B_Gamma",
@@ -125,10 +125,10 @@ static const std::unordered_map<std::string, S_Const>& GetBuildInConstantsInstan
  * @brief Resolves a potentially relative shader path to an accessible absolute path.
  *
  * Tries, in order:
- *   1. Already absolute → return as-is
+ *   1. Already absolute -> return as-is
  *   2. Relative to NEURUS_SHADER_DIR (the compile-time cmake define)
  *   3. Multiple "../" prefixes (for GPU tests that run from build/debug/test/)
- *   4. Return the original path — let the caller fail with a clear error
+ *   4. Return the original path -- let the caller fail with a clear error
  */
 static std::string ResolveShaderPath(const std::string& path)
 {
@@ -161,7 +161,7 @@ static std::string ResolveShaderPath(const std::string& path)
 		}
 	}
 
-	// Could not resolve — return original and let the constructor fail with a clear error
+	// Could not resolve -- return original and let the constructor fail with a clear error
 	NEURUS_LOG("[ShaderLibrary] Could NOT resolve shader path '" << path << "'");
 	return path;
 }
@@ -225,7 +225,7 @@ bool ShaderLibrary::Reload(const std::string& name)
 	}
 
 	cache.erase(it);
-	NEURUS_LOG("[ShaderLibrary] Reloaded '" << name << "' — will recompile on next Load*");
+	NEURUS_LOG("[ShaderLibrary] Reloaded '" << name << "' -- will recompile on next Load*");
 	return true;
 }
 
@@ -244,7 +244,7 @@ std::shared_ptr<Shader> ShaderLibrary::GetOrCreate(
 	const std::string& name,
 	const std::function<std::shared_ptr<Shader>()>& factory)
 {
-	// Fast path — shared lock for concurrent reads
+	// Fast path -- shared lock for concurrent reads
 	{
 		std::shared_lock lock(GetMutexInstance());
 		auto& cache = GetCacheInstance();
@@ -255,7 +255,7 @@ std::shared_ptr<Shader> ShaderLibrary::GetOrCreate(
 		}
 	}
 
-	// Slow path — exclusive lock for insertion
+	// Slow path -- exclusive lock for insertion
 	std::unique_lock lock(GetMutexInstance());
 	auto& cache = GetCacheInstance();
 
@@ -267,7 +267,7 @@ std::shared_ptr<Shader> ShaderLibrary::GetOrCreate(
 		return it->second;
 	}
 
-	// Create the shader (factory may be expensive — runs under exclusive lock,
+	// Create the shader (factory may be expensive -- runs under exclusive lock,
 	// but only on first access for each unique name)
 	auto shader = factory();
 	if (shader)

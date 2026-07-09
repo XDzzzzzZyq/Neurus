@@ -9,7 +9,7 @@
 
 namespace neurus {
 
-// Forward declarations — full includes only needed in .cpp
+// Forward declarations -- full includes only needed in .cpp
 class Shader;
 class ShaderCompiler;
 
@@ -25,13 +25,13 @@ class ShaderCompiler;
  *   - Owns ShaderCompiler internally (never exposed publicly).
  *   - Thread-safe cache via std::shared_mutex (concurrent reads, exclusive
  *     inserts).
- *   - DeferredRenderer never includes or knows about ShaderLibrary —
+ *   - DeferredRenderer never includes or knows about ShaderLibrary --
  *     passes call the static Load* methods directly.
  *   - Build-in constants (PI, Pix_UV_ratio, Gamma, FilmicF, FilmicV4)
  *     ported from the OpenGL ShaderBuildIn.cpp reference.
  *
  * @note RenderShader (Task 11) and ComputeShader (Task 12) are forward-
- *       declared — the Load* methods return std::shared_ptr&lt;Shader&gt;
+ *       declared -- the Load* methods return std::shared_ptr&lt;Shader&gt;
  *       base-class pointers.  Consumers downcast via std::static_pointer_cast.
  *       Placeholder implementations exist until Tasks 11/12 are complete.
  */
@@ -58,7 +58,7 @@ public:
 	 * @param vertPath Path to vertex shader GLSL source file.
 	 * @param fragPath Path to fragment shader GLSL source file.
 	 * @return Shared pointer to the compiled shader, or nullptr on failure
-	 *         (currently a placeholder — see Tasks 11/12).
+	 *         (currently a placeholder -- see Tasks 11/12).
 	 */
 	static std::shared_ptr<Shader> LoadRenderShader(
 		const std::string& name,
@@ -75,7 +75,7 @@ public:
 	 * @param name     Unique shader name (cache key), e.g. "SSAO".
 	 * @param compPath Path to compute shader GLSL source file.
 	 * @return Shared pointer to the compiled shader, or nullptr on failure
-	 *         (currently a placeholder — see Tasks 11/12).
+	 *         (currently a placeholder -- see Tasks 11/12).
 	 */
 	static std::shared_ptr<Shader> LoadComputeShader(
 		const std::string& name,
