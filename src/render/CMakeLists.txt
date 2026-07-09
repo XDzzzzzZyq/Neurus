@@ -66,7 +66,7 @@ target_link_libraries(neurus_render PUBLIC
 	neurus_core
 	neurus_scene
 	neurus_render_passes
-	shaderc_combined
+	shaderc_shared
 )
 
 target_include_directories(neurus_render PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
