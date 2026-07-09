@@ -93,8 +93,6 @@ private:
 	// --- Shaders (self-loaded via ShaderLibrary) ---
 	std::shared_ptr<RenderShader> m_multiviewShader;  ///< Point-light cubemap depth+colour (multiview)
 	std::shared_ptr<RenderShader> m_sunShader;         ///< Sun-light orthographic depth-only
-	std::shared_ptr<RenderShader> m_debugShader;       ///< Debug depth-to-color visualization
-
 	// Graphics pipeline (multiview depth+colour)
 	vk::raii::PipelineLayout p_pipelineLayout = nullptr;
 	vk::raii::Pipeline p_pipeline = nullptr;
@@ -104,10 +102,6 @@ private:
 	vk::raii::Pipeline p_sunPipeline = nullptr;
 	void createSunPipeline(const vk::raii::Device& device);
 
-	// Debug pipeline (fullscreen depth-to-color visualization)
-	vk::raii::PipelineLayout p_debugPipelineLayout = nullptr;
-	vk::raii::Pipeline p_debugPipeline = nullptr;
-	void createDebugPipeline(const vk::raii::Device& device);
 };
 
 } // namespace neurus

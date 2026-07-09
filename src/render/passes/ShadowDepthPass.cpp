@@ -45,7 +45,7 @@ namespace {
 } // anon
 
 // ===========================================================================
-// Static helpers â€?6 cubemap face view-projection matrices from origin
+// Static helpers ï¿½?6 cubemap face view-projection matrices from origin
 // ===========================================================================
 
 namespace {
@@ -109,10 +109,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 		ShaderLibrary::LoadRenderShader("ShadowDepthSun",
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.vert",
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag")))
-	, m_debugShader(std::static_pointer_cast<RenderShader>(
-		ShaderLibrary::LoadRenderShader("DepthToColor",
-		                                NEURUS_SHADER_DIR "render/fullscreen.vert",
-		                                NEURUS_SHADER_DIR "render/depth_to_color.frag")))
 {
 	p_device = &device;
 	p_physicalDevice = &physicalDevice;
@@ -120,7 +116,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	// --- Set device on loaded shaders (creates ShaderModules from SPIR-V) ---
 	if (m_multiviewShader) { m_multiviewShader->SetDevice(device); }
 	if (m_sunShader)       { m_sunShader->SetDevice(device); }
-	if (m_debugShader)     { m_debugShader->SetDevice(device); }
 
 	p_vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
 	p_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
@@ -129,18 +124,16 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	createSSBOResources(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 	createPipeline(device);
 	createSunPipeline(device);
-	createDebugPipeline(device);
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " faceVPSize=" << kFaceVPSize
 	           << " staticFarPlane=" << kStaticFarPlane
 	           << " multiviewShader=" << (m_multiviewShader ? "OK" : "FAIL")
-	           << " sunShader=" << (m_sunShader ? "OK" : "FAIL")
-	           << " debugShader=" << (m_debugShader ? "OK" : "FAIL"));
+	           << " sunShader=" << (m_sunShader ? "OK" : "FAIL"));
 }
 
 // ===========================================================================
-// createSSBOResources â€?SSBO, descriptor pool & set
+// createSSBOResources ï¿½?SSBO, descriptor pool & set
 // ===========================================================================
 
 void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
@@ -176,7 +169,7 @@ void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
 }
 
 // ===========================================================================
-// createPipeline â€?multiview colour+depth pipeline (all 6 faces in single pass)
+// createPipeline ï¿½?multiview colour+depth pipeline (all 6 faces in single pass)
 // ===========================================================================
 
 void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
@@ -235,7 +228,7 @@ void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
 }
 
 // ===========================================================================
-// createSunPipeline â€?non-multiview depth-only pipeline (mat4 lightViewProj push)
+// createSunPipeline ï¿½?non-multiview depth-only pipeline (mat4 lightViewProj push)
 // ===========================================================================
 
 void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
@@ -263,13 +256,13 @@ void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
 		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
 		.SetVertexInput(p_vtxLayout)
 		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		// No SetViewMask â€?single view (non-multiview)
+		// No SetViewMask ï¿½?single view (non-multiview)
 		.SetRasterization(vk::PolygonMode::eFill,
 		                  vk::CullModeFlagBits::eNone,
 		                  vk::FrontFace::eClockwise)
 		.SetMultisampling()
 		.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
-		// No color attachments â€?depth-only
+		// No color attachments ï¿½?depth-only
 		.SetDepthFormat(kDepthFmt)
 		.SetPushConstantRanges(pushRanges)
 		.BuildGraphicsPipeline(device);
@@ -278,65 +271,6 @@ void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
 	p_sunPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
 
 	NEURUS_LOG("[ShadowDepthPass] Sun pipeline created (depth-only, push-constant mat4 lightViewProj)");
-}
-
-// ===========================================================================
-// createDebugPipeline â€?fullscreen depth-to-color visualization
-// ===========================================================================
-
-void ShadowDepthPass::createDebugPipeline(const vk::raii::Device& device)
-{
-	if (!m_debugShader || !m_debugShader->IsValid())
-	{
-		NEURUS_LOG("[ShadowDepthPass] Debug shader not loaded, skipping debug pipeline");
-		return;
-	}
-
-	// --- Use self-loaded shader modules ---
-	auto& vertModule = *m_debugShader->GetVertexModule();
-	auto& fragModule = *m_debugShader->GetFragmentModule();
-
-	// Push constant range: 80 bytes (lightPos+farPlane at offset 0, invProjView at offset 16)
-	// Must match fullscreen.vert layout: unused[16] + invProjView[64] = 80
-	vk::PushConstantRange pcr(
-		vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-		0, kTotalPushSize);
-
-	vk::PipelineLayoutCreateInfo plCI({}, nullptr, pcr);
-	p_debugPipelineLayout = vk::raii::PipelineLayout(device, plCI);
-
-	// --- Graphics pipeline: fullscreen triangle, no vertex input ---
-	// Must provide a valid (empty) vertex input state -- SetVertexInput() ensures
-	// the pVertexInput pointer is non-null in BuildGraphicsPipeline (VUID 02097).
-	// Must set viewMask=0x3F to match the multiview rendering info viewMask
-	// used in the Record() debug path (VUID 06178).
-	PipelineBuilder builder;
-	p_debugPipeline = builder
-		.SetDebugName("ShadowDepthPass::DebugDepthToColor")
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput()                  // empty vertex input (fullscreen tri)
-		.SetViewMask(0x3F)                 // match rendering info viewMask
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eCounterClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, false, vk::CompareOp::eAlways)
-		.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
-			VK_FALSE,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-			vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA))
-		.SetColorFormats({vk::Format::eR32G32B32A32Sfloat})
-		.SetDepthFormat(kDepthFmt)
-		.SetPushConstantRanges({pcr})
-		.BuildGraphicsPipeline(device);
-
-	NEURUS_LOG("[ShadowDepthPass] Debug pipeline created (fullscreen depth-to-color)");
 }
 
 // ===========================================================================
@@ -455,83 +389,10 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		}
 
-		// Transition cubemap to DepthShaderRead for sampling in subsequent passes
-		{
-			auto& cubemap = cache.GetShadowMap(uid, LightType::POINTLIGHT);
-			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthShaderRead);
-		}
-
-		// --- Debug: render depth as colour using m_debugShader ---
-		if (m_debugShader && m_debugShader->IsValid())
-		{
-			// Transition colour cubemap BACK to ColorAttachment (was ColorShaderRead from above)
-			auto& colorCube = cache.GetShadowColorMap(uid, {p_resolution, p_resolution});
-			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
-
-			// Transition depth cubemap to DepthAttachment for debug rendering
-			auto& cubemap2 = cache.GetShadowMap(uid, LightType::POINTLIGHT);
-			Barrier::Transition(cmdBuf, cubemap2, ImageState::DepthAttachment);
-
-			// Build invProjView for the -Z face (looking toward the scene when light is above)
-			const glm::mat4 proj = glm::perspective(glm::radians(90.0f), 1.0f,
-			                                        0.1f, kStaticFarPlane);
-			const auto faceVPs = MakeFaceVPs(proj);
-			const glm::mat4 invProjView = glm::inverse(faceVPs[5]);  // -Z face
-
-			// Push LightPushData (offset 0, 16 bytes)
-			{
-				LightPushData lp = {lightPos.x, lightPos.y, lightPos.z, farPlane};
-				cmdBuf.pushConstants<LightPushData>(*p_debugPipelineLayout,
-				    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-				    0, lp);
-			}
-
-			// Push invProjView (offset 16, 64 bytes)
-			cmdBuf.pushConstants<glm::mat4>(*p_debugPipelineLayout,
-			    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-			    kModelPushOffset, invProjView);
-
-			// Colour attachment (load existing content, store)
-			vk::RenderingAttachmentInfo debugColorAtt(
-				colorCube.ArrayView(),
-				vk::ImageLayout::eColorAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eLoad,
-				vk::AttachmentStoreOp::eStore,
-				vk::ClearColorValue(std::array<float, 4>{1.0f, 1.0f, 1.0f, 1.0f}));
-
-			// Depth attachment (no depth write needed for debug)
-			vk::RenderingAttachmentInfo debugDepthAtt(
-				cache.GetShadowMap(uid, LightType::POINTLIGHT).ArrayView(),
-				vk::ImageLayout::eDepthStencilAttachmentOptimal,
-				vk::ResolveModeFlagBits::eNone, nullptr,
-				vk::ImageLayout::eUndefined,
-				vk::AttachmentLoadOp::eLoad,
-				vk::AttachmentStoreOp::eDontCare,
-				vk::ClearDepthStencilValue(1.0f, 0));
-
-			vk::RenderingInfo debugRenderInfo({},
-				{{0, 0}, {p_resolution, p_resolution}},
-				kShadowFaceCount, 0x3Fu, debugColorAtt, &debugDepthAtt, nullptr);
-
-			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_debugPipeline);
-			cmdBuf.setViewport(0, viewport);
-			cmdBuf.setScissor(0, scissor);
-			cmdBuf.beginRendering(debugRenderInfo);
-			cmdBuf.draw(3, 1, 0, 0);  // fullscreen triangle
-			cmdBuf.endRendering();
-
-			// Transition colour cubemap back to ColorShaderRead
-			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
-
-			// Transition depth cubemap to DepthShaderRead for subsequent passes
-			Barrier::Transition(cmdBuf, cubemap2, ImageState::DepthShaderRead);
-		}
 	}
 
 	// =========================================================================
-	// Sun light pass â€?orthographic depth-only (non-multiview)
+	// Sun light pass ï¿½?orthographic depth-only (non-multiview)
 	// =========================================================================
 
 	{

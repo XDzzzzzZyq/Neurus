@@ -85,7 +85,6 @@ std::vector<const char*> AllShaderPaths()
         "res/shaders/render/skybox.vert",
         "res/shaders/render/sun_shadow_depth.frag",
         "res/shaders/render/shadow_depth.frag",
-        "res/shaders/render/depth_to_color.frag",
         "res/shaders/render/triangle.frag",
         "res/shaders/render/skybox.frag",
         "res/shaders/render/gbuffer.frag",
@@ -350,18 +349,6 @@ TEST_F(ShaderParserTest, ParseFile_ShadowDepthFrag_Succeeds)
 TEST_F(ShaderParserTest, ParseFile_ShadowDepthFrag_HasCorrectVersion)
 {
     const auto& s = ParseSuccessfully("res/shaders/render/shadow_depth.frag");
-    EXPECT_EQ(s.version, 450);
-}
-
-TEST_F(ShaderParserTest, ParseFile_DepthToColorFrag_Succeeds)
-{
-    const auto& s = ParseSuccessfully("res/shaders/render/depth_to_color.frag");
-    EXPECT_FALSE(s.IsEmpty());
-}
-
-TEST_F(ShaderParserTest, ParseFile_DepthToColorFrag_HasCorrectVersion)
-{
-    const auto& s = ParseSuccessfully("res/shaders/render/depth_to_color.frag");
     EXPECT_EQ(s.version, 450);
 }
 
