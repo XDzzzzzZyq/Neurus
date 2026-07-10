@@ -71,7 +71,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 		redPixels[i * 4 + 2] = 0;    // B
 		redPixels[i * 4 + 3] = 255;  // A
 	}
-	ImageData imgData(redPixels.data(), extent.width, extent.height, vk::Format::eR8G8B8A8Unorm);
+	ImageData imgData(redPixels.data(), extent.width, extent.height, PixelFormat::RGBA8U);
 	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
 	ASSERT_NE(imagePtr, nullptr);
 	Image& image = *imagePtr;
@@ -126,7 +126,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 		halfData[i * 4 + 2] = h0_75;
 		halfData[i * 4 + 3] = h1_0;
 	}
-	ImageData imgData(halfData.data(), extent.width, extent.height, vk::Format::eR16G16B16A16Sfloat);
+	ImageData imgData(halfData.data(), extent.width, extent.height, PixelFormat::RGBA16F);
 	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
 	ASSERT_NE(imagePtr, nullptr);
 	Image& image = *imagePtr;
@@ -160,7 +160,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
 	std::vector<uint8_t> pixels(pixelCount * 4, 128);
-	ImageData imgData(pixels.data(), extent.width, extent.height, vk::Format::eR8G8B8A8Unorm);
+	ImageData imgData(pixels.data(), extent.width, extent.height, PixelFormat::RGBA8U);
 	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
 	ASSERT_NE(imagePtr, nullptr);
 	Image& image = *imagePtr;

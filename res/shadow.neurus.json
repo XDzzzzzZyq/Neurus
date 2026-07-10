@@ -18,8 +18,8 @@
                                 "transform": {
                                     "m_position": {
                                         "x": 0.0,
-                                        "y": -1.0,
-                                        "z": 1.0
+                                        "y": -6.0,
+                                        "z": 6.0
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -183,9 +183,9 @@
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": 0.5,
+                                        "x": 3.0,
                                         "y": 0.0,
-                                        "z": 0.75
+                                        "z": 4.0
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -200,7 +200,7 @@
                                 },
                                 "use_shadow": true,
                                 "light_type": 0,
-                                "light_power": 0.5,
+                                "light_power": 10.0,
                                 "light_color": {
                                     "x": 0.3,
                                     "y": 0.3,
@@ -229,9 +229,9 @@
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": -0.5,
+                                        "x": -3.0,
                                         "y": 0.0,
-                                        "z": 0.75
+                                        "z": 4.0
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -246,7 +246,7 @@
                                 },
                                 "use_shadow": true,
                                 "light_type": 0,
-                                "light_power": 0.5,
+                                "light_power": 10.0,
                                 "light_color": {
                                     "x": 0.3,
                                     "y": 1.0,

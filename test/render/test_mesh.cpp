@@ -1,13 +1,11 @@
 /**
  * @file test_mesh.cpp
- * @brief GPU tests for Mesh::UploadToGPU() / ReleaseGPUBuffers() lifecycle.
+ * @brief GPU tests for RenderCache::GetMeshGPU() mesh upload lifecycle.
  *
  * Validates that:
- *   - UploadToGPU creates valid VertexBuffer and IndexBuffer
- *   - ReleaseGPUBuffers destroys GPU buffers (null after release)
- *   - Mesh destruction after UploadToGPU does NOT trigger
- *     VUID-vkFreeMemory-memory-00677 (destructor calls waitIdle first)
- *   - Upload → Release → Re-upload cycle works (m_gpuDevice updated)
+ *   - GetMeshGPU lazily creates VertexBuffer and IndexBuffer
+ *   - GetMeshGPU returns the same MeshGPU on subsequent calls (caching)
+ *   - RemoveMeshGPU destroys GPU buffers
  *
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
  */
@@ -23,8 +21,8 @@
 
 #include "scene/Mesh.h"
 #include "asset/MeshData.h"
-#include "render/buffers/VertexBuffer.h"
-#include "render/buffers/IndexBuffer.h"
+#include "render/RenderCache.h"
+#include "render/MeshGPU.h"
 
 using namespace neurus;
 
@@ -52,135 +50,114 @@ protected:
 	void SetUp() override
 	{
 		VulkanTestShared::SetUp();
+		if (!m_hasVulkan) return;
+
+		m_cache = std::make_unique<RenderCache>(*m_device, PhysicalDevice());
 	}
 
 	void TearDown() override
 	{
+		m_cache.reset();
 		VulkanTestShared::TearDown();
 	}
+
+	std::unique_ptr<RenderCache> m_cache;
 };
 
 // ---------------------------------------------------------------------------
-// UploadToGPU_CreatesBuffers
+// GetMeshGPU_CreatesBuffers
 // ---------------------------------------------------------------------------
 
 /**
- * @brief After UploadToGPU, GetVertexBuffer / GetIndexBuffer return non-null
- *        and GetGPUIndexCount reports a positive count.
+ * @brief After GetMeshGPU, the returned MeshGPU has non-null buffers
+ *        and positive index count.
  */
-TEST_F(MeshRenderTest, UploadToGPU_CreatesBuffers)
+TEST_F(MeshRenderTest, GetMeshGPU_CreatesBuffers)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan GPU.";
 
 	auto meshData = std::make_shared<MeshData>();
 	ASSERT_TRUE(meshData->LoadObjFromString(kTriangleObj));
 
-	Mesh mesh;
-	mesh.o_mesh = meshData;
+	constexpr int kTestObjectId = 42;
+	MeshGPU& gpu = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
 
-	mesh.UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-
-	EXPECT_NE(mesh.GetVertexBuffer(), nullptr);
-	EXPECT_NE(mesh.GetIndexBuffer(), nullptr);
-	EXPECT_GT(mesh.GetGPUIndexCount(), 0u);
+	EXPECT_NE(gpu.vertexBuffer, nullptr);
+	EXPECT_NE(gpu.indexBuffer, nullptr);
+	EXPECT_GT(gpu.indexCount, 0u);
 }
 
 // ---------------------------------------------------------------------------
-// ReleaseGPUBuffers_DestroysBuffers
+// GetMeshGPU_ReturnsCached
 // ---------------------------------------------------------------------------
 
 /**
- * @brief After ReleaseGPUBuffers, GetVertexBuffer / GetIndexBuffer return
- *        nullptr and GetGPUIndexCount is zero.
+ * @brief Calling GetMeshGPU twice with the same objectId returns the
+ *        same MeshGPU (cached, not re-created).
  */
-TEST_F(MeshRenderTest, ReleaseGPUBuffers_DestroysBuffers)
+TEST_F(MeshRenderTest, GetMeshGPU_ReturnsCached)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan GPU.";
 
 	auto meshData = std::make_shared<MeshData>();
 	ASSERT_TRUE(meshData->LoadObjFromString(kTriangleObj));
 
-	Mesh mesh;
-	mesh.o_mesh = meshData;
+	constexpr int kTestObjectId = 99;
+	MeshGPU& first  = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
+	MeshGPU& second = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
 
-	mesh.UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-	mesh.ReleaseGPUBuffers();
-
-	EXPECT_EQ(mesh.GetVertexBuffer(), nullptr);
-	EXPECT_EQ(mesh.GetIndexBuffer(), nullptr);
-	EXPECT_EQ(mesh.GetGPUIndexCount(), 0u);
+	EXPECT_EQ(&first, &second);
+	EXPECT_NE(first.vertexBuffer, nullptr);
+	EXPECT_NE(first.indexBuffer, nullptr);
 }
 
 // ---------------------------------------------------------------------------
-// MeshDestructionAfterUpload
+// RemoveMeshGPU_Destroys
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Mesh destroyed after UploadToGPU (no explicit ReleaseGPUBuffers).
- *        The destructor calls ReleaseGPUBuffers which calls
- *        m_gpuDevice->waitIdle() before freeing — no VUID-vkFreeMemory-00677.
+ * @brief After RemoveMeshGPU, the MeshGPU entries are gone.
  */
-TEST_F(MeshRenderTest, MeshDestructionAfterUpload)
+TEST_F(MeshRenderTest, RemoveMeshGPU_Destroys)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan GPU.";
 
 	auto meshData = std::make_shared<MeshData>();
 	ASSERT_TRUE(meshData->LoadObjFromString(kTriangleObj));
 
-	{
-		Mesh mesh;
-		mesh.o_mesh = meshData;
+	constexpr int kTestObjectId = 77;
 
-		mesh.UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	// Create
+	MeshGPU& created = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
+	EXPECT_NE(created.vertexBuffer, nullptr);
 
-		EXPECT_NE(mesh.GetVertexBuffer(), nullptr);
-		EXPECT_NE(mesh.GetIndexBuffer(), nullptr);
-		EXPECT_GT(mesh.GetGPUIndexCount(), 0u);
+	// Remove
+	m_cache->RemoveMeshGPU(kTestObjectId);
 
-		// mesh goes out of scope → destructor calls ReleaseGPUBuffers
-		//   → waitIdle() → m_gpuVertices.reset() / m_gpuIndices.reset()
-	}
-
-	// Reaching here without Vulkan validation errors means the fix works.
-	SUCCEED();
+	// Subsequent get creates a new one
+	MeshGPU& recreated = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
+	EXPECT_NE(recreated.vertexBuffer, nullptr);
+	// Should be a different instance
+	EXPECT_NE(&created, &recreated);
 }
 
 // ---------------------------------------------------------------------------
-// MeshUploadReleaseReupload
+// GetMeshGPU_EmptyMeshData
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Upload → Release → Upload again. Verifies that m_gpuDevice is
- *        updated on re-upload and the second upload produces valid buffers.
+ * @brief GetMeshGPU with empty MeshData returns an empty MeshGPU
+ *        (null buffers, zero counts) rather than crashing.
  */
-TEST_F(MeshRenderTest, MeshUploadReleaseReupload)
+TEST_F(MeshRenderTest, GetMeshGPU_EmptyMeshData)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan GPU.";
 
-	auto meshData = std::make_shared<MeshData>();
-	ASSERT_TRUE(meshData->LoadObjFromString(kTriangleObj));
+	MeshData emptyData;
+	constexpr int kTestObjectId = 0;
+	MeshGPU& gpu = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, emptyData);
 
-	Mesh mesh;
-	mesh.o_mesh = meshData;
-
-	// --- First upload ---
-	mesh.UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-
-	EXPECT_NE(mesh.GetVertexBuffer(), nullptr);
-	EXPECT_NE(mesh.GetIndexBuffer(), nullptr);
-	EXPECT_GT(mesh.GetGPUIndexCount(), 0u);
-
-	// --- Release ---
-	mesh.ReleaseGPUBuffers();
-
-	EXPECT_EQ(mesh.GetVertexBuffer(), nullptr);
-	EXPECT_EQ(mesh.GetIndexBuffer(), nullptr);
-	EXPECT_EQ(mesh.GetGPUIndexCount(), 0u);
-
-	// --- Re-upload ---
-	mesh.UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-
-	EXPECT_NE(mesh.GetVertexBuffer(), nullptr);
-	EXPECT_NE(mesh.GetIndexBuffer(), nullptr);
-	EXPECT_GT(mesh.GetGPUIndexCount(), 0u);
+	EXPECT_EQ(gpu.vertexBuffer, nullptr);
+	EXPECT_EQ(gpu.indexBuffer, nullptr);
+	EXPECT_EQ(gpu.indexCount, 0u);
 }

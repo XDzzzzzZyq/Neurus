@@ -16,7 +16,6 @@
 
 #include "Log.h"
 
-#include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
@@ -483,72 +482,55 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
-	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from scene Environment or fallback ---
+	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from RenderCache EnvironmentGPU or fallback ---
 	{
 		DescriptorSet& dstSet = p_descriptorSets[frameIndex];
 		const bool hasEnv = (ctx.scene != nullptr && !ctx.scene->env_list.empty());
+		const EnvironmentGPU* envGPU = nullptr;
 
 		if (hasEnv)
 		{
 			auto& env = ctx.scene->env_list.begin()->second;
-			Texture* diffuseTex = env->GetDiffuseTexture();
-			Texture* specularTex = env->GetSpecularTexture();
+			envGPU = cache.GetEnvironmentGPU(env->GetObjectID());
+		}
 
-			if (diffuseTex && diffuseTex->GetImage())
-			{
-				vk::DescriptorImageInfo irrInfo(
-					*diffuseTex->GetSampler(),
-					*diffuseTex->GetImage()->ImageViewHandle(),
-					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(8, irrInfo,
-				                  vk::DescriptorType::eCombinedImageSampler);
-			}
-			else
-			{
-				// Diffuse not ready - use fallback
-				vk::DescriptorImageInfo fbInfo(
-					*p_fallbackCubeSampler,
-					*p_fallbackIrradianceCube->ImageViewHandle(),
-					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(8, fbInfo,
-				                  vk::DescriptorType::eCombinedImageSampler);
-			}
-
-			if (specularTex && specularTex->GetImage())
-			{
-				vk::DescriptorImageInfo specInfo(
-					*specularTex->GetSampler(),
-					*specularTex->GetImage()->ImageViewHandle(),
-					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(9, specInfo,
-				                  vk::DescriptorType::eCombinedImageSampler);
-			}
-			else
-			{
-				// Specular not ready - use fallback
-				vk::DescriptorImageInfo fbInfo(
-					*p_fallbackCubeSampler,
-					*p_fallbackPrefilteredCube->ImageViewHandle(),
-					vk::ImageLayout::eShaderReadOnlyOptimal);
-				dstSet.WriteImage(9, fbInfo,
-				                  vk::DescriptorType::eCombinedImageSampler);
-			}
+		if (envGPU && envGPU->diffuseTexture && envGPU->diffuseTexture->GetImage())
+		{
+			vk::DescriptorImageInfo irrInfo(
+				*envGPU->diffuseTexture->GetSampler(),
+				*envGPU->diffuseTexture->GetImage()->ImageViewHandle(),
+				vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(8, irrInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
 		}
 		else
 		{
-			// No scene or no environment — bind fallback cubemaps
-			vk::DescriptorImageInfo fbIrradInfo(
+			// Diffuse not ready - use fallback
+			vk::DescriptorImageInfo fbInfo(
 				*p_fallbackCubeSampler,
 				*p_fallbackIrradianceCube->ImageViewHandle(),
 				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(8, fbIrradInfo,
+			dstSet.WriteImage(8, fbInfo,
 			                  vk::DescriptorType::eCombinedImageSampler);
+		}
 
-			vk::DescriptorImageInfo fbSpecInfo(
+		if (envGPU && envGPU->specularTexture && envGPU->specularTexture->GetImage())
+		{
+			vk::DescriptorImageInfo specInfo(
+				*envGPU->specularTexture->GetSampler(),
+				*envGPU->specularTexture->GetImage()->ImageViewHandle(),
+				vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(9, specInfo,
+			                  vk::DescriptorType::eCombinedImageSampler);
+		}
+		else
+		{
+			// Specular not ready - use fallback
+			vk::DescriptorImageInfo fbInfo(
 				*p_fallbackCubeSampler,
 				*p_fallbackPrefilteredCube->ImageViewHandle(),
 				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(9, fbSpecInfo,
+			dstSet.WriteImage(9, fbInfo,
 			                  vk::DescriptorType::eCombinedImageSampler);
 		}
 	}

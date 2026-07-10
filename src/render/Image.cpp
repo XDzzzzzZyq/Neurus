@@ -1,5 +1,6 @@
 #include "Image.h"
 #include "Barrier.h"
+#include "asset/PixelFormat.h"
 
 #include "Log.h"
 
@@ -97,10 +98,17 @@ std::unique_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
 		return nullptr;
 	}
 
+	const vk::Format vkFmt = ToVkFormat(imageData.GetFormat());
+	if (vkFmt == vk::Format::eUndefined)
+	{
+		NEURUS_ERR("[Image] FromImageData: unsupported PixelFormat");
+		return nullptr;
+	}
+
 	auto image = std::make_unique<Image>(
 		device, physicalDevice,
 		vk::Extent2D{imageData.GetWidth(), imageData.GetHeight()},
-		imageData.GetFormat(),
+		vkFmt,
 		vk::ImageUsageFlagBits::eSampled |
 		    vk::ImageUsageFlagBits::eTransferDst |
 		    extraUsage,
@@ -444,7 +452,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
                                 const vk::ImageSubresourceRange* subresourceRange,
                                 vk::Extent2D readExtent)
 {
-	const uint32_t bytesPerPixel = ImageData::PixelByteSize(im_format);
+	const uint32_t bytesPerPixel = PixelByteSize(im_format);
 
 	if (bytesPerPixel == 0)
 	{
@@ -519,7 +527,8 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	queue.waitIdle();
 
 	void* mapped = stagingMemory.mapMemory(0, imageSize);
-	ImageData result(mapped, copyExtent.width, copyExtent.height, im_format, layerCount);
+	const PixelFormat pf = FromVkFormat(im_format);
+	ImageData result(mapped, copyExtent.width, copyExtent.height, pf, layerCount);
 	stagingMemory.unmapMemory();
 
 	return result;
@@ -592,6 +601,75 @@ const vk::raii::ImageView& Image::ImageViewArrayHandle() const
 const vk::raii::ImageView& Image::ArrayView() const
 {
 	return im_cubeArrayView;
+}
+
+// ---------------------------------------------------------------------------
+// Format conversion helpers
+// ---------------------------------------------------------------------------
+
+vk::Format Image::ToVkFormat(const PixelFormat fmt)
+{
+	switch (fmt)
+	{
+	case PixelFormat::Undefined:    return vk::Format::eUndefined;
+	case PixelFormat::RGBA8U:       return vk::Format::eR8G8B8A8Unorm;
+	case PixelFormat::RGBA8S:       return vk::Format::eR8G8B8A8Srgb;
+	case PixelFormat::RGBA32F:      return vk::Format::eR32G32B32A32Sfloat;
+	case PixelFormat::RGBA16F:      return vk::Format::eR16G16B16A16Sfloat;
+	case PixelFormat::R8U:          return vk::Format::eR8Unorm;
+	case PixelFormat::D32F:         return vk::Format::eD32Sfloat;
+	case PixelFormat::BGRA8U:       return vk::Format::eB8G8R8A8Unorm;
+	case PixelFormat::BGRA8S:       return vk::Format::eB8G8R8A8Srgb;
+	case PixelFormat::RGBA16U:      return vk::Format::eR16G16B16A16Unorm;
+	case PixelFormat::RGBA16SN:     return vk::Format::eR16G16B16A16Snorm;
+	case PixelFormat::R8S:          return vk::Format::eR8Srgb;
+	}
+	return vk::Format::eUndefined;
+}
+
+PixelFormat Image::FromVkFormat(const vk::Format format)
+{
+	switch (format)
+	{
+	case vk::Format::eUndefined:            return PixelFormat::Undefined;
+	case vk::Format::eR8G8B8A8Unorm:        return PixelFormat::RGBA8U;
+	case vk::Format::eR8G8B8A8Srgb:         return PixelFormat::RGBA8S;
+	case vk::Format::eR32G32B32A32Sfloat:   return PixelFormat::RGBA32F;
+	case vk::Format::eR16G16B16A16Sfloat:   return PixelFormat::RGBA16F;
+	case vk::Format::eR8Unorm:              return PixelFormat::R8U;
+	case vk::Format::eD32Sfloat:            return PixelFormat::D32F;
+	case vk::Format::eB8G8R8A8Unorm:        return PixelFormat::BGRA8U;
+	case vk::Format::eB8G8R8A8Srgb:         return PixelFormat::BGRA8S;
+	case vk::Format::eR16G16B16A16Unorm:    return PixelFormat::RGBA16U;
+	case vk::Format::eR16G16B16A16Snorm:    return PixelFormat::RGBA16SN;
+	case vk::Format::eR8Srgb:               return PixelFormat::R8S;
+	default:                                return PixelFormat::Undefined;
+	}
+}
+
+uint32_t Image::PixelByteSize(const vk::Format format)
+{
+	switch (format)
+	{
+	case vk::Format::eR8G8B8A8Unorm:
+	case vk::Format::eR8G8B8A8Srgb:
+	case vk::Format::eB8G8R8A8Unorm:
+	case vk::Format::eB8G8R8A8Srgb:
+		return 4;
+	case vk::Format::eR16G16B16A16Sfloat:
+	case vk::Format::eR16G16B16A16Unorm:
+	case vk::Format::eR16G16B16A16Snorm:
+		return 8;
+	case vk::Format::eR32G32B32A32Sfloat:
+		return 16;
+	case vk::Format::eR8Unorm:
+	case vk::Format::eR8Srgb:
+		return 1;
+	case vk::Format::eD32Sfloat:
+		return 4;
+	default:
+		return 0;
+	}
 }
 
 void Image::createArrayView(const vk::raii::Device& device)

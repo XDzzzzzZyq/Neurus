@@ -128,7 +128,7 @@ void OutlinerPanel::OnItemClicked(const QModelIndex& index)
 	int objectId = index.data(Qt::UserRole + 1).toInt();
 	if (objectId > 0)
 	{
-		EventQueue().enqueue(ObjectSelected{objectId});
+		eventQueue().enqueue(ObjectSelected{objectId});
 	}
 }
 

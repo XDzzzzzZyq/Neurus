@@ -42,12 +42,18 @@ isolation. Use this file as the high-level reference; detailed rules live in
             ┌─────────┴──────────┐
             ▼                    ▼
 ┌──────────────────┐  ┌────────────────────────────────────────┐
-│ Data & Resource   │  │ Renderer Layer (Vulkan-HPP vk::raii)   │
-│  owns: allocators │  │  owns: VkInstance, VkDevice, VkQueue,  │
-│  descriptor pools │  │   VkSwapchainKHR, VkPipeline,          │
-│  pipeline cache   │  │   VkCommandBuffer, all GPU resources   │
-│  (stub for MVP)   │  │  consumes: VkSurfaceKHR (read-only)    │
-└──────────────────┘  └────────────────────────────────────────┘
+│ Asset Layer       │  │ Renderer Layer (Vulkan-HPP vk::raii)   │
+│  Vulkan-free       │  │  owns: VkInstance, VkDevice, VkQueue,  │
+│  MeshData,         │  │   VkSwapchainKHR, VkPipeline,          │
+│  ImageData,        │  │   VkCommandBuffer, all GPU resources   │
+│  PixelFormat       │  │   MeshGPU, EnvironmentGPU (via Cache)  │
+│                    │  │  consumes: VkSurfaceKHR (read-only)    │
+├──────────────────┤  └────────────────────────────────────────┘
+│ Scene Layer       │
+│  Vulkan-free       │
+│  Camera, Light,    │
+│  Mesh, Transform   │
+└──────────────────┘
 ```
 
 ### Isolation Chain (Hard Requirement)
@@ -66,13 +72,16 @@ UI Layer (Qt6) → UIEvents (Qt Signals) → Editor → EventQueue (typed events
 
 ### Layer Boundaries
 
-- **Renderer**: pure rendering service; owns GPU resources; consumes read-only
-  scene data; must not mutate application-level state.
+- **Renderer**: pure rendering service; owns GPU resources; owns `MeshGPU` and
+  `EnvironmentGPU` via `RenderCache`; consumes read-only scene data; must not
+  mutate application-level state.
 - **Editor**: application logic and scene mutation; owns Controllers;
   communicates via Context, UIEvents (Qt signals), and EventQueue (typed events).
 - **UI**: Qt6 Widgets presentation only; owns surface; emits signals.
-- **Data & Resource**: GPU resource management; descriptor pools, allocators,
-  buffer/image abstractions. (Stub for MVP.)
+- **Asset** (`src/asset/`): Vulkan-free CPU-side asset loading (MeshData,
+  ImageData, PixelFormat enum). No GPU resources.
+- **Scene** (`src/scene/`): Vulkan-free logical scene objects (Camera, Light,
+  Mesh, Transform). GPU resources separated into `MeshGPU` owned by Renderer.
 
 ### Communication
 
@@ -152,6 +161,7 @@ Neurus/
 │   │   ├── Barrier.h/cpp            # Centralized image barrier management
 │   │   ├── DeferredRenderer.h/cpp   # Deferred PBR pipeline (active renderer)
 │   │   ├── Image.h/cpp              # GPU image with state tracking (ImageState)
+│   │   ├── MeshGPU.h                # GPU-side mesh resources (owned by RenderCache)
 │   │   ├── ShaderProgram.h/cpp
 │   │   ├── Swapchain.h/cpp
 │   │   ├── VulkanContext.h/cpp
@@ -187,7 +197,15 @@ Neurus/
 │   │   ├── MainWindow.h/cpp       # (legacy QWindow subclass)
 │   │   ├── VulkanWidget.h/cpp     # (legacy vk::raii widget)
 │   │   └── qml/            # QML source files (legacy)
-│   ├── data/               # Data & Resource layer
+│   ├── asset/              # Asset layer (Vulkan-free)
+│   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
+│   │   ├── ImageData.h/cpp # CPU-side image pixels (no Vulkan)
+│   │   └── PixelFormat.h   # Vulkan-free format enum + helpers
+│   ├── scene/              # Scene layer (Vulkan-free)
+│   │   ├── Camera.h        # Camera object
+│   │   ├── Light.h         # Light objects (PointLight, SunLight)
+│   │   ├── Mesh.h          # Mesh + Transform (no GPU buffers)
+│   │   └── Transform.h     # Spatial transform
 │   └── main.cpp            # Application entry point
 ├── test/
 │   ├── render/             # Renderer GPU tests

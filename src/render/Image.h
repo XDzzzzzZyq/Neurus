@@ -1,6 +1,7 @@
 #pragma once
 
 #include "asset/ImageData.h"
+#include "asset/PixelFormat.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -213,6 +214,29 @@ public:
 
 	/** @brief Current logical image state (updated by Barrier::Transition). */
 	ImageState State() const { return im_state; }
+
+	// --- Format conversion helpers ---
+
+	/**
+	 * @brief Converts CPU-side PixelFormat to Vulkan vk::Format.
+	 * @param fmt Pixel format.
+	 * @return Equivalent vk::Format, or eUndefined if no mapping exists.
+	 */
+	static vk::Format ToVkFormat(PixelFormat fmt);
+
+	/**
+	 * @brief Converts Vulkan vk::Format to CPU-side PixelFormat.
+	 * @param format Vulkan pixel format.
+	 * @return Equivalent PixelFormat, or PixelFormat::Undefined if no mapping exists.
+	 */
+	static PixelFormat FromVkFormat(vk::Format format);
+
+	/**
+	 * @brief Computes bytes per pixel for a Vulkan format (GPU-side helper).
+	 * @param format Vulkan pixel format.
+	 * @return Byte count, or 0 if unsupported.
+	 */
+	static uint32_t PixelByteSize(vk::Format format);
 
 	// --- Subresource range helpers ---
 

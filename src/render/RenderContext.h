@@ -11,11 +11,9 @@
  * Architecture:
  * - Pure data struct with no methods — owned and populated by the caller
  *   (DeferredRenderer or test fixture) each frame.
- * - Forward-declares GeometryRenderItem and Scene to avoid coupling to
- *   GeometryPass.h or Scene.h.
- * - Nullable pointer fields (`renderItems`, `scene`) let passes that don't
- *   need them (e.g. LightingPass, SSAOPass) ignore the data without
- *   special-case overloads.
+ * - Passes iterate scene->mesh_list for meshes and scene->light_list for lights.
+ * - Nullable pointer field (`scene`) lets passes that don't need it
+ *   (e.g. standalone tests) work without a scene.
  *
  * @note This is NOT a GPU push-constant block — it's CPU-side metadata
  *       carried through the pass execution chain.
@@ -32,8 +30,19 @@ namespace neurus
 {
 
 // Forward declarations — avoid including GeometryPass.h or Scene.h here.
-struct GeometryRenderItem;
 class Scene;
+
+/**
+ * @brief Per-mesh push-constant block sent to the vertex shader.
+ *
+ * Packed as two mat4s (128 bytes total) to satisfy Vulkan's
+ * 16-byte alignment requirement for push constants.
+ */
+struct alignas(16) PushConstants
+{
+	glm::mat4 model;           ///< Local-to-world transform (offset 0)
+	glm::mat4 normalMatrix;    ///< 3x3 in upper-left of mat4 (offset 64)
+};
 
 /**
  * @brief Per-frame context for all render passes.
@@ -61,10 +70,9 @@ struct RenderContext
 	/// @brief Inverse of (projection * view) for reconstructing world rays from depth.
 	glm::mat4 invProjView{1.0f};
 
-	/// @brief Geometry draw batches (nullable). Only GeometryPass reads this.
-	const std::vector<GeometryRenderItem>* renderItems = nullptr;
-
-	/// @brief Scene data for light SSBO uploads (nullable). Used by LightingPass.
+	/// @brief Scene data for mesh and light iteration (nullable).
+	/// GeometryPass and ShadowDepthPass iterate scene->mesh_list for drawing;
+	/// LightingPass and ShadowIntensityPass read scene->light_list.
 	const Scene* scene = nullptr;
 
 };

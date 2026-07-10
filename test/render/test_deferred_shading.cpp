@@ -129,13 +129,10 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
  	// -------------------------------------------------------------------
 	// Step 1: Load sphere scene (shared helper)
 	// -------------------------------------------------------------------
-	auto scene = neurus::test::BuildDeferredScene(
-		*m_device, pd, m_queue, m_graphicsQueueFamily,
+	auto resources = neurus::test::BuildDeferredScene(
 		ResolveAssetPath("res/obj/sphere.obj"));
 
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*scene.camera);
-	GeometryRenderItem renderItem = scene.renderItem;
-	std::vector<GeometryRenderItem> items = { renderItem };
+	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*resources.camera);
 
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer attachments & build RenderContext
@@ -147,9 +144,9 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 		.frameIndex = 0,
 		.viewProj = camUBO.viewProj,
 		.view = camUBO.view,
-		.cameraPos = scene.camera->GetPosition(),
+		.cameraPos = resources.camera->GetPosition(),
 		.invProjView = glm::inverse(camUBO.viewProj),
-		.renderItems = &items,
+		.scene = resources.scene.get(),
 	};
 
 	// --- Record geometry pass ---
@@ -164,7 +161,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	// -------------------------------------------------------------------
 	{
 		Scene testScene;
-		testScene.UseLight(scene.light);
+		testScene.UseLight(resources.light);
 		m_lightingPass->UploadLights(testScene);
 	}
 

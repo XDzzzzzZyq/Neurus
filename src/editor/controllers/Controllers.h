@@ -1,8 +1,8 @@
 #pragma once
 
-namespace neurus {
+#include "editor/events/EventBus.h"
 
-class EventQueue;
+namespace neurus {
 
 class Controllers
 {

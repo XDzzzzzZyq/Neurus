@@ -2,8 +2,17 @@
 
 #include "Log.h"
 #include "scene/Light.h"
+#include "scene/Environment.h"
+#include "asset/MeshData.h"
+#include "asset/ImageData.h"
+#include "asset/PixelFormat.h"
+#include "buffers/VertexBuffer.h"
+#include "buffers/IndexBuffer.h"
+#include "Texture.h"
+#include "passes/IBLPass.h"
 
 #include <cassert>
+#include <cstring>
 #include <stdexcept>
 
 namespace neurus {
@@ -229,6 +238,81 @@ bool RenderCache::HasAttachment(const AttachmentName name) const
 }
 
 // ---------------------------------------------------------------------------
+// Mesh GPU resources (lazy creation)
+// ---------------------------------------------------------------------------
+
+MeshGPU& RenderCache::GetMeshGPU(const int objectId,
+                                 const vk::Queue queue,
+                                 const uint32_t queueFamilyIndex,
+                                 const MeshData& meshData)
+{
+	auto it = rc_meshGPUs.find(objectId);
+	if (it != rc_meshGPUs.end())
+	{
+		return it->second;
+	}
+
+	const auto& rawMesh = meshData.GetMeshData();
+	const size_t srcVertexTotal = rawMesh.dataArray.size() / 14;  // 14 floats per vertex (source format)
+	const size_t vertexCount = srcVertexTotal;
+	const size_t indexCount = rawMesh.indexArray.size();
+
+	if (vertexCount == 0 || indexCount == 0)
+	{
+		NEURUS_ERR("[RenderCache::GetMeshGPU] Empty mesh data for objectId=" << objectId);
+		// Insert an empty MeshGPU and return it (caller checks for null buffers)
+		auto [insertedIt, _] = rc_meshGPUs.emplace(objectId, MeshGPU{});
+		return insertedIt->second;
+	}
+
+	// Strip vertex data from 14 floats (pos+normal+uv+tangent+bitangent)
+	// down to 8 floats (pos+normal+uv) to match the pipeline vertex layout (32-byte stride).
+	constexpr size_t kSrcStride = 14;
+	constexpr size_t kDstStride = 8;
+	std::vector<float> strippedVertices(vertexCount * kDstStride);
+	for (size_t i = 0; i < vertexCount; ++i)
+	{
+		std::memcpy(&strippedVertices[i * kDstStride],
+		            &rawMesh.dataArray[i * kSrcStride],
+		            kDstStride * sizeof(float));
+	}
+
+	const uint32_t vertexStride = static_cast<uint32_t>(kDstStride * sizeof(float));
+	const vk::DeviceSize vertexDataSize = strippedVertices.size() * sizeof(float);
+	const vk::DeviceSize indexDataSize = indexCount * sizeof(uint32_t);
+
+	auto [insertedIt, _] = rc_meshGPUs.emplace(objectId, MeshGPU{});
+	MeshGPU& gpu = insertedIt->second;
+
+	gpu.vertexBuffer = std::make_unique<VertexBuffer>(
+		*rc_device, *rc_physicalDevice, queue, queueFamilyIndex,
+		strippedVertices.data(), vertexDataSize,
+		vertexStride,
+		static_cast<uint32_t>(vertexCount),
+		("MeshGPU_VBO_" + std::to_string(objectId)).c_str());
+
+	gpu.indexBuffer = std::make_unique<IndexBuffer>(
+		*rc_device, *rc_physicalDevice, queue, queueFamilyIndex,
+		rawMesh.indexArray.data(), indexDataSize,
+		static_cast<uint32_t>(indexCount),
+		("MeshGPU_IBO_" + std::to_string(objectId)).c_str());
+
+	gpu.vertexCount = static_cast<uint32_t>(vertexCount);
+	gpu.indexCount = static_cast<uint32_t>(indexCount);
+
+	NEURUS_LOG("[RenderCache::GetMeshGPU] objectId=" << objectId
+	           << " vertices=" << gpu.vertexCount
+	           << " indices=" << gpu.indexCount);
+
+	return gpu;
+}
+
+void RenderCache::RemoveMeshGPU(const int objectId)
+{
+	rc_meshGPUs.erase(objectId);
+}
+
+// ---------------------------------------------------------------------------
 // Clean / CleanScreenSpace
 // ---------------------------------------------------------------------------
 
@@ -239,6 +323,8 @@ void RenderCache::Clean()
 	rc_shadowColorMaps.clear();
 	rc_shadowIntensityArray.reset();
 	rc_shadowIntensityLayerIndex.clear();
+	rc_meshGPUs.clear();
+	rc_environmentGPUs.clear();
 }
 
 void RenderCache::CleanScreenSpace()
@@ -248,6 +334,156 @@ void RenderCache::CleanScreenSpace()
 	rc_shadowIntensityArray.reset();
 	rc_shadowIntensityLayerIndex.clear();
 	// rc_shadowMaps preserved — shadow cubemaps survive resize
+	// rc_meshGPUs preserved — mesh GPU buffers survive resize
+	// rc_environmentGPUs preserved — IBL cubemaps survive resize
+}
+
+// ---------------------------------------------------------------------------
+// Environment GPU resources (lazy creation)
+// ---------------------------------------------------------------------------
+
+EnvironmentGPU& RenderCache::CreateEnvironmentGPU(const int envId,
+                                                   const Environment& env,
+                                                   const vk::Queue queue,
+                                                   const uint32_t queueFamilyIndex,
+                                                   IBLPass& iblPass)
+{
+	auto it = rc_environmentGPUs.find(envId);
+	if (it != rc_environmentGPUs.end())
+	{
+		return it->second;
+	}
+
+	NEURUS_LOG("[RenderCache] Lazily creating EnvironmentGPU for envId=" << envId);
+
+	// --- 1. Load equirectangular ImageData (CPU-side) ---
+	// Use directly-set ImageData first (for tests/procedural), then try path loading,
+	// fall back to pink-purple gradient
+	ImageData equirectData = env.GetEquirectData();
+	if (!equirectData.IsValid())
+	{
+		const std::string& eqPath = env.GetEquirectPath();
+		if (!eqPath.empty())
+		{
+			equirectData = ImageData(eqPath);
+		}
+	}
+	if (!equirectData.IsValid())
+	{
+		// Generate pink‑purple fallback equirect (64×32)
+		constexpr uint32_t kFallbackW = 64;
+		constexpr uint32_t kFallbackH = 32;
+		std::vector<float> pixels(static_cast<size_t>(kFallbackW) * kFallbackH * 4, 0.0f);
+		for (size_t i = 0; i < pixels.size(); i += 4)
+		{
+			pixels[i + 0] = 1.0f;   // R
+			pixels[i + 1] = 0.0f;   // G
+			pixels[i + 2] = 0.5f;   // B
+			pixels[i + 3] = 1.0f;   // A
+		}
+		equirectData = ImageData(pixels.data(), kFallbackW, kFallbackH, PixelFormat::RGBA32F);
+		NEURUS_LOG("[RenderCache] Using pink-purple fallback equirect for envId=" << envId);
+	}
+
+	// --- 2. Upload equirect to GPU ---
+	auto equirectImage = Image::FromImageData(*rc_device, *rc_physicalDevice,
+	                                           queue, queueFamilyIndex,
+	                                           equirectData,
+	                                           "Env_Equirect",
+	                                           vk::ImageUsageFlagBits::eStorage);
+	if (!equirectImage)
+	{
+		NEURUS_ERR("[RenderCache] Failed to upload equirect for envId=" << envId);
+		// Insert empty EnvironmentGPU and return it
+		auto [insertedIt, _] = rc_environmentGPUs.emplace(envId, EnvironmentGPU{});
+		return insertedIt->second;
+	}
+
+	// --- 3. Create cubemap Images ---
+	constexpr uint32_t kDiffuseRes  = 64;
+	constexpr uint32_t kSpecularRes = 2048;
+	constexpr uint32_t kSpecularMips = 8;
+
+	const vk::ImageUsageFlags cubeUsage =
+		vk::ImageUsageFlagBits::eStorage
+		| vk::ImageUsageFlagBits::eSampled
+		| vk::ImageUsageFlagBits::eTransferSrc;
+
+	auto diffuseImage = std::make_unique<Image>(
+		*rc_device, *rc_physicalDevice,
+		vk::Extent2D{kDiffuseRes, kDiffuseRes},
+		vk::Format::eR32G32B32A32Sfloat,
+		cubeUsage,
+		/*mipLevels=*/1,
+		Image::ImageType::eCube,
+		"Env_DiffuseCubemap");
+
+	auto specularImage = std::make_unique<Image>(
+		*rc_device, *rc_physicalDevice,
+		vk::Extent2D{kSpecularRes, kSpecularRes},
+		vk::Format::eR32G32B32A32Sfloat,
+		cubeUsage,
+		/*mipLevels=*/kSpecularMips,
+		Image::ImageType::eCube,
+		"Env_SpecularCubemap");
+
+	// --- 4. Create cubemap samplers ---
+	vk::SamplerCreateInfo samplerCI(
+		{},
+		vk::Filter::eLinear,
+		vk::Filter::eLinear,
+		vk::SamplerMipmapMode::eLinear,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		vk::SamplerAddressMode::eClampToEdge,
+		0.0f,
+		VK_FALSE,
+		0.0f,
+		VK_FALSE,
+		vk::CompareOp::eAlways,
+		0.0f,
+		static_cast<float>(1),
+		vk::BorderColor::eFloatTransparentBlack,
+		VK_FALSE);
+	auto diffuseSampler = vk::raii::Sampler(*rc_device, samplerCI);
+
+	samplerCI.setMaxLod(static_cast<float>(kSpecularMips));
+	auto specularSampler = vk::raii::Sampler(*rc_device, samplerCI);
+
+	// --- 5. Run IBL convolution ---
+	iblPass.Generate(*equirectImage, *diffuseImage, *specularImage);
+
+	// --- 6. Wrap in Textures and store ---
+	EnvironmentGPU gpu;
+	gpu.diffuseTexture = std::make_unique<Texture>(
+		Texture::FromImage(std::move(diffuseImage), std::move(diffuseSampler)));
+	gpu.specularTexture = std::make_unique<Texture>(
+		Texture::FromImage(std::move(specularImage), std::move(specularSampler)));
+
+	auto [insertedIt, _] = rc_environmentGPUs.emplace(envId, std::move(gpu));
+
+	NEURUS_LOG("[RenderCache] EnvironmentGPU created for envId=" << envId
+	           << " diffuse=" << kDiffuseRes << "^2 specular="
+	           << kSpecularRes << "^2 x" << kSpecularMips << " mips");
+
+	return insertedIt->second;
+}
+
+EnvironmentGPU* RenderCache::GetEnvironmentGPU(const int envId)
+{
+	auto it = rc_environmentGPUs.find(envId);
+	return (it != rc_environmentGPUs.end()) ? &it->second : nullptr;
+}
+
+const EnvironmentGPU* RenderCache::GetEnvironmentGPU(const int envId) const
+{
+	auto it = rc_environmentGPUs.find(envId);
+	return (it != rc_environmentGPUs.end()) ? &it->second : nullptr;
+}
+
+void RenderCache::RemoveEnvironmentGPU(const int envId)
+{
+	rc_environmentGPUs.erase(envId);
 }
 
 // ---------------------------------------------------------------------------

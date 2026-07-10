@@ -112,7 +112,7 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
 		3, LightType::SUNLIGHT);
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 sun lights";
-	ASSERT_EQ(shadowRes.renderItems.size(), 2u) << "Expected cube + plane";
+	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected cube + plane";
 
 	// Verify all lights are SUNLIGHT
 	for (int uid : shadowRes.lightUIDs)
@@ -139,7 +139,6 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = camera->GetPosition();
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &shadowRes.renderItems;
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -260,7 +259,6 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_ReferenceImage)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = camera->GetPosition();
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &shadowRes.renderItems;
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -317,7 +315,7 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_ReferenceImage)
 		}
 
 		// --- Save to temporary PNG ---
-		ImageData imgData(pixelData.data(), kRes, kRes, vk::Format::eR8Unorm);
+		ImageData imgData(pixelData.data(), kRes, kRes, PixelFormat::R8U);
 		const std::string refPath = neurus::test::ReferencePath::Make(
 			"shadow_intensity/SunIntensity_Light_" + std::to_string(li) + ".png");
 		const std::string tmpPath = refPath + ".tmp";

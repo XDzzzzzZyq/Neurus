@@ -18,8 +18,8 @@ class TypedEventQueueTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		// EventQueue() returns the global singleton EventQueue
-		m_queue = &EventQueue();
+		// eventQueue() returns the global singleton EventQueue
+		m_queue = &eventQueue();
 	}
 
 	void TearDown() override
@@ -43,7 +43,7 @@ class TypedEventQueueExpandedTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_queue = &EventQueue();
+		m_queue = &eventQueue();
 	}
 
 	void TearDown() override

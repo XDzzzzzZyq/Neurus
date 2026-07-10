@@ -1,8 +1,6 @@
 # src/ui/CMakeLists.txt - UI Layer (Qt6 QML)
 
 add_library(neurus_ui STATIC
-	MainWindow.h
-	MainWindow.cpp
 	NeurusMainWindow.h
 	NeurusMainWindow.cpp
 	OutlinerPanel.h

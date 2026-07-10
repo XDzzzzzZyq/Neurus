@@ -88,12 +88,10 @@ protected:
 	 */
 	CameraUBOData RenderTestTriangle()
 	{
-		auto& pd = PhysicalDevice();
-
 		// Transition GBuffer → renderable
 		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
-		// Build test triangle mesh from inline OBJ data → Mesh → UploadToGPU
+		// Build test triangle mesh from inline OBJ data
 		const std::string triObj =
 			"o TestTriangle\n"
 			"v  0.0  0.0 -0.5\n"
@@ -109,28 +107,21 @@ protected:
 
 		auto meshData = std::make_shared<MeshData>();
 		meshData->LoadObjFromString(triObj);
-		Mesh mesh;
-		mesh.o_mesh = meshData;
-		mesh.UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
+		auto mesh = std::make_shared<Mesh>();
+		mesh->o_mesh = meshData;
 
-		GeometryRenderItem item;
-		item.vertexBuffer = mesh.GetVertexBuffer()->buffer();
-		item.indexBuffer  = mesh.GetIndexBuffer()->buffer();
-		item.indexCount   = mesh.GetGPUIndexCount();
-		item.indexType    = mesh.GetIndexBuffer()->GetIndexType();
-		item.pushConstants.model = glm::mat4(1.0f);
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
+		Scene testScene;
+		testScene.UseMesh(mesh);
 
 		const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 		{
 			auto& cmd = BeginCmd();
-			std::vector<GeometryRenderItem> items = {item};
 			m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 				.renderExtent = {kRenderWidth, kRenderHeight},
 				.viewProj = camera.viewProj,
 				.view = camera.view,
-				.renderItems = &items,
+				.scene = &testScene,
 			});
 			EndSubmitWait(cmd);
 		}

@@ -142,8 +142,7 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	// -------------------------------------------------------------------
 	auto shadowRes = neurus::test::LoadSimpleShadow(
 		*m_device, pd, m_queue, m_graphicsQueueFamily);
-	const auto& renderItems = shadowRes.renderItems;
-	ASSERT_EQ(renderItems.size(), 2u);
+	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u);
 
 	const auto& camera   = shadowRes.scene->cam_list.begin()->second;
 	const int   lightUID = shadowRes.scene->light_list.begin()->first;
@@ -172,7 +171,6 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	ctx.viewProj     = camUBO.viewProj;
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = cameraPos;
-	ctx.renderItems  = &renderItems;
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -263,7 +261,7 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	{
 		const std::string refPath =
 			neurus::test::ReferencePath::Make("shadow_intensity/ShadowIntensity.png");
-		ImageData img(u8ShadowData.data(), kRes, kRes, vk::Format::eR8Unorm);
+		ImageData img(u8ShadowData.data(), kRes, kRes, PixelFormat::R8U);
 		ASSERT_TRUE(img.SavePNG(refPath + ".tmp")) << "Failed to save shadow intensity PNG";
 		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
 		if (refResult < 0)

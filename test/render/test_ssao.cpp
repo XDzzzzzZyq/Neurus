@@ -95,7 +95,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	// Step 1: Load Cornell Box scene
 	// -------------------------------------------------------------------
 	auto cb = test::LoadCornellBox(*m_device, pd, m_queue, m_graphicsQueueFamily);
-	ASSERT_GT(cb.renderItems.size(), 0u) << "No meshes loaded for Cornell Box";
+	ASSERT_GT(cb.scene->mesh_list.size(), 0u) << "No meshes loaded for Cornell Box";
 
 	// Adjust camera aspect ratio to match the render target
 	cb.camera->ChangeCamRatio(
@@ -114,7 +114,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 		.viewProj = camUBO.viewProj,
 		.view = camUBO.view,
 		.cameraPos = cb.camera->GetPosition(),
-		.renderItems = &cb.renderItems,
+		.scene = cb.scene.get(),
 	};
 
 	// --- Record geometry pass ---

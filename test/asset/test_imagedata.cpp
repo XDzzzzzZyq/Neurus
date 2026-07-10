@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <vulkan/vulkan_raii.hpp>
+
 #include "asset/ImageData.h"
+#include "asset/PixelFormat.h"
 
 #include <vector>
 
@@ -12,28 +15,28 @@ using namespace neurus;
 
 TEST(ImageDataTest, PixelByteSize_RGBA8_Returns4)
 {
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR8G8B8A8Unorm), 4u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR8G8B8A8Srgb), 4u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eB8G8R8A8Unorm), 4u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eB8G8R8A8Srgb), 4u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::RGBA8U), 4u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::RGBA8S), 4u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::BGRA8U), 4u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::BGRA8S), 4u);
 }
 
 TEST(ImageDataTest, PixelByteSize_RGBA16F_Returns8)
 {
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR16G16B16A16Sfloat), 8u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR16G16B16A16Unorm), 8u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR16G16B16A16Snorm), 8u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::RGBA16F), 8u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::RGBA16U), 8u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::RGBA16SN), 8u);
 }
 
 TEST(ImageDataTest, PixelByteSize_R8_Returns1)
 {
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR8Unorm), 1u);
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eR8Srgb), 1u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::R8U), 1u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::R8S), 1u);
 }
 
 TEST(ImageDataTest, PixelByteSize_UnknownFormat_Returns0)
 {
-	EXPECT_EQ(ImageData::PixelByteSize(vk::Format::eUndefined), 0u);
+	EXPECT_EQ(neurus::PixelByteSize(PixelFormat::Undefined), 0u);
 }
 
 // ---------------------------------------------------------------------------
@@ -42,18 +45,18 @@ TEST(ImageDataTest, PixelByteSize_UnknownFormat_Returns0)
 
 TEST(ImageDataTest, ChannelCount_R8_Returns1)
 {
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eR8Unorm), 1u);
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eR8Srgb), 1u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::R8U), 1u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::R8S), 1u);
 }
 
 TEST(ImageDataTest, ChannelCount_RGBA_Returns4)
 {
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eR8G8B8A8Unorm), 4u);
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eR8G8B8A8Srgb), 4u);
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eB8G8R8A8Unorm), 4u);
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eB8G8R8A8Srgb), 4u);
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eR16G16B16A16Sfloat), 4u);
-	EXPECT_EQ(ImageData::ChannelCount(vk::Format::eUndefined), 4u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::RGBA8U), 4u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::RGBA8S), 4u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::BGRA8U), 4u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::BGRA8S), 4u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::RGBA16F), 4u);
+	EXPECT_EQ(neurus::ChannelCount(PixelFormat::Undefined), 4u);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,16 +65,16 @@ TEST(ImageDataTest, ChannelCount_RGBA_Returns4)
 
 TEST(ImageDataTest, IsBGRFormat_BGRA_ReturnsTrue)
 {
-	EXPECT_TRUE(ImageData::IsBGRFormat(vk::Format::eB8G8R8A8Unorm));
-	EXPECT_TRUE(ImageData::IsBGRFormat(vk::Format::eB8G8R8A8Srgb));
+	EXPECT_TRUE(neurus::IsBGRFormat(PixelFormat::BGRA8U));
+	EXPECT_TRUE(neurus::IsBGRFormat(PixelFormat::BGRA8S));
 }
 
 TEST(ImageDataTest, IsBGRFormat_RGBA_ReturnsFalse)
 {
-	EXPECT_FALSE(ImageData::IsBGRFormat(vk::Format::eR8G8B8A8Unorm));
-	EXPECT_FALSE(ImageData::IsBGRFormat(vk::Format::eR8G8B8A8Srgb));
-	EXPECT_FALSE(ImageData::IsBGRFormat(vk::Format::eR16G16B16A16Sfloat));
-	EXPECT_FALSE(ImageData::IsBGRFormat(vk::Format::eR8Unorm));
+	EXPECT_FALSE(neurus::IsBGRFormat(PixelFormat::RGBA8U));
+	EXPECT_FALSE(neurus::IsBGRFormat(PixelFormat::RGBA8S));
+	EXPECT_FALSE(neurus::IsBGRFormat(PixelFormat::RGBA16F));
+	EXPECT_FALSE(neurus::IsBGRFormat(PixelFormat::R8U));
 }
 
 // ---------------------------------------------------------------------------
@@ -237,21 +240,21 @@ TEST(ImageDataTest, SwizzleBGRtoRGB_3Channel)
 TEST(ImageDataTest, ConstructorAndGetters)
 {
 	const uint8_t pixelData[] = {255, 0, 0, 255};
-	ImageData img(pixelData, 1, 1, vk::Format::eR8G8B8A8Unorm);
+	ImageData img(pixelData, 1, 1, PixelFormat::RGBA8U);
 
 	EXPECT_EQ(img.GetWidth(), 1u);
 	EXPECT_EQ(img.GetHeight(), 1u);
-	EXPECT_EQ(img.GetFormat(), vk::Format::eR8G8B8A8Unorm);
+	EXPECT_EQ(img.GetFormat(), PixelFormat::RGBA8U);
 	EXPECT_EQ(img.GetPixelData()[0], 255u);
 }
 
 TEST(ImageDataTest, Constructor_NonSquare)
 {
 	const std::vector<uint8_t> pixelData(4 * 4 * 4, 0); // 4 wide x 4 tall x RGBA
-	ImageData img(pixelData.data(), 4, 4, vk::Format::eR8G8B8A8Srgb);
+	ImageData img(pixelData.data(), 4, 4, PixelFormat::RGBA8S);
 
 	EXPECT_EQ(img.GetWidth(), 4u);
 	EXPECT_EQ(img.GetHeight(), 4u);
-	EXPECT_EQ(img.GetFormat(), vk::Format::eR8G8B8A8Srgb);
+	EXPECT_EQ(img.GetFormat(), PixelFormat::RGBA8S);
 	EXPECT_FALSE(img.GetPixelData().empty());
 }

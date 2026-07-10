@@ -269,8 +269,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	auto shadowRes = neurus::test::LoadSimpleShadow(
 		*m_device, pd, m_queue, m_graphicsQueueFamily);
 
-	const auto& renderItems = shadowRes.renderItems;
-	ASSERT_EQ(renderItems.size(), 2u) << "Expected 2 meshes (cube + plane)";
+	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected 2 meshes (cube + plane)";
 
 	// -------------------------------------------------------------------
 	// Step 2: Light position is read from ctx.scene->light_list at Record() time.
@@ -287,7 +286,6 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 
 		RenderContext ctx{};
 		ctx.renderExtent = vk::Extent2D(kRes, kRes);
-		ctx.renderItems  = &renderItems;
 		ctx.scene        = shadowRes.scene.get();
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 

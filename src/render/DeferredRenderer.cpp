@@ -31,6 +31,7 @@
 #include "Log.h"
 
 #include "scene/Camera.h"
+#include "scene/Environment.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
@@ -256,44 +257,19 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 }
 
 // ---------------------------------------------------------------------------
-// Render item construction
-// ---------------------------------------------------------------------------
-
-GeometryRenderItem DeferredRenderer::buildRenderItem(const Mesh& mesh) const
-{
-	GeometryRenderItem item = {};
-
-	const VertexBuffer* vb = mesh.GetVertexBuffer();
-	const IndexBuffer* ib = mesh.GetIndexBuffer();
-	if (!vb || !ib)
-	{
-		return item;  // Not uploaded to GPU - return default (no draw will occur)
-	}
-
-	item.vertexBuffer = vb->buffer();
-	item.indexBuffer = ib->buffer();
-	item.indexCount = mesh.GetGPUIndexCount();
-	item.indexType = vk::IndexType::eUint32;
-
-	// Identity model matrix (sphere at origin).
-	// The icosphere OBJ has radius ~7.44 - scale down to fit the view
-	// frustum (camera at ~5 units from origin).
-	const glm::mat4 sphereScale = glm::scale(glm::mat4(1.0f), glm::vec3(0.12f));
-	item.pushConstants.model = sphereScale;
-	item.pushConstants.normalMatrix = glm::transpose(glm::inverse(sphereScale));
-
-	return item;
-}
-
-// ---------------------------------------------------------------------------
 // GenerateIBL - wrapper for Editor (avoids cross-layer include of IBLPass.h)
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::GenerateIBL(const Image& equirectImage,
-                                    Image& diffuseOut,
-                                    Image& specularOut)
+void DeferredRenderer::GenerateIBL(const std::shared_ptr<Environment>& env)
 {
-	r_iblPass->Generate(equirectImage, diffuseOut, specularOut);
+	NEURUS_LOG("[DeferredRenderer] GenerateIBL for envId=" << env->GetObjectID());
+
+	r_renderCache->CreateEnvironmentGPU(
+		env->GetObjectID(),
+		*env,
+		r_graphicsQueue,
+		r_queueFamilyIndex,
+		*r_iblPass);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,9 +331,12 @@ void DeferredRenderer::DrawFrame()
 	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
 	// No-args DrawFrame is deprecated and used only as camera-fallback.
-	// Pass empty render items (no geometry drawn) - the fallback exists only
+	// Pass empty scene (no geometry drawn) - the fallback exists only
 	// to prevent a crash when no camera is configured.
-	recordFrame(r_commandBuffers[imageIndex], imageIndex, fallbackCam, {}, nullptr);
+	{
+		Scene emptyScene;
+		recordFrame(r_commandBuffers[imageIndex], imageIndex, emptyScene);
+	}
 
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -446,26 +425,10 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	// Only reset fence after successful acquire
 	r_device.resetFences(*fence);
 
-	// --- Build render items from scene meshes (querying mesh GPU buffers directly) ---
-	std::vector<GeometryRenderItem> renderItems;
-	renderItems.reserve(scene.mesh_list.size());
-	for (const auto& [id, mesh] : scene.mesh_list)
-	{
-		if (!mesh || !mesh->o_mesh)
-		{
-			continue;
-		}
-		if (!mesh->GetVertexBuffer())
-		{
-			continue;
-		}
-		renderItems.push_back(buildRenderItem(*mesh));
-	}
-
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
-	recordFrame(r_commandBuffers[imageIndex], imageIndex, *activeCam, renderItems, &scene);
+	recordFrame(r_commandBuffers[imageIndex], imageIndex, scene);
 
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -572,9 +535,7 @@ void DeferredRenderer::recreateSwapchain()
 // ---------------------------------------------------------------------------
 
 void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
-                                   const Camera& camera,
-                                   const std::vector<GeometryRenderItem>& renderItems,
-                                   const Scene* scene)
+                                   const Scene& scene)
 {
 	const vk::Extent2D extent = r_swapchain->extent();
 
@@ -584,18 +545,20 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	cmdBuf.begin(beginInfo);
 
 	// --- Compute camera matrices for this frame ---
+	const Camera* activeCam = scene.GetActiveCamera();
+	if (!activeCam) { cmdBuf.end(); return; }
+
 	// --- Build per-frame render context (constructed once, passed to all passes) ---
 	RenderContext ctx{};
 	ctx.renderExtent = extent;
 	ctx.frameIndex = r_currentFrame;
-	ctx.view = camera.GetViewMatrix();
-	ctx.viewProj = camera.GetProjectionMatrix() * ctx.view;
-	ctx.cameraPos = camera.GetPosition();
+	ctx.view = activeCam->GetViewMatrix();
+	ctx.viewProj = activeCam->GetProjectionMatrix() * ctx.view;
+	ctx.cameraPos = activeCam->GetPosition();
 	ctx.invProjView = glm::inverse(ctx.viewProj);
-	ctx.renderItems = &renderItems;
-	ctx.scene = scene;
+	ctx.scene = &scene;
 
-	// --- Phase 1: GeometryPass → G-Buffer MRT (using caller-provided render items) ---
+	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---
 	r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---

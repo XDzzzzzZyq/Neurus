@@ -28,6 +28,7 @@
 
 #include "editor/controllers/Controllers.h"
 #include "editor/events/CameraEvents.h"
+#include "editor/events/EventBus.h"
 #include "editor/Input.h"
 
 namespace neurus {

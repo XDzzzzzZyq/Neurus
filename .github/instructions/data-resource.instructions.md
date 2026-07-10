@@ -3,8 +3,10 @@
 ## Overview
 
 The Asset layer (`src/asset/`) manages **loading, storing, and providing access**
-to external asset data (meshes, images). GPU resource abstractions (buffers,
-images, descriptors) are owned by the **Renderer layer** (`src/render/`) — see
+to external asset data (meshes, images). It is **Vulkan-free**: no `<vulkan/>`
+includes appear in public headers. Format queries use the `PixelFormat` enum
+rather than raw `vk::Format` values. GPU resource abstractions (buffers,
+images, descriptors) are owned by the **Renderer layer** (`src/render/`) -- see
 `renderer.instructions.md` for the Buffer class hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer), Image, Texture, and
 DescriptorManager.
 
@@ -15,6 +17,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 
 - `src/asset/MeshData.h/cpp` - Mesh geometry data (vertices, indices)
 - `src/asset/ImageData.h/cpp` - Image pixel data (CPU-side, owning vector, PNG/HDR save)
+- `src/asset/PixelFormat.h` - Vulkan-free pixel format enum for CPU-side format queries (PixelByteSize, ChannelCount, IsSRGB, IsHDR helpers)
 - `src/render/buffers/Buffer.h` - Virtual base class (Buffer) with m_buffer, m_memory
 - `src/render/buffers/StagingBuffer.h/cpp` - Host-visible staging buffer (StagingBuffer) for CPU↔GPU transfers
 - `src/render/buffers/GPUBuffer.h/cpp` - Device-local GPU buffer (GPUBuffer) with staging Map/Unmap
@@ -87,10 +90,12 @@ All image layout transitions go through `Barrier::Transition()`.
 ### ✅ Asset & Resource Code MAY:
 - Load and parse asset files (OBJ, PNG, HDR)
 - Provide CPU-side data structs (MeshData, ImageData)
-- Own GPU memory allocations (VkDeviceMemory via Buffer, Image)
+- Query pixel format metadata via `PixelFormat` enum (Vulkan-free)
+- Own GPU memory allocations (VkDeviceMemory via Buffer, Image) -- Renderer layer only
 - Provide allocation utilities to Renderer passes
 
 ### ❌ Asset & Resource Code MUST NOT:
+- Include Vulkan headers in public interfaces (`src/asset/` is Vulkan-free)
 - Issue draw calls (Renderer's responsibility)
 - Create pipelines or shader modules (Renderer's responsibility)
 - Manage swapchain or presentation (Renderer's responsibility)
@@ -101,12 +106,13 @@ All image layout transitions go through `Barrier::Transition()`.
 
 - OBJ mesh loading via MeshData (icosphere, cube, etc.)
 - PNG/HDR image decoding via ImageData (owns pixel data, member SavePNG/SaveHDR)
+- `PixelFormat` enum for CPU-side format queries (PixelByteSize, ChannelCount, IsSRGB, IsHDR) -- zero Vulkan includes
 - Buffer hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer<T>) for vertex, index, uniform, and storage buffers
 - Image for GPU image allocation with ImageState tracking and Barrier::Transition for layout changes
 - Texture class combining image + sampler + descriptor
 - Barrier for centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - DescriptorManager with per-frame descriptor pool rotation
-- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), and a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
+- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`), and cross-frame GPU resources for meshes (`MeshGPU` via `GetMeshGPU()`) and environments (`EnvironmentGPU` via `CreateEnvironmentGPU()`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
 
 ## Future Enhancements
 

@@ -28,7 +28,6 @@
 #include "asset/MeshData.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/buffers/IndexBuffer.h"
-#include "render/passes/GeometryPass.h"
 
 #include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
@@ -52,7 +51,6 @@ struct SimpleShadowResources
 {
 	std::shared_ptr<Scene> scene;
 	glm::vec3               cubePos;        // World-space position of the cube (default: (0,0,3))
-	std::vector<GeometryRenderItem> renderItems;
 };
 
 /**
@@ -122,21 +120,9 @@ f 2 6 7 3
 		auto cubeMesh = std::make_shared<Mesh>();
 		cubeMesh->o_name = "SimpleShadowCube";
 		cubeMesh->o_mesh = cubeMeshData;
-		cubeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 		cubeMesh->SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));  // raise cube above plane (Z-up)
 
 		res.scene->UseMesh(cubeMesh);
-
-		GeometryRenderItem item{};
-		item.vertexBuffer = cubeMesh->GetVertexBuffer()->buffer();
-		item.indexBuffer  = cubeMesh->GetIndexBuffer()->buffer();
-		item.indexCount   = cubeMesh->GetGPUIndexCount();
-		item.indexType    = vk::IndexType::eUint32;
-		// Cube pushed to (0, 0, 3) via model matrix; geometry at origin.
-		item.pushConstants.model        = cubeMesh->GetModelMatrix();
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-		res.renderItems.push_back(item);
 		res.cubePos = cubeMesh->GetPosition();
 	}
 
@@ -166,20 +152,8 @@ f 1 2 3 4
 		auto planeMesh = std::make_shared<Mesh>();
 		planeMesh->o_name = "SimpleShadowPlane";
 		planeMesh->o_mesh = planeMeshData;
-		planeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 
 		res.scene->UseMesh(planeMesh);
-
-		GeometryRenderItem item{};
-		item.vertexBuffer = planeMesh->GetVertexBuffer()->buffer();
-		item.indexBuffer  = planeMesh->GetIndexBuffer()->buffer();
-		item.indexCount   = planeMesh->GetGPUIndexCount();
-		item.indexType    = vk::IndexType::eUint32;
-		// Identity: plane geometry is already in world space (z=0, spans ±10 in XY).
-		item.pushConstants.model        = glm::mat4(1.0f);
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-		res.renderItems.push_back(item);
 	}
 
 	// ===================================================================
@@ -208,8 +182,7 @@ f 1 2 3 4
 		res.scene->UseCamera(cam);
 	}
 
-	NEURUS_LOG("[LoadSimpleShadow] Built 2 meshes (cube + plane) + 1 point light + 1 camera — "
-	           << res.renderItems.size() << " render items");
+	NEURUS_LOG("[LoadSimpleShadow] Built 2 meshes (cube + plane) + 1 point light + 1 camera");
 
 	return res;
 }

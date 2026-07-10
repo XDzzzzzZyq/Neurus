@@ -3,13 +3,13 @@
  * @brief Header-only helper for loading the Cornell Box scene in GPU tests.
  *
  * Provides LoadCornellBox() which loads 6 OBJ meshes (back_wall, left_wall,
- * right_wall, left_box, right_box, light_up), uploads them to GPU vertex/index
- * buffers, and returns render items + camera + light for the scene.
+ * right_wall, left_box, right_box, light_up), registers them in a Scene
+ * for auto-iteration by GeometryPass and ShadowDepthPass.
  *
  * Usage:
  * @code
  *   auto cb = LoadCornellBox(device, pd, queue, qfi);
- *   m_geometryPass->Record(cmd, camUBO, cb.renderItems, extent);
+ *   // Meshes registered in cb.scene.mesh_list — passes iterate automatically
  * @endcode
  *
  * The Cornell Box occupies approximately [-1, 1] in all axes, making it
@@ -19,10 +19,9 @@
 #pragma once
 
 #include "Log.h"
-#include "render/passes/GeometryPass.h"
 #include "scene/Material.h"
-#include "render/buffers/IndexBuffer.h"
-#include "render/buffers/VertexBuffer.h"
+#include "scene/Scene.h"
+#include "scene/Mesh.h"
 
 #include "asset/MeshData.h"
 
@@ -38,36 +37,16 @@
 namespace neurus {
 namespace test {
 
-// ---------------------------------------------------------------------------
-// Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
-// ---------------------------------------------------------------------------
-struct CornellBoxVertex
-{
-	float posX, posY, posZ;
-	float nrmX, nrmY, nrmZ;
-	float uvX,  uvY;
-};
-
-/**
- * @brief Per-mesh entry: owns the GPU buffers and exposes the render item.
- */
-struct CornellMeshEntry
-{
-	std::unique_ptr<VertexBuffer> vertexBuffer;
-	std::unique_ptr<IndexBuffer>  indexBuffer;
-	GeometryRenderItem            renderItem = {};
-};
-
 /**
  * @brief Aggregated result of loading the Cornell Box scene.
  *
- * All GPU buffers are owned by this struct (via meshes vector).
- * renderItems provides a flat list for direct use with GeometryPass::Record.
+ * Meshes are registered in scene.mesh_list for automatic iteration by
+ * GeometryPass and ShadowDepthPass.  GPU buffers are lazily created
+ * via RenderCache::GetMeshGPU() on first access.
  */
 struct CornellBoxResources
 {
-	std::vector<CornellMeshEntry> meshes;
-	std::vector<GeometryRenderItem> renderItems;
+	std::shared_ptr<Scene> scene;
 
 	std::shared_ptr<Camera> camera;
 	std::shared_ptr<Light>  light;
@@ -99,39 +78,25 @@ struct CornellBoxResources
  * @return Fully populated CornellBoxResources (move-only due to unique_ptr members).
  */
 inline CornellBoxResources LoadCornellBox(
-	const vk::raii::Device& device,
-	const vk::raii::PhysicalDevice& physicalDevice,
-	vk::Queue graphicsQueue,
-	uint32_t queueFamilyIndex,
+	const vk::raii::Device& /*device*/,
+	const vk::raii::PhysicalDevice& /*physicalDevice*/,
+	vk::Queue /*graphicsQueue*/,
+	uint32_t /*queueFamilyIndex*/,
 	const std::string& basePath = "res/obj/cornellbox/")
 {
 	CornellBoxResources res;
+	res.scene = std::make_shared<Scene>();
 
-	// --- OBJ file names and their material colours ---
-	struct ObjEntry
-	{
-		const char* filename;
-		glm::vec3   albedo;
-		float       metallic;
-		float       roughness;
+	// --- OBJ file names ---
+	const std::vector<const char*> filenames = {
+		"back_wall.obj", "left_wall.obj", "right_wall.obj",
+		"left_box.obj", "right_box.obj", "light_up.obj",
 	};
 
-	const std::vector<ObjEntry> entries = {
-		{"back_wall.obj",  glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, 0.5f},
-		{"left_wall.obj",  glm::vec3(1.0f, 0.0f, 0.0f), 0.0f, 0.5f},
-		{"right_wall.obj", glm::vec3(0.0f, 1.0f, 0.0f), 0.0f, 0.5f},
-		{"left_box.obj",   glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, 0.5f},
-		{"right_box.obj",  glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, 0.5f},
-		{"light_up.obj",   glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, 0.5f},
-	};
-
-	res.meshes.reserve(entries.size());
-	res.renderItems.reserve(entries.size());
-
-	for (const auto& entry : entries)
+	for (const auto& filename : filenames)
 	{
 		// --- Load OBJ (try multiple relative paths) ---
-		const std::string relPath = basePath + entry.filename;
+		const std::string relPath = basePath + filename;
 		std::string objPath = relPath;
 		{
 			// CTest runs from build/debug/test/ or build/debug/
@@ -148,57 +113,21 @@ inline CornellBoxResources LoadCornellBox(
 		}
 
 		const auto& rawMesh = meshData->GetMeshData();
-		const size_t srcVertexCount = rawMesh.dataArray.size() / 14;
+		const size_t vertexCount = rawMesh.dataArray.size() / 14;
 		const size_t indexCount = rawMesh.indexArray.size();
 
-		if (srcVertexCount == 0 || indexCount == 0)
+		if (vertexCount == 0 || indexCount == 0)
 		{
-			NEURUS_ERR("LoadCornellBox: Empty geometry in " << entry.filename);
+			NEURUS_ERR("LoadCornellBox: Empty geometry in " << filename);
 			continue;
 		}
 
-		// --- Convert vertex data (14 floats → 8: pos+nrm+uv) ---
-		std::vector<CornellBoxVertex> vertices(srcVertexCount);
-		for (size_t i = 0; i < srcVertexCount; ++i)
-		{
-			const float* s = &rawMesh.dataArray[i * 14];
-			vertices[i].posX = s[0];
-			vertices[i].posY = s[1];
-			vertices[i].posZ = s[2];
-			vertices[i].nrmX = s[3];
-			vertices[i].nrmY = s[4];
-			vertices[i].nrmZ = s[5];
-			vertices[i].uvX  = s[6];
-			vertices[i].uvY  = s[7];
-		}
-
-		std::vector<uint32_t> indices = rawMesh.indexArray;
-
-		// --- Upload to GPU ---
-		CornellMeshEntry meshEntry;
-
-		meshEntry.vertexBuffer = std::make_unique<VertexBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			vertices.data(), vertices.size() * sizeof(CornellBoxVertex),
-			sizeof(CornellBoxVertex), static_cast<uint32_t>(vertices.size()));
-
-		meshEntry.indexBuffer = std::make_unique<IndexBuffer>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
-			indices.data(), indices.size() * sizeof(uint32_t),
-			static_cast<uint32_t>(indices.size()));
-
-		// --- Build render item ---
-		GeometryRenderItem& item = meshEntry.renderItem;
-		item.vertexBuffer = meshEntry.vertexBuffer->buffer();
-		item.indexBuffer  = meshEntry.indexBuffer->buffer();
-		item.indexCount   = meshEntry.indexBuffer->GetIndexCount();
-		item.indexType    = meshEntry.indexBuffer->GetIndexType();
-		// Identity model matrix (OBJ coordinates are already world-space)
-		item.pushConstants.model = glm::mat4(1.0f);
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-		res.meshes.push_back(std::move(meshEntry));
-		res.renderItems.push_back(res.meshes.back().renderItem);
+		// --- Create Mesh and register in scene ---
+		// GPU buffers created lazily by RenderCache::GetMeshGPU() on first use.
+		auto mesh = std::make_shared<Mesh>();
+		mesh->o_name = std::string("CornellBox_") + filename;
+		mesh->o_mesh = meshData;
+		res.scene->UseMesh(mesh);
 	}
 
 	// --- Create default camera ---
@@ -216,8 +145,7 @@ inline CornellBoxResources LoadCornellBox(
 	                                    glm::vec3(1.0f, 0.95f, 0.8f));
 	res.light->SetPosition(glm::vec3(-0.3f, 1.0f, 0.8f));  // Z-up: near ceiling
 
-	NEURUS_LOG("[LoadCornellBox] Loaded " << res.renderItems.size()
-	           << " meshes from " << basePath);
+	NEURUS_LOG("[LoadCornellBox] Loaded 6 meshes from " << basePath);
 
 	return res;
 }

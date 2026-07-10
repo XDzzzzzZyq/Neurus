@@ -23,7 +23,7 @@ protected:
 	{
 		m_context = std::make_unique<EditorContext>();
 		m_scene = std::make_unique<Scene>();
-		m_queue = &EventQueue();
+		m_queue = &eventQueue();
 	}
 
 	void TearDown() override

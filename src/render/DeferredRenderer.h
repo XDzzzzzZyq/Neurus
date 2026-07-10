@@ -40,13 +40,13 @@ class Camera;
 class Scene;
 class Mesh;
 class Image;
+class Environment;
 class GeometryPass;
 class LightingPass;
 class SSAOPass;
 class IBLPass;
 class ShadowDepthPass;
 class ShadowIntensityPass;
-struct GeometryRenderItem;
 struct CameraUBOData;
 
 /**
@@ -176,43 +176,35 @@ public:
 	void HandleResize(uint32_t width, uint32_t height);
 
 	/**
-	 * @brief Generates diffuse + specular cubemaps from an equirect HDR image.
+	 * @brief Generates IBL cubemaps for an environment and caches them in RenderCache.
 	 *
-	 * Forwards to IBLPass::Generate().  Editor calls this instead of reaching
-	 * into render pass headers directly (architecture boundary).
+	 * Delegates to RenderCache::CreateEnvironmentGPU() which loads the equirect
+	 * ImageData, creates cubemap Images + samplers, and runs IBLPass convolution.
+	 * The resulting EnvironmentGPU is stored in RenderCache for per-frame use
+	 * by LightingPass.
 	 *
-	 * @param equirectImage  Equirectangular HDR panorama (2D image).
-	 * @param diffuseOut     Pre-created diffuse irradiance cubemap.
-	 * @param specularOut    Pre-created specular prefiltered cubemap.
+	 * @param env Shared pointer to the CPU-side Environment (provides equirect data).
 	 */
-	void GenerateIBL(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
+	void GenerateIBL(const std::shared_ptr<Environment>& env);
 
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
 	 *
 	 * Sequence:
-	 *   1. GeometryPass::Record(renderItems) → G-Buffer MRT
-	 *   2. LightingPass::Record() → compute PBR → HDRColor (uses own light SSBO)
-	 *   3. Blit HDRColor → swapchain image
-	 *   4. Transition swapchain image to present layout
+	 *   1. GeometryPass::Record() → G-Buffer MRT (reads scene.mesh_list via MeshGPU)
+	 *   2. ShadowDepthPass::Record() → cubemap depth (reads scene.mesh_list via MeshGPU)
+	 *   3. LightingPass::Record() → compute PBR → HDRColor (uses own light SSBO)
+	 *   4. Blit HDRColor → swapchain image
+	 *   5. Transition swapchain image to present layout
 	 *
-	 * @param renderItems Pre-built render items from scene meshes (may be empty).
+	 * @param scene Scene providing active camera and mesh/light lists for iteration.
 	 */
 	void recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
-	                 const Camera& camera,
-	                 const std::vector<GeometryRenderItem>& renderItems,
-	                 const Scene* scene = nullptr);
+	                 const Scene& scene);
 
 	/** @brief Destroys and re-creates sync objects after swapchain resize. */
 	void recreateSwapchain();
-
-	/**
-	 * @brief Builds a GeometryRenderItem for the specified mesh from its GPU buffers.
-	 * @param mesh Mesh providing GPU vertex/index buffers via GetVertexBuffer/GetIndexBuffer.
-	 * @return GeometryRenderItem with buffers from mesh, or default item if mesh GPU buffers unavailable.
-	 */
-	GeometryRenderItem buildRenderItem(const Mesh& mesh) const;
 
 	/** @brief Creates the command pool (static helper for init-list use). */
 	static vk::raii::CommandPool createCommandPool(const vk::raii::Device& device,

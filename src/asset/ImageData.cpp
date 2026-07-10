@@ -61,60 +61,6 @@ void ImageData::EnsureDirectory(const std::string& filePath)
 }
 
 // ===========================================================================
-// Format helpers
-// ===========================================================================
-
-uint32_t ImageData::PixelByteSize(vk::Format format)
-{
-	switch (format)
-	{
-	case vk::Format::eR8G8B8A8Unorm:
-	case vk::Format::eR8G8B8A8Srgb:
-	case vk::Format::eB8G8R8A8Unorm:
-	case vk::Format::eB8G8R8A8Srgb:
-		return 4;
-	case vk::Format::eR16G16B16A16Sfloat:
-	case vk::Format::eR16G16B16A16Unorm:
-	case vk::Format::eR16G16B16A16Snorm:
-		return 8;
-	case vk::Format::eR32G32B32A32Sfloat:
-		return 16;
-	case vk::Format::eR8Unorm:
-	case vk::Format::eR8Srgb:
-		return 1;
-	case vk::Format::eD32Sfloat:
-		return 4;
-	default:
-		return 0;
-	}
-}
-
-uint32_t ImageData::ChannelCount(vk::Format format)
-{
-	switch (format)
-	{
-	case vk::Format::eR8Unorm:
-	case vk::Format::eR8Srgb:
-		return 1;
-	case vk::Format::eR8G8B8A8Unorm:
-	case vk::Format::eR8G8B8A8Srgb:
-	case vk::Format::eB8G8R8A8Unorm:
-	case vk::Format::eB8G8R8A8Srgb:
-	case vk::Format::eR16G16B16A16Sfloat:
-	case vk::Format::eR16G16B16A16Unorm:
-	case vk::Format::eR16G16B16A16Snorm:
-	default:
-		return 4;
-	}
-}
-
-bool ImageData::IsBGRFormat(vk::Format format)
-{
-	return format == vk::Format::eB8G8R8A8Unorm ||
-	       format == vk::Format::eB8G8R8A8Srgb;
-}
-
-// ===========================================================================
 // Data conversion
 // ===========================================================================
 
@@ -171,7 +117,7 @@ ImageData::ImageData(const std::string& path)
 	LoadFromPath(path);
 }
 
-ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
+ImageData::ImageData(const void* data, uint32_t w, uint32_t h, PixelFormat fmt,
                      uint32_t arrayLayers)
 	: im_width(w)
 	, im_height(h)
@@ -180,7 +126,7 @@ ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
 	if (!data || w == 0 || h == 0 || arrayLayers == 0)
 		return;
 
-	const uint32_t bpp = PixelByteSize(fmt);
+	const uint32_t bpp = neurus::PixelByteSize(fmt);
 	if (bpp == 0)
 		return;
 
@@ -195,19 +141,19 @@ ImageData::ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
 
 bool ImageData::SavePNG(const std::string& path, bool remapSigned) const
 {
-	const uint32_t channels = ChannelCount(im_format);
+	const uint32_t channels = ChannelCount();
 	std::vector<uint8_t> pngData;
 
-	if (im_format == vk::Format::eR16G16B16A16Sfloat ||
-	    im_format == vk::Format::eR16G16B16A16Unorm ||
-	    im_format == vk::Format::eR16G16B16A16Snorm)
+	if (im_format == PixelFormat::RGBA16F ||
+	    im_format == PixelFormat::RGBA16U ||
+	    im_format == PixelFormat::RGBA16SN)
 	{
 		pngData = ConvertHalfToU8(im_pixelData.data(), im_width, im_height, remapSigned);
 	}
 	else
 	{
 		pngData = im_pixelData;
-		if (IsBGRFormat(im_format) && channels >= 3)
+		if (neurus::IsBGRFormat(im_format) && channels >= 3)
 			SwizzleBGRtoRGB(pngData.data(), im_width, im_height, channels);
 	}
 
@@ -309,7 +255,7 @@ void ImageData::LoadFromPath(const std::string& path)
 
 		im_width = static_cast<uint32_t>(w);
 		im_height = static_cast<uint32_t>(h);
-		im_format = vk::Format::eR32G32B32A32Sfloat;
+		im_format = PixelFormat::RGBA32F;
 
 		const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * 4 * sizeof(float);
 		im_pixelData.resize(byteCount);
@@ -330,7 +276,7 @@ void ImageData::LoadFromPath(const std::string& path)
 
 		im_width = static_cast<uint32_t>(w);
 		im_height = static_cast<uint32_t>(h);
-		im_format = vk::Format::eR8G8B8A8Srgb;
+		im_format = PixelFormat::RGBA8S;
 
 		const size_t byteCount = static_cast<size_t>(w) * static_cast<size_t>(h) * 4;
 		im_pixelData.resize(byteCount);

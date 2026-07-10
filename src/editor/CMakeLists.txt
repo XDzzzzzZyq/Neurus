@@ -29,6 +29,7 @@ target_include_directories(neurus_editor PUBLIC
 
 target_include_directories(neurus_editor PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/..
+	${Vulkan_INCLUDE_DIRS}
 )
 
 # Enable Qt MOC for QObject subclasses (UIEvents, EditorContext)

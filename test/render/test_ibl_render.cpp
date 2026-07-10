@@ -146,21 +146,18 @@ protected:
 			dev, pd,
 			m_queue, m_graphicsQueueFamily);
 
-		// --- Create Environment + Build IBL textures (cubemap Images + samplers) ---
+		// --- Create Environment (CPU-only) and generate IBL via RenderCache ---
 		m_env = std::make_shared<Environment>();
-		m_env->BuildIBLTextures(dev, pd);
 
-		// --- Generate equirect gradient & upload to GPU ---
+		// Set up procedural colourful gradient equirect data
 		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
+		ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
+		m_env->SetEquirectData(imgData);
 
-		ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, vk::Format::eR32G32B32A32Sfloat);
-		m_equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
-		                                       imgData, "IBLRenderTest_Equirect");
-
-		// --- Generate IBL cubemaps into Environment ---
-		m_iblPass->Generate(*m_equirectImage,
-		                   *m_env->GetCubemapDiffuse(),
-		                   *m_env->GetCubemapSpecular());
+		// Lazily create EnvironmentGPU in RenderCache (loads equirect, creates cubemaps, runs IBLPass)
+		m_renderCache->CreateEnvironmentGPU(m_env->GetObjectID(), *m_env,
+		                                    m_queue, m_graphicsQueueFamily,
+		                                    *m_iblPass);
 	}
 
 	void TearDown() override
@@ -169,12 +166,11 @@ protected:
 	}
 
 	// --- Render pass infrastructure ---
-		std::unique_ptr<RenderCache>  m_renderCache;
+	std::unique_ptr<RenderCache>  m_renderCache;
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<LightingPass>       m_lightingPass;
 	std::unique_ptr<IBLPass>            m_iblPass;
-	std::unique_ptr<Image>              m_equirectImage;
-	// --- IBL environment (owns cubemap Images + samplers via Texture objects) ---
+	// --- IBL environment (CPU-only now; GPU resources in RenderCache) ---
 	std::shared_ptr<Environment>        m_env;
 };
 
@@ -244,15 +240,6 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	auto mesh = std::make_shared<Mesh>();
 	mesh->o_mesh = meshData;
 	mesh->o_material = material;
-	mesh->UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-
-	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
-	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
-	renderItem.indexCount   = mesh->GetGPUIndexCount();
-	renderItem.indexType    = vk::IndexType::eUint32;
-	renderItem.pushConstants.model = glm::mat4(1.0f);
-	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer, build RenderContext, create scene
@@ -260,11 +247,11 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	Scene scene;
+	scene.UseMesh(mesh);
 	scene.UseLight(light);
 	scene.env_list[m_env->GetObjectID()] = m_env;
 	m_lightingPass->UploadLights(scene);
 
-	std::vector<GeometryRenderItem> items = { renderItem };
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
 		.frameIndex = 0,
@@ -272,7 +259,6 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 		.view = camUBO.view,
 		.cameraPos = camera->GetPosition(),
 		.invProjView = glm::inverse(camUBO.viewProj),
-		.renderItems = &items,
 		.scene = &scene,
 	};
 
@@ -368,40 +354,30 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	material->SetMatParam(Material::MAT_ROUGH, 0.5f);
 	material->SetMatParam(Material::MAT_ALBEDO, glm::vec3(1.0f, 1.0f, 1.0f));
 
-	// --- Mesh + UploadToGPU ---
+	// --- Mesh ---
 	auto mesh = std::make_shared<Mesh>();
 	mesh->o_mesh = meshData;
 	mesh->o_material = material;
-	mesh->UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-
-	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
-	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
-	renderItem.indexCount   = mesh->GetGPUIndexCount();
-	renderItem.indexType    = vk::IndexType::eUint32;
-	renderItem.pushConstants.model = glm::mat4(1.0f);
-	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
 
 	// --- Render Frame 1 (IBL active) ---
 	{
 		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
-		Scene scene;
-		scene.UseLight(light);
-		scene.env_list[m_env->GetObjectID()] = m_env;
-		m_lightingPass->UploadLights(scene);
+	Scene scene;
+				scene.UseMesh(mesh);
+				scene.UseLight(light);
+				scene.env_list[m_env->GetObjectID()] = m_env;
+				m_lightingPass->UploadLights(scene);
 
-		std::vector<GeometryRenderItem> items = { renderItem };
-		RenderContext ctx{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.frameIndex = 0,
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.cameraPos = camera->GetPosition(),
-			.invProjView = glm::inverse(camUBO.viewProj),
-			.renderItems = &items,
-			.scene = &scene,
-		};
+				RenderContext ctx{
+					.renderExtent = {kRenderWidth, kRenderHeight},
+					.frameIndex = 0,
+					.viewProj = camUBO.viewProj,
+					.view = camUBO.view,
+					.cameraPos = camera->GetPosition(),
+					.invProjView = glm::inverse(camUBO.viewProj),
+					.scene = &scene,
+				};
 
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
@@ -432,11 +408,11 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	m_geometryPass.reset();
 	m_renderCache.reset();
 
-	// 2d. Destroy IBL GPU resources (Environment + equirect).
-	//     The Environment owns cubemap Images + samplers via its Texture objects.
+	// 2d. Destroy IBL GPU resources (Environment + GPU resources in RenderCache).
+	//     RenderCache::Clean() handles GPU resource teardown; the Environment
+	//     (CPU-only) must be re-created.
 	SCOPED_TRACE("Destroy IBL resources");
 	m_env.reset();
-	m_equirectImage.reset();
 
 	// 2e. Recreate RenderCache + passes (simulating renderer init).
 	SCOPED_TRACE("Recreate passes");
@@ -452,25 +428,20 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	m_iblPass = std::make_unique<IBLPass>(
 		dev, pd, m_queue, m_graphicsQueueFamily);
 
-	// 2f. Re-create Environment + build IBL textures (cubemap Images + samplers).
+	// 2f. Re-create Environment (CPU-only) + generate IBL via RenderCache.
 	SCOPED_TRACE("Recreate IBL resources");
 	m_env = std::make_shared<Environment>();
-	m_env->BuildIBLTextures(dev, pd);
-
-	// 2g. Re-create equirect gradient + upload to GPU.
 	{
-	auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
-	ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, vk::Format::eR32G32B32A32Sfloat);
-	m_equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
-	                                       imgData, "IBLRenderTest_Equirect_Reload");
+		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
+		ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
+		m_env->SetEquirectData(imgData);
 	}
 
-	// 2h. Generate IBL cubemaps into the new Environment.
-	//     (No SetIBLResources needed – LightingPass reads from scene per-frame.)
+	// 2g. Lazily create EnvironmentGPU in RenderCache
 	SCOPED_TRACE("Generate IBL cubemaps");
-	m_iblPass->Generate(*m_equirectImage,
-	                   *m_env->GetCubemapDiffuse(),
-	                   *m_env->GetCubemapSpecular());
+	m_renderCache->CreateEnvironmentGPU(m_env->GetObjectID(), *m_env,
+	                                    m_queue, m_graphicsQueueFamily,
+	                                    *m_iblPass);
 
 	// ================================================================
 	// Phase 3 — Render Frame 2 (after reload, IBL active again)
@@ -480,22 +451,21 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	{
 		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
-		Scene scene;
-		scene.UseLight(light);
-		scene.env_list[m_env->GetObjectID()] = m_env;
-		m_lightingPass->UploadLights(scene);
+	Scene scene;
+				scene.UseMesh(mesh);
+				scene.UseLight(light);
+				scene.env_list[m_env->GetObjectID()] = m_env;
+				m_lightingPass->UploadLights(scene);
 
-		std::vector<GeometryRenderItem> items = { renderItem };
-		RenderContext ctx{
-			.renderExtent = {kRenderWidth, kRenderHeight},
-			.frameIndex = 0,
-			.viewProj = camUBO.viewProj,
-			.view = camUBO.view,
-			.cameraPos = camera->GetPosition(),
-			.invProjView = glm::inverse(camUBO.viewProj),
-			.renderItems = &items,
-			.scene = &scene,
-		};
+				RenderContext ctx{
+					.renderExtent = {kRenderWidth, kRenderHeight},
+					.frameIndex = 0,
+					.viewProj = camUBO.viewProj,
+					.view = camUBO.view,
+					.cameraPos = camera->GetPosition(),
+					.invProjView = glm::inverse(camUBO.viewProj),
+					.scene = &scene,
+				};
 
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, ctx);

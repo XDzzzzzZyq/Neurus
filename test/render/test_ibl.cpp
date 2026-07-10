@@ -205,7 +205,7 @@ protected:
 	                                                uint32_t height,
 	                                                const char* debugName)
 	{
-		ImageData imgData(pixelData.data(), width, height, vk::Format::eR32G32B32A32Sfloat);
+		ImageData imgData(pixelData.data(), width, height, PixelFormat::RGBA32F);
 		return Image::FromImageData(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
 		                            imgData, debugName, vk::ImageUsageFlagBits::eStorage);
 	}
@@ -410,7 +410,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsHDR_ProducesValidFiles)
 	{
 		const std::string path = outDir + "faces.hdr/cube_face_" + kFaceNames[face] + ".hdr";
 		const float* faceData = cubeFloats + face * faceFloats;
-		ImageData faceImg(faceData, kCubeFaceRes, kCubeFaceRes, vk::Format::eR32G32B32A32Sfloat);
+		ImageData faceImg(faceData, kCubeFaceRes, kCubeFaceRes, PixelFormat::RGBA32F);
 		bool saved = faceImg.SaveHDR(path);
 		EXPECT_TRUE(saved) << "Failed to save HDR face " << kFaceNames[face];
 
@@ -439,7 +439,7 @@ TEST_F(IBLConversionTest, SaveHDRFloatImage_ProducesValidHDRFile)
 	const std::string hdrPath = neurus::test::ReferencePath::Make("ibl/test_gradient.hdr");
 	std::filesystem::create_directories(std::filesystem::path(hdrPath).parent_path());
 
-	ImageData gradientImg(pixels.data(), 64, 32, vk::Format::eR32G32B32A32Sfloat);
+	ImageData gradientImg(pixels.data(), 64, 32, PixelFormat::RGBA32F);
 	bool saved = gradientImg.SaveHDR(hdrPath);
 	EXPECT_TRUE(saved) << "Failed to save HDR file";
 
@@ -496,7 +496,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 		const uint16_t* faceSrc = halfData + face * facePixelCount * 4;
 		auto u8Data = ImageData::ConvertHalfToU8(faceSrc, kCubeFaceRes, kCubeFaceRes, false);
 
-		ImageData img(u8Data.data(), kCubeFaceRes, kCubeFaceRes, vk::Format::eR8G8B8A8Unorm);
+		ImageData img(u8Data.data(), kCubeFaceRes, kCubeFaceRes, PixelFormat::RGBA8U);
 		bool saved = img.SavePNG(path);
 		EXPECT_TRUE(saved) << "Failed to save PNG face " << kFaceNames[face];
 	}

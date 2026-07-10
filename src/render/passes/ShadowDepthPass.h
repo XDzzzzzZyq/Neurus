@@ -22,7 +22,6 @@
 
 namespace neurus {
 
-struct GeometryRenderItem;
 class RenderShader;
 class Shader;
 
@@ -81,6 +80,8 @@ private:
 	// --- Parameters ---
 	uint32_t p_resolution;
 	const vk::raii::PhysicalDevice* p_physicalDevice = nullptr;
+	vk::Queue m_queue = nullptr;          ///< Graphics queue (for MeshGPU staging uploads)
+	uint32_t m_queueFamilyIndex = 0;      ///< Queue family index (for MeshGPU staging uploads)
 
 	// --- GPU resources ---
 	// Static SSBO with 6 face VP matrices (computed once from origin; never changes)

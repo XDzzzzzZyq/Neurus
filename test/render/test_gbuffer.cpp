@@ -23,6 +23,7 @@
 
 #include "asset/MeshData.h"
 #include "scene/Mesh.h"
+#include "scene/Scene.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -153,18 +154,12 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 		"f 1//1 2//1 3//1\n";
 	ASSERT_TRUE(meshData->LoadObjFromString(objStr));
 
-	Mesh mesh;
-	mesh.o_mesh = meshData;
-	mesh.UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
+	auto mesh = std::make_shared<Mesh>();
+	mesh->o_mesh = meshData;
 
-	// --- Build render item ---
-	GeometryRenderItem item;
-	item.vertexBuffer = mesh.GetVertexBuffer()->buffer();
-	item.indexBuffer  = mesh.GetIndexBuffer()->buffer();
-	item.indexCount   = mesh.GetGPUIndexCount();
-	item.indexType    = mesh.GetIndexBuffer()->GetIndexType();
-	item.pushConstants.model = glm::mat4(1.0f);         // identity
-	item.pushConstants.normalMatrix = glm::mat4(1.0f);   // identity
+	// Register mesh in Scene so GeometryPass can iterate mesh_list
+	Scene testScene;
+	testScene.UseMesh(mesh);
 
 	// --- Camera ---
 	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
@@ -172,13 +167,12 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 	// --- Record ---
 	{
 		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { item };
 
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camera.viewProj,
 			.view = camera.view,
-			.renderItems = &items,
+			.scene = &testScene,
 		});
 
 		EndSubmitWait(cmd);
@@ -208,34 +202,26 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 		"f 1//1 2//1 3//1\n";
 	ASSERT_TRUE(meshData->LoadObjFromString(objStr));
 
-	Mesh mesh;
-	mesh.o_mesh = meshData;
-	mesh.UploadToGPU(*m_device, pd, m_queue, m_graphicsQueueFamily);
+	// Create two Mesh instances with different transforms sharing the same MeshData.
+	auto mesh0 = std::make_shared<Mesh>();
+	mesh0->o_mesh = meshData;
+	auto mesh1 = std::make_shared<Mesh>();
+	mesh1->o_mesh = meshData;
+	mesh1->SetPosition(glm::vec3(1.0f, 0.0f, 0.0f));
 
-	// --- Two render items with different transforms ---
-	GeometryRenderItem item0;
-	item0.vertexBuffer = mesh.GetVertexBuffer()->buffer();
-	item0.indexBuffer  = mesh.GetIndexBuffer()->buffer();
-	item0.indexCount   = mesh.GetGPUIndexCount();
-	item0.indexType    = mesh.GetIndexBuffer()->GetIndexType();
-	item0.pushConstants.model = glm::mat4(1.0f);
-	item0.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-	GeometryRenderItem item1 = item0;
-	item1.pushConstants.model = glm::translate(glm::mat4(1.0f),
-	                                           glm::vec3(1.0f, 0.0f, 0.0f));
-	// Normal matrix stays identity since we're only translating
+	Scene testScene;
+	testScene.UseMesh(mesh0);
+	testScene.UseMesh(mesh1);
 
 	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 	{
 		auto& cmd = BeginCmd();
-		std::vector<GeometryRenderItem> items = { item0, item1 };
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camera.viewProj,
 			.view = camera.view,
-			.renderItems = &items,
+			.scene = &testScene,
 		});
 		EndSubmitWait(cmd);
 	}
@@ -260,12 +246,11 @@ TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 
 	{
 		auto& cmd = BeginCmd();
-		const std::vector<GeometryRenderItem> emptyItems;
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.viewProj = camera.viewProj,
 			.view = camera.view,
-			.renderItems = &emptyItems,
+			.scene = nullptr,  // No scene → no geometry drawn (should not crash)
 		});
 		EndSubmitWait(cmd);
 	}

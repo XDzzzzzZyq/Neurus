@@ -70,7 +70,7 @@ void EditorContext::SetScene(Scene* scene)
 
 void EditorContext::NotifySceneChanged(int status)
 {
-	EventQueue().enqueue(SceneStatusChanged{status});
+	eventQueue().enqueue(SceneStatusChanged{status});
 }
 
 const Scene* EditorContext::activeScene() const

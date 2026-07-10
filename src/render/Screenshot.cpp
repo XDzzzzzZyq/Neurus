@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "RenderCache.h"
 #include "asset/ImageData.h"
+#include "asset/PixelFormat.h"
 #include "Texture.h"
 #include "render/Barrier.h"
 #include "Log.h"
@@ -20,6 +21,63 @@
 #include <sstream>
 
 namespace neurus {
+
+// ---------------------------------------------------------------------------
+// Local helpers (format conversion)
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Converts a Vulkan vk::Format to the CPU-side PixelFormat equivalent.
+ * Used when constructing ImageData from swapchain or GPU image formats.
+ */
+static PixelFormat vkFormatToPixelFormat(vk::Format format)
+{
+	switch (format)
+	{
+	case vk::Format::eUndefined:            return PixelFormat::Undefined;
+	case vk::Format::eR8G8B8A8Unorm:        return PixelFormat::RGBA8U;
+	case vk::Format::eR8G8B8A8Srgb:         return PixelFormat::RGBA8S;
+	case vk::Format::eR32G32B32A32Sfloat:   return PixelFormat::RGBA32F;
+	case vk::Format::eR16G16B16A16Sfloat:   return PixelFormat::RGBA16F;
+	case vk::Format::eR8Unorm:              return PixelFormat::R8U;
+	case vk::Format::eD32Sfloat:            return PixelFormat::D32F;
+	case vk::Format::eB8G8R8A8Unorm:        return PixelFormat::BGRA8U;
+	case vk::Format::eB8G8R8A8Srgb:         return PixelFormat::BGRA8S;
+	case vk::Format::eR16G16B16A16Unorm:    return PixelFormat::RGBA16U;
+	case vk::Format::eR16G16B16A16Snorm:    return PixelFormat::RGBA16SN;
+	case vk::Format::eR8Srgb:               return PixelFormat::R8S;
+	default:                                return PixelFormat::Undefined;
+	}
+}
+
+/**
+ * @brief Returns bytes per pixel for a Vulkan vk::Format.
+ * Used as a local replacement for PixelFormat::PixelByteSize which takes PixelFormat.
+ */
+static uint32_t vkFormatByteSize(vk::Format format)
+{
+	switch (format)
+	{
+	case vk::Format::eR8G8B8A8Unorm:
+	case vk::Format::eR8G8B8A8Srgb:
+	case vk::Format::eB8G8R8A8Unorm:
+	case vk::Format::eB8G8R8A8Srgb:
+		return 4;
+	case vk::Format::eR16G16B16A16Sfloat:
+	case vk::Format::eR16G16B16A16Unorm:
+	case vk::Format::eR16G16B16A16Snorm:
+		return 8;
+	case vk::Format::eR32G32B32A32Sfloat:
+		return 16;
+	case vk::Format::eR8Unorm:
+	case vk::Format::eR8Srgb:
+		return 1;
+	case vk::Format::eD32Sfloat:
+		return 4;
+	default:
+		return 0;
+	}
+}
 
 // ===========================================================================
 // Constructor
@@ -270,7 +328,7 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 	const std::string path = Screenshot::timestampedFilename(
 		filenamePrefix + "_Light" + std::to_string(lightUID), ".png");
 
-	ImageData grayImg(grayPixels.data(), equiWidth, equiHeight, vk::Format::eR8Unorm);
+	ImageData grayImg(grayPixels.data(), equiWidth, equiHeight, PixelFormat::R8U);
 	const bool saved = grayImg.SavePNG(path);
 
 	if (saved)
@@ -328,7 +386,7 @@ std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
 		filenamePrefix + "_Light" + std::to_string(lightUID), ".png");
 
 	ImageData grayImg(grayPixels.data(), extent.width, extent.height,
-	                   vk::Format::eR8Unorm);
+	                   PixelFormat::R8U);
 	const bool saved = grayImg.SavePNG(path);
 
 	// Restore original layout — ReadImageData transitions to TransferSrc.
@@ -390,7 +448,7 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
                                    vk::Extent2D extent,
                                    const std::string& path)
 {
-	if (ImageData::PixelByteSize(format) == 0)
+	if (vkFormatByteSize(format) == 0)
 	{
 		return false;
 	}
@@ -545,7 +603,7 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
 	}
 
 	// --- 4. Delegate PNG write to ImageData ---
-	ImageData imgData(rawData.data(), extent.width, extent.height, format);
+	ImageData imgData(rawData.data(), extent.width, extent.height, vkFormatToPixelFormat(format));
 	return imgData.SavePNG(path);
 }
 
@@ -560,7 +618,7 @@ bool Screenshot::CaptureAttachment(const vk::raii::Device& device,
                                      Image& vulkanImage,
                                     const std::string& path)
 {
-	if (ImageData::PixelByteSize(vulkanImage.Format()) == 0)
+	if (vkFormatByteSize(vulkanImage.Format()) == 0)
 	{
 		return false;
 	}
@@ -583,7 +641,7 @@ bool Screenshot::CaptureImageLayer(const vk::raii::Device& device,
                                     uint32_t layerIndex,
                                     const std::string& path)
 {
-	if (ImageData::PixelByteSize(vulkanImage.Format()) == 0)
+	if (vkFormatByteSize(vulkanImage.Format()) == 0)
 	{
 		return false;
 	}

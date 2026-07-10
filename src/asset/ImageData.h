@@ -6,13 +6,15 @@
  * Provides static helpers for pixel‑byte queries, half‑float conversion,
  * BGR swizzle, and member functions for CPU‑side PNG/HDR output.
  *
- * Pure CPU data - no Vulkan/GPU resources.  Analogous to MeshData.
+ * Pure CPU data - zero Vulkan/GPU resources.  Analogous to MeshData.
+ * Uses PixelFormat (not vk::Format) for format identification.
  */
 #pragma once
 
-#include <vulkan/vulkan_raii.hpp>
+#include "asset/PixelFormat.h"
 
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -30,8 +32,8 @@ public:
 	 * @brief Constructs ImageData by loading an image from a file path.
 	 *
 	 * Auto-detects HDR vs LDR format using stb_is_hdr().
-	 * HDR images (.hdr) are loaded as R32G32B32A32_SFLOAT.
-	 * LDR images (.png, .bmp, .jpg, .tga) are loaded as R8G8B8A8_SRGB.
+	 * HDR images (.hdr) are loaded as RGBA32F.
+	 * LDR images (.png, .bmp, .jpg, .tga) are loaded as RGBA8S.
 	 *
 	 * @param path File path to the image.
 	 */
@@ -42,11 +44,11 @@ public:
 	 * @param data        Non-owning pointer to raw pixel bytes.
 	 * @param w           Image width in pixels.
 	 * @param h           Image height in pixels.
-	 * @param fmt         Vulkan pixel format.
+	 * @param fmt         Pixel format.
 	 * @param arrayLayers Number of array layers (default 1). Total copy size is
 	 *                    w * h * PixelByteSize(fmt) * arrayLayers.
 	 */
-	ImageData(const void* data, uint32_t w, uint32_t h, vk::Format fmt,
+	ImageData(const void* data, uint32_t w, uint32_t h, PixelFormat fmt,
 	          uint32_t arrayLayers = 1);
 
 	// --- Validity ---
@@ -59,20 +61,17 @@ public:
 	const std::vector<uint8_t>& GetPixelData() const { return im_pixelData; }
 	uint32_t GetWidth() const { return im_width; }
 	uint32_t GetHeight() const { return im_height; }
-	vk::Format GetFormat() const { return im_format; }
+	PixelFormat GetFormat() const { return im_format; }
 
 	// -------------------------------------------------------------------
-	// Format helpers (static)
+	// Format helpers (non‑static convenience wrappers)
 	// -------------------------------------------------------------------
 
-	/** @brief Bytes per pixel, or 0 if unsupported. */
-	static uint32_t PixelByteSize(vk::Format format);
+	/** @brief Bytes per pixel for the owned format. */
+	uint32_t PixelByteSize() const { return neurus::PixelByteSize(im_format); }
 
-	/** @brief Number of colour channels. */
-	static uint32_t ChannelCount(vk::Format format);
-
-	/** @brief True for BGRA formats. */
-	static bool IsBGRFormat(vk::Format format);
+	/** @brief Number of colour channels for the owned format. */
+	uint32_t ChannelCount() const { return neurus::ChannelCount(im_format); }
 
 	/**
 	 * @brief Converts RGBA16F half‑float data to RGBA8.
@@ -104,7 +103,7 @@ public:
 	/**
 	 * @brief Writes the owned pixel data to a Radiance .hdr file.
 	 *
-	 * Expects R32G32B32A32_SFLOAT pixel data (16 bytes per pixel).
+	 * Expects RGBA32F pixel data (16 bytes per pixel).
 	 * Output is RGBE-encoded in the Radiance HDR format.
 	 *
 	 * @param path Output file path (.hdr extension recommended).
@@ -129,7 +128,7 @@ private:
 	std::vector<uint8_t> im_pixelData;  ///< Owning pixel data (raw bytes, format-dependent byte count)
 	uint32_t im_width = 0;
 	uint32_t im_height = 0;
-	vk::Format im_format = vk::Format::eUndefined;
+	PixelFormat im_format{};
 };
 
 } // namespace neurus

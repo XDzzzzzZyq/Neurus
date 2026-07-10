@@ -1,7 +1,5 @@
 #pragma once
 
-#include "render/Texture.h"
-
 #include <glm/glm.hpp>
 
 #include <memory>
@@ -11,6 +9,9 @@
 #include <vector>
 
 namespace neurus {
+
+// Forward declarations
+class Texture;
 
 /**
  * @brief Material descriptor for PBR rendering.
@@ -86,7 +87,7 @@ public:
 	 *
 	 * Only the member corresponding to the current MatDataType is meaningful.
 	 */
-	using MatParamData = std::tuple<MatDataType, float, glm::vec3, Texture::TextureRes>;
+	using MatParamData = std::tuple<MatDataType, float, glm::vec3, std::shared_ptr<Texture>>;
 
 	/** @brief Shared pointer to a Material. */
 	using MaterialRes = std::shared_ptr<Material>;
@@ -182,7 +183,7 @@ public:
 	 * @param _tar Target parameter.
 	 * @param _tex Shared pointer to the Texture.
 	 */
-	void SetMatParam(MatParaType _tar, Texture::TextureRes _tex);
+	void SetMatParam(MatParaType _tar, std::shared_ptr<Texture> _tex);
 
 	// ---------------------------------------------------------------------------
 	// Configuration loading

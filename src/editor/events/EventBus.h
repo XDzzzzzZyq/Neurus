@@ -84,7 +84,7 @@ inline EventQueue& GetEventQueue()
 	return queue;
 }
 
-inline EventQueue& EventQueue()
+inline EventQueue& eventQueue()
 {
 	return GetEventQueue();
 }

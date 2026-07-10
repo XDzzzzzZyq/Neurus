@@ -13,6 +13,9 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
+- `src/render/MeshGPU.h` - GPU-side mesh resources (VertexBuffer + IndexBuffer), owned by RenderCache
+- `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, attachments, shadow maps
+- `src/render/Texture.h/cpp` - Texture resource (Image + sampler + descriptor)
 
 ## Core Responsibilities
 
@@ -220,6 +223,33 @@ assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
 | SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
 | ShadowMap | D32_SFLOAT | 1.0 | Per-light shadow depth (RenderCache-owned). Cubemap (6-layer 2D_ARRAY, 1024×1024) for point lights; 2D (2048×2048) for sun lights |
 | ShadowIntensity | R8_UNORM | 0 (no shadow) | Layered 2D_ARRAY, one layer per shadow-casting light (RenderCache-owned) |
+
+### RenderCache GPU Resources (MeshGPU, EnvironmentGPU)
+
+`RenderCache` owns cross-frame mutable GPU resources beyond framebuffer attachments.
+These resources separate GPU ownership from the Vulkan-free scene and asset layers:
+
+**MeshGPU** (`src/render/MeshGPU.h`)
+- Holds device-local `VertexBuffer` + `IndexBuffer` for a mesh, plus vertex/index counts
+- Created lazily via `RenderCache::GetMeshGPU(objectId, meshData, device, pd, queue, qfi)`
+  which uploads geometry from `MeshData` to GPU
+- Subsequent calls return the cached `MeshGPU` immediately
+- Destroyed via `RenderCache::RemoveMeshGPU(objectId)` or `RenderCache::Clean()`
+- Scene `Mesh` objects call `RenderCache::GetMeshGPU()` through `Mesh::UploadToGPU()`;
+  the scene layer never owns GPU buffers directly
+
+**EnvironmentGPU** (`src/render/RenderCache.h`)
+- Holds diffuse irradiance and specular prefiltered cubemap `Texture` objects
+  (each wraps `Image` + sampler + descriptor)
+- Created lazily via `RenderCache::CreateEnvironmentGPU(envId, device, pd, queue, qfi, env)`
+  from an `Environment` scene object
+- Read per-frame by `LightingPass` via `RenderCache::GetEnvironmentGPU(envId)`
+- Destroyed via `RenderCache::RemoveEnvironmentGPU(envId)`
+
+**GeometryRenderItem** (removed)
+- Previously mixed CPU (MeshData) and GPU (VertexBuffer, IndexBuffer) concerns in one struct
+- Removed as part of CPU/GPU isolation refactoring. GPU resources now live in `MeshGPU`;
+  CPU data stays in `MeshData`
 
 ## Future Evolution
 

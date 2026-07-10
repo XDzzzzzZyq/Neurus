@@ -204,7 +204,7 @@ protected:
 	}
 
 	/**
-	 * @brief Creates a triangle Mesh and uploads it to the GPU.
+	 * @brief Creates a triangle Mesh (GPU upload is lazy via RenderCache).
 	 */
 	std::shared_ptr<Mesh> CreateAndUploadTriangleMesh()
 	{
@@ -213,8 +213,6 @@ protected:
 
 		auto mesh = std::make_shared<Mesh>();
 		mesh->o_mesh = md;
-		mesh->UploadToGPU(*m_device, m_physicalDevices[m_selectedPdIndex],
-		                  m_queue, m_graphicsQueueFamily);
 		return mesh;
 	}
 

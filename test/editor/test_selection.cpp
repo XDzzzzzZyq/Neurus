@@ -184,7 +184,7 @@ protected:
 	void SetUp() override
 	{
 		m_sel = std::make_unique<SelectionController>();
-		m_queue = &EventQueue();
+		m_queue = &eventQueue();
 	}
 
 	void TearDown() override

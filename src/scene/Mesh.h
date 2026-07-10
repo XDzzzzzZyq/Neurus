@@ -25,7 +25,6 @@
 #include <glm/glm.hpp>
 
 #include <cereal/types/base_class.hpp>
-#include <vulkan/vulkan_raii.hpp>
 
 #include "UID.h"
 #include "Transform.h"
@@ -37,9 +36,6 @@ namespace neurus
 
 class Material;
 class MeshData;
-class VertexBuffer;
-class IndexBuffer;
-
 /**
  * @brief 3D mesh object representing renderable geometry with material and transform.
  *
@@ -98,16 +94,6 @@ public:
 
 	void ReloadMeshData(const std::string& assetDir = "");
 
-	void UploadToGPU(const vk::raii::Device& device,
-	                 const vk::raii::PhysicalDevice& physicalDevice,
-	                 vk::Queue queue,
-	                 uint32_t queueFamilyIndex);
-
-	const VertexBuffer* GetVertexBuffer() const { return me_gpuVertices.get(); }
-	const IndexBuffer* GetIndexBuffer() const { return me_gpuIndices.get(); }
-	uint32_t GetGPUIndexCount() const { return me_gpuIndexCount; }
-	void ReleaseGPUBuffers();
-
 	void SetObjShader(void* shader);
 	void SetTex(int _type, const std::string& _name);
 	void SetMatColor(int _type, float _val);
@@ -120,10 +106,6 @@ public:
 	void* GetTransform() override { return static_cast<Transform*>(this); }
 
 private:
-	std::unique_ptr<VertexBuffer> me_gpuVertices;
-	std::unique_ptr<IndexBuffer> me_gpuIndices;
-	uint32_t me_gpuIndexCount = 0;
-	const vk::raii::Device* me_gpuDevice = nullptr;
 };
 
 } // namespace neurus

@@ -21,8 +21,9 @@
  */
 
 #include "passes/ShadowDepthPass.h"
-#include "passes/GeometryPass.h"       // for GeometryRenderItem
-#include "RenderCache.h"               // for GetShadowMap
+#include "RenderContext.h"
+#include "RenderCache.h"
+#include "../MeshGPU.h"
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"
@@ -30,6 +31,7 @@
 #include "../shaders/RenderShader.h"
 
 #include "scene/Light.h"
+#include "scene/Mesh.h"
 #include "scene/Scene.h"
 
 #include "Log.h"
@@ -92,12 +94,15 @@ DescriptorSetLayout ShadowDepthPass::CreateSSBOLayout(const vk::raii::Device& de
 // ===========================================================================
 
 ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
-                                   const vk::raii::PhysicalDevice& physicalDevice,
-                                   vk::Queue graphicsQueue,
-                                   uint32_t queueFamilyIndex,
-                                   uint32_t resolution)
+                                    const vk::raii::PhysicalDevice& physicalDevice,
+                                    vk::Queue graphicsQueue,
+                                    uint32_t queueFamilyIndex,
+                                    uint32_t resolution)
 	: Pass()
 	, p_resolution(resolution)
+	, p_physicalDevice(&physicalDevice)
+	, m_queue(graphicsQueue)
+	, m_queueFamilyIndex(queueFamilyIndex)
 	, p_pipelineLayout(nullptr)
 	, p_pipeline(nullptr)
 	// --- Self-load shaders via ShaderLibrary ---
@@ -111,7 +116,6 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag"))
 {
 	p_device = &device;
-	p_physicalDevice = &physicalDevice;
 
 	// --- Create modules from self-loaded shaders (creates ShaderModules from SPIR-V) ---
 	if (m_multiviewShader) { m_multiviewShader->CreateModule(device); }
@@ -364,19 +368,28 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		cmdBuf.beginRendering(renderInfo);
 
-		if (ctx.renderItems)
+		if (ctx.scene)
 		{
-			for (const auto& item : *ctx.renderItems)
+			for (const auto& [id, mesh] : ctx.scene->mesh_list)
 			{
+				if (!mesh || !mesh->o_mesh) continue;
+
+				MeshGPU& gpu = cache.GetMeshGPU(
+					mesh->GetObjectID(), m_queue, m_queueFamilyIndex, *mesh->o_mesh);
+
+				if (!gpu.vertexBuffer || !gpu.indexBuffer) continue;
+
+				const glm::mat4 model = mesh->GetModelMatrix();
+
 				// Push model matrix at offset 16 (light data at offset 0
 				// persists from the per-light push above).
 				cmdBuf.pushConstants<glm::mat4>(p_pipelineLayout,
 				    vk::ShaderStageFlagBits::eVertex |
 				    vk::ShaderStageFlagBits::eFragment,
-				    kModelPushOffset, item.pushConstants.model);
-				cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-				cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-				cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+				    kModelPushOffset, model);
+				cmdBuf.bindVertexBuffers(0, gpu.vertexBuffer->buffer(), {vk::DeviceSize{0}});
+				cmdBuf.bindIndexBuffer(gpu.indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+				cmdBuf.drawIndexed(gpu.indexCount, 1, 0, 0, 0);
 			}
 		}
 
@@ -463,19 +476,27 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 			cmdBuf.beginRendering(renderInfo);
 
-			if (ctx.renderItems)
+			if (ctx.scene)
 			{
-				for (const auto& item : *ctx.renderItems)
+				for (const auto& [id, mesh] : ctx.scene->mesh_list)
 				{
-					const glm::mat4 mvp = lightViewProj * item.pushConstants.model;
+					if (!mesh || !mesh->o_mesh) continue;
+
+					MeshGPU& gpu = cache.GetMeshGPU(
+						mesh->GetObjectID(), m_queue, m_queueFamilyIndex, *mesh->o_mesh);
+
+					if (!gpu.vertexBuffer || !gpu.indexBuffer) continue;
+
+					const glm::mat4 model = mesh->GetModelMatrix();
+					const glm::mat4 mvp = lightViewProj * model;
 
 					cmdBuf.pushConstants<glm::mat4>(p_sunPipelineLayout,
 					    vk::ShaderStageFlagBits::eVertex,
 					    0, mvp);
 
-					cmdBuf.bindVertexBuffers(0, {item.vertexBuffer}, {vk::DeviceSize{0}});
-					cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
-					cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+					cmdBuf.bindVertexBuffers(0, gpu.vertexBuffer->buffer(), {vk::DeviceSize{0}});
+					cmdBuf.bindIndexBuffer(gpu.indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+					cmdBuf.drawIndexed(gpu.indexCount, 1, 0, 0, 0);
 				}
 			}
 

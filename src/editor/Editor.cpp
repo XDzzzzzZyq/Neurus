@@ -19,7 +19,6 @@
 #include "scene/Scene.h"
 #include "app/VulkanContext.h"
 #include "render/DeferredRenderer.h"
-#include "render/Image.h"
 #include "core/Log.h"
 
 namespace {
@@ -66,7 +65,7 @@ void Editor::Initialize(Scene& scene)
 	ed_ownerScene = &scene;
 
 	// Create Context with EventQueue singleton
-	ed_context = std::make_unique<Context>(EventQueue());
+	ed_context = std::make_unique<Context>(eventQueue());
 	ed_context->editor.SetScene(&scene);
 
 	// --- Wire project file signal handlers ---
@@ -110,10 +109,10 @@ void Editor::Initialize(Scene& scene)
 	OnIBLLoad();
 
 	// --- Register controllers ---
-	RegisterController<CameraController>(EventQueue());
+	RegisterController<CameraController>(eventQueue());
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
-	EventQueue().subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
+	eventQueue().subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
 		auto it = GetScene().env_list.find(e.envId);
 		if (it != GetScene().env_list.end())
 		{
@@ -158,12 +157,7 @@ void Editor::OnProjectNew()
 		auto& projectScene = ed_project->GetScene();
 		ed_ownerScene = &projectScene;
 
-		// Upload scene data to GPU
-		for (const auto& [id, mesh] : projectScene.mesh_list)
-		{
-			mesh->UploadToGPU(ed_vkContext->device(), ed_vkContext->physicalDevice(),
-			                  ed_vkContext->graphicsQueue(), ed_vkContext->graphicsQueueFamily());
-		}
+		// GPU resources created lazily by RenderCache on first use
 		if (ed_renderer)
 		{
 			ed_renderer->UploadLights(projectScene);
@@ -202,12 +196,7 @@ void Editor::OnProjectOpen(const QString& path)
 		auto& projectScene = ed_project->GetScene();
 		ed_ownerScene = &projectScene;
 
-		// Re-upload scene data to GPU
-		for (const auto& [id, mesh] : projectScene.mesh_list)
-		{
-			mesh->UploadToGPU(ed_vkContext->device(), ed_vkContext->physicalDevice(),
-			                  ed_vkContext->graphicsQueue(), ed_vkContext->graphicsQueueFamily());
-		}
+		// GPU resources created lazily by RenderCache on first use
 		if (ed_renderer)
 		{
 			ed_renderer->UploadLights(projectScene);
@@ -252,8 +241,7 @@ void Editor::OnMeshImport(const QString& path)
 {
 	try {
 		auto mesh = std::make_shared<neurus::Mesh>(path.toStdString());
-		mesh->UploadToGPU(ed_vkContext->device(), ed_vkContext->physicalDevice(),
-		                  ed_vkContext->graphicsQueue(), ed_vkContext->graphicsQueueFamily());
+		// GPU upload happens lazily via RenderCache::GetMeshGPU() on first render.
 		ed_project->GetScene().UseMesh(mesh);
 		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Imported mesh: " << path.toStdString());
@@ -366,24 +354,8 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 		return;
 	}
 
-	auto& device = ed_vkContext->device();
-	auto& pd = ed_vkContext->physicalDevice();
-	auto queue = ed_vkContext->graphicsQueue();
-	uint32_t qfi = ed_vkContext->graphicsQueueFamily();
-
-	// Ensure cubemaps exist (lazily created on first call)
-	env->BuildIBLTextures(device, pd);
-
-	// Load HDR or fallback
-	ImageData hdrData(env->GetEquirectPath());
-	auto equirect = Image::FromImageData(device, pd, queue, qfi, hdrData);
-	if (!equirect)
-	{
-		equirect = Environment::GenerateFallbackImage(device, pd, queue, qfi);
-	}
-
-	// Generate IBL into cubemaps via DeferredRenderer wrapper (respects layer isolation)
-	ed_renderer->GenerateIBL(*equirect, *env->GetCubemapDiffuse(), *env->GetCubemapSpecular());
+	// Delegate GPU resource creation to RenderCache (via DeferredRenderer)
+	ed_renderer->GenerateIBL(env);
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
 }
@@ -398,7 +370,7 @@ void Editor::Edit(const InputState& input)
 	auto* cam = const_cast<Camera*>(scene.GetActiveCamera());
 	if (!cam) return;
 
-	auto& bus = EventQueue();
+	auto& bus = eventQueue();
 
 	// Translate InputState → CameraEvents (matching OpenGL Viewport.cpp:178-198)
 	if (input.middleMouseHeld)

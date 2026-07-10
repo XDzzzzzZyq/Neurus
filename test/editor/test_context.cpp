@@ -202,7 +202,7 @@ TEST_F(EditorContextRefactoredTest, SelectionManager_InitiallyEmpty)
 
 TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventQueue)
 {
-	auto& pool = EventQueue();
+	auto& pool = eventQueue();
 	int receivedStatus = -1;
 
 	pool.subscribe<SceneStatusChanged>(
@@ -226,7 +226,7 @@ protected:
 	{
 		m_context = std::make_unique<EditorContext>();
 		m_scene = std::make_unique<Scene>();
-		m_queue = &EventQueue();
+		m_queue = &eventQueue();
 	}
 
 	void TearDown() override
@@ -311,7 +311,7 @@ class ContextTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_queue = &EventQueue();
+		m_queue = &eventQueue();
 		m_scene = std::make_unique<Scene>();
 		m_context = std::make_unique<Context>(*m_queue);
 	}
@@ -329,7 +329,7 @@ protected:
 TEST_F(ContextTest, ConstructsWithoutCrash)
 {
 	ASSERT_NO_THROW({
-		Context ctx(EventQueue());
+		Context ctx(eventQueue());
 	});
 }
 

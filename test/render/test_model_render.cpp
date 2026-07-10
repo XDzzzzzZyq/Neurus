@@ -231,30 +231,18 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -----------------------------------------------------------------------
-	// Step 9: Upload mesh data to GPU
+	// Step 9: GPU buffers created lazily by RenderCache::GetMeshGPU()
+	// on first access during GeometryPass::Record().
 	// -----------------------------------------------------------------------
-	mesh->UploadToGPU(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	// -----------------------------------------------------------------------
-	// Step 10: Build GeometryRenderItem with identity model matrix
-	// -----------------------------------------------------------------------
-	GeometryRenderItem renderItem;
-	renderItem.vertexBuffer = mesh->GetVertexBuffer()->buffer();
-	renderItem.indexBuffer  = mesh->GetIndexBuffer()->buffer();
-	renderItem.indexCount   = mesh->GetGPUIndexCount();
-	renderItem.indexType    = mesh->GetIndexBuffer()->GetIndexType();
-	renderItem.pushConstants.model = glm::mat4(1.0f);
-	renderItem.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-	// -----------------------------------------------------------------------
-	// Step 11: Transition G-Buffer attachments to renderable layouts
+	// Step 10: Transition G-Buffer attachments to renderable layouts
 	// -----------------------------------------------------------------------
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	// -----------------------------------------------------------------------
-	// Step 12: Build RenderContext & record geometry pass (G-Buffer write)
+	// Step 11: Build RenderContext & record geometry pass (G-Buffer write)
 	// -----------------------------------------------------------------------
-	std::vector<GeometryRenderItem> items = { renderItem };
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
 		.frameIndex = 0,
@@ -262,7 +250,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		.view = camUBO.view,
 		.cameraPos = camera->GetPosition(),
 		.invProjView = glm::inverse(camUBO.viewProj),
-		.renderItems = &items,
+		.scene = &scene,
 	};
 
 	{

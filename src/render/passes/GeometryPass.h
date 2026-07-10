@@ -10,9 +10,10 @@
  * Architecture:
  * - Owns the graphics pipeline, descriptor set layout, descriptor pool,
  *   camera UBO, and camera descriptor set (set 0).
- * - Borrows RenderCache (non-owning reference).
- * - Receives pre-assembled GeometryRenderItem batches from the caller.
- * - Each GeometryRenderItem bundles GPU buffers + model matrices.
+ * - Borrows RenderCache (non-owning reference) for MeshGPU lookups.
+ * - Reads mesh list from RenderContext::scene->mesh_list.
+ * - For each Mesh: looks up MeshGPU via RenderCache::GetMeshGPU(),
+ *   reads model matrix from Mesh::GetTransform().
  *
  * @note No PBR lighting - only geometry data is written to the G-Buffer.
  * @note Uses PipelineBuilder for MRT pipeline construction.
@@ -36,9 +37,6 @@
 
 namespace neurus {
 
-// --- Forward declarations ---
-class RenderCache;
-
 /**
  * @brief Camera data uploaded to the GPU each frame.
  *
@@ -49,32 +47,6 @@ struct CameraUBOData
 {
 	glm::mat4 viewProj;   ///< projection * view
 	glm::mat4 view;       ///< view matrix (for normal transform)
-};
-
-/**
- * @brief Per-mesh push-constant block sent to the vertex shader.
- *
- * Packed as two mat4s (128 bytes total) to satisfy Vulkan's
- * 16-byte alignment requirement for push constants.
- */
-struct alignas(16) PushConstants
-{
-	glm::mat4 model;           ///< Local-to-world transform (offset 0)
-	glm::mat4 normalMatrix;    ///< 3x3 in upper-left of mat4 (offset 64)
-};
-
-/**
- * @brief Single draw batch for the geometry pass.
- *
- * Assembly by the caller (test or Renderer) from a scene Mesh.
- */
-struct GeometryRenderItem
-{
-	vk::Buffer     vertexBuffer;   ///< Vertex buffer handle (binding 0)
-	vk::Buffer     indexBuffer;    ///< Index buffer handle
-	uint32_t       indexCount;     ///< Number of indices to draw
-	vk::IndexType  indexType;      ///< Index type (always UINT32)
-	PushConstants  pushConstants;  ///< Model + normal matrix
 };
 
 /**
@@ -113,15 +85,14 @@ public:
 	 *   1. Uploads camera data to the UBO (host-visible memcpy).
 	 *   2. Begins the G_BUFFER dynamic rendering pass.
 	 *   3. Sets viewport and scissor.
-	 *   4. For each GeometryRenderItem: pushes model/normal matrices,
-	 *      binds vertex/index buffers, binds camera descriptor set,
-	 *      and draws indexed.
+	 *   4. Iterates ctx.scene->mesh_list, looks up MeshGPU via cache.GetMeshGPU(),
+	 *      reads model/normal matrices from mesh->GetTransform(), pushes constants,
+	 *      binds vertex/index buffers, and draws indexed.
 	 *   5. Ends the dynamic rendering pass.
 	 *
 	 * @param cmdBuf          Command buffer in recording state.
-	 * @param cameraData      Camera matrices for the current frame.
-	 * @param renderItems     Vector of draw batches to render.
-	 * @param renderExtent    Render area dimensions.
+	 * @param cache           Render cache for MeshGPU and attachment lookups.
+	 * @param ctx             Per-frame context (scene, camera, extent).
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
@@ -145,6 +116,8 @@ private:
 
 	// --- References (non-owning) ---
 	const vk::raii::PhysicalDevice* p_physicalDevice;
+	vk::Queue p_queue = nullptr;          ///< Graphics queue (for MeshGPU staging uploads)
+	uint32_t p_queueFamilyIndex = 0;      ///< Queue family index (for MeshGPU staging uploads)
 
 	// --- Descriptor resources ---
 	DescriptorSetLayout p_cameraLayout;             ///< Set 0 layout definition

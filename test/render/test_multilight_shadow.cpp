@@ -127,8 +127,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	// -------------------------------------------------------------------
 	auto shadowRes = neurus::test::LoadMultiShadow(
 		*m_device, pd, m_queue, m_graphicsQueueFamily);
-	const auto& renderItems = shadowRes.renderItems;
-	ASSERT_EQ(renderItems.size(), 2u) << "Expected cube + plane (2 render items)";
+	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected cube + plane (2 meshes)";
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
 
 	// Get the camera from the scene
@@ -154,7 +153,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = cameraPos;
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &renderItems;
+	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -265,7 +264,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = camera->GetPosition();
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &shadowRes.renderItems;
+	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -344,7 +343,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = camera->GetPosition();
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &shadowRes.renderItems;
+	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -476,7 +475,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = camera->GetPosition();
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &shadowRes.renderItems;
+	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -560,7 +559,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 		}
 
 		// --- Save to temporary PNG ---
-		ImageData imgData(pixelData.data(), kRenderWidth, kRenderHeight, vk::Format::eR8Unorm);
+		ImageData imgData(pixelData.data(), kRenderWidth, kRenderHeight, PixelFormat::R8U);
 		const std::string refPath = neurus::test::ReferencePath::Make(
 			"multilight/ShadowIntensity_Light_" + std::to_string(li) + ".png");
 		const std::string tmpPath = refPath + ".tmp";
@@ -645,8 +644,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	auto shadowRes = neurus::test::LoadMultiShadow(
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
 		3, LightType::SUNLIGHT);
-	const auto& renderItems = shadowRes.renderItems;
-	ASSERT_EQ(renderItems.size(), 2u) << "Expected cube + plane (2 render items)";
+	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected cube + plane (2 meshes)";
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 sun lights";
 
 	// Verify all lights are SUNLIGHT
@@ -682,7 +680,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	ctx.view         = camUBO.view;
 	ctx.cameraPos    = cameraPos;
 	ctx.invProjView  = glm::inverse(camUBO.viewProj);
-	ctx.renderItems  = &renderItems;
+	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------

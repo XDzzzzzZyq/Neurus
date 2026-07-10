@@ -38,10 +38,13 @@ target_include_directories(neurus_scene PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
+target_link_libraries(neurus_scene PRIVATE
+	Vulkan::Vulkan
+)
+
 target_link_libraries(neurus_scene PUBLIC
 	glm
 	cereal
-	Vulkan::Vulkan
 )
 
 target_link_libraries(neurus_scene PRIVATE

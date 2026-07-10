@@ -219,13 +219,7 @@ std::unique_ptr<project::Project> Application::LoadProject()
 		}
 	}
 
-	// --- Upload each Mesh object directly to GPU ---
-	for (const auto& [id, mesh] : scene.mesh_list)
-	{
-		mesh->UploadToGPU(app_vkContext->device(), app_vkContext->physicalDevice(),
-		                  app_vkContext->graphicsQueue(), app_vkContext->graphicsQueueFamily());
-	}
-
+	// GPU resources created lazily by RenderCache on first use
 	return project;
 }
 

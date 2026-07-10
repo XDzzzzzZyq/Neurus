@@ -72,7 +72,7 @@ protected:
 		return rgba;
 	}
 
-	struct TS { std::shared_ptr<Scene> s; std::vector<GeometryRenderItem> items; int uid=-1; };
+	struct TS { std::shared_ptr<Scene> s; int uid=-1; };
 	TS BuildScene() {
 		TS r; r.s=std::make_shared<Scene>();
 		// Quad at y=-5 in XZ plane, 5 units forward from the sun shadow camera at (0,-10,0)
@@ -84,16 +84,8 @@ protected:
 			"f 1 2 3 4\n";
 		auto md=std::make_shared<MeshData>(); md->LoadObjFromString(ob);
 		auto m=std::make_shared<Mesh>(); m->o_name="Q"; m->o_mesh=md;
-		m->UploadToGPU(*m_device,PhysicalDevice(),m_queue,m_graphicsQueueFamily);
+		// GPU buffers created lazily by RenderCache::GetMeshGPU()
 		r.s->UseMesh(m);
-		GeometryRenderItem it{};
-		it.vertexBuffer=m->GetVertexBuffer()->buffer();
-		it.indexBuffer=m->GetIndexBuffer()->buffer();
-		it.indexCount=m->GetGPUIndexCount();
-		it.indexType=vk::IndexType::eUint32;
-		it.pushConstants.model=glm::mat4(1.f);
-		it.pushConstants.normalMatrix=glm::mat4(1.f);
-		r.items.push_back(it);
 		auto l=std::make_shared<Light>(LightType::SUNLIGHT,10.f,glm::vec3(1.f));
 		l->o_name="S"; l->use_shadow=true;
 		r.s->UseLight(l); r.uid=r.s->light_list.begin()->first;
@@ -109,13 +101,13 @@ TEST_F(SunShadowDepthTest, OrthoDepthMap)
 	if (!m_hasVulkan) { GTEST_SKIP()<<"No Vulkan GPU."; }
 	auto& pd=PhysicalDevice();
 	auto ts=BuildScene();
-	ASSERT_GT(ts.items.size(),0u); ASSERT_NE(ts.uid,-1);
+	ASSERT_NE(ts.uid,-1);
 	const int uid=ts.uid;
 
 	{ auto& cmd=BeginCmd();
 		RenderContext ctx{};
 		ctx.renderExtent=vk::Extent2D(kRes,kRes);
-		ctx.renderItems=&ts.items; ctx.scene=ts.s.get();
+		ctx.scene=ts.s.get();
 		m_pass->Record(*cmd,*m_cache,ctx);
 		EndSubmitWait(cmd); }
 
@@ -143,7 +135,7 @@ TEST_F(SunShadowDepthTest, OrthoDepthMap)
 
 	{ const std::string rp=neurus::test::ReferencePath::Make("shadow/SunDepth.png");
 		auto rgba=DepthToRGBA8(dd);
-		ImageData img(rgba.data(),kRes,kRes,vk::Format::eR8G8B8A8Unorm);
+		ImageData img(rgba.data(),kRes,kRes,PixelFormat::RGBA8U);
 		ASSERT_TRUE(img.SavePNG(rp+".tmp"));
 		int rr=neurus::test::CheckReferenceOrGenerate(rp,2);
 		if (rr<0) { std::cout<<"[Depth] Reference generated\n"; GTEST_SKIP()<<"Re-run."; }

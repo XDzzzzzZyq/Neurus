@@ -52,6 +52,8 @@ are shared across layers.
 - Consumes read-only VkSurfaceKHR from UI layer
 - Consumes per-frame RenderContext (immutable scene snapshot) for pass dispatch
 - Centralized image barrier management via `Barrier::Transition` (ImageState → Vulkan layout/stage/access)
+- Owns `MeshGPU` (GPU-side mesh resources: VertexBuffer + IndexBuffer) via `RenderCache::GetMeshGPU()`
+- Owns `EnvironmentGPU` (GPU-side IBL resources: diffuse + specular cubemap Textures) via `RenderCache::CreateEnvironmentGPU()`
 - Must NOT mutate application state
 - Must NOT depend on Editor or UI layers
 
@@ -75,10 +77,18 @@ are shared across layers.
 - Must NOT mutate scene state directly
 
 **Asset Layer** (`src/asset/`)
-- OBJ mesh loading and parsing into MeshData
-- PNG/HDR image decoding into ImageData
-- CPU-side data representation; GPU upload handled by Renderer
-- Must NOT issue draw calls or manage GPU pipelines
+- Vulkan-free: no `<vulkan/>` includes in public headers
+- OBJ mesh loading and parsing into MeshData (pure CPU struct)
+- PNG/HDR image decoding into ImageData (pure CPU struct, owning pixel vector)
+- `PixelFormat` enum for CPU-side format queries (maps to `vk::Format` by convention, not by cast)
+- CPU-side data representation only; GPU upload handled by Renderer via `MeshGPU` and `Image::FromImageData`
+- Must NOT issue draw calls, manage GPU pipelines, or own GPU resources
+
+**Scene Layer** (`src/scene/`)
+- Vulkan-free in public interface: no GPU types exposed to consumers
+- Scene objects (Camera, Light, Transform, Mesh, UID) define logical scene structure
+- GPU resources (VertexBuffer, IndexBuffer) are separated into `MeshGPU` owned by RenderCache
+- `Mesh::UploadToGPU()` bridges scene data to Renderer-owned GPU resources
 
 ### Communication Protocols
 
@@ -120,7 +130,15 @@ Renderer Layer owns:
    VkImage + VkDeviceMemory + VkImageView triples (Image, Texture)
    VkDescriptorPool + VkDescriptorSet (DescriptorManager)
    Barrier::Transition (centralized layout transitions, ImageState → Vulkan mapping)
+   MeshGPU (GPU-side mesh resources: VertexBuffer + IndexBuffer, owned by RenderCache)
+   EnvironmentGPU (GPU-side IBL resources: diffuse + specular cubemap Textures, owned by RenderCache)
 ```
+
+Scene and Asset layers own NO GPU resources. `Mesh::UploadToGPU()` delegates to
+`RenderCache::GetMeshGPU()` which creates and owns the `MeshGPU`. `ImageData`
+provides CPU-side pixel buffers; GPU upload goes through `Image::FromImageData`.
+The `GeometryRenderItem` struct that previously mixed CPU and GPU concerns has
+been removed.
 
 ## Design Constraints
 
@@ -184,6 +202,10 @@ compute pass, and full G-Buffer pipeline through the four-layer architecture.
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
 - OBJ mesh loading with MeshData
+- `PixelFormat` enum for CPU-side format queries (Vulkan-free asset layer)
+- `MeshGPU` and `EnvironmentGPU` as RenderCache-owned GPU resources (separated from scene/asset layers)
+- GPU-side mesh resources separated from scene `Mesh` (`MeshGPU` owned by RenderCache)
+- `GeometryRenderItem` removed (CPU/GPU concerns now fully separated)
 - Deferred PBR pipeline: ShadowDepthPass → GeometryPass (G-Buffer) → SSAOPass → LightingPass (compute) → IBLPass
 - Centralized image barrier system (Barrier::Transition, ImageState enum)
 - Screenshot capture + TextureData PNG readback

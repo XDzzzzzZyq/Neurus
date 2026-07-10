@@ -34,7 +34,6 @@
 #include "asset/MeshData.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/buffers/IndexBuffer.h"
-#include "render/passes/GeometryPass.h"
 
 #include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
@@ -58,7 +57,6 @@ namespace test {
 struct MultiShadowResources
 {
 	std::shared_ptr<Scene> scene;
-	std::vector<GeometryRenderItem> renderItems;
 	std::vector<int> lightUIDs;
 };
 
@@ -141,21 +139,9 @@ f 2 6 7 3
 		auto cubeMesh = std::make_shared<Mesh>();
 		cubeMesh->o_name = "MultiShadowCube";
 		cubeMesh->o_mesh = cubeMeshData;
-		cubeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 		cubeMesh->SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));  // cube rests on plane
 
 		res.scene->UseMesh(cubeMesh);
-
-		GeometryRenderItem item{};
-		item.vertexBuffer = cubeMesh->GetVertexBuffer()->buffer();
-		item.indexBuffer  = cubeMesh->GetIndexBuffer()->buffer();
-		item.indexCount   = cubeMesh->GetGPUIndexCount();
-		item.indexType    = vk::IndexType::eUint32;
-		// Cube identity transform; geometry at origin resting on plane.
-		item.pushConstants.model        = cubeMesh->GetModelMatrix();
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-		res.renderItems.push_back(item);
 	}
 
 	// ===================================================================
@@ -184,20 +170,8 @@ f 1 2 3 4
 		auto planeMesh = std::make_shared<Mesh>();
 		planeMesh->o_name = "MultiShadowPlane";
 		planeMesh->o_mesh = planeMeshData;
-		planeMesh->UploadToGPU(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 
 		res.scene->UseMesh(planeMesh);
-
-		GeometryRenderItem item{};
-		item.vertexBuffer = planeMesh->GetVertexBuffer()->buffer();
-		item.indexBuffer  = planeMesh->GetIndexBuffer()->buffer();
-		item.indexCount   = planeMesh->GetGPUIndexCount();
-		item.indexType    = vk::IndexType::eUint32;
-		// Identity: plane geometry is already in world space (z=0, spans ±10 in XY).
-		item.pushConstants.model        = glm::mat4(1.0f);
-		item.pushConstants.normalMatrix = glm::mat4(1.0f);
-
-		res.renderItems.push_back(item);
 	}
 
 	// ===================================================================
@@ -282,8 +256,7 @@ f 1 2 3 4
 	NEURUS_LOG("[LoadMultiShadow] Built 2 meshes (cube + plane) + "
 	           << numLights
 	           << (lightType == LightType::SUNLIGHT ? " sun" : " point")
-	           << " lights + 1 camera -- "
-	           << res.renderItems.size() << " render items");
+	           << " lights + 1 camera");
 
 	return res;
 }

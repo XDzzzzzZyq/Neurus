@@ -14,6 +14,9 @@
 
 #include "Log.h"
 
+#include "scene/Mesh.h"
+#include "scene/Scene.h"
+
 #include <array>
 #include <cstring>
 #include <stdexcept>
@@ -29,6 +32,8 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
                            vk::Queue queue,
                            uint32_t queueFamilyIndex)
 	: p_physicalDevice(&physicalDevice)
+	, p_queue(queue)
+	, p_queueFamilyIndex(queueFamilyIndex)
 	// --- Descriptor set layout ---
 	, p_cameraLayout(CreateCameraLayout(device))
 	// --- Camera UBO (host-visible for per-frame memcpy update) ---
@@ -173,16 +178,12 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 {
 	// --- Extract per-frame context ---
 	const CameraUBOData cameraData{ctx.viewProj, ctx.view};
-	const auto& renderItems = *ctx.renderItems;
 	const auto& renderExtent = ctx.renderExtent;
 
 	// --- 1. Upload camera data to UBO ---
 	p_cameraUBO.Upload(cameraData);
 
 	// --- 2. Collect G-Buffer attachment image views ---
-	//     Attachments start in ImageState::Undefined (first frame) or
-	//     ImageState::ColorAttachment (subsequent frames from previous pass).
-	//     Barrier::Transition reads the current state and emits the appropriate barrier.
 	const std::array<AttachmentName, 4> gBufferColorAttachments = {
 		AttachmentName::Position,
 		AttachmentName::Normal,
@@ -206,11 +207,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 3. Begin G-Buffer dynamic rendering pass ---
 	const auto clearValues = Pass::PresetClearValues(Pass::PassType::G_BUFFER);
 
-	BeginPass(cmdBuf,
-	          colorViews,
-	          &depthView,
-	          clearValues,
-	          renderExtent);
+	BeginPass(cmdBuf, colorViews, &depthView, clearValues, renderExtent);
 
 	// --- 4. Set viewport and scissor (dynamic state) ---
 	const vk::Viewport viewport(0.0f, 0.0f,
@@ -228,28 +225,35 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 6. Bind camera descriptor set (set 0) ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
 	                          *p_pipelineLayout,
-	                          0,                           // firstSet
+	                          0,
 	                          {p_cameraDescriptorSet.handle()},
 	                          {});
 
-	// --- 7. Draw each render item ---
-	for (const auto& item : renderItems)
+	// --- 7. Draw each mesh from scene.mesh_list ---
+	if (ctx.scene)
 	{
-		// Push per-draw constants (model + normalMatrix)
-		cmdBuf.pushConstants<PushConstants>(*p_pipelineLayout,
-		                                    vk::ShaderStageFlagBits::eVertex,
-		                                    0,
-		                                    item.pushConstants);
+		for (const auto& [id, mesh] : ctx.scene->mesh_list)
+		{
+			if (!mesh || !mesh->o_mesh) continue;
 
-		// Bind vertex buffer
-		const vk::DeviceSize vbOffset = 0;
-		cmdBuf.bindVertexBuffers(0, item.vertexBuffer, vbOffset);
+			MeshGPU& gpu = cache.GetMeshGPU(
+				mesh->GetObjectID(), p_queue, p_queueFamilyIndex, *mesh->o_mesh);
 
-		// Bind index buffer
-		cmdBuf.bindIndexBuffer(item.indexBuffer, 0, item.indexType);
+			if (!gpu.vertexBuffer || !gpu.indexBuffer) continue;
 
-		// Draw indexed
-		cmdBuf.drawIndexed(item.indexCount, 1, 0, 0, 0);
+			const glm::mat4 model = mesh->GetModelMatrix();
+			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
+
+			PushConstants pushConstants{model, normalMat};
+			cmdBuf.pushConstants<PushConstants>(*p_pipelineLayout,
+			                                    vk::ShaderStageFlagBits::eVertex,
+			                                    0, pushConstants);
+
+			const vk::DeviceSize vbOffset = 0;
+			cmdBuf.bindVertexBuffers(0, gpu.vertexBuffer->buffer(), vbOffset);
+			cmdBuf.bindIndexBuffer(gpu.indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+			cmdBuf.drawIndexed(gpu.indexCount, 1, 0, 0, 0);
+		}
 	}
 
 	// --- 8. End dynamic rendering pass ---

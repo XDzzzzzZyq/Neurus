@@ -15,6 +15,10 @@ target_include_directories(neurus_project PUBLIC
 	${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
+target_include_directories(neurus_project PRIVATE
+	${Vulkan_INCLUDE_DIRS}
+)
+
 target_link_libraries(neurus_project PUBLIC
 	neurus_scene
 	glm
