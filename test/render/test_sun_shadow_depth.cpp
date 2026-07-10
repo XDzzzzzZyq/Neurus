@@ -104,6 +104,10 @@ TEST_F(SunShadowDepthTest, OrthoDepthMap)
 	ASSERT_NE(ts.uid,-1);
 	const int uid=ts.uid;
 
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_cache, *ts.s, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_cache, *ts.s, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	{ auto& cmd=BeginCmd();
 		RenderContext ctx{};
 		ctx.renderExtent=vk::Extent2D(kRes,kRes);
@@ -112,7 +116,10 @@ TEST_F(SunShadowDepthTest, OrthoDepthMap)
 		EndSubmitWait(cmd); }
 
 	std::vector<float> dd;
-	{ auto& sm=m_cache->GetShadowMap(uid,LightType::SUNLIGHT);
+	{ auto* lgpu = m_cache->GetLightGPU(uid);
+		ASSERT_NE(lgpu, nullptr);
+		ASSERT_NE(lgpu->shadowDepthMap, nullptr);
+		auto& sm = *lgpu->shadowDepthMap;
 		auto data=sm.ReadImageData(*m_device,pd,m_queue,m_graphicsQueueFamily,nullptr,{kRes,kRes});
 		const float* rd=reinterpret_cast<const float*>(data.GetPixelData().data());
 		dd.assign(rd,rd+kRes*kRes);

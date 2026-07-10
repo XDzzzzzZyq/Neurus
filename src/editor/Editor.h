@@ -14,6 +14,7 @@ class DeferredRenderer;
 class Context;
 class Scene;
 class Environment;
+class UploadManager;
 }
 
 namespace neurus::project {
@@ -75,6 +76,15 @@ public:
 	 */
 	void Edit(const InputState& input);
 
+	/**
+	 * @brief Uploads all scene meshes and shadow-casting lights to GPU.
+	 *
+	 * Must be called AFTER the window is shown and the surface is ready,
+	 * typically from Application::Run() after show() + ResizeViewport(),
+	 * and from OnProjectOpen() / OnProjectNew().
+	 */
+	void UploadSceneResources();
+
 private:
 	// --- Signal handlers (implemented in later tasks) ---
 	void OnProjectNew();
@@ -93,6 +103,7 @@ private:
 	// --- Owned ---
 	std::unique_ptr<neurus::project::Project> ed_project;
 	std::unique_ptr<Context> ed_context;
+	std::unique_ptr<UploadManager> ed_uploadManager;
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---

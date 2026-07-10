@@ -23,36 +23,29 @@
 
 #include "app/Application.h"
 
+#include "VulkanContext.h"
+#include "core/Log.h"
+#include "editor/Editor.h"
+#include "editor/Input.h"
+#include "editor/events/UIEvents.h"
+#include "render/DeferredRenderer.h"
+#include "render/RenderCache.h"
+#include "render/Screenshot.h"
+#include "render/Texture.h"
+#include "render/shaders/ShaderLibrary.h"
+#include "project/Project.h"
+#include "scene/Scene.h"
+#include "ui/NeurusMainWindow.h"
+#include "ui/VulkanWidget.h"
+
 #include <QApplication>
 #include <QCoreApplication>
-#include <QKeyEvent>
-#include <DockWidget.h>
 #include <QTimer>
 
 #include <windows.h>
 
 #include <iostream>
 #include <memory>
-#include <algorithm>
-#include <cmath>
-#include <cstring>
-
-#include "core/Log.h"
-#include "editor/Editor.h"
-#include "editor/Input.h"
-#include "editor/events/UIEvents.h"
-#include "editor/events/EventBus.h"
-#include "ui/NeurusMainWindow.h"
-#include "ui/VulkanWidget.h"
-#include "VulkanContext.h"
-#include "render/DeferredRenderer.h"
-#include "render/RenderCache.h"
-#include "render/Screenshot.h"
-#include "render/Texture.h"
-#include "render/shaders/ShaderLibrary.h"
-#include "asset/MeshData.h"
-#include "scene/Scene.h"
-#include "project/Project.h"
 
 namespace {
 
@@ -123,6 +116,11 @@ int Application::Run()
 	app_mainWindow->SetScene(&app_editor->GetScene());
 	app_mainWindow->show();
 	ResizeViewport(app_mainWindow->getViewportWidth(), app_mainWindow->getViewportHeight());
+
+	// Upload scene GPU resources AFTER window is shown and surface is ready.
+	// Doing this earlier (in Editor::Initialize) causes "Surface lost during recreation"
+	// on the first frame because the swapchain isn't fully ready.
+	app_editor->UploadSceneResources();
 
 	WireSignals();
 	StartRenderLoop();

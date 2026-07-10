@@ -608,14 +608,20 @@ is NOT acceptable -- skip none of these steps.
    - Crashes (access violations, segfaults)
    - Unexpected `NEURUS_ERR` log lines
 
-3. **Run tests → all pass**
+4. **Run tests related to the task**
+   ```bash
+   cd build/debug && ctest -R <related_test_name> --output-on-failure
+   ```
+   Verify the test that is associated with the task FIRST. Otherwise, it will waste too much time on running the whole test suite.
+
+4. **Run tests → 100% all pass**
    ```bash
    cd build/debug && ctest --output-on-failure
    ```
    ALL tests must pass.  Do not ignore failures; fix them or update
    reference images if the change is intentional.
 
-4. **Verify feature works visually**
+5. **Verify feature works visually**
    - Screenshots: check that `TakeScreenshotAllAttachments()` exports
      all relevant attachments (screenshots/ directory).
    - Visual check: the rendered viewport shows the expected result
@@ -623,12 +629,12 @@ is NOT acceptable -- skip none of these steps.
    - Runtime behaviour: resize the window, interact with the viewport,
      verify no deadlocks or freezes.
 
- 5. **No stubs, TODOs, or placeholders remain**
-    - No `// TODO`, `// FIXME`, `// STUB`, or placeholder comments
-      left behind in the changed files.
-    - No hardcoded magic numbers without documentation.
-    - No commented-out code blocks unless explicitly justified.
+6. **No stubs, TODOs, or placeholders remain**
+   - No `// TODO`, `// FIXME`, `// STUB`, or placeholder comments
+     left behind in the changed files.
+   - No hardcoded magic numbers without documentation.
+   - No commented-out code blocks unless explicitly justified.
 
-6. **Feature workflow** — For new rendering features, follow the full
+7. **Feature workflow** — For new rendering features, follow the full
     pattern in `.github/instructions/development.instructions.md` (4-wave
     implementation, per-wave verification, common bug fixes)

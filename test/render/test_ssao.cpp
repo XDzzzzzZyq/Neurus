@@ -109,6 +109,9 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	// -------------------------------------------------------------------
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
+	// Pre-register mesh GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *cb.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
 		.viewProj = camUBO.viewProj,

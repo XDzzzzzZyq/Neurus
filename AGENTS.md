@@ -161,7 +161,7 @@ Neurus/
 │   │   ├── Barrier.h/cpp            # Centralized image barrier management
 │   │   ├── DeferredRenderer.h/cpp   # Deferred PBR pipeline (active renderer)
 │   │   ├── Image.h/cpp              # GPU image with state tracking (ImageState)
-│   │   ├── MeshGPU.h                # GPU-side mesh resources (owned by RenderCache)
+│   │   ├── resources/MeshGPU.h       # GPU-side mesh resources (owned by RenderCache)
 │   │   ├── ShaderProgram.h/cpp
 │   │   ├── Swapchain.h/cpp
 │   │   ├── VulkanContext.h/cpp
@@ -286,10 +286,10 @@ The entire codebase uses a **Z-up, +Y forward, right-hand** coordinate system
 
 ---
 
-## Subagent Build/Test Racing Prevention
+## Subagent Racing Prevention
 
 Multiple parallel subagents can race on `cmake --build` or launching
-`Neurus.exe`, causing file lock contention and false test failures.
+`Neurus.exe` or the tests, causing file lock contention and false test failures. Moreover, subagent may use `git stash` to revet the changes, this will interrupt the editing of other subagents.
 
 **Rules:**
 1. **Only the master agent runs `cmake --build build/debug`** for the final
@@ -301,6 +301,7 @@ Multiple parallel subagents can race on `cmake --build` or launching
    but must NOT invoke the build system.
 4. **Never run `Neurus.exe` or the test binary from a subagent** — always
    let the master agent handle it.
+5. **Never use `git stash` while editing files**
 
 **Test working directory**: CTest runs with `WorkingDirectory = build/debug/test/`.
 Running the test binary directly from `build/debug/` causes `../../../res/`

@@ -114,6 +114,10 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 sun lights";
 	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected cube + plane";
 
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	// Verify all lights are SUNLIGHT
 	for (int uid : shadowRes.lightUIDs)
 	{
@@ -243,6 +247,10 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_ReferenceImage)
 		*m_device, pd, m_queue, m_graphicsQueueFamily,
 		3, LightType::SUNLIGHT);
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u);
+
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	// -------------------------------------------------------------------
 	// Step 2: Build render context

@@ -146,18 +146,71 @@ protected:
 			dev, pd,
 			m_queue, m_graphicsQueueFamily);
 
-		// --- Create Environment (CPU-only) and generate IBL via RenderCache ---
-		m_env = std::make_shared<Environment>();
+	// --- Create Environment (CPU-only) and generate IBL cubemaps ---
+	m_env = std::make_shared<Environment>();
 
-		// Set up procedural colourful gradient equirect data
-		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
-		ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
-		m_env->SetEquirectData(imgData);
+	// Set up procedural colourful gradient equirect data
+	auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
+	ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
+	m_env->SetEquirectData(imgData);
 
-		// Lazily create EnvironmentGPU in RenderCache (loads equirect, creates cubemaps, runs IBLPass)
-		m_renderCache->CreateEnvironmentGPU(m_env->GetObjectID(), *m_env,
-		                                    m_queue, m_graphicsQueueFamily,
-		                                    *m_iblPass);
+	// Inline EnvironmentGPU creation (was RenderCache::CreateEnvironmentGPU)
+	{
+		auto& dev = *m_device;
+		auto& pd = PhysicalDevice();
+		const int envId = m_env->GetObjectID();
+
+		// 1. Upload equirect to GPU
+		auto equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
+		                                           imgData, "Env_Equirect",
+		                                           vk::ImageUsageFlagBits::eStorage);
+		ASSERT_TRUE(equirectImage != nullptr) << "Failed to upload equirect";
+
+		// 2. Create cubemap Images
+		constexpr uint32_t kDiffuseRes  = 64;
+		constexpr uint32_t kSpecularRes = 2048;
+		constexpr uint32_t kSpecularMips = 8;
+		const vk::ImageUsageFlags cubeUsage =
+			vk::ImageUsageFlagBits::eStorage |
+			vk::ImageUsageFlagBits::eSampled |
+			vk::ImageUsageFlagBits::eTransferSrc;
+
+		auto diffuseImage = std::make_unique<Image>(
+			dev, pd, vk::Extent2D{kDiffuseRes, kDiffuseRes},
+			vk::Format::eR32G32B32A32Sfloat, cubeUsage,
+			/*mipLevels=*/1, Image::ImageType::eCube, "Env_DiffuseCubemap");
+
+		auto specularImage = std::make_unique<Image>(
+			dev, pd, vk::Extent2D{kSpecularRes, kSpecularRes},
+			vk::Format::eR32G32B32A32Sfloat, cubeUsage,
+			/*mipLevels=*/kSpecularMips, Image::ImageType::eCube, "Env_SpecularCubemap");
+
+		// 3. Create cubemap samplers
+		vk::SamplerCreateInfo samplerCI(
+			{}, vk::Filter::eLinear, vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eLinear,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			0.0f, VK_FALSE, 0.0f, VK_FALSE,
+			vk::CompareOp::eAlways, 0.0f, 1.0f,
+			vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+		auto diffuseSampler = vk::raii::Sampler(dev, samplerCI);
+		samplerCI.setMaxLod(static_cast<float>(kSpecularMips));
+		auto specularSampler = vk::raii::Sampler(dev, samplerCI);
+
+		// 4. Run IBL convolution
+		m_iblPass->Generate(*equirectImage, *diffuseImage, *specularImage);
+
+		// 5. Wrap in Textures and register
+		EnvironmentGPU gpu;
+		gpu.diffuseTexture = std::make_unique<Texture>(
+			Texture::FromImage(std::move(diffuseImage), std::move(diffuseSampler)));
+		gpu.specularTexture = std::make_unique<Texture>(
+			Texture::FromImage(std::move(specularImage), std::move(specularSampler)));
+
+		m_renderCache->UseEnvironmentGPU(envId, std::move(gpu));
+	}
 	}
 
 	void TearDown() override
@@ -250,6 +303,11 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	scene.UseMesh(mesh);
 	scene.UseLight(light);
 	scene.env_list[m_env->GetObjectID()] = m_env;
+
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	m_lightingPass->UploadLights(scene);
 
 	RenderContext ctx{
@@ -367,6 +425,9 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				scene.UseMesh(mesh);
 				scene.UseLight(light);
 				scene.env_list[m_env->GetObjectID()] = m_env;
+				// Pre-register GPU resources before pass recording
+				VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+				VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 				m_lightingPass->UploadLights(scene);
 
 				RenderContext ctx{
@@ -428,20 +489,74 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	m_iblPass = std::make_unique<IBLPass>(
 		dev, pd, m_queue, m_graphicsQueueFamily);
 
-	// 2f. Re-create Environment (CPU-only) + generate IBL via RenderCache.
+	// 2f. Re-create Environment (CPU-only) + generate IBL cubemaps.
 	SCOPED_TRACE("Recreate IBL resources");
 	m_env = std::make_shared<Environment>();
+	ImageData imgData; // moved out of narrow scope for inline IBL creation below
 	{
 		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
-		ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
+		imgData = ImageData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
 		m_env->SetEquirectData(imgData);
 	}
 
-	// 2g. Lazily create EnvironmentGPU in RenderCache
+	// 2g. Inline EnvironmentGPU creation (was RenderCache::CreateEnvironmentGPU)
 	SCOPED_TRACE("Generate IBL cubemaps");
-	m_renderCache->CreateEnvironmentGPU(m_env->GetObjectID(), *m_env,
-	                                    m_queue, m_graphicsQueueFamily,
-	                                    *m_iblPass);
+	{
+		auto& device = *m_device;
+		auto& physDev = PhysicalDevice();
+		const int envId = m_env->GetObjectID();
+
+		// 1. Upload equirect to GPU
+		auto equirectImage = Image::FromImageData(device, physDev, m_queue, m_graphicsQueueFamily,
+		                                           imgData, "Env_Equirect",
+		                                           vk::ImageUsageFlagBits::eStorage);
+		ASSERT_TRUE(equirectImage != nullptr) << "Failed to upload equirect";
+
+		// 2. Create cubemap Images
+		constexpr uint32_t kDiffuseRes  = 64;
+		constexpr uint32_t kSpecularRes = 2048;
+		constexpr uint32_t kSpecularMips = 8;
+		const vk::ImageUsageFlags cubeUsage =
+			vk::ImageUsageFlagBits::eStorage |
+			vk::ImageUsageFlagBits::eSampled |
+			vk::ImageUsageFlagBits::eTransferSrc;
+
+		auto diffuseImage = std::make_unique<Image>(
+			device, physDev, vk::Extent2D{kDiffuseRes, kDiffuseRes},
+			vk::Format::eR32G32B32A32Sfloat, cubeUsage,
+			/*mipLevels=*/1, Image::ImageType::eCube, "Env_DiffuseCubemap");
+
+		auto specularImage = std::make_unique<Image>(
+			device, physDev, vk::Extent2D{kSpecularRes, kSpecularRes},
+			vk::Format::eR32G32B32A32Sfloat, cubeUsage,
+			/*mipLevels=*/kSpecularMips, Image::ImageType::eCube, "Env_SpecularCubemap");
+
+		// 3. Create cubemap samplers
+		vk::SamplerCreateInfo samplerCI(
+			{}, vk::Filter::eLinear, vk::Filter::eLinear,
+			vk::SamplerMipmapMode::eLinear,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			vk::SamplerAddressMode::eClampToEdge,
+			0.0f, VK_FALSE, 0.0f, VK_FALSE,
+			vk::CompareOp::eAlways, 0.0f, 1.0f,
+			vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
+		auto diffuseSampler = vk::raii::Sampler(device, samplerCI);
+		samplerCI.setMaxLod(static_cast<float>(kSpecularMips));
+		auto specularSampler = vk::raii::Sampler(device, samplerCI);
+
+		// 4. Run IBL convolution
+		m_iblPass->Generate(*equirectImage, *diffuseImage, *specularImage);
+
+		// 5. Wrap in Textures and register
+		EnvironmentGPU gpu;
+		gpu.diffuseTexture = std::make_unique<Texture>(
+			Texture::FromImage(std::move(diffuseImage), std::move(diffuseSampler)));
+		gpu.specularTexture = std::make_unique<Texture>(
+			Texture::FromImage(std::move(specularImage), std::move(specularSampler)));
+
+		m_renderCache->UseEnvironmentGPU(envId, std::move(gpu));
+	}
 
 	// ================================================================
 	// Phase 3 — Render Frame 2 (after reload, IBL active again)
@@ -455,6 +570,9 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				scene.UseMesh(mesh);
 				scene.UseLight(light);
 				scene.env_list[m_env->GetObjectID()] = m_env;
+				// Pre-register GPU resources before pass recording
+				VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+				VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 				m_lightingPass->UploadLights(scene);
 
 				RenderContext ctx{

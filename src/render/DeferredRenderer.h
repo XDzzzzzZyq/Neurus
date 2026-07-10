@@ -24,8 +24,6 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include <glm/glm.hpp>
-
 #include <memory>
 #include <vector>
 
@@ -44,7 +42,6 @@ class Environment;
 class GeometryPass;
 class LightingPass;
 class SSAOPass;
-class IBLPass;
 class ShadowDepthPass;
 class ShadowIntensityPass;
 struct CameraUBOData;
@@ -175,18 +172,6 @@ public:
 	 */
 	void HandleResize(uint32_t width, uint32_t height);
 
-	/**
-	 * @brief Generates IBL cubemaps for an environment and caches them in RenderCache.
-	 *
-	 * Delegates to RenderCache::CreateEnvironmentGPU() which loads the equirect
-	 * ImageData, creates cubemap Images + samplers, and runs IBLPass convolution.
-	 * The resulting EnvironmentGPU is stored in RenderCache for per-frame use
-	 * by LightingPass.
-	 *
-	 * @param env Shared pointer to the CPU-side Environment (provides equirect data).
-	 */
-	void GenerateIBL(const std::shared_ptr<Environment>& env);
-
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
@@ -231,7 +216,6 @@ private:
 	GeometryPass* r_geometryPass = nullptr;
 	LightingPass* r_lightingPass = nullptr;
 	SSAOPass*   r_ssaoPass     = nullptr;
-	IBLPass*    r_iblPass      = nullptr;
 	ShadowDepthPass* r_shadowDepthPass = nullptr;
 	ShadowIntensityPass* r_shadowIntensityPass = nullptr;
 

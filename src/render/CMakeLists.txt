@@ -43,6 +43,9 @@ add_library(neurus_render STATIC
 	shaders/ShaderCompiler.cpp
 	shaders/ShaderLibrary.h
 	shaders/ShaderLibrary.cpp
+	resources/MeshGPU.h
+	resources/EnvironmentGPU.h
+	resources/LightGPU.h
 	Texture.h
 	Texture.cpp
 	PipelineBuilder.h
@@ -54,6 +57,8 @@ add_library(neurus_render STATIC
 	DeferredRenderer.cpp
 	Screenshot.h
 	Screenshot.cpp
+	UploadManager.h
+	UploadManager.cpp
 )
 
 add_subdirectory(passes)

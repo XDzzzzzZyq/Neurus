@@ -130,6 +130,10 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected cube + plane (2 meshes)";
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
 
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	// Get the camera from the scene
 	ASSERT_FALSE(shadowRes.scene->cam_list.empty()) << "Scene must have a camera";
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
@@ -330,6 +334,10 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 	ASSERT_FALSE(shadowRes.scene->cam_list.empty());
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
 
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
 	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
@@ -461,6 +469,10 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	auto shadowRes = neurus::test::LoadMultiShadow(
 		*m_device, pd, m_queue, m_graphicsQueueFamily);
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 shadow-casting lights";
+
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
@@ -646,6 +658,10 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 		3, LightType::SUNLIGHT);
 	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u) << "Expected cube + plane (2 meshes)";
 	ASSERT_EQ(shadowRes.lightUIDs.size(), 3u) << "Expected 3 sun lights";
+
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	// Verify all lights are SUNLIGHT
 	for (int uid : shadowRes.lightUIDs)

@@ -22,7 +22,6 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -303,7 +302,9 @@ void ShadowIntensityPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D exten
 
 	// --- Binding 1: Shadow depth cubemap (combined image sampler, samplerCube) ---
 	{
-		auto& shadowCube = cache.GetShadowMap(p_currentLightUID, LightType::POINTLIGHT);
+		LightGPU* lgpu = cache.GetLightGPU(p_currentLightUID);
+		if (!lgpu || !lgpu->shadowDepthMap) return;
+		auto& shadowCube = *lgpu->shadowDepthMap;
 
 		vk::DescriptorImageInfo imageInfo(
 			*p_sampler,                                     // sampler
@@ -354,7 +355,9 @@ void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D ex
 
 	// --- Binding 1: Sun shadow depth map (combined image sampler, sampler2D) ---
 	{
-		auto& sunShadowMap = cache.GetShadowMap(p_currentLightUID, LightType::SUNLIGHT);
+		LightGPU* slgpu = cache.GetLightGPU(p_currentLightUID);
+		if (!slgpu || !slgpu->shadowDepthMap) return;
+		auto& sunShadowMap = *slgpu->shadowDepthMap;
 
 		vk::DescriptorImageInfo imageInfo(
 			*p_sunShadowSampler,                             // sampler (nearest, clamp-to-border, black)
@@ -440,7 +443,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		// --- Transition shadow depth cubemap: post-ShadowDepthPass → DepthShaderRead ---
 		{
-			auto& shadowCube = cache.GetShadowMap(uid, LightType::POINTLIGHT);
+			LightGPU* lgpu = cache.GetLightGPU(uid);
+			if (!lgpu || !lgpu->shadowDepthMap) continue;
+			auto& shadowCube = *lgpu->shadowDepthMap;
 			Barrier::Transition(cmdBuf, shadowCube, ImageState::DepthShaderRead);
 		}
 
@@ -506,7 +511,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		// --- Transition sun shadow depth map: post-ShadowDepthPass → DepthShaderRead ---
 		{
-			auto& sunShadowMap = cache.GetShadowMap(uid, LightType::SUNLIGHT);
+			LightGPU* slgpu = cache.GetLightGPU(uid);
+			if (!slgpu || !slgpu->shadowDepthMap) continue;
+			auto& sunShadowMap = *slgpu->shadowDepthMap;
 			Barrier::Transition(cmdBuf, sunShadowMap, ImageState::DepthShaderRead);
 		}
 

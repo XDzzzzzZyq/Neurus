@@ -23,7 +23,7 @@
 #include "passes/ShadowDepthPass.h"
 #include "RenderContext.h"
 #include "RenderCache.h"
-#include "../MeshGPU.h"
+#include "../resources/MeshGPU.h"
 #include "../PipelineBuilder.h"
 #include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"
@@ -36,7 +36,6 @@
 
 #include "Log.h"
 
-#include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace neurus {
@@ -324,7 +323,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// Transition cubemap to depth attachment layout (all faces/layers)
 		{
-			auto& cubemap = cache.GetShadowMap(uid, LightType::POINTLIGHT);
+			LightGPU* lgpu = cache.GetLightGPU(uid);
+			if (!lgpu || !lgpu->shadowDepthMap) continue;
+			auto& cubemap = *lgpu->shadowDepthMap;
 			Barrier::Transition(cmdBuf, cubemap, ImageState::DepthAttachment);
 		}
 
@@ -336,22 +337,27 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// --- Transition colour cubemap to ColorAttachment for rendering ---
 		{
-			auto& colorCube = cache.GetShadowColorMap(uid, {p_resolution, p_resolution});
+			LightGPU* lgpu = cache.GetLightGPU(uid);
+			if (!lgpu || !lgpu->shadowColorMap) continue;
+			auto& colorCube = *lgpu->shadowColorMap;
 			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorAttachment);
 		}
 
 		// --- Depth attachment ---
-		vk::RenderingAttachmentInfo depthAtt(
-			cache.GetShadowMap(uid, LightType::POINTLIGHT).ArrayView(),
-			vk::ImageLayout::eDepthStencilAttachmentOptimal,
-			vk::ResolveModeFlagBits::eNone, nullptr,
-			vk::ImageLayout::eUndefined,
-			vk::AttachmentLoadOp::eClear,
-			vk::AttachmentStoreOp::eStore,
-			vk::ClearDepthStencilValue(1.0f, 0));
+		// Re-obtain lgpu pointer for depth attachment (guaranteed valid from transition above)
+		{
+			LightGPU* lgpu = cache.GetLightGPU(uid);
+			vk::RenderingAttachmentInfo depthAtt(
+				lgpu->shadowDepthMap->ArrayView(),
+				vk::ImageLayout::eDepthStencilAttachmentOptimal,
+				vk::ResolveModeFlagBits::eNone, nullptr,
+				vk::ImageLayout::eUndefined,
+				vk::AttachmentLoadOp::eClear,
+				vk::AttachmentStoreOp::eStore,
+				vk::ClearDepthStencilValue(1.0f, 0));
 
 		// --- Colour attachment: RenderCache colour cubemap ---
-		vk::ImageView colorView = cache.GetShadowColorMap(uid, {p_resolution, p_resolution}).ArrayView();
+		vk::ImageView colorView = lgpu->shadowColorMap->ArrayView();
 
 		vk::RenderingAttachmentInfo colorAtt(
 			colorView,
@@ -367,6 +373,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			1u, 0x3Fu, colorAtt, &depthAtt, nullptr);
 
 		cmdBuf.beginRendering(renderInfo);
+		}
 
 		if (ctx.scene)
 		{
@@ -374,10 +381,12 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			{
 				if (!mesh || !mesh->o_mesh) continue;
 
-				MeshGPU& gpu = cache.GetMeshGPU(
-					mesh->GetObjectID(), m_queue, m_queueFamilyIndex, *mesh->o_mesh);
-
-				if (!gpu.vertexBuffer || !gpu.indexBuffer) continue;
+				MeshGPU* gpuPtr = cache.GetMeshGPU(mesh->GetObjectID());
+				if (!gpuPtr)
+				{
+					NEURUS_ERR("[ShadowDepthPass] GetMeshGPU returned nullptr for objectId=" << mesh->GetObjectID());
+					continue;
+				}
 
 				const glm::mat4 model = mesh->GetModelMatrix();
 
@@ -387,9 +396,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 				    vk::ShaderStageFlagBits::eVertex |
 				    vk::ShaderStageFlagBits::eFragment,
 				    kModelPushOffset, model);
-				cmdBuf.bindVertexBuffers(0, gpu.vertexBuffer->buffer(), {vk::DeviceSize{0}});
-				cmdBuf.bindIndexBuffer(gpu.indexBuffer->buffer(), 0, vk::IndexType::eUint32);
-				cmdBuf.drawIndexed(gpu.indexCount, 1, 0, 0, 0);
+				cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), {vk::DeviceSize{0}});
+				cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+				cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 			}
 		}
 
@@ -397,9 +406,12 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// Transition colour cubemap to ColorShaderRead for sampling in subsequent passes
 		{
-			auto& colorCube = cache.GetShadowColorMap(uid, {p_resolution, p_resolution});
-			Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
-
+			LightGPU* lgpu = cache.GetLightGPU(uid);
+			if (lgpu && lgpu->shadowColorMap)
+			{
+				auto& colorCube = *lgpu->shadowColorMap;
+				Barrier::Transition(cmdBuf, colorCube, ImageState::ColorShaderRead);
+			}
 		}
 
 	}
@@ -452,7 +464,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			                                0, lightViewProj);
 
 			// --- Transition sun shadow map to DepthAttachment ---
-			auto& sunImage = cache.GetShadowMap(uid, LightType::SUNLIGHT);
+			LightGPU* slgpu = cache.GetLightGPU(uid);
+			if (!slgpu || !slgpu->shadowDepthMap) continue;
+			auto& sunImage = *slgpu->shadowDepthMap;
 			Barrier::Transition(cmdBuf, sunImage, ImageState::DepthAttachment);
 
 			// --- Depth attachment (2D, not cubemap) ---
@@ -482,10 +496,8 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 				{
 					if (!mesh || !mesh->o_mesh) continue;
 
-					MeshGPU& gpu = cache.GetMeshGPU(
-						mesh->GetObjectID(), m_queue, m_queueFamilyIndex, *mesh->o_mesh);
-
-					if (!gpu.vertexBuffer || !gpu.indexBuffer) continue;
+					MeshGPU* gpuPtr = cache.GetMeshGPU(mesh->GetObjectID());
+					if (!gpuPtr || !gpuPtr->vertexBuffer || !gpuPtr->indexBuffer) continue;
 
 					const glm::mat4 model = mesh->GetModelMatrix();
 					const glm::mat4 mvp = lightViewProj * model;
@@ -494,9 +506,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 					    vk::ShaderStageFlagBits::eVertex,
 					    0, mvp);
 
-					cmdBuf.bindVertexBuffers(0, gpu.vertexBuffer->buffer(), {vk::DeviceSize{0}});
-					cmdBuf.bindIndexBuffer(gpu.indexBuffer->buffer(), 0, vk::IndexType::eUint32);
-					cmdBuf.drawIndexed(gpu.indexCount, 1, 0, 0, 0);
+					cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), {vk::DeviceSize{0}});
+					cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+					cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 				}
 			}
 

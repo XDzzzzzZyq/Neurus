@@ -11,7 +11,6 @@
 #include "DescriptorManager.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
-#include "scene/Light.h"
 
 #include <algorithm>
 #include <chrono>
@@ -185,7 +184,9 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
                                                   const std::string& filenamePrefix,
                                                   const uint32_t cubemapResolution)
 {
-	auto& cubemap = renderCache.GetShadowMap(lightUID, LightType::POINTLIGHT);
+	LightGPU* lgpu = renderCache.GetLightGPU(lightUID);
+	if (!lgpu || !lgpu->shadowDepthMap) return {};
+	auto& cubemap = *lgpu->shadowDepthMap;
 
 	// This method only handles cubemaps; 2D shadow maps are handled by ExportShadowDepth.
 	if (cubemap.Type() != Image::ImageType::eCube)
@@ -348,9 +349,9 @@ std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
                                           const int lightUID,
                                           const std::string& filenamePrefix)
 {
-	// Sun light shadow map is a 2D D32_SFLOAT image — read back depth
-	// values, normalise to [0,1] grayscale, and save as PNG.
-	auto& depthMap = renderCache.GetShadowMap(lightUID, LightType::POINTLIGHT);
+	LightGPU* slgpu = renderCache.GetLightGPU(lightUID);
+	if (!slgpu || !slgpu->shadowDepthMap) return {};
+	auto& depthMap = *slgpu->shadowDepthMap;
 
 	if (depthMap.Type() == Image::ImageType::eCube)
 	{

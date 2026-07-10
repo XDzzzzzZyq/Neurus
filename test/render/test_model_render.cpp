@@ -225,6 +225,10 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	scene.UseMesh(mesh);
 	scene.UseLight(light);
 
+	// --- Pre-register GPU resources before pass recording ---
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	// -----------------------------------------------------------------------
 	// Step 8: Build CameraUBOData from the Camera
 	// -----------------------------------------------------------------------

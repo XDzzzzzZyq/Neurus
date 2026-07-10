@@ -113,6 +113,8 @@ protected:
 		Scene testScene;
 		testScene.UseMesh(mesh);
 
+		VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, testScene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 		const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
 
 		{

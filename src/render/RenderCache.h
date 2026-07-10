@@ -1,23 +1,16 @@
 #pragma once
 
 #include "Image.h"
-#include "MeshGPU.h"
-#include "Texture.h"
+#include "resources/MeshGPU.h"
+#include "resources/EnvironmentGPU.h"
+#include "resources/LightGPU.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
 namespace neurus {
-
-// Forward declarations
-enum LightType : int;    // defined in scene/Light.h
-class MeshData;           // defined in asset/MeshData.h
-class Environment;        // defined in scene/Environment.h
-class IBLPass;            // defined in passes/IBLPass.h
 
 /**
  * @brief Named attachment identifiers for G-Buffer and post-FX framebuffer attachments.
@@ -41,21 +34,6 @@ enum class AttachmentName
 
 	// Count sentinel
 	Count,
-};
-
-/**
- * @brief GPU-side IBL environment resources owned by the Renderer layer.
- *
- * Holds diffuse irradiance and specular prefiltered cubemap Textures
- * (Image + Sampler).  Created lazily by RenderCache::CreateEnvironmentGPU()
- * and read per-frame by LightingPass via GetEnvironmentGPU().
- *
- * Non-copyable (GPU resource handles are move-only).
- */
-struct EnvironmentGPU
-{
-	std::unique_ptr<Texture> diffuseTexture;   ///< Diffuse irradiance cubemap (64 px, 1 mip)
-	std::unique_ptr<Texture> specularTexture;  ///< Specular prefiltered cubemap (2048 px, 8 mips)
 };
 
 /**
@@ -114,37 +92,18 @@ public:
 	// --- Mesh GPU resources (lazily created) ---
 
 	/**
-	 * @brief Returns (or lazily creates) the MeshGPU for a mesh by its object ID.
+	 * @brief Returns the cached MeshGPU for an object, or nullptr.
 	 *
-	 * On first access for a given objectId, creates VertexBuffer and IndexBuffer
-	 * from the MeshData and stores them in a MeshGPU.  Subsequent calls return
-	 * the cached MeshGPU immediately.
+	 * Read-only lookup - does NOT create.  Used for per-frame query
+	 * of previously-uploaded mesh GPU resources.
 	 *
-	 * @param objectId          Unique object ID of the mesh (from Mesh::GetObjectID()).
-	 * @param queue             Graphics queue for staging upload (first call only).
-	 * @param queueFamilyIndex  Queue family index for temp command pool.
-	 * @param meshData          CPU-side mesh data (vertices + indices).
-	 * @return Non-owning reference to the cached MeshGPU.
+	 * @param objectId Unique object ID of the mesh.
+	 * @return Non-owning pointer, or nullptr if not found.
 	 */
-	MeshGPU& GetMeshGPU(int objectId,
-	                    vk::Queue queue,
-	                    uint32_t queueFamilyIndex,
-	                    const MeshData& meshData);
+	MeshGPU* GetMeshGPU(int objectId);
 
-	/**
-	 * @brief Returns (or lazily creates) the shadow depth image for a light.
-	 *
-	 * Point lights (default) get a 1024x1024 D32_SFLOAT cubemap with
-	 * eDepthStencilAttachment | eSampled | eTransferSrc usage.
-	 * Sun lights get a 2048x2048 D32_SFLOAT 2D image with
-	 * eDepthStencilAttachment | eSampled usage.
-	 * Created on first access for the given lightUID.
-	 *
-	 * @param lightUID Unique identifier of the light (int).
-	 * @param type     Light type (defaults to POINTLIGHT for backward compatibility).
-	 * @return Non-owning reference to the shadow depth Image.
-	 */
-	Image& GetShadowMap(int lightUID, LightType type);
+	/** @brief const overload of GetMeshGPU(). */
+	const MeshGPU* GetMeshGPU(int objectId) const;
 
 	/**
 	 * @brief Returns (or lazily creates) the shadow intensity image array.
@@ -180,22 +139,9 @@ public:
 	uint32_t GetShadowIntensityLayerIndex(int lightUID) const;
 
 	/**
-	 * @brief Returns (or lazily creates) a colour-format shadow cubemap for a light.
+	 * @brief Returns all light UIDs that currently have LightGPU entries.
 	 *
-	 * The cubemap is a screen-res R32G32B32A32_SFLOAT with eColorAttachment | eSampled | eTransferSrc
-	 * usage. ShadowDepthPass renders depth encoded as colour here for GPU compatibility where
-	 * the depth-only Multiview pipeline does not render correctly.
-	 *
-	 * @param lightUID Unique identifier of the point light (int).
-	 * @param extent   Image dimensions for the cubemap (matches shadow map resolution).
-	 * @return Non-owning reference to the colour cubemap Image.
-	 */
-	Image& GetShadowColorMap(int lightUID, vk::Extent2D extent);
-
-	/**
-	 * @brief Returns all light UIDs that currently have shadow cubemaps.
-	 *
-	 * Iterates rc_shadowMaps keys.  Returns an empty vector if no shadow maps exist.
+	 * Iterates rc_lightGPUs keys. Returns an empty vector if no entries exist.
 	 *
 	 * @return Vector of light UID integers.
 	 */
@@ -211,13 +157,41 @@ public:
 	/**
 	 * @brief Removes all per-light shadow resources for the given light.
 	 *
-	 * Erases entries from rc_shadowMaps, rc_shadowColorMaps,
-	 * and recycles the intensity layer index.
+	 * Recycles the intensity layer index and clears shadow maps
+	 * within the LightGPU for this lightUID.
 	 * Safe to call for lights that have no resources yet.
 	 *
 	 * @param lightUID Unique identifier of the point light (int).
 	 */
 	void RemoveLight(int lightUID);
+
+	// --- Per-light GPU resources (registration/query) ---
+
+	/**
+	 * @brief Register a LightGPU into the cache.
+	 * Takes ownership via move semantics.  Overwrites any existing
+	 * entry for the same lightUID.
+	 * @param lightUID Unique light identifier.
+	 * @param lightGPU Constructed LightGPU to cache (moved in).
+	 */
+	void UseLightGPU(int lightUID, LightGPU lightGPU);
+
+	/**
+	 * @brief Returns the cached LightGPU for a light UID, or nullptr.
+	 * @param lightUID Unique light identifier.
+	 * @return Non-owning pointer, or nullptr if not found.
+	 */
+	LightGPU* GetLightGPU(int lightUID);
+
+	/** @brief const overload of GetLightGPU(). */
+	const LightGPU* GetLightGPU(int lightUID) const;
+
+	/**
+	 * @brief Removes the cached LightGPU for a given light UID.
+	 * Safe to call for lights with no GPU resources yet.
+	 * @param lightUID Light UID to remove.
+	 */
+	void RemoveLightGPU(int lightUID);
 
 	/** @brief const overload of GetAttachment() - returns existing only, throws if missing. */
 	const Image& GetAttachment(AttachmentName name) const;
@@ -243,11 +217,10 @@ public:
 	/**
 	 * @brief Clear screen-space attachments (G-Buffer) and shadow intensities.
 	 *
-	 * Preserves shadow cubemaps (rc_shadowMaps) which are owned by
-	 * this RenderCache and retain their fixed 1024×1024 resolution.
-	 * Screen-space attachments (Position through SSR in rc_attachments)
-	 * and per-pixel shadow intensities are discarded and must be
-	 * re-created on the next frame.
+	 * Preserves LightGPU-owned shadow maps which retain their fixed
+	 * resolution. Screen-space attachments (Position through SSR in
+	 * rc_attachments) and per-pixel shadow intensities are discarded
+	 * and must be re-created on the next frame.
 	 *
 	 * @note Call on swapchain resize (screen-space images change size,
 	 *       shadow cubemaps do not).
@@ -259,30 +232,25 @@ public:
 	 */
 	void RemoveMeshGPU(int objectId);
 
-	// --- Environment GPU resources (lazily created) ---
+	/**
+	 * @brief Register a previously-constructed MeshGPU into the cache.
+	 * Takes ownership via move semantics.  Overwrites any existing
+	 * entry for the same objectId.
+	 * @param objectId  Unique object identifier.
+	 * @param meshGPU   Constructed MeshGPU to cache (moved in).
+	 */
+	void UseMeshGPU(int objectId, MeshGPU meshGPU);
+
+	// --- Environment GPU resources (registration/query) ---
 
 	/**
-	 * @brief Returns (or lazily creates) the EnvironmentGPU for an environment.
-	 *
-	 * On first call for a given envId, loads the equirectangular ImageData
-	 * from the Environment (or generates a pink-purple fallback), uploads it
-	 * to the GPU, creates diffuse (64 px, 1 mip) and specular (2048 px, 8 mips)
-	 * cubemap Images with samplers, and runs IBL convolution via IBLPass.
-	 *
-	 * Subsequent calls return the cached EnvironmentGPU immediately.
-	 *
-	 * @param envId            Unique object ID of the environment.
-	 * @param env              CPU-side environment (provides equirect path + ImageData).
-	 * @param queue            Graphics queue for staging upload.
-	 * @param queueFamilyIndex Queue family index for transient command pools.
-	 * @param iblPass          IBL pass for cubemap convolution.
-	 * @return Non-owning reference to the cached EnvironmentGPU.
+	 * @brief Register a previously-constructed EnvironmentGPU into the cache.
+	 * Takes ownership via move semantics.  Overwrites any existing
+	 * entry for the same envId.
+	 * @param envId   Unique environment identifier.
+	 * @param envGPU  Constructed EnvironmentGPU to cache (moved in).
 	 */
-	EnvironmentGPU& CreateEnvironmentGPU(int envId,
-	                                     const Environment& env,
-	                                     vk::Queue queue,
-	                                     uint32_t queueFamilyIndex,
-	                                     IBLPass& iblPass);
+	void UseEnvironmentGPU(int envId, EnvironmentGPU envGPU);
 
 	/**
 	 * @brief Returns the cached EnvironmentGPU for an environment, or nullptr.
@@ -329,17 +297,17 @@ private:
 	// --- State ---
 	std::unordered_map<AttachmentName, Image> rc_attachments;
 
-	// --- Per-light lazy resources (key = light UID as int) ---
-	std::unordered_map<int, Image> rc_shadowMaps;
 	std::unique_ptr<Image> rc_shadowIntensityArray;
 	std::unordered_map<int, uint32_t> rc_shadowIntensityLayerIndex;
-	std::unordered_map<int, Image> rc_shadowColorMaps;
 
 	// --- Per-mesh lazy GPU resources (key = object UID as int) ---
 	std::unordered_map<int, MeshGPU> rc_meshGPUs;
 
 	// --- Per-environment lazy GPU resources (key = environment UID as int) ---
 	std::unordered_map<int, EnvironmentGPU> rc_environmentGPUs;
+
+	// --- Per-light GPU resources (key = light UID as int) ---
+	std::unordered_map<int, LightGPU> rc_lightGPUs;
 };
 
 /**

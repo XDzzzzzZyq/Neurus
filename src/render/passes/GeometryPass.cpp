@@ -236,10 +236,12 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		{
 			if (!mesh || !mesh->o_mesh) continue;
 
-			MeshGPU& gpu = cache.GetMeshGPU(
-				mesh->GetObjectID(), p_queue, p_queueFamilyIndex, *mesh->o_mesh);
-
-			if (!gpu.vertexBuffer || !gpu.indexBuffer) continue;
+			MeshGPU* gpuPtr = cache.GetMeshGPU(mesh->GetObjectID());
+			if (!gpuPtr)
+			{
+				NEURUS_ERR("[GeometryPass] GetMeshGPU returned nullptr for objectId=" << mesh->GetObjectID());
+				continue;
+			}
 
 			const glm::mat4 model = mesh->GetModelMatrix();
 			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
@@ -250,9 +252,9 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			                                    0, pushConstants);
 
 			const vk::DeviceSize vbOffset = 0;
-			cmdBuf.bindVertexBuffers(0, gpu.vertexBuffer->buffer(), vbOffset);
-			cmdBuf.bindIndexBuffer(gpu.indexBuffer->buffer(), 0, vk::IndexType::eUint32);
-			cmdBuf.drawIndexed(gpu.indexCount, 1, 0, 0, 0);
+			cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), vbOffset);
+			cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+			cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 		}
 	}
 

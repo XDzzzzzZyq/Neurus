@@ -1,9 +1,9 @@
 /**
  * @file test_mesh.cpp
- * @brief GPU tests for RenderCache::GetMeshGPU() mesh upload lifecycle.
+ * @brief GPU tests for RenderCache mesh GPU insertion / caching lifecycle.
  *
  * Validates that:
- *   - GetMeshGPU lazily creates VertexBuffer and IndexBuffer
+ *   - UseMeshGPU stores a MeshGPU and GetMeshGPU returns it
  *   - GetMeshGPU returns the same MeshGPU on subsequent calls (caching)
  *   - RemoveMeshGPU destroys GPU buffers
  *
@@ -22,7 +22,9 @@
 #include "scene/Mesh.h"
 #include "asset/MeshData.h"
 #include "render/RenderCache.h"
-#include "render/MeshGPU.h"
+#include "render/resources/MeshGPU.h"
+#include "render/buffers/VertexBuffer.h"
+#include "render/buffers/IndexBuffer.h"
 
 using namespace neurus;
 
@@ -38,6 +40,60 @@ namespace
 		"v 0.0 1.0 0.0\n"
 		"vn 0.0 0.0 1.0\n"
 		"f 1//1 2//1 3//1\n";
+
+	/**
+	 * @brief Creates a MeshGPU from MeshData by manually constructing
+	 *        VertexBuffer and IndexBuffer (was lazy-created by GetMeshGPU).
+	 */
+	MeshGPU CreateTestMeshGPU(const vk::raii::Device& device,
+	                          const vk::raii::PhysicalDevice& physicalDevice,
+	                          vk::Queue queue,
+	                          uint32_t queueFamilyIndex,
+	                          const MeshData& meshData,
+	                          int objectId)
+	{
+		const auto& rawMesh = meshData.GetMeshData();
+		const size_t vertexCount = rawMesh.dataArray.size() / 14;
+		const size_t indexCount = rawMesh.indexArray.size();
+
+		if (vertexCount == 0 || indexCount == 0)
+		{
+			return MeshGPU{};
+		}
+
+		// Strip from 14 floats → 8 floats (pos+normal+uv)
+		constexpr size_t kSrcStride = 14;
+		constexpr size_t kDstStride = 8;
+		std::vector<float> stripped(vertexCount * kDstStride);
+		for (size_t i = 0; i < vertexCount; ++i)
+		{
+			std::memcpy(&stripped[i * kDstStride],
+			            &rawMesh.dataArray[i * kSrcStride],
+			            kDstStride * sizeof(float));
+		}
+
+		const uint32_t stride = static_cast<uint32_t>(kDstStride * sizeof(float));
+		const vk::DeviceSize vSize = stripped.size() * sizeof(float);
+		const vk::DeviceSize iSize = indexCount * sizeof(uint32_t);
+
+		MeshGPU gpu;
+		gpu.vertexBuffer = std::make_unique<VertexBuffer>(
+			device, physicalDevice, queue, queueFamilyIndex,
+			stripped.data(), vSize, stride,
+			static_cast<uint32_t>(vertexCount),
+			("TestMesh_VBO_" + std::to_string(objectId)).c_str());
+
+		gpu.indexBuffer = std::make_unique<IndexBuffer>(
+			device, physicalDevice, queue, queueFamilyIndex,
+			rawMesh.indexArray.data(), iSize,
+			static_cast<uint32_t>(indexCount),
+			("TestMesh_IBO_" + std::to_string(objectId)).c_str());
+
+		gpu.vertexCount = static_cast<uint32_t>(vertexCount);
+		gpu.indexCount = static_cast<uint32_t>(indexCount);
+
+		return gpu;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -65,14 +121,14 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// GetMeshGPU_CreatesBuffers
+// UseMeshGPU_Stores
 // ---------------------------------------------------------------------------
 
 /**
- * @brief After GetMeshGPU, the returned MeshGPU has non-null buffers
- *        and positive index count.
+ * @brief After UseMeshGPU, GetMeshGPU returns a non-null pointer with
+ *        correct buffer and index count.
  */
-TEST_F(MeshRenderTest, GetMeshGPU_CreatesBuffers)
+TEST_F(MeshRenderTest, UseMeshGPU_Stores)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan GPU.";
 
@@ -80,11 +136,20 @@ TEST_F(MeshRenderTest, GetMeshGPU_CreatesBuffers)
 	ASSERT_TRUE(meshData->LoadObjFromString(kTriangleObj));
 
 	constexpr int kTestObjectId = 42;
-	MeshGPU& gpu = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
-
+	auto gpu = CreateTestMeshGPU(*m_device, PhysicalDevice(),
+	                              m_queue, m_graphicsQueueFamily,
+	                              *meshData, kTestObjectId);
 	EXPECT_NE(gpu.vertexBuffer, nullptr);
 	EXPECT_NE(gpu.indexBuffer, nullptr);
 	EXPECT_GT(gpu.indexCount, 0u);
+
+	m_cache->UseMeshGPU(kTestObjectId, std::move(gpu));
+
+	MeshGPU* retrieved = m_cache->GetMeshGPU(kTestObjectId);
+	ASSERT_NE(retrieved, nullptr);
+	EXPECT_NE(retrieved->vertexBuffer, nullptr);
+	EXPECT_NE(retrieved->indexBuffer, nullptr);
+	EXPECT_EQ(retrieved->indexCount, gpu.indexCount); // moved-from; use captured
 }
 
 // ---------------------------------------------------------------------------
@@ -92,8 +157,7 @@ TEST_F(MeshRenderTest, GetMeshGPU_CreatesBuffers)
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Calling GetMeshGPU twice with the same objectId returns the
- *        same MeshGPU (cached, not re-created).
+ * @brief Calling GetMeshGPU twice returns the same pointer (cached).
  */
 TEST_F(MeshRenderTest, GetMeshGPU_ReturnsCached)
 {
@@ -103,12 +167,18 @@ TEST_F(MeshRenderTest, GetMeshGPU_ReturnsCached)
 	ASSERT_TRUE(meshData->LoadObjFromString(kTriangleObj));
 
 	constexpr int kTestObjectId = 99;
-	MeshGPU& first  = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
-	MeshGPU& second = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
+	auto gpu = CreateTestMeshGPU(*m_device, PhysicalDevice(),
+	                              m_queue, m_graphicsQueueFamily,
+	                              *meshData, kTestObjectId);
+	m_cache->UseMeshGPU(kTestObjectId, std::move(gpu));
 
-	EXPECT_EQ(&first, &second);
-	EXPECT_NE(first.vertexBuffer, nullptr);
-	EXPECT_NE(first.indexBuffer, nullptr);
+	MeshGPU* first  = m_cache->GetMeshGPU(kTestObjectId);
+	MeshGPU* second = m_cache->GetMeshGPU(kTestObjectId);
+
+	ASSERT_NE(first, nullptr);
+	EXPECT_EQ(first, second);
+	EXPECT_NE(first->vertexBuffer, nullptr);
+	EXPECT_NE(first->indexBuffer, nullptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +186,7 @@ TEST_F(MeshRenderTest, GetMeshGPU_ReturnsCached)
 // ---------------------------------------------------------------------------
 
 /**
- * @brief After RemoveMeshGPU, the MeshGPU entries are gone.
+ * @brief After RemoveMeshGPU, GetMeshGPU returns nullptr.
  */
 TEST_F(MeshRenderTest, RemoveMeshGPU_Destroys)
 {
@@ -127,37 +197,52 @@ TEST_F(MeshRenderTest, RemoveMeshGPU_Destroys)
 
 	constexpr int kTestObjectId = 77;
 
-	// Create
-	MeshGPU& created = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
-	EXPECT_NE(created.vertexBuffer, nullptr);
+	// Insert
+	auto gpu = CreateTestMeshGPU(*m_device, PhysicalDevice(),
+	                              m_queue, m_graphicsQueueFamily,
+	                              *meshData, kTestObjectId);
+	m_cache->UseMeshGPU(kTestObjectId, std::move(gpu));
+
+	MeshGPU* created = m_cache->GetMeshGPU(kTestObjectId);
+	ASSERT_NE(created, nullptr);
+	EXPECT_NE(created->vertexBuffer, nullptr);
 
 	// Remove
 	m_cache->RemoveMeshGPU(kTestObjectId);
+	EXPECT_EQ(m_cache->GetMeshGPU(kTestObjectId), nullptr);
 
-	// Subsequent get creates a new one
-	MeshGPU& recreated = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, *meshData);
-	EXPECT_NE(recreated.vertexBuffer, nullptr);
+	// Re-insert a new one
+	auto gpu2 = CreateTestMeshGPU(*m_device, PhysicalDevice(),
+	                               m_queue, m_graphicsQueueFamily,
+	                               *meshData, kTestObjectId);
+	m_cache->UseMeshGPU(kTestObjectId, std::move(gpu2));
+
+	MeshGPU* recreated = m_cache->GetMeshGPU(kTestObjectId);
+	ASSERT_NE(recreated, nullptr);
+	EXPECT_NE(recreated->vertexBuffer, nullptr);
 	// Should be a different instance
-	EXPECT_NE(&created, &recreated);
+	EXPECT_NE(created, recreated);
 }
 
 // ---------------------------------------------------------------------------
-// GetMeshGPU_EmptyMeshData
+// UseMeshGPU_EmptyMeshData
 // ---------------------------------------------------------------------------
 
 /**
- * @brief GetMeshGPU with empty MeshData returns an empty MeshGPU
- *        (null buffers, zero counts) rather than crashing.
+ * @brief UseMeshGPU with empty MeshGPU (null buffers, zero counts)
+ *        is stored and retrievable.
  */
-TEST_F(MeshRenderTest, GetMeshGPU_EmptyMeshData)
+TEST_F(MeshRenderTest, UseMeshGPU_EmptyMeshData)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan GPU.";
 
-	MeshData emptyData;
 	constexpr int kTestObjectId = 0;
-	MeshGPU& gpu = m_cache->GetMeshGPU(kTestObjectId, m_queue, m_graphicsQueueFamily, emptyData);
+	MeshGPU emptyGpu;
+	m_cache->UseMeshGPU(kTestObjectId, std::move(emptyGpu));
 
-	EXPECT_EQ(gpu.vertexBuffer, nullptr);
-	EXPECT_EQ(gpu.indexBuffer, nullptr);
-	EXPECT_EQ(gpu.indexCount, 0u);
+	MeshGPU* retrieved = m_cache->GetMeshGPU(kTestObjectId);
+	ASSERT_NE(retrieved, nullptr);
+	EXPECT_EQ(retrieved->vertexBuffer, nullptr);
+	EXPECT_EQ(retrieved->indexBuffer, nullptr);
+	EXPECT_EQ(retrieved->indexCount, 0u);
 }

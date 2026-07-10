@@ -144,6 +144,10 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 		*m_device, pd, m_queue, m_graphicsQueueFamily);
 	ASSERT_EQ(shadowRes.scene->mesh_list.size(), 2u);
 
+	// Pre-register GPU resources before pass recording
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
 	const auto& camera   = shadowRes.scene->cam_list.begin()->second;
 	const int   lightUID = shadowRes.scene->light_list.begin()->first;
 	const auto& light    = shadowRes.scene->light_list.begin()->second;

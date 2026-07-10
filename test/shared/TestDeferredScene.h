@@ -25,14 +25,11 @@
 #pragma once
 
 #include "Log.h"
-#include "render/RenderCache.h"
-#include "render/MeshGPU.h"
-#include "scene/Material.h"
 
 #include "asset/MeshData.h"
-
 #include "scene/Camera.h"
 #include "scene/Light.h"
+#include "scene/Material.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 

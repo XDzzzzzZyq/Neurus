@@ -1,25 +1,31 @@
 #include "Editor.h"
 
+#include "editor/Context.h"
+#include "editor/controllers/CameraController.h"
+#include "editor/events/CameraEvents.h"
+#include "editor/events/EditorEvents.h"
+#include "editor/events/EventBus.h"
+#include "editor/events/UIEvents.h"
+#include "project/Project.h"
+
+#include "app/VulkanContext.h"
+#include "render/DeferredRenderer.h"
+#include "render/RenderCache.h"
+#include "render/UploadManager.h"
+#include "render/resources/LightGPU.h"
+#include "render/resources/MeshGPU.h"
+
+#include "core/Log.h"
+#include "scene/Camera.h"
+#include "scene/Environment.h"
+#include "scene/Scene.h"
+
 #include <QCoreApplication>
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <vector>
-
-#include "editor/Context.h"
-#include "editor/controllers/CameraController.h"
-#include "editor/events/CameraEvents.h"
-#include "editor/events/EventBus.h"
-#include "editor/events/EditorEvents.h"
-#include "editor/events/UIEvents.h"
-#include "project/Project.h"
-#include "scene/Camera.h"
-#include "scene/Environment.h"
-#include "scene/Scene.h"
-#include "app/VulkanContext.h"
-#include "render/DeferredRenderer.h"
-#include "core/Log.h"
 
 namespace {
 
@@ -45,6 +51,13 @@ Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer)
 	: ed_vkContext(vkCtx)
 	, ed_renderer(renderer)
 {
+	if (ed_vkContext && ed_renderer)
+	{
+		ed_uploadManager = std::make_unique<UploadManager>(
+			ed_vkContext->device(),
+			ed_vkContext->physicalDevice(),
+			ed_vkContext->graphicsQueueFamily());
+	}
 }
 
 void Editor::SetProject(std::unique_ptr<neurus::project::Project> project)
@@ -63,6 +76,10 @@ void Editor::Initialize(Scene& scene)
 {
 	// Store the scene reference for OnIBLLoad and other operations
 	ed_ownerScene = &scene;
+
+	// Note: Mesh/light GPU upload happens AFTER window is shown and surface
+	// is ready — see UploadSceneResources() called from Application::Run()
+	// and from OnProjectOpen() / OnProjectNew().
 
 	// Create Context with EventQueue singleton
 	ed_context = std::make_unique<Context>(eventQueue());
@@ -157,11 +174,12 @@ void Editor::OnProjectNew()
 		auto& projectScene = ed_project->GetScene();
 		ed_ownerScene = &projectScene;
 
-		// GPU resources created lazily by RenderCache on first use
+		// Upload scene resources to GPU
 		if (ed_renderer)
 		{
 			ed_renderer->UploadLights(projectScene);
 		}
+		UploadSceneResources();
 
 		if (ed_context)
 		{
@@ -196,11 +214,12 @@ void Editor::OnProjectOpen(const QString& path)
 		auto& projectScene = ed_project->GetScene();
 		ed_ownerScene = &projectScene;
 
-		// GPU resources created lazily by RenderCache on first use
+		// Upload scene resources to GPU
 		if (ed_renderer)
 		{
 			ed_renderer->UploadLights(projectScene);
 		}
+		UploadSceneResources();
 
 		if (ed_context)
 		{
@@ -241,8 +260,15 @@ void Editor::OnMeshImport(const QString& path)
 {
 	try {
 		auto mesh = std::make_shared<neurus::Mesh>(path.toStdString());
-		// GPU upload happens lazily via RenderCache::GetMeshGPU() on first render.
 		ed_project->GetScene().UseMesh(mesh);
+
+		// Upload to GPU immediately via UploadManager
+		if (ed_uploadManager && ed_renderer)
+		{
+			auto meshGPU = ed_uploadManager->UploadMesh(*mesh);
+			ed_renderer->GetRenderCache().UseMeshGPU(mesh->GetObjectID(), std::move(meshGPU));
+		}
+
 		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Imported mesh: " << path.toStdString());
 	}
@@ -278,6 +304,12 @@ void Editor::OnLightAdd()
 		{
 			ed_renderer->UploadLights(ed_project->GetScene());
 		}
+		// Upload shadow map for this light
+		if (ed_uploadManager && ed_renderer && light->use_shadow)
+		{
+			auto lightGPU = ed_uploadManager->UploadLight(*light);
+			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
+		}
 		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Added point light at (3, 3, 3)");
 	}
@@ -298,6 +330,12 @@ void Editor::OnSunLightAdd()
 		if (ed_renderer)
 		{
 			ed_renderer->UploadLights(ed_project->GetScene());
+		}
+		// Upload shadow map for this sun light
+		if (ed_uploadManager && ed_renderer && light->use_shadow)
+		{
+			auto lightGPU = ed_uploadManager->UploadLight(*light);
+			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
 		}
 		ed_project->MarkDirty();
 		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
@@ -348,16 +386,47 @@ void Editor::OnIBLLoad()
 
 void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 {
-	if (!ed_vkContext || !ed_renderer)
+	if (!ed_uploadManager || !ed_renderer)
 	{
-		NEURUS_ERR("[Editor] GenerateIBL: VulkanContext or Renderer not available");
+		NEURUS_ERR("[Editor] GenerateIBL: UploadManager or Renderer not available");
 		return;
 	}
 
-	// Delegate GPU resource creation to RenderCache (via DeferredRenderer)
-	ed_renderer->GenerateIBL(env);
+	auto envGPU = ed_uploadManager->UploadEnvironment(*env);
+	ed_renderer->GetRenderCache().UseEnvironmentGPU(env->GetObjectID(), std::move(envGPU));
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
+}
+
+// =========================================================================
+// UploadSceneResources() – upload all meshes and shadow-casting lights to GPU
+// =========================================================================
+
+void Editor::UploadSceneResources()
+{
+	if (!ed_uploadManager || !ed_renderer || !ed_project) return;
+
+	auto& scene = ed_project->GetScene();
+
+	for (const auto& [id, mesh] : scene.mesh_list)
+	{
+		if (!mesh || !mesh->o_mesh) continue;
+		const int objId = mesh->GetObjectID();
+		NEURUS_LOG("[Editor::UploadSceneResources] Registering MeshGPU: mapKey=" << id << " GetObjectID=" << objId);
+		if (ed_renderer->GetRenderCache().GetMeshGPU(objId)) continue;
+		auto meshGPU = ed_uploadManager->UploadMesh(*mesh);
+		ed_renderer->GetRenderCache().UseMeshGPU(objId, std::move(meshGPU));
+	}
+
+	for (const auto& [uid, light] : scene.light_list)
+	{
+		if (!light || !light->use_shadow) continue;
+		if (ed_renderer->GetRenderCache().GetLightGPU(uid)) continue;
+		auto lightGPU = ed_uploadManager->UploadLight(*light);
+		ed_renderer->GetRenderCache().UseLightGPU(uid, std::move(lightGPU));
+	}
+
+	NEURUS_LOG("[Editor] Uploaded scene resources to GPU");
 }
 
 // =========================================================================

@@ -279,6 +279,12 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	const glm::vec3 viewPos = shadowRes.cubePos;
 
 	// -------------------------------------------------------------------
+	// Step 3: Pre-register GPU resources before pass recording
+	// -------------------------------------------------------------------
+	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *shadowRes.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
+
+	// -------------------------------------------------------------------
 	// Step 3: Render all 6 faces into depth cubemap + colour output (via cache).
 	// -------------------------------------------------------------------
 	{
@@ -296,7 +302,10 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 	// Step 4: Read back the actual depth cubemap (D32_SFLOAT)
 	// -------------------------------------------------------------------
 	{
-		auto& shadowCubemap = m_renderCache->GetShadowMap(lightUID, LightType::POINTLIGHT);
+		auto* lgpu = m_renderCache->GetLightGPU(lightUID);
+		ASSERT_NE(lgpu, nullptr);
+		ASSERT_NE(lgpu->shadowDepthMap, nullptr);
+		auto& shadowCubemap = *lgpu->shadowDepthMap;
 		std::cout << "\n=== Depth Cubemap Readback (D32_SFLOAT) ===\n";
 
 		for (uint32_t face = 0; face < 6; ++face)

@@ -15,12 +15,15 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "render/RenderCache.h"
 #include "render/Barrier.h"
+#include "render/RenderCache.h"
+#include "render/UploadManager.h"
+#include "render/passes/GeometryPass.h"
+#include "scene/Camera.h"
+#include "scene/Scene.h"
 
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <fstream>
 #include <memory>
 #include <string>
@@ -28,10 +31,6 @@
 #include <vector>
 
 #include <glm/gtc/matrix_transform.hpp>
-
-#include "render/passes/GeometryPass.h"
-#include "scene/Camera.h"
-#include "render/buffers/GPUBuffer.h"
 
 // ---------------------------------------------------------------------------
 // Test vertex structure (matches BufferLayout: pos(3) + normal(3) + uv(2))
@@ -207,6 +206,54 @@ protected:
 			neurus::ImageState::DepthAttachment);
 
 		fixture.EndSubmitWait(cmd);
+	}
+
+	/**
+	 * @brief Pre-register all meshes in the scene into the RenderCache.
+	 *
+	 * Skips meshes already cached. Uses UploadManager for GPU-resident
+	 * buffer construction.
+	 */
+	static void EnsureMeshesUploaded(
+		neurus::RenderCache& cache,
+		const neurus::Scene& scene,
+		const vk::raii::Device& device,
+		const vk::raii::PhysicalDevice& pd,
+		vk::Queue /*queue*/,
+		uint32_t qfi)
+	{
+		neurus::UploadManager upload(device, pd, qfi);
+		for (const auto& [id, mesh] : scene.mesh_list)
+		{
+			if (!mesh || !mesh->o_mesh) continue;
+			if (cache.GetMeshGPU(id)) continue;
+			auto meshGPU = upload.UploadMesh(*mesh);
+			cache.UseMeshGPU(id, std::move(meshGPU));
+		}
+	}
+
+	/**
+	 * @brief Pre-register all shadow-casting lights in the scene into the RenderCache.
+	 *
+	 * Skips lights already cached or without shadow enabled. Uses
+	 * UploadManager for shadow depth map construction.
+	 */
+	static void EnsureLightShadowsUploaded(
+		neurus::RenderCache& cache,
+		const neurus::Scene& scene,
+		const vk::raii::Device& device,
+		const vk::raii::PhysicalDevice& pd,
+		vk::Queue /*queue*/,
+		uint32_t qfi)
+	{
+		neurus::UploadManager upload(device, pd, qfi);
+		for (const auto& [uid, light] : scene.light_list)
+		{
+			if (!light || !light->use_shadow) continue;
+			if (cache.GetLightGPU(uid)) continue;
+			auto lightGPU = upload.UploadLight(*light);
+			cache.UseLightGPU(uid, std::move(lightGPU));
+		}
 	}
 
 	// --- Vulkan state (destructor order: reverse declaration) ---

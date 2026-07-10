@@ -6,42 +6,28 @@
 #include "DeferredRenderer.h"
 
 #include "Barrier.h"
-#include "RenderCache.h"
-#include "passes/GeometryPass.h"
-#include "passes/IBLPass.h"
-#include "passes/LightingPass.h"
-#include "RenderContext.h"
 #include "Image.h"
-#include "Texture.h"
+#include "RenderCache.h"
+#include "RenderContext.h"
+#include "Swapchain.h"
+
+#include "passes/GeometryPass.h"
+#include "passes/LightingPass.h"
 #include "passes/SSAOPass.h"
 #include "passes/ShadowDepthPass.h"
 #include "passes/ShadowIntensityPass.h"
-#include "Swapchain.h"
-#include "passes/SyncObjects.h"
-#include "buffers/GPUBuffer.h"
-#include "buffers/VertexBuffer.h"
-#include "buffers/IndexBuffer.h"
 
+#include "scene/Camera.h"
 #include "scene/Light.h"
-
-
+#include "scene/Scene.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "Log.h"
 
-#include "scene/Camera.h"
-#include "scene/Environment.h"
-#include "scene/Mesh.h"
-#include "scene/Scene.h"
-
 #include <algorithm>
-#include <array>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cstring>
-#include <iostream>
 #include <stdexcept>
 #include <unordered_map>
 #include <vector>
@@ -100,17 +86,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		r_passes.push_back(std::move(ssaoPass));
 	}
 
-	// --- 7. Create IBL pass (pure compute service) ---
-	{
-		auto iblPass = std::make_unique<IBLPass>(
-			device, physicalDevice,
-			r_graphicsQueue, r_queueFamilyIndex);
-		r_iblPass = iblPass.get();
-		r_passes.push_back(std::move(iblPass));
-		NEURUS_LOG("[DeferredRenderer] IBLPass created");
-	}
-
-	// --- 8. Create shadow depth pass (cubemap depth from light's POV) ---
+	// --- 7. Create shadow depth pass (cubemap depth from light's POV) ---
 	{
 		auto shadowDepth = std::make_unique<ShadowDepthPass>(
 			device, physicalDevice, graphicsQueue, queueFamilyIndex,
@@ -254,22 +230,6 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 {
 	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamilyIndex);
 	return vk::raii::CommandPool(device, poolCI);
-}
-
-// ---------------------------------------------------------------------------
-// GenerateIBL - wrapper for Editor (avoids cross-layer include of IBLPass.h)
-// ---------------------------------------------------------------------------
-
-void DeferredRenderer::GenerateIBL(const std::shared_ptr<Environment>& env)
-{
-	NEURUS_LOG("[DeferredRenderer] GenerateIBL for envId=" << env->GetObjectID());
-
-	r_renderCache->CreateEnvironmentGPU(
-		env->GetObjectID(),
-		*env,
-		r_graphicsQueue,
-		r_queueFamilyIndex,
-		*r_iblPass);
 }
 
 // ---------------------------------------------------------------------------
