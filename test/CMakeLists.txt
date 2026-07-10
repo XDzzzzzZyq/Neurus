@@ -3,13 +3,16 @@
 add_executable(neurus_test
 	shared/TestVulkanShared.cpp
 	shared/TestVulkanShared.h
+	shared/TestMinimalSpv.h
 	shared/test_main.cpp
 	render/test_buffers.cpp
 	render/test_buffer.cpp
 	render/test_vulkan_context.cpp
 	asset/test_meshdata.cpp
 	asset/test_imagedata.cpp
+	render/test_shader_classes.cpp
 	render/test_shader_module.cpp
+	render/test_shader_parser.cpp
 	render/test_syncobjects.cpp
 	render/test_image.cpp
 	render/test_descriptor.cpp
@@ -63,7 +66,6 @@ target_link_libraries(neurus_test PRIVATE
 	neurus_editor
 	neurus_ui
 	neurus_asset
-	shader_headers
 	gtest
 	Vulkan::Vulkan
 	Qt6::Core
@@ -75,7 +77,6 @@ target_link_libraries(neurus_test PRIVATE
 target_include_directories(neurus_test PRIVATE
 	${CMAKE_SOURCE_DIR}/src
 	${CMAKE_SOURCE_DIR}/test
-	${CMAKE_BINARY_DIR}/generated/shaders
 )
 
 target_compile_definitions(neurus_test PRIVATE
@@ -107,6 +108,16 @@ if(WIN32 AND WINDEPLOYQT)
 			"${_qt6_bin_dir}/$<IF:$<CONFIG:Debug>,Qt6Testd.dll,Qt6Test.dll>"
 			$<TARGET_FILE_DIR:neurus_test>
 		COMMENT "Deploying Qt DLLs for test executable (including Qt6Test)"
+	)
+endif()
+
+# Deploy shaderc_shared.dll alongside the test executable
+if(TARGET shaderc_shared)
+	add_custom_command(TARGET neurus_test POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different
+			$<TARGET_FILE:shaderc_shared>
+			$<TARGET_FILE_DIR:neurus_test>
+		COMMENT "Copying shaderc_shared.dll for runtime access"
 	)
 endif()
 

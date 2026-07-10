@@ -8,7 +8,8 @@
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
-#include "shaders/ShaderModule.h"
+#include "shaders/ShaderLibrary.h"
+#include "shaders/ComputeShader.h"
 
 #include "Log.h"
 
@@ -38,26 +39,37 @@ static_assert(sizeof(IBLPushConstants) == 16, "IBLPushConstants must be 16 bytes
 IBLPass::IBLPass(const vk::raii::Device& device,
                  const vk::raii::PhysicalDevice& physicalDevice,
                  vk::Queue graphicsQueue,
-                 uint32_t queueFamilyIndex,
-                 const uint32_t* irradianceSpv,
-                 size_t irradianceSize,
-                 const uint32_t* specularSpv,
-                 size_t specularSize)
+                 uint32_t queueFamilyIndex)
 	: ComputePass(device, physicalDevice, IBLPass::CreateDescriptorSetLayout(device), 1)
 	, p_graphicsQueue(graphicsQueue)
 	, p_queueFamilyIndex(queueFamilyIndex)
+	// --- Self-load compute shaders via ShaderLibrary ---
+	, p_irradianceShader(
+		ShaderLibrary::LoadComputeShader("irradiance_conv",
+		                                "res/shaders/compute/irradiance_conv.comp"))
+	, p_specularShader(
+		ShaderLibrary::LoadComputeShader("importance_samp",
+		                                 "res/shaders/compute/importance_samp.comp"))
 	// --- Pipeline builders (must outlive pipelines) ---
-	, p_irradiancePipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
-	, p_irradiancePipeline(CreatePipeline(device, irradianceSpv, irradianceSize,
-	                                       p_irradiancePipelineBuilder,
-	                                       "IBLPass::Irradiance"))
-	, p_specularPipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
-	, p_specularPipeline(CreatePipeline(device, specularSpv, specularSize,
-	                                     p_specularPipelineBuilder,
-	                                     "IBLPass::Specular"))
+	, p_irradiancePipelineBuilder(nullptr)
+	, p_irradiancePipeline(nullptr)
+	, p_specularPipelineBuilder(nullptr)
+	, p_specularPipeline(nullptr)
 {
-	NEURUS_LOG("[IBLPass] irradianceSize=" << irradianceSize
-	           << " specularSize=" << specularSize
+	// --- Create modules from self-loaded shaders ---
+	if (p_irradianceShader) { p_irradianceShader->CreateModule(device); }
+	if (p_specularShader)   { p_specularShader->CreateModule(device); }
+
+	// --- Create pipelines from self-loaded shaders ---
+	p_irradiancePipeline = CreatePipeline(device, p_irradianceShader,
+	                                       p_irradiancePipelineBuilder,
+	                                       "IBLPass::Irradiance");
+	p_specularPipeline = CreatePipeline(device, p_specularShader,
+	                                     p_specularPipelineBuilder,
+	                                     "IBLPass::Specular");
+
+	NEURUS_LOG("[IBLPass] irradiance=" << (p_irradianceShader ? "OK" : "FAIL")
+	           << " specular=" << (p_specularShader ? "OK" : "FAIL")
 	           << " qfi=" << queueFamilyIndex);
 }
 
@@ -295,12 +307,16 @@ vk::raii::Sampler IBLPass::CreateEquirectSampler(const vk::raii::Device& device)
 // ---------------------------------------------------------------------------
 
 vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
-                                            const uint32_t* compSpv,
-                                            size_t compSize,
+                                            std::shared_ptr<ComputeShader> computeShader,
                                             std::unique_ptr<ComputePipelineBuilder>& outBuilder,
                                             const char* debugName)
 {
-	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
+	if (!computeShader || !computeShader->IsValid())
+	{
+		throw std::runtime_error(std::string("IBLPass: ") + debugName + " shader not loaded or invalid");
+	}
+
+	auto compModule = computeShader->GetShaderModule(ShaderType::COMPUTE);
 
 	outBuilder = std::make_unique<ComputePipelineBuilder>(device);
 
@@ -309,7 +325,7 @@ vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
 		0,
 		sizeof(IBLPushConstants));
 
-	return outBuilder->SetShaderStage(compModule, "main")
+	return outBuilder->SetShaderStage(*compModule, "main")
 		.SetDebugName(debugName)
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)

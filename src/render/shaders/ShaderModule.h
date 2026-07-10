@@ -46,6 +46,21 @@ public:
 	static ShaderModule FromFile(const vk::raii::Device& device, const std::string& path);
 
 	/**
+	 * @brief Factory: wraps SPIR-V from a std::vector.
+	 *
+	 * Useful for shaderc::CompileGlslToSpv() output which produces
+	 * vector<uint32_t>. Returns a shared_ptr for shared ownership
+	 * across the pipeline.
+	 *
+	 * @param device Logical device.
+	 * @param spirv SPIR-V bytecode as a vector of uint32_t words.
+	 * @return A shared_ptr to a new ShaderModule.
+	 */
+	static std::shared_ptr<ShaderModule> FromSpirV(
+		const vk::raii::Device& device,
+		const std::vector<uint32_t>& spirv);
+
+	/**
 	 * @brief Factory: wraps SPIR-V from an embedded C header array.
 	 *
 	 * Matches the format produced by the CMake SpvToHeader.cmake script:

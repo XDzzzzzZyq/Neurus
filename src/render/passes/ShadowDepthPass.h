@@ -23,6 +23,8 @@
 namespace neurus {
 
 struct GeometryRenderItem;
+class RenderShader;
+class Shader;
 
 class ShadowDepthPass : public Pass
 {
@@ -88,6 +90,9 @@ private:
 	std::unique_ptr<DescriptorSet> p_ssboSet;
 	BufferLayout p_vtxLayout;
 
+	// --- Shaders (self-loaded via ShaderLibrary) ---
+	std::shared_ptr<RenderShader> m_multiviewShader;  ///< Point-light cubemap depth+colour (multiview)
+	std::shared_ptr<RenderShader> m_sunShader;         ///< Sun-light orthographic depth-only
 	// Graphics pipeline (multiview depth+colour)
 	vk::raii::PipelineLayout p_pipelineLayout = nullptr;
 	vk::raii::Pipeline p_pipeline = nullptr;
@@ -96,6 +101,7 @@ private:
 	vk::raii::PipelineLayout p_sunPipelineLayout = nullptr;
 	vk::raii::Pipeline p_sunPipeline = nullptr;
 	void createSunPipeline(const vk::raii::Device& device);
+
 };
 
 } // namespace neurus

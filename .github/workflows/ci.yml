@@ -36,6 +36,11 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Sync shaderc dependencies
+        run: |
+          cd dep/shaderc
+          python utils/git-sync-deps
+
       - name: Configure CMake
         run: cmake --preset vs2022
 

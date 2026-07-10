@@ -49,6 +49,7 @@
 #include "render/RenderCache.h"
 #include "render/Screenshot.h"
 #include "render/Texture.h"
+#include "render/shaders/ShaderLibrary.h"
 #include "asset/MeshData.h"
 #include "scene/Scene.h"
 #include "project/Project.h"
@@ -86,7 +87,16 @@ Application::Application(int argc, char* argv[])
 	app_qtApp->setApplicationVersion("0.1.0");
 }
 
-Application::~Application() = default;
+Application::~Application()
+{
+	// ShaderLibrary is a Meyer's singleton (function-local static cache) that
+	// outlives main(). Its cached Shader objects own vk::raii::ShaderModule
+	// handles which must be destroyed BEFORE the VkDevice. Clear the cache here
+	// while app_vkContext (and thus the device) is still alive; subsequent
+	// reverse-order member destruction then releases the passes' shared_ptrs,
+	// destroying the ShaderModules while the device still exists.
+	ShaderLibrary::Clear();
+}
 
 // =========================================================================
 // Run() – orchestration

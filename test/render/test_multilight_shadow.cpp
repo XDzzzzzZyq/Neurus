@@ -37,11 +37,7 @@
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
-// --- Embedded shaders ---
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-#include <shadow_eval.comp.h>
-#include <pbr_lighting.comp.h>
+
 
 #include "shared/TestReferenceImage.h"
 
@@ -86,9 +82,7 @@ protected:
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 		// --- Shadow depth pass ---
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
@@ -97,14 +91,12 @@ protected:
 		// --- Shadow intensity pass (1 set = single-frame recording) ---
 		m_shadowIntensityPass = std::make_unique<ShadowIntensityPass>(
 			*m_device, pd, 1u,
-			m_queue, m_graphicsQueueFamily,
-			shadow_eval_comp_spv, sizeof(shadow_eval_comp_spv));
+			m_queue, m_graphicsQueueFamily);
 
 		// --- Lighting pass (2 sets = matches test_deferred_shading) ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd, 2u,
-			m_queue, m_graphicsQueueFamily,
-			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+			m_queue, m_graphicsQueueFamily);
 	}
 
 	void TearDown() override

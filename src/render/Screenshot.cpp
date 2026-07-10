@@ -6,10 +6,10 @@
 #include "render/Barrier.h"
 #include "Log.h"
 
-#include "c2e.comp.h"
 #include "ComputePipelineBuilder.h"
 #include "DescriptorManager.h"
-#include "shaders/ShaderModule.h"
+#include "shaders/ShaderLibrary.h"
+#include "shaders/ComputeShader.h"
 #include "scene/Light.h"
 
 #include <algorithm>
@@ -183,12 +183,19 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 		c2eSet.WriteImage(1, equiInfo, vk::DescriptorType::eStorageImage);
 	}
 
-	// --- 4. Create compute pipeline ---
-	auto compModule = ShaderModule::FromEmbedded(m_device,
-		c2e_comp_spv, sizeof(c2e_comp_spv));
+	// --- 4. Load compute shader via ShaderLibrary ---
+	auto c2eShader =
+		ShaderLibrary::LoadComputeShader("c2e_export",
+		                                "res/shaders/convert/c2e.comp");
+	if (!c2eShader || !c2eShader->IsValid())
+	{
+		throw std::runtime_error("[Screenshot] Failed to load c2e compute shader");
+	}
+	c2eShader->CreateModule(m_device);
+	auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
 
 	ComputePipelineBuilder c2eBuilder(m_device);
-	c2eBuilder.SetShaderStage(compModule, "main");
+	c2eBuilder.SetShaderStage(*compModule, "main");
 	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 

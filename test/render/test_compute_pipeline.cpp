@@ -4,8 +4,7 @@
 #include "render/shaders/ShaderModule.h"
 #include "render/DescriptorManager.h"
 #include "app/VulkanContext.h"
-
-#include <dummy.comp.h>
+#include "shared/TestMinimalSpv.h"
 
 using namespace neurus;
 
@@ -87,11 +86,12 @@ TEST_F(ComputePipelineTest, Build_ReturnsValidPipeline)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	// Create a compute shader module from embedded SPIR-V
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	// Create compute shader module from inline SPIR-V
+	std::vector<uint32_t> spirv(
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
+	ShaderModule shader(*m_device, spirv);
+	ASSERT_NE(*shader.handle(), VK_NULL_HANDLE);
 
 	// Build the compute pipeline
 	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
@@ -112,10 +112,11 @@ TEST_F(ComputePipelineTest, WithDescriptorSetLayout_BuildsSuccessfully)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	std::vector<uint32_t> spirv(
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
+	ShaderModule shader(*m_device, spirv);
+	ASSERT_NE(*shader.handle(), VK_NULL_HANDLE);
 
 	// Create a descriptor set layout with a storage buffer binding
 	auto layout = BuildLayout()
@@ -142,10 +143,11 @@ TEST_F(ComputePipelineTest, WithPushConstants_BuildsSuccessfully)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	std::vector<uint32_t> spirv(
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
+	ShaderModule shader(*m_device, spirv);
+	ASSERT_NE(*shader.handle(), VK_NULL_HANDLE);
 
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute, 0, 16);
@@ -169,10 +171,11 @@ TEST_F(ComputePipelineTest, WithLayoutAndPushConstants_BuildsSuccessfully)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shader(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	std::vector<uint32_t> spirv(
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
+	ShaderModule shader(*m_device, spirv);
+	ASSERT_NE(*shader.handle(), VK_NULL_HANDLE);
 
 	auto layout = BuildLayout()
 		.AddBinding(0, vk::DescriptorType::eUniformBuffer,
@@ -202,15 +205,14 @@ TEST_F(ComputePipelineTest, TwoBuilds_BothProduceValidPipelines)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	ShaderModule shaderA(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	std::vector<uint32_t> spirv(
+		kMinimalCompSpv,
+		kMinimalCompSpv + (kMinimalCompSpvSize / sizeof(uint32_t)));
+	ShaderModule shaderA(*m_device, spirv);
+	ASSERT_NE(*shaderA.handle(), VK_NULL_HANDLE);
 
-	ShaderModule shaderB(*m_device,
-		std::vector<uint32_t>(
-			dummy_comp_spv,
-			dummy_comp_spv + (dummy_comp_spv_size / sizeof(uint32_t))));
+	ShaderModule shaderB(*m_device, spirv);
+	ASSERT_NE(*shaderB.handle(), VK_NULL_HANDLE);
 
 	vk::raii::Pipeline pipelineA = ComputePipelineBuilder(*m_device)
 		.SetShaderStage(shaderA)

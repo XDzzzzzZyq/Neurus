@@ -10,7 +10,8 @@
 #include "Image.h"
 #include "render/Barrier.h"
 #include "RenderContext.h"
-#include "shaders/ShaderModule.h"
+#include "shaders/ShaderLibrary.h"
+#include "shaders/ComputeShader.h"
 
 #include "Log.h"
 
@@ -80,16 +81,25 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
                    const vk::raii::PhysicalDevice& physicalDevice,
                    uint32_t numSets,
                    vk::Queue graphicsQueue,
-                   uint32_t queueFamilyIndex,
-                   const uint32_t* compSpv,
-                   size_t compSize)
+                   uint32_t queueFamilyIndex)
 	: ComputePass(device, physicalDevice,
 	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
-	, p_pipeline(CreatePipeline(device, compSpv, compSize))
+	, p_pipeline(nullptr)
+	// --- Self-load compute shader via ShaderLibrary ---
+	, p_computeShader(
+		ShaderLibrary::LoadComputeShader("ssao",
+		                                "res/shaders/compute/ssao.comp"))
 {
-	NEURUS_LOG("[SSAOPass] compSize=" << compSize << " numSets=" << numSets
+	// --- Create module from self-loaded shader ---
+	if (p_computeShader) { p_computeShader->CreateModule(device); }
+
+	// --- Create pipeline from self-loaded shader ---
+	p_pipeline = CreatePipeline(device);
+
+	NEURUS_LOG("[SSAOPass] numSets=" << numSets
 	           << " kernelLength=" << kDefaultKernelLength
-	           << " qfi=" << queueFamilyIndex);
+	           << " qfi=" << queueFamilyIndex
+	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
 
 	// --- Generate and upload kernel + initial camera data ---
 	{
@@ -221,12 +231,16 @@ DescriptorSetLayout SSAOPass::CreateDescriptorSetLayout(const vk::raii::Device& 
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
-                                             const uint32_t* compSpv,
-                                             size_t compSize)
+vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device)
 {
-	// --- Create compute shader module from embedded SPIR-V ---
-	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
+	// --- Guard: shader must be valid ---
+	if (!p_computeShader || !p_computeShader->IsValid())
+	{
+		throw std::runtime_error("SSAOPass: Compute shader not loaded or invalid");
+	}
+
+	// --- Use self-loaded compute shader module ---
+	auto compModule = p_computeShader->GetShaderModule(ShaderType::COMPUTE);
 
 	// --- Push constant range (4 ints = 16 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -235,7 +249,7 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device,
 		4 * sizeof(int32_t));  // kernelLength, radius (float), noiseSize, frameIndex
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->SetShaderStage(compModule, "main")
+	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
 		.SetDebugName("SSAOPass")
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)

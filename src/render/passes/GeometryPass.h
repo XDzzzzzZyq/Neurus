@@ -23,6 +23,8 @@
 #include "../DescriptorManager.h"
 #include "../buffers/BufferLayout.h"
 #include "../buffers/UniformBuffer.h"
+#include "../shaders/ShaderLibrary.h"
+#include "../shaders/RenderShader.h"
 #include "Pass.h"
 #include "RenderContext.h"
 
@@ -91,25 +93,19 @@ public:
 	/**
 	 * @brief Constructs the geometry pass and creates all GPU resources.
 	 *
+	 * Shaders are self-loaded via ShaderLibrary from GLSL source files.
+	 *
 	 * @param device              Logical device (retained reference).
 	 * @param physicalDevice      Physical device (for format queries).
 	 * @param queue               Graphics queue (for staging uploads).
 	 * @param queueFamilyIndex    Queue family index (for temp command pool).
-	 * @param vertSpv             Embedded vertex shader SPIR-V data.
-	 * @param vertSize            Vertex shader SPIR-V size in bytes.
-	 * @param fragSpv             Embedded fragment shader SPIR-V data.
-	 * @param fragSize            Fragment shader SPIR-V size in bytes.
 	 *
 	 * @throws std::runtime_error if shader or pipeline creation fails.
 	 */
 	GeometryPass(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
 	             vk::Queue queue,
-	             uint32_t queueFamilyIndex,
-	             const uint32_t* vertSpv,
-	             size_t vertSize,
-	             const uint32_t* fragSpv,
-	             size_t fragSize);
+	             uint32_t queueFamilyIndex);
 
 	/**
 	 * @brief Records the G-Buffer draw commands into a command buffer.
@@ -142,13 +138,10 @@ private:
 
 	/**
 	 * @brief Creates the graphics pipeline using PipelineBuilder.
+	 * ShaderModules from self-loaded RenderShader.
 	 * Sets p_pipelineLayout as a side effect.
 	 */
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
-	                                  const uint32_t* vertSpv,
-	                                  size_t vertSize,
-	                                  const uint32_t* fragSpv,
-	                                  size_t fragSize);
+	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);
 
 	// --- References (non-owning) ---
 	const vk::raii::PhysicalDevice* p_physicalDevice;
@@ -166,6 +159,9 @@ private:
 	// --- Pipeline ---
 	vk::raii::PipelineLayout p_pipelineLayout;
 	vk::raii::Pipeline p_pipeline;
+
+	// --- Self-loaded render shader (via ShaderLibrary) ---
+	std::shared_ptr<RenderShader> p_renderShader;
 
 	// --- Vertex input layout ---
 	BufferLayout p_vertexLayout;

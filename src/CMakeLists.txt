@@ -44,7 +44,6 @@ target_link_libraries(Neurus PRIVATE
 	neurus_ui
 	neurus_asset
 	neurus_scene
-	shader_headers
 	ads::qtadvanceddocking-qt6
 	Qt6::Core
 	Qt6::Quick
@@ -54,7 +53,6 @@ target_link_libraries(Neurus PRIVATE
 
 target_include_directories(Neurus PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}
-	${CMAKE_BINARY_DIR}/generated/shaders
 )
 
 # ADS_STATIC: tell Qt-Advanced-Docking-System headers to use static linkage

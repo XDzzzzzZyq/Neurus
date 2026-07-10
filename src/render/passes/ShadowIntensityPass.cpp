@@ -17,7 +17,8 @@
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
-#include "sun_shadow_eval.comp.h"
+#include "shaders/ComputeShader.h"
+#include "shaders/ShaderLibrary.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -67,9 +68,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
                                          const vk::raii::PhysicalDevice& physicalDevice,
                                          uint32_t numSets,
                                          vk::Queue /*graphicsQueue*/,
-                                         uint32_t /*queueFamilyIndex*/,
-                                         const uint32_t* compSpv,
-                                         size_t compSize)
+                                         uint32_t /*queueFamilyIndex*/)
 	: ComputePass(device, physicalDevice,
 	              // Allocate 2× descriptor sets per in-flight frame so that
 	              // the per-light loop can alternate between two sets without
@@ -77,11 +76,40 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	              // invalidate the command buffer — see VUID 00059 et al.).
 	              ShadowIntensityPass::CreateDescriptorSetLayout(device),
 	              numSets * kSetsPerFrameSlot)
-	, p_pipeline(CreatePipeline(device, compSpv, compSize))
 	, p_sunDescSetLayout(CreateSunDescriptorSetLayout(device))
 {
-	NEURUS_LOG("[ShadowIntensityPass] compSize=" << compSize
-	           << " numSets=" << numSets
+	// --- Load point-light cubemap eval shader via ShaderLibrary ---
+	p_pointLightShader = ShaderLibrary::LoadComputeShader(
+		"shadow_eval", "res/shaders/compute/shadow_eval.comp");
+
+	if (!p_pointLightShader)
+	{
+		throw std::runtime_error("[ShadowIntensityPass] Failed to load 'shadow_eval' compute shader");
+	}
+
+	if (!p_pointLightShader->CreateModule(device))
+	{
+		throw std::runtime_error("[ShadowIntensityPass] Failed to create compute shader module for 'shadow_eval'");
+	}
+
+	// --- Create point-light pipeline ---
+	p_pipeline = std::make_unique<vk::raii::Pipeline>(CreatePipeline(device));
+
+	// --- Load sun-light 2D eval shader via ShaderLibrary ---
+	p_sunLightShader = ShaderLibrary::LoadComputeShader(
+		"sun_shadow_eval", "res/shaders/compute/sun_shadow_eval.comp");
+
+	if (!p_sunLightShader)
+	{
+		throw std::runtime_error("[ShadowIntensityPass] Failed to load 'sun_shadow_eval' compute shader");
+	}
+
+	if (!p_sunLightShader->CreateModule(device))
+	{
+		throw std::runtime_error("[ShadowIntensityPass] Failed to create compute shader module for 'sun_shadow_eval'");
+	}
+
+	NEURUS_LOG("[ShadowIntensityPass] numSets=" << numSets
 	           << " farPlane=" << Light::point_shadow_far
 	           << " bias=" << p_bias);
 
@@ -90,9 +118,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 
 	// --- Sun compute pipeline (sun_shadow_eval.comp) ---
 	const uint32_t sunSetCount = numSets * kSetsPerFrameSlot;
-	p_sunPipeline = CreateSunPipeline(device,
-	                                  sun_shadow_eval_comp_spv,
-	                                  sizeof(sun_shadow_eval_comp_spv));
+	p_sunPipeline = CreateSunPipeline(device);
 
 	// --- Sun shadow sampler (clamp-to-border, black border for out-of-bounds UV) ---
 	p_sunShadowSampler = CreateSunShadowSampler(device, physicalDevice);
@@ -168,12 +194,10 @@ DescriptorSetLayout ShadowIntensityPass::CreateSunDescriptorSetLayout(const vk::
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& device,
-                                                        const uint32_t* compSpv,
-                                                        size_t compSize)
+vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& device)
 {
-	// --- Create compute shader module from embedded SPIR-V ---
-	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
+	// --- Get compute shader module from ShaderLibrary ---
+	auto compModule = p_pointLightShader->GetShaderModule(ShaderType::COMPUTE);
 
 	// --- Push constant range (lightWorldPos + farPlane + bias + layerIndex = 24 bytes) ---
 	// Matches shadow_eval.comp push constant layout:
@@ -187,7 +211,7 @@ vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& d
 		6 * sizeof(float));   // 24 bytes
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->SetShaderStage(compModule, "main")
+	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
 		.SetDebugName("ShadowIntensityPass")
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
@@ -198,12 +222,10 @@ vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& d
 // Sun pipeline creation (sun_shadow_eval.comp, 72-byte push constants)
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline ShadowIntensityPass::CreateSunPipeline(const vk::raii::Device& device,
-                                                           const uint32_t* compSpv,
-                                                           size_t compSize)
+vk::raii::Pipeline ShadowIntensityPass::CreateSunPipeline(const vk::raii::Device& device)
 {
-	// --- Create compute shader module from embedded SPIR-V ---
-	auto compModule = ShaderModule::FromEmbedded(device, compSpv, compSize);
+	// --- Get compute shader module from ShaderLibrary ---
+	auto compModule = p_sunLightShader->GetShaderModule(ShaderType::COMPUTE);
 
 	// --- Push constant range ---
 	// The GLSL push constant block is 72 bytes (mat4 64B + float 4B + int 4B),
@@ -220,7 +242,7 @@ vk::raii::Pipeline ShadowIntensityPass::CreateSunPipeline(const vk::raii::Device
 		20 * sizeof(float));   // 80 bytes — matches sizeof(SunShadowEvalPushConstants)
 
 	// --- Build sun compute pipeline ---
-	return p_sunPipelineBuilder->SetShaderStage(compModule, "main")
+	return p_sunPipelineBuilder->SetShaderStage(*compModule, "main")
 		.SetDebugName("ShadowIntensityPass_Sun")
 		.AddDescriptorSetLayout(*p_sunDescSetLayout.layout())
 		.AddPushConstantRange(pushRange)

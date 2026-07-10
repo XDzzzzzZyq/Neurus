@@ -21,6 +21,8 @@
 
 #include "passes/ComputePass.h"
 #include "../buffers/GPUBuffer.h"
+#include "../shaders/ShaderLibrary.h"
+#include "../shaders/ComputeShader.h"
 #include "../buffers/UniformBuffer.h"
 
 #include <glm/glm.hpp>
@@ -110,13 +112,13 @@ public:
 	/**
 	 * @brief Constructs the SSAO pass and creates all GPU resources.
 	 *
+	 * Shaders are self-loaded via ShaderLibrary from GLSL source files.
+	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for sampler creation).
 	 * @param numSets           Number of descriptor sets (one per in-flight frame).
 	 * @param graphicsQueue     Graphics queue for noise UBO staging upload.
 	 * @param queueFamilyIndex  Queue family index for staging command pool.
-	 * @param compSpv           Embedded compute shader SPIR-V data.
-	 * @param compSize          Compute shader SPIR-V size in bytes.
 	 *
 	 * @throws std::runtime_error if shader or pipeline creation fails.
 	 */
@@ -124,9 +126,7 @@ public:
 	         const vk::raii::PhysicalDevice& physicalDevice,
 	         uint32_t numSets,
 	         vk::Queue graphicsQueue,
-	         uint32_t queueFamilyIndex,
-	         const uint32_t* compSpv,
-	         size_t compSize);
+	         uint32_t queueFamilyIndex);
 
 	// -------------------------------------------------------------------
 	// Recording
@@ -169,10 +169,9 @@ private:
 
 	/**
 	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
+	 * ShaderModule from self-loaded ComputeShader.
 	 */
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
-	                                  const uint32_t* compSpv,
-	                                  size_t compSize);
+	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);
 
 	/**
 	 * @brief Generates the hemisphere kernel samples.
@@ -198,6 +197,9 @@ private:
 
 	// --- Pipeline ---
 	vk::raii::Pipeline p_pipeline;
+
+	// --- Self-loaded compute shader (via ShaderLibrary) ---
+	std::shared_ptr<ComputeShader> p_computeShader;
 
 	// --- Owned UBOs ---
 	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> p_paramsUBO;   ///< SSAO params (camera + kernel), host-visible

@@ -24,9 +24,6 @@
 #include "asset/MeshData.h"
 #include "scene/Mesh.h"
 
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
@@ -73,9 +70,7 @@ protected:
 
 			// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 			m_hasVulkan = true;
 		}

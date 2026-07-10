@@ -42,11 +42,6 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
-// Embedded shaders
-#include <gbuffer.vert.h>
-#include <gbuffer.frag.h>
-#include <pbr_lighting.comp.h>
-
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <array>
@@ -89,16 +84,13 @@ protected:
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			gbuffer_vert_spv, sizeof(gbuffer_vert_spv),
-			gbuffer_frag_spv, sizeof(gbuffer_frag_spv));
+			*m_device, pd, m_queue, m_graphicsQueueFamily);
 
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
 			2u,                          // numSets = kMaxFramesInFlight
-			m_queue, m_graphicsQueueFamily,
-			pbr_lighting_comp_spv, sizeof(pbr_lighting_comp_spv));
+			m_queue, m_graphicsQueueFamily);
 	}
 
 	// --- Constants ---
