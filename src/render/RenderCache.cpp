@@ -13,15 +13,18 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 
 RenderCache::RenderCache(const vk::raii::Device& device,
-                       const vk::raii::PhysicalDevice& physicalDevice,
-                       vk::Queue graphicsQueue,
-                       uint32_t queueFamilyIndex)
+                       const vk::raii::PhysicalDevice& physicalDevice)
 	: rc_device(&device)
 	, rc_physicalDevice(&physicalDevice)
 {
-	rc_lightingGPU = std::make_unique<LightingGPU>(
-		device, physicalDevice, graphicsQueue, queueFamilyIndex);
-	NEURUS_LOG("[RenderCache] LightingGPU initialized in constructor");
+	NEURUS_LOG("[RenderCache] Created");
+}
+
+void RenderCache::InitLightingGPU(vk::Queue graphicsQueue, uint32_t queueFamilyIndex)
+{
+	rc_lightingGPU = std::make_unique<LightingGPU>(*rc_device, *rc_physicalDevice);
+	rc_lightingGPU->Init(graphicsQueue, queueFamilyIndex);
+	NEURUS_LOG("[RenderCache] LightingGPU initialized");
 }
 
 // ---------------------------------------------------------------------------

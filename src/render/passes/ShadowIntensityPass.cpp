@@ -65,9 +65,7 @@ static_assert(
 
 ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
                                          const vk::raii::PhysicalDevice& physicalDevice,
-                                         uint32_t numSets,
-                                         vk::Queue /*graphicsQueue*/,
-                                         uint32_t /*queueFamilyIndex*/)
+                                         uint32_t numSets)
 	: ComputePass(device, physicalDevice,
 	              // Allocate 2× descriptor sets per in-flight frame so that
 	              // the per-light loop can alternate between two sets without

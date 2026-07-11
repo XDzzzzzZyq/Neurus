@@ -91,20 +91,19 @@ protected:
 		}
 
 		// --- Render pass infrastructure (attachments created lazily) ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-		                                             m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 		// --- Upload manager for CPU→GPU struct conversion ---
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily);
+			*m_device, pd);
 
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
-			2u,
-			m_graphicsQueueFamily);
+			2u);
 	}
 
 	void TearDown() override

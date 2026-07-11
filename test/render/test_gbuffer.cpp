@@ -68,12 +68,12 @@ protected:
 			}
 
 			// --- Attachment manager (G-Buffer + depth) - attachments created lazily ---
-			m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-			                                            m_queue, m_graphicsQueueFamily);
+			m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+			m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 			// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily);
+			*m_device, pd);
 
 			m_hasVulkan = true;
 		}

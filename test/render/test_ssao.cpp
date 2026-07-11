@@ -53,12 +53,12 @@ protected:
 		auto& pd = PhysicalDevice();
 
 		// --- Render pass infrastructure (attachments created lazily) ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-		                                             m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily);
+			*m_device, pd);
 
 		// --- SSAO pass ---
 		m_ssaoPass = std::make_unique<SSAOPass>(

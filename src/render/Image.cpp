@@ -84,28 +84,32 @@ Image::Image(const vk::raii::Device& device,
 // Static factory: FromImageData
 // ---------------------------------------------------------------------------
 
-std::unique_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
-                                            const vk::raii::PhysicalDevice& physicalDevice,
-                                            vk::Queue queue,
-                                            uint32_t queueFamilyIndex,
-                                            ImageData& imageData,
-                                            const char* debugName,
-                                            vk::ImageUsageFlags extraUsage)
+std::shared_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
+                                           const vk::raii::PhysicalDevice& physicalDevice,
+                                           vk::Queue queue,
+                                           uint32_t queueFamilyIndex,
+                                           ImageData& imageData,
+                                           const char* debugName,
+                                           vk::ImageUsageFlags extraUsage)
 {
 	if (!imageData.IsValid())
 	{
 		NEURUS_ERR("[Image] FromImageData: invalid ImageData provided");
-		return nullptr;
+		auto empty = std::make_shared<Image>();
+		empty->im_state = ImageState::Invalid;
+		return empty;
 	}
 
 	const vk::Format vkFmt = ToVkFormat(imageData.GetFormat());
 	if (vkFmt == vk::Format::eUndefined)
 	{
 		NEURUS_ERR("[Image] FromImageData: unsupported PixelFormat");
-		return nullptr;
+		auto empty = std::make_shared<Image>();
+		empty->im_state = ImageState::Invalid;
+		return empty;
 	}
 
-	auto image = std::make_unique<Image>(
+	auto image = std::make_shared<Image>(
 		device, physicalDevice,
 		vk::Extent2D{imageData.GetWidth(), imageData.GetHeight()},
 		vkFmt,

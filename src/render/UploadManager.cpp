@@ -116,8 +116,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	// --- 0. Lazy-init IBLPass ---
 	if (!um_iblPass)
 	{
-		um_iblPass = std::make_unique<IBLPass>(*um_device, *um_physicalDevice,
-		                                       um_queue, um_queueFamilyIndex);
+		um_iblPass = std::make_unique<IBLPass>(*um_device, *um_physicalDevice);
 		NEURUS_LOG("[UploadManager] Lazily created IBLPass for environment uploads");
 	}
 
@@ -152,11 +151,11 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 
 	// --- 2. Upload equirect to GPU ---
 	auto equirectImage = Image::FromImageData(*um_device, *um_physicalDevice,
-	                                           um_queue, um_queueFamilyIndex,
-	                                           equirectData,
-	                                           "Env_Equirect",
-	                                           vk::ImageUsageFlagBits::eStorage);
-	if (!equirectImage)
+	                                                  um_queue, um_queueFamilyIndex,
+	                                                  equirectData,
+	                                                  "Env_Equirect",
+	                                                  vk::ImageUsageFlagBits::eStorage);
+	if (equirectImage->State() == ImageState::Invalid)
 	{
 		NEURUS_ERR("[UploadManager] Failed to upload equirect image to GPU");
 		return EnvironmentGPU{};
@@ -214,7 +213,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	auto specularSampler = vk::raii::Sampler(*um_device, samplerCI);
 
 	// --- 5. Run IBL convolution ---
-	um_iblPass->Generate(*equirectImage, *diffuseImage, *specularImage);
+	um_iblPass->Generate(um_queue, um_queueFamilyIndex, *equirectImage, *diffuseImage, *specularImage);
 
 	// --- 6. Wrap in Textures and return ---
 	EnvironmentGPU gpu;

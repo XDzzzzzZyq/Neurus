@@ -30,12 +30,8 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 
 GeometryPass::GeometryPass(const vk::raii::Device& device,
-                           const vk::raii::PhysicalDevice& physicalDevice,
-                           vk::Queue queue,
-                           uint32_t queueFamilyIndex)
+                           const vk::raii::PhysicalDevice& physicalDevice)
 	: p_physicalDevice(&physicalDevice)
-	, p_queue(queue)
-	, p_queueFamilyIndex(queueFamilyIndex)
 	// --- Descriptor set layout ---
 	, p_cameraLayout(CreateCameraLayout(device))
 	// --- Camera UBO (host-visible for per-frame memcpy update) ---

@@ -35,6 +35,8 @@ enum class ImageState
 	ShaderWrite,      ///< Storage image write in compute shaders
 
 	Present,         ///< Ready for presentation
+
+	Invalid,         ///< Image creation failed — no valid GPU resource
 };
 
 /**
@@ -108,15 +110,25 @@ public:
 	 * @param imageData       CPU-side image data (moved in, must be valid).
 	 * @param debugName       Optional debug name for the image.
 	 * @param extraUsage      Additional usage flags (OR-ed with Sampled|TransferDst).
-	 * @return A unique pointer to the GPU Image, or nullptr if imageData is invalid.
+	 * @return A shared pointer to the GPU Image.  Returns a shared_ptr
+	 *         containing an empty Image with ImageState::Invalid on failure.
 	 */
-	static std::unique_ptr<Image> FromImageData(const vk::raii::Device& device,
+	static std::shared_ptr<Image> FromImageData(const vk::raii::Device& device,
 	                                            const vk::raii::PhysicalDevice& physicalDevice,
 	                                            vk::Queue queue,
 	                                            uint32_t queueFamilyIndex,
 	                                            ImageData& imageData,
 	                                            const char* debugName = "Image",
 	                                            vk::ImageUsageFlags extraUsage = {});
+
+	/**
+	 * @brief Default constructor — creates an empty/invalid Image.
+	 *
+	 * All GPU handles are null, and the state is Undefined (callers should
+	 * set to ImageState::Invalid).  This facilitates return-by-value from
+	 * factory functions on failure paths.
+	 */
+	Image() = default;
 
 	~Image() = default;
 

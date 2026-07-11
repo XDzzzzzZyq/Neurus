@@ -129,9 +129,16 @@ public:
 	 * @param queueFamilyIndex  Queue family index for staging command pool.
 	 */
 	LightingGPU(const vk::raii::Device& device,
-	            const vk::raii::PhysicalDevice& physicalDevice,
-	            vk::Queue graphicsQueue,
-	            uint32_t queueFamilyIndex);
+	            const vk::raii::PhysicalDevice& physicalDevice);
+
+	/**
+	 * @brief Initialise the staging queue for SSBO uploads.
+	 *
+	 * Must be called before UpdatePointLights() or UpdateSunLights().
+	 * @param graphicsQueue     Graphics queue for staging uploads.
+	 * @param queueFamilyIndex  Queue family index for staging command pool.
+	 */
+	void Init(vk::Queue graphicsQueue, uint32_t queueFamilyIndex);
 
 	// Non-copyable — owns GPU resources
 	LightingGPU(const LightingGPU&) = delete;

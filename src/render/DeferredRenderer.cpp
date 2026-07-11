@@ -58,13 +58,13 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	const auto extent = r_swapchain->extent();
 
 	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
-	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice,
-	                                              graphicsQueue, queueFamilyIndex);
+	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
+	r_renderCache->InitLightingGPU(graphicsQueue, queueFamilyIndex);
 
 	// --- 3. Create geometry pass ---
 	{
 		auto geoPass = std::make_unique<GeometryPass>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex);
+			device, physicalDevice);
 		r_geometryPass = geoPass.get();
 		r_passes.push_back(std::move(geoPass));
 	}
@@ -73,8 +73,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto lightPass = std::make_unique<LightingPass>(
 			device, physicalDevice,
-			kMaxFramesInFlight,
-			r_queueFamilyIndex);
+			kMaxFramesInFlight);
 		r_lightingPass = lightPass.get();
 		r_passes.push_back(std::move(lightPass));
 	}
@@ -84,7 +83,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto ssaoPass = std::make_unique<SSAOPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			r_graphicsQueue, r_queueFamilyIndex);
+			graphicsQueue, queueFamilyIndex);
 		r_ssaoPass = ssaoPass.get();
 		r_passes.push_back(std::move(ssaoPass));
 	}
@@ -92,7 +91,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	// --- 7. Create shadow depth pass (cubemap depth from light's POV) ---
 	{
 		auto shadowDepth = std::make_unique<ShadowDepthPass>(
-			device, physicalDevice, graphicsQueue, queueFamilyIndex,
+			device, physicalDevice,
+			graphicsQueue, queueFamilyIndex,
 			ShadowDepthPass::kDefaultResolution);
 		r_shadowDepthPass = shadowDepth.get();
 		r_passes.push_back(std::move(shadowDepth));
@@ -103,8 +103,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	{
 		auto shadowIntensity = std::make_unique<ShadowIntensityPass>(
 			device, physicalDevice,
-			kMaxFramesInFlight,
-			graphicsQueue, queueFamilyIndex);
+			kMaxFramesInFlight);
 		r_shadowIntensityPass = shadowIntensity.get();
 		r_passes.push_back(std::move(shadowIntensity));
 		NEURUS_LOG("[DeferredRenderer] ShadowIntensityPass created");

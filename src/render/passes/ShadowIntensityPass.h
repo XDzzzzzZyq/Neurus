@@ -64,9 +64,7 @@ public:
 	 */
 	ShadowIntensityPass(const vk::raii::Device& device,
 	                    const vk::raii::PhysicalDevice& physicalDevice,
-	                    uint32_t numSets,
-	                    vk::Queue graphicsQueue,
-	                    uint32_t queueFamilyIndex);
+	                    uint32_t numSets);
 
 	// -------------------------------------------------------------------
 	// Recording

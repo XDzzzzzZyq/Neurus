@@ -19,15 +19,20 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 
 LightingGPU::LightingGPU(const vk::raii::Device& device,
-                         const vk::raii::PhysicalDevice& physicalDevice,
-                         vk::Queue graphicsQueue,
-                         uint32_t queueFamilyIndex)
+                         const vk::raii::PhysicalDevice& physicalDevice)
 	: m_device(device)
 	, m_physicalDevice(physicalDevice)
-	, m_graphicsQueue(graphicsQueue)
-	, m_queueFamilyIndex(queueFamilyIndex)
+	, m_graphicsQueue(nullptr)
+	, m_queueFamilyIndex(0)
 {
-	NEURUS_LOG("[LightingGPU] Created (qfi=" << queueFamilyIndex << ")");
+	NEURUS_LOG("[LightingGPU] Created");
+}
+
+void LightingGPU::Init(vk::Queue graphicsQueue, uint32_t queueFamilyIndex)
+{
+	m_graphicsQueue = graphicsQueue;
+	m_queueFamilyIndex = queueFamilyIndex;
+	NEURUS_LOG("[LightingGPU] Initialized (qfi=" << queueFamilyIndex << ")");
 }
 
 // ---------------------------------------------------------------------------

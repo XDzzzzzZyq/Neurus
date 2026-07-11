@@ -200,7 +200,7 @@ protected:
 	// Image upload helper (delegates to Image::FromImageData)
 	// -------------------------------------------------------------------
 
-	std::unique_ptr<Image> createAndUploadEquirect(const std::vector<float>& pixelData,
+	std::shared_ptr<Image> createAndUploadEquirect(const std::vector<float>& pixelData,
 	                                                uint32_t width,
 	                                                uint32_t height,
 	                                                const char* debugName)

@@ -73,7 +73,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA8_WritesPngFile)
 	}
 	ImageData imgData(redPixels.data(), extent.width, extent.height, PixelFormat::RGBA8U);
 	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
-	ASSERT_NE(imagePtr, nullptr);
+	ASSERT_NE(imagePtr->State(), ImageState::Invalid);
 	Image& image = *imagePtr;
 
 	// --- Capture to PNG ---
@@ -128,7 +128,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_RGBA16F_WritesPngFile)
 	}
 	ImageData imgData(halfData.data(), extent.width, extent.height, PixelFormat::RGBA16F);
 	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
-	ASSERT_NE(imagePtr, nullptr);
+	ASSERT_NE(imagePtr->State(), ImageState::Invalid);
 	Image& image = *imagePtr;
 
 	// --- Capture to PNG ---
@@ -162,7 +162,7 @@ TEST_F(ScreenshotTest, CaptureAttachment_AutoCreatesDirectory)
 	std::vector<uint8_t> pixels(pixelCount * 4, 128);
 	ImageData imgData(pixels.data(), extent.width, extent.height, PixelFormat::RGBA8U);
 	auto imagePtr = Image::FromImageData(*m_device, pd, m_queue, m_graphicsQueueFamily, imgData);
-	ASSERT_NE(imagePtr, nullptr);
+	ASSERT_NE(imagePtr->State(), ImageState::Invalid);
 	Image& image = *imagePtr;
 
 	// --- Use a nested directory that doesn't exist ---

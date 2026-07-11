@@ -17,6 +17,13 @@ VulkanImageState Barrier::ToVulkanImageState(ImageState state)
 			vk::AccessFlagBits2::eNone
 		};
 
+	case ImageState::Invalid:
+		return {
+			vk::ImageLayout::eUndefined,
+			vk::PipelineStageFlagBits2::eTopOfPipe,
+			vk::AccessFlagBits2::eNone
+		};
+
 	case ImageState::TransferSrc:
 		return {
 			vk::ImageLayout::eTransferSrcOptimal,

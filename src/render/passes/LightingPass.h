@@ -23,7 +23,6 @@
 #include "passes/ComputePass.h"
 #include "../DescriptorManager.h"
 #include "../buffers/GPUBuffer.h"
-#include "../resources/LightingGPU.h"
 #include "../shaders/ShaderLibrary.h"
 #include "../shaders/ComputeShader.h"
 
@@ -38,7 +37,7 @@ namespace neurus {
 // --- Forward declarations ---
 class RenderCache;
 class ComputePipelineBuilder;
-class Image;
+class Texture;
 
 // ---------------------------------------------------------------------------
 // LightingPass
@@ -67,14 +66,12 @@ public:
 	 * @param numSets           Number of descriptor sets to allocate (one per
 	 *                          in-flight frame). Must match kMaxFramesInFlight
 	 *                          in the renderer.
-	 * @param queueFamilyIndex  Queue family index for fallback cubemap command pool.
 	 *
 	 * @throws std::runtime_error if shader or pipeline creation fails.
 	 */
 	LightingPass(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
-	             uint32_t numSets,
-	             uint32_t queueFamilyIndex);
+	             uint32_t numSets);
 
 	~LightingPass() override;
 
@@ -145,9 +142,8 @@ private:
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
 	std::shared_ptr<ComputeShader> p_computeShader;
 
-	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---
-	std::unique_ptr<Image> p_fallbackIrradianceCube;
-	std::unique_ptr<Image> p_fallbackPrefilteredCube;
-	vk::raii::Sampler p_fallbackCubeSampler = nullptr;
+	// --- Empty cubemap placeholder for IBL bindings when no env exists (1x1x6, black) ---
+	std::unique_ptr<Texture> p_emptyCube;
+	bool p_emptyInitialized = false;
 };
 } // namespace neurus

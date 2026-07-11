@@ -80,12 +80,12 @@ protected:
 		}
 
 		// --- Render pass infrastructure (attachments created lazily) ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-		                                             m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily);
+			*m_device, pd);
 
 		// --- Shadow depth pass ---
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
@@ -93,13 +93,11 @@ protected:
 			ShadowDepthPass::kDefaultResolution);
 		// --- Shadow intensity pass (1 set = single-frame recording) ---
 		m_shadowIntensityPass = std::make_unique<ShadowIntensityPass>(
-			*m_device, pd, 1u,
-			m_queue, m_graphicsQueueFamily);
+			*m_device, pd, 1u);
 
 		// --- Lighting pass (2 sets = matches test_deferred_shading) ---
 		m_lightingPass = std::make_unique<LightingPass>(
-			*m_device, pd, 2u,
-			m_graphicsQueueFamily);
+			*m_device, pd, 2u);
 
 		// --- Upload manager for CPU→GPU struct conversion ---
 	}

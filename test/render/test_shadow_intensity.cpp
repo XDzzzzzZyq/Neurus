@@ -77,15 +77,15 @@ protected:
 		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 		auto& pd = PhysicalDevice();
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-		                                            m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily);
+			*m_device, pd);
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily,
 			ShadowDepthPass::kDefaultResolution);
 		m_shadowIntensityPass = std::make_unique<ShadowIntensityPass>(
-			*m_device, pd, 1u, m_queue, m_graphicsQueueFamily);
+			*m_device, pd, 1u);
 	}
 	void TearDown() override { VulkanTestShared::TearDown(); }
 

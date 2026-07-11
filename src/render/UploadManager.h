@@ -18,6 +18,7 @@ class Mesh;              // scene/Mesh.h
 class Environment;       // scene/Environment.h
 class Light;             // scene/Light.h
 class Scene;             // scene/Scene.h
+class RenderCache;       // render/RenderCache.h
 struct MeshGPU;          // render/resources/MeshGPU.h
 struct EnvironmentGPU;   // render/resources/EnvironmentGPU.h
 struct LightGPU;         // render/resources/LightGPU.h

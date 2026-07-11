@@ -70,9 +70,7 @@ public:
 	 * @param queueFamilyIndex Queue family index for transient cmd pools.
 	 */
 	IBLPass(const vk::raii::Device& device,
-	        const vk::raii::PhysicalDevice& physicalDevice,
-	        vk::Queue graphicsQueue,
-	        uint32_t queueFamilyIndex);
+	        const vk::raii::PhysicalDevice& physicalDevice);
 
 	~IBLPass();
 
@@ -105,11 +103,14 @@ public:
 	 * Records one-shot command buffers for irradiance convolution (1 dispatch)
 	 * and specular prefilter (kSpecularMipLevels dispatches, one per mip).
 	 *
+	 * @param graphicsQueue   Graphics queue for one-shot command submits.
+	 * @param queueFamilyIndex Queue family index for transient cmd pools.
 	 * @param equirectImage  Equirectangular HDR panorama (2D image).
 	 * @param diffuseOut     Pre-created diffuse irradiance cubemap Image.
 	 * @param specularOut    Pre-created specular prefiltered cubemap Image.
 	 */
-	void Generate(const Image& equirectImage, Image& diffuseOut, Image& specularOut);
+	void Generate(vk::Queue graphicsQueue, uint32_t queueFamilyIndex,
+	              const Image& equirectImage, Image& diffuseOut, Image& specularOut);
 
 	/** @brief Static factory: creates a linear-clamp equirect sampler. */
 	static vk::raii::Sampler CreateEquirectSampler(const vk::raii::Device& device);
@@ -137,10 +138,6 @@ private:
 	                     int32_t mipLevel,
 	                     int32_t maxStep,
 	                     float roughnessSq);
-
-	// --- References (non-owning) ---
-	vk::Queue p_graphicsQueue;
-	uint32_t p_queueFamilyIndex;
 
 	// --- Self-loaded compute shaders (via ShaderLibrary) ---
 	std::shared_ptr<ComputeShader> p_irradianceShader;

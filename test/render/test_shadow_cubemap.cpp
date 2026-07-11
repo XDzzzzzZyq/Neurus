@@ -61,8 +61,8 @@ protected:
 
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily, kRes);
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-		                                            m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 	}
 
 	void TearDown() override

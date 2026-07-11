@@ -61,9 +61,18 @@ public:
 	 * @param queueFamilyIndex  Queue family index for staging command pool.
 	 */
 	RenderCache(const vk::raii::Device& device,
-	            const vk::raii::PhysicalDevice& physicalDevice,
-	            vk::Queue graphicsQueue,
-	            uint32_t queueFamilyIndex);
+	            const vk::raii::PhysicalDevice& physicalDevice);
+
+	/**
+	 * @brief Initialises the LightingGPU with staging queue info.
+	 *
+	 * Must be called after construction and before any UpdateLighting() calls.
+	 * Creates the internal LightingGPU and configures its staging queue.
+	 *
+	 * @param graphicsQueue     Graphics queue for SSBO staging uploads.
+	 * @param queueFamilyIndex  Queue family index for staging command pool.
+	 */
+	void InitLightingGPU(vk::Queue graphicsQueue, uint32_t queueFamilyIndex);
 
 	~RenderCache() = default;
 

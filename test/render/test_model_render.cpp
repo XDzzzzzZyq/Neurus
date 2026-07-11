@@ -84,18 +84,17 @@ protected:
 		}
 
 		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
-		                                             m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily);
+			*m_device, pd);
 
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
-			2u,                          // numSets = kMaxFramesInFlight
-			m_graphicsQueueFamily);
+			2u);                          // numSets = kMaxFramesInFlight
 
 		// --- Upload manager for CPU→GPU struct conversion ---
 	}

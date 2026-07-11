@@ -10,7 +10,6 @@
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
-#include "../resources/LightingGPU.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
 #include "Texture.h"
@@ -36,8 +35,7 @@ namespace neurus {
 
 LightingPass::LightingPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
-                           uint32_t numSets,
-                           uint32_t queueFamilyIndex)
+                           uint32_t numSets)
 	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
 	, p_pipeline(nullptr)
@@ -52,78 +50,20 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	// --- Create pipeline from self-loaded shader ---
 	p_pipeline = CreatePipeline(device);
 
-	NEURUS_LOG("[LightingPass] numSets=" << numSets << " qfi=" << queueFamilyIndex
+	// --- Create 1x1 black cubemap empty placeholder for IBL bindings when no env exists ---
+	auto emptyImage = std::make_unique<Image>(
+		device, physicalDevice,
+		vk::Extent2D{1, 1},
+		vk::Format::eR8G8B8A8Unorm,
+		vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+		1, Image::ImageType::eCube,
+		"LightingPass_EmptyCube");
+		auto emptySampler = CreateSampler(device, physicalDevice);
+	p_emptyCube = std::make_unique<Texture>(
+			Texture::FromImage(std::move(emptyImage), std::move(emptySampler)));
+
+	NEURUS_LOG("[LightingPass] numSets=" << numSets
 	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
-
-	// --- Create fallback IBL cubemaps (4×4 black) for bindings 8-9 ---
-	//     These ensure the descriptor bindings are always valid even when
-	//     no Environment is present in the scene (no IBL to sample).
-	//     Using 4×4 faces to satisfy minimum cubemap dimension requirements.
-	{
-		const vk::ImageUsageFlags cubeUsage =
-			vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst;
-		const vk::Extent2D fbExtent{4, 4};
-
-		// --- Fallback diffuse irradiance cubemap ---
-		p_fallbackIrradianceCube = std::make_unique<Image>(
-			*p_device, *p_physicalDevice, fbExtent,
-			vk::Format::eR32G32B32A32Sfloat,
-			cubeUsage, /*mipLevels=*/1,
-			Image::ImageType::eCube,
-			"Lighting_IrradianceFallback");
-
-		// --- Fallback specular prefiltered cubemap ---
-		p_fallbackPrefilteredCube = std::make_unique<Image>(
-			*p_device, *p_physicalDevice, fbExtent,
-			vk::Format::eR32G32B32A32Sfloat,
-			cubeUsage, /*mipLevels=*/1,
-			Image::ImageType::eCube,
-			"Lighting_PrefilteredFallback");
-
-		// Transition fallback cubemaps from UNDEFINED to SHADER_READ_ONLY_OPTIMAL
-		// so that the descriptor image layout matches the actual image layout.
-		{
-			vk::Queue graphicsQueue = device.getQueue(queueFamilyIndex, 0);
-
-			vk::CommandPoolCreateInfo poolCI(
-				vk::CommandPoolCreateFlagBits::eTransient,
-				queueFamilyIndex);
-			vk::raii::CommandPool cmdPool(*p_device, poolCI);
-
-			vk::CommandBufferAllocateInfo allocInfo(
-				*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-			vk::raii::CommandBuffers cmdBufs(*p_device, allocInfo);
-
-			cmdBufs[0].begin(vk::CommandBufferBeginInfo(
-				vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
-
-			Barrier::Transition(*cmdBufs[0], *p_fallbackIrradianceCube, ImageState::ColorShaderRead);
-
-			Barrier::Transition(*cmdBufs[0], *p_fallbackPrefilteredCube, ImageState::ColorShaderRead);
-
-			cmdBufs[0].end();
-
-			vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-			graphicsQueue.submit(submitInfo);
-			graphicsQueue.waitIdle();
-		}
-
-		// Sampler for fallback cubemaps (maxLod=0 - only mip 0 exists)
-		{
-			vk::SamplerCreateInfo samplerCI(
-				{}, vk::Filter::eNearest, vk::Filter::eNearest,
-				vk::SamplerMipmapMode::eNearest,
-				vk::SamplerAddressMode::eClampToEdge,
-				vk::SamplerAddressMode::eClampToEdge,
-				vk::SamplerAddressMode::eClampToEdge,
-				0.0f, VK_FALSE, 0.0f, VK_FALSE,
-				vk::CompareOp::eAlways, 0.0f, 0.0f,  // minLod=0, maxLod=0
-				vk::BorderColor::eFloatTransparentBlack, VK_FALSE);
-			p_fallbackCubeSampler = vk::raii::Sampler(*p_device, samplerCI);
-		}
-
-		NEURUS_LOG("[LightingPass] Created fallback IBL cubemaps (4×4 black)");
-	}
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -335,56 +275,53 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex, renderExtent, cache);
 
-	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from RenderCache EnvironmentGPU or fallback ---
+	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from RenderCache EnvironmentGPU ---
 	{
 		DescriptorSet& dstSet = p_descriptorSets[frameIndex];
 		const bool hasEnv = (ctx.scene != nullptr && !ctx.scene->env_list.empty());
-		const EnvironmentGPU* envGPU = nullptr;
 
 		if (hasEnv)
 		{
 			auto& env = ctx.scene->env_list.begin()->second;
-			envGPU = cache.GetEnvironmentGPU(env->GetObjectID());
-		}
+			const EnvironmentGPU* envGPU = cache.GetEnvironmentGPU(env->GetObjectID());
 
-		if (envGPU && envGPU->diffuseTexture && envGPU->diffuseTexture->GetImage())
-		{
-			vk::DescriptorImageInfo irrInfo(
-				*envGPU->diffuseTexture->GetSampler(),
-				*envGPU->diffuseTexture->GetImage()->ImageViewHandle(),
-				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(8, irrInfo,
-			                  vk::DescriptorType::eCombinedImageSampler);
-		}
-		else
-		{
-			// Diffuse not ready - use fallback
-			vk::DescriptorImageInfo fbInfo(
-				*p_fallbackCubeSampler,
-				*p_fallbackIrradianceCube->ImageViewHandle(),
-				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(8, fbInfo,
-			                  vk::DescriptorType::eCombinedImageSampler);
-		}
+			if (envGPU && envGPU->diffuseTexture && envGPU->diffuseTexture->GetImage())
+			{
+				vk::DescriptorImageInfo irrInfo(
+					*envGPU->diffuseTexture->GetSampler(),
+					*envGPU->diffuseTexture->GetImage()->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+				dstSet.WriteImage(8, irrInfo, vk::DescriptorType::eCombinedImageSampler);
+			}
 
-		if (envGPU && envGPU->specularTexture && envGPU->specularTexture->GetImage())
+			if (envGPU && envGPU->specularTexture && envGPU->specularTexture->GetImage())
+			{
+				vk::DescriptorImageInfo specInfo(
+					*envGPU->specularTexture->GetSampler(),
+					*envGPU->specularTexture->GetImage()->ImageViewHandle(),
+					vk::ImageLayout::eShaderReadOnlyOptimal);
+				dstSet.WriteImage(9, specInfo, vk::DescriptorType::eCombinedImageSampler);
+			}
+		}else
 		{
-			vk::DescriptorImageInfo specInfo(
-				*envGPU->specularTexture->GetSampler(),
-				*envGPU->specularTexture->GetImage()->ImageViewHandle(),
-				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(9, specInfo,
-			                  vk::DescriptorType::eCombinedImageSampler);
-		}
-		else
-		{
-			// Specular not ready - use fallback
-			vk::DescriptorImageInfo fbInfo(
-				*p_fallbackCubeSampler,
-				*p_fallbackPrefilteredCube->ImageViewHandle(),
-				vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(9, fbInfo,
-			                  vk::DescriptorType::eCombinedImageSampler);
+			// When no env exists, write empty cubemap descriptors to satisfy Vulkan validation
+			// (shader won't access bindings 8-9 since iblEnabled=0)
+			if (!p_emptyInitialized)
+			{
+				Barrier::Transition(cmdBuf, *p_emptyCube->GetImage(), ImageState::TransferDst);
+
+				vk::ClearColorValue black(std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f});
+				cmdBuf.clearColorImage(*p_emptyCube->GetImage()->ImageHandle(), vk::ImageLayout::eTransferDstOptimal,
+				                       black, vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6));
+
+				Barrier::Transition(cmdBuf, *p_emptyCube->GetImage(), ImageState::ColorShaderRead);
+				p_emptyInitialized = true;
+			}
+
+			vk::DescriptorImageInfo dummyInfo(*p_emptyCube->GetSampler(), *p_emptyCube->GetImage()->ImageViewHandle(),
+			                                   vk::ImageLayout::eShaderReadOnlyOptimal);
+			dstSet.WriteImage(8, dummyInfo, vk::DescriptorType::eCombinedImageSampler);
+			dstSet.WriteImage(9, dummyInfo, vk::DescriptorType::eCombinedImageSampler);
 		}
 	}
 

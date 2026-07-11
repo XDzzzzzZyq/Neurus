@@ -131,25 +131,23 @@ protected:
 		auto& pd  = PhysicalDevice();
 
 		// --- Render pass infrastructure ---
-		m_renderCache = std::make_unique<RenderCache>(dev, pd,
-		                                             m_queue, m_graphicsQueueFamily);
+		m_renderCache = std::make_unique<RenderCache>(dev, pd);
+		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
-			dev, pd, m_queue, m_graphicsQueueFamily);
+			dev, pd);
 
 		// --- Upload manager for CPU→GPU struct conversion ---
 
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			dev, pd,
-			1u,  // single frame
-			m_graphicsQueueFamily);
+			1u);  // single frame
 
 		// --- IBL pass ---
 		m_iblPass = std::make_unique<IBLPass>(
-			dev, pd,
-			m_queue, m_graphicsQueueFamily);
+			dev, pd);
 
 	// --- Create Environment (CPU-only) and generate IBL cubemaps ---
 	m_env = std::make_shared<Environment>();
@@ -167,9 +165,9 @@ protected:
 
 		// 1. Upload equirect to GPU
 		auto equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
-		                                           imgData, "Env_Equirect",
-		                                           vk::ImageUsageFlagBits::eStorage);
-		ASSERT_TRUE(equirectImage != nullptr) << "Failed to upload equirect";
+		                                                  imgData, "Env_Equirect",
+		                                                  vk::ImageUsageFlagBits::eStorage);
+		ASSERT_NE(equirectImage->State(), ImageState::Invalid) << "Failed to upload equirect";
 
 		// 2. Create cubemap Images
 		constexpr uint32_t kDiffuseRes  = 64;
@@ -205,7 +203,7 @@ protected:
 		auto specularSampler = vk::raii::Sampler(dev, samplerCI);
 
 		// 4. Run IBL convolution
-		m_iblPass->Generate(*equirectImage, *diffuseImage, *specularImage);
+		m_iblPass->Generate(m_queue, m_graphicsQueueFamily, *equirectImage, *diffuseImage, *specularImage);
 
 		// 5. Wrap in Textures and register
 		EnvironmentGPU gpu;
@@ -485,18 +483,17 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 	// 2e. Recreate RenderCache + passes (simulating renderer init).
 	SCOPED_TRACE("Recreate passes");
-	m_renderCache = std::make_unique<RenderCache>(dev, pd,
-	                                             m_queue, m_graphicsQueueFamily);
+	m_renderCache = std::make_unique<RenderCache>(dev, pd);
+	m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
 
 	m_geometryPass = std::make_unique<GeometryPass>(
-		dev, pd, m_queue, m_graphicsQueueFamily);
+		dev, pd);
 
 	m_lightingPass = std::make_unique<LightingPass>(
-		dev, pd, 1u,
-		m_graphicsQueueFamily);
+		dev, pd, 1u);
 
 	m_iblPass = std::make_unique<IBLPass>(
-		dev, pd, m_queue, m_graphicsQueueFamily);
+		dev, pd);
 
 	// 2f. Re-create Environment (CPU-only) + generate IBL cubemaps.
 	SCOPED_TRACE("Recreate IBL resources");
@@ -517,9 +514,9 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 		// 1. Upload equirect to GPU
 		auto equirectImage = Image::FromImageData(device, physDev, m_queue, m_graphicsQueueFamily,
-		                                           imgData, "Env_Equirect",
-		                                           vk::ImageUsageFlagBits::eStorage);
-		ASSERT_TRUE(equirectImage != nullptr) << "Failed to upload equirect";
+		                                                  imgData, "Env_Equirect",
+		                                                  vk::ImageUsageFlagBits::eStorage);
+		ASSERT_NE(equirectImage->State(), ImageState::Invalid) << "Failed to upload equirect";
 
 		// 2. Create cubemap Images
 		constexpr uint32_t kDiffuseRes  = 64;
@@ -555,7 +552,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		auto specularSampler = vk::raii::Sampler(device, samplerCI);
 
 		// 4. Run IBL convolution
-		m_iblPass->Generate(*equirectImage, *diffuseImage, *specularImage);
+		m_iblPass->Generate(m_queue, m_graphicsQueueFamily, *equirectImage, *diffuseImage, *specularImage);
 
 		// 5. Wrap in Textures and register
 		EnvironmentGPU gpu;

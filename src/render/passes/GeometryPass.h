@@ -74,9 +74,7 @@ public:
 	 * @throws std::runtime_error if shader or pipeline creation fails.
 	 */
 	GeometryPass(const vk::raii::Device& device,
-	             const vk::raii::PhysicalDevice& physicalDevice,
-	             vk::Queue queue,
-	             uint32_t queueFamilyIndex);
+	             const vk::raii::PhysicalDevice& physicalDevice);
 
 	/**
 	 * @brief Records the G-Buffer draw commands into a command buffer.
@@ -115,8 +113,6 @@ private:
 
 	// --- References (non-owning) ---
 	const vk::raii::PhysicalDevice* p_physicalDevice;
-	vk::Queue p_queue = nullptr;          ///< Graphics queue (for MeshGPU staging uploads)
-	uint32_t p_queueFamilyIndex = 0;      ///< Queue family index (for MeshGPU staging uploads)
 
 	// --- Descriptor resources ---
 	DescriptorSetLayout p_cameraLayout;             ///< Set 0 layout definition

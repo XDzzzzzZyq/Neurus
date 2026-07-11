@@ -37,12 +37,8 @@ static_assert(sizeof(IBLPushConstants) == 16, "IBLPushConstants must be 16 bytes
 // ---------------------------------------------------------------------------
 
 IBLPass::IBLPass(const vk::raii::Device& device,
-                 const vk::raii::PhysicalDevice& physicalDevice,
-                 vk::Queue graphicsQueue,
-                 uint32_t queueFamilyIndex)
+                 const vk::raii::PhysicalDevice& physicalDevice)
 	: ComputePass(device, physicalDevice, IBLPass::CreateDescriptorSetLayout(device), 1)
-	, p_graphicsQueue(graphicsQueue)
-	, p_queueFamilyIndex(queueFamilyIndex)
 	// --- Self-load compute shaders via ShaderLibrary ---
 	, p_irradianceShader(
 		ShaderLibrary::LoadComputeShader("irradiance_conv",
@@ -69,8 +65,7 @@ IBLPass::IBLPass(const vk::raii::Device& device,
 	                                     "IBLPass::Specular");
 
 	NEURUS_LOG("[IBLPass] irradiance=" << (p_irradianceShader ? "OK" : "FAIL")
-	           << " specular=" << (p_specularShader ? "OK" : "FAIL")
-	           << " qfi=" << queueFamilyIndex);
+	           << " specular=" << (p_specularShader ? "OK" : "FAIL"));
 }
 
 IBLPass::~IBLPass() = default;
@@ -79,7 +74,8 @@ IBLPass::~IBLPass() = default;
 // Generation
 // ---------------------------------------------------------------------------
 
-void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& specularOut)
+void IBLPass::Generate(vk::Queue graphicsQueue, uint32_t queueFamilyIndex,
+                       const Image& equirectImage, Image& diffuseOut, Image& specularOut)
 {
 	NEURUS_LOG("[IBLPass] Generating IBL cubemaps from equirect "
 	           << equirectImage.Extent().width << "x" << equirectImage.Extent().height);
@@ -126,7 +122,7 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 
 	// --- Create transient command pool ---
 	const vk::CommandPoolCreateInfo poolCI(
-		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, p_queueFamilyIndex);
+		vk::CommandPoolCreateFlagBits::eTransient | vk::CommandPoolCreateFlagBits::eResetCommandBuffer, queueFamilyIndex);
 	vk::raii::CommandPool cmdPool(*p_device, poolCI);
 
 	const vk::CommandBufferAllocateInfo allocInfo(
@@ -171,8 +167,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-		p_graphicsQueue.submit(submitInfo);
-		p_graphicsQueue.waitIdle();
+		graphicsQueue.submit(submitInfo);
+		graphicsQueue.waitIdle();
 
 		NEURUS_LOG("[IBLPass] Diffuse irradiance convolution complete");
 	}
@@ -231,8 +227,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-		p_graphicsQueue.submit(submitInfo);
-		p_graphicsQueue.waitIdle();
+		graphicsQueue.submit(submitInfo);
+		graphicsQueue.waitIdle();
 	}
 
 	// --- Final: transition cubemaps to SHADER_READ_ONLY_OPTIMAL ---
@@ -248,8 +244,8 @@ void IBLPass::Generate(const Image& equirectImage, Image& diffuseOut, Image& spe
 		cmdBufs[0].end();
 
 		vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-		p_graphicsQueue.submit(submitInfo);
-		p_graphicsQueue.waitIdle();
+		graphicsQueue.submit(submitInfo);
+		graphicsQueue.waitIdle();
 	}
 
 	NEURUS_LOG("[IBLPass] IBL generation complete - diffuse "
