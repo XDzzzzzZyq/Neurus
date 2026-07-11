@@ -7,6 +7,7 @@
 
 #include "passes/Pass.h"
 #include "RenderCache.h"
+#include "RenderContext.h"
 #include "render/Barrier.h"
 #include "PipelineBuilder.h"
 #include "shaders/ShaderLibrary.h"
@@ -14,6 +15,7 @@
 
 #include "Log.h"
 
+#include "../resources/MeshGPU.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
@@ -130,7 +132,7 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device)
 	std::vector<vk::PushConstantRange> pushConstantRanges = {
 		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
 		                      0,
-		                      sizeof(PushConstants))
+		                      sizeof(MeshPushConstants))
 	};
 
 	// --- Descriptor set layout handles ---
@@ -246,8 +248,8 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			const glm::mat4 model = mesh->GetModelMatrix();
 			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
 
-			PushConstants pushConstants{model, normalMat};
-			cmdBuf.pushConstants<PushConstants>(*p_pipelineLayout,
+			MeshPushConstants pushConstants{model, normalMat};
+			cmdBuf.pushConstants<MeshPushConstants>(*p_pipelineLayout,
 			                                    vk::ShaderStageFlagBits::eVertex,
 			                                    0, pushConstants);
 

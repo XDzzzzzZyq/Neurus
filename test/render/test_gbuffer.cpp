@@ -16,6 +16,7 @@
 #include "shared/TestVulkanShared.h"
 
 #include "render/RenderCache.h"
+#include "render/RenderContext.h"
 #include "render/passes/GeometryPass.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"
@@ -60,14 +61,15 @@ protected:
 
 			// --- Check push-constant size support ---
 			const auto& limits = pd.getProperties().limits;
-			if (limits.maxPushConstantsSize < sizeof(PushConstants))
+			if (limits.maxPushConstantsSize < sizeof(MeshPushConstants))
 			{
 				m_hasVulkan = false;
 				return;
 			}
 
 			// --- Attachment manager (G-Buffer + depth) - attachments created lazily ---
-			m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+			m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+			                                            m_queue, m_graphicsQueueFamily);
 
 			// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -297,5 +299,5 @@ TEST_F(GeometryPassTest, CameraUBOData_SizeMatchesShaderExpectation)
 TEST_F(GeometryPassTest, PushConstants_SizeMatchesShaderExpectation)
 {
 	// Shader expects 2 mat4s (model + normalMatrix) = 128 bytes
-	EXPECT_EQ(sizeof(PushConstants), 128u);
+	EXPECT_EQ(sizeof(MeshPushConstants), 128u);
 }

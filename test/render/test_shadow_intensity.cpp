@@ -77,7 +77,8 @@ protected:
 		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 		auto& pd = PhysicalDevice();
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+		                                            m_queue, m_graphicsQueueFamily);
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd, m_queue, m_graphicsQueueFamily);
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(

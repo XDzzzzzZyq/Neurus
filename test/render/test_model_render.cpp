@@ -22,6 +22,8 @@
 
 // Render layer
 #include "render/RenderCache.h"
+#include "render/UploadManager.h"
+#include "render/resources/LightingGPU.h"
 #include "scene/Material.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
@@ -46,7 +48,9 @@
 
 #include <array>
 #include <fstream>
+#include <cstdint>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 using namespace neurus;
@@ -80,7 +84,8 @@ protected:
 		}
 
 		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+		                                             m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -90,7 +95,9 @@ protected:
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
 			2u,                          // numSets = kMaxFramesInFlight
-			m_queue, m_graphicsQueueFamily);
+			m_graphicsQueueFamily);
+
+		// --- Upload manager for CPU→GPU struct conversion ---
 	}
 
 	// --- Constants ---
@@ -99,6 +106,7 @@ protected:
 
 	// --- Render pass infrastructure ---
 	std::unique_ptr<RenderCache>  m_renderCache;
+
 
 	// --- Systems under test ---
 	std::unique_ptr<GeometryPass>  m_geometryPass;
@@ -264,9 +272,12 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	}
 
 	// -----------------------------------------------------------------------
-	// Step 13: Upload light to LightingPass and record lighting pass
+	// Step 13: Upload light to RenderCache and record lighting pass
 	// -----------------------------------------------------------------------
-	m_lightingPass->UploadLights(scene);
+	{
+		auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
+		m_renderCache->UpdateLighting(lightDict);
+	}
 
 	{
 		auto& cmd = BeginCmd();

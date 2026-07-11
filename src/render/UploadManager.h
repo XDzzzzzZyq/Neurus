@@ -2,8 +2,13 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "resources/LightingGPU.h"
+
 #include <cstdint>
 #include <memory>
+#include <unordered_map>
+#include <variant>
+#include <vector>
 
 namespace neurus {
 
@@ -12,6 +17,7 @@ class IBLPass;
 class Mesh;              // scene/Mesh.h
 class Environment;       // scene/Environment.h
 class Light;             // scene/Light.h
+class Scene;             // scene/Scene.h
 struct MeshGPU;          // render/resources/MeshGPU.h
 struct EnvironmentGPU;   // render/resources/EnvironmentGPU.h
 struct LightGPU;         // render/resources/LightGPU.h
@@ -47,6 +53,34 @@ public:
 
 	/** @brief Upload light shadow resources to GPU. Creates shadow depth map. */
 	LightGPU UploadLight(const Light& light);
+
+	/**
+	 * @brief Convert a map of lights to GPU structs (variant-based).
+	 *
+	 * Pure CPU conversion — no GPU operations.  Iterates the light map,
+	 * converts each light to PointLightStruct or SunLightStruct with
+	 * shadowMapIndex set to -1, and returns a map keyed by light UID.
+	 * The caller (RenderCache::UpdateLighting) assigns real shadow indices.
+	 *
+	 * @param lights  Map of light UID to shared pointers to Light objects.
+	 * @return Map: light UID → variant<PointLightStruct, SunLightStruct>.
+	 */
+	std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>>
+	UploadLighting(const std::unordered_map<int, std::shared_ptr<Light>>& lights);
+
+	/**
+	 * @brief Convert a single light to its GPU struct (variant-based).
+	 *
+	 * Pure CPU conversion — no GPU operations.  Returns a variant containing
+	 * the appropriate GPU struct with shadowMapIndex set to -1.
+	 * Returns an empty variant (default-initialized PointLightStruct) for
+	 * LightType::NONELIGHT.
+	 *
+	 * @param light  The light to convert.
+	 * @return variant<PointLightStruct, SunLightStruct>.
+	 */
+	std::variant<PointLightStruct, SunLightStruct>
+	UploadLighting(const Light& light);
 
 	/** @brief Wait for all pending upload operations to complete. */
 	void WaitIdle();

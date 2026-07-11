@@ -245,9 +245,6 @@ bool Application::InitRenderer(const project::Project& project)
 		return false;
 	}
 
-	// --- Upload scene lights to GPU (via LightingPass) ---
-	app_renderer->UploadLights(project.GetScene());
-
 	// --- Create screenshot helper (needs Vulkan handles; RenderCache passed per-call) ---
 	app_screenshot = std::make_unique<neurus::Screenshot>(
 		app_vkContext->device(),

@@ -21,6 +21,8 @@
 // --- Render layer ---
 #include "render/RenderCache.h"
 #include "render/RenderContext.h"
+#include "render/UploadManager.h"
+#include "render/resources/LightingGPU.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/IBLPass.h"
 #include "render/passes/LightingPass.h"
@@ -129,17 +131,20 @@ protected:
 		auto& pd  = PhysicalDevice();
 
 		// --- Render pass infrastructure ---
-		m_renderCache = std::make_unique<RenderCache>(dev, pd);
+		m_renderCache = std::make_unique<RenderCache>(dev, pd,
+		                                             m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
 			dev, pd, m_queue, m_graphicsQueueFamily);
 
+		// --- Upload manager for CPU→GPU struct conversion ---
+
 		// --- Lighting pass ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			dev, pd,
 			1u,  // single frame
-			m_queue, m_graphicsQueueFamily);
+			m_graphicsQueueFamily);
 
 		// --- IBL pass ---
 		m_iblPass = std::make_unique<IBLPass>(
@@ -220,6 +225,7 @@ protected:
 
 	// --- Render pass infrastructure ---
 	std::unique_ptr<RenderCache>  m_renderCache;
+
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<LightingPass>       m_lightingPass;
 	std::unique_ptr<IBLPass>            m_iblPass;
@@ -308,7 +314,8 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
-	m_lightingPass->UploadLights(scene);
+	auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
+	m_renderCache->UpdateLighting(lightDict);
 
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
@@ -428,7 +435,8 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				// Pre-register GPU resources before pass recording
 				VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 				VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-				m_lightingPass->UploadLights(scene);
+				auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
+				m_renderCache->UpdateLighting(lightDict);
 
 				RenderContext ctx{
 					.renderExtent = {kRenderWidth, kRenderHeight},
@@ -477,14 +485,15 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 
 	// 2e. Recreate RenderCache + passes (simulating renderer init).
 	SCOPED_TRACE("Recreate passes");
-	m_renderCache = std::make_unique<RenderCache>(dev, pd);
+	m_renderCache = std::make_unique<RenderCache>(dev, pd,
+	                                             m_queue, m_graphicsQueueFamily);
 
 	m_geometryPass = std::make_unique<GeometryPass>(
 		dev, pd, m_queue, m_graphicsQueueFamily);
 
 	m_lightingPass = std::make_unique<LightingPass>(
 		dev, pd, 1u,
-		m_queue, m_graphicsQueueFamily);
+		m_graphicsQueueFamily);
 
 	m_iblPass = std::make_unique<IBLPass>(
 		dev, pd, m_queue, m_graphicsQueueFamily);
@@ -573,7 +582,8 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				// Pre-register GPU resources before pass recording
 				VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 				VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-				m_lightingPass->UploadLights(scene);
+				auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
+				m_renderCache->UpdateLighting(lightDict);
 
 				RenderContext ctx{
 					.renderExtent = {kRenderWidth, kRenderHeight},

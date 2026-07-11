@@ -13,6 +13,7 @@
 #include "render/RenderCache.h"
 #include "render/UploadManager.h"
 #include "render/resources/LightGPU.h"
+#include "render/resources/LightingGPU.h"
 #include "render/resources/MeshGPU.h"
 
 #include "core/Log.h"
@@ -24,7 +25,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstring>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -174,11 +177,6 @@ void Editor::OnProjectNew()
 		auto& projectScene = ed_project->GetScene();
 		ed_ownerScene = &projectScene;
 
-		// Upload scene resources to GPU
-		if (ed_renderer)
-		{
-			ed_renderer->UploadLights(projectScene);
-		}
 		UploadSceneResources();
 
 		if (ed_context)
@@ -214,11 +212,6 @@ void Editor::OnProjectOpen(const QString& path)
 		auto& projectScene = ed_project->GetScene();
 		ed_ownerScene = &projectScene;
 
-		// Upload scene resources to GPU
-		if (ed_renderer)
-		{
-			ed_renderer->UploadLights(projectScene);
-		}
 		UploadSceneResources();
 
 		if (ed_context)
@@ -300,9 +293,11 @@ void Editor::OnLightAdd()
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.05f);
 		ed_project->GetScene().UseLight(light);
-		if (ed_renderer)
+		// Upload lighting via UploadManager (variant API) → RenderCache
+		if (ed_uploadManager && ed_renderer)
 		{
-			ed_renderer->UploadLights(ed_project->GetScene());
+			auto lightDict = ed_uploadManager->UploadLighting(ed_project->GetScene().light_list);
+			ed_renderer->GetRenderCache().UpdateLighting(lightDict);
 		}
 		// Upload shadow map for this light
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
@@ -327,9 +322,11 @@ void Editor::OnSunLightAdd()
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->use_shadow = true;
 		ed_project->GetScene().UseLight(light);
-		if (ed_renderer)
+		// Upload lighting via UploadManager (variant API) → RenderCache
+		if (ed_uploadManager && ed_renderer)
 		{
-			ed_renderer->UploadLights(ed_project->GetScene());
+			auto lightDict = ed_uploadManager->UploadLighting(ed_project->GetScene().light_list);
+			ed_renderer->GetRenderCache().UpdateLighting(lightDict);
 		}
 		// Upload shadow map for this sun light
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
@@ -424,6 +421,12 @@ void Editor::UploadSceneResources()
 		if (ed_renderer->GetRenderCache().GetLightGPU(uid)) continue;
 		auto lightGPU = ed_uploadManager->UploadLight(*light);
 		ed_renderer->GetRenderCache().UseLightGPU(uid, std::move(lightGPU));
+	}
+
+	// Upload lighting SSBO (point/sun light structs) via variant API
+	{
+		auto lightDict = ed_uploadManager->UploadLighting(scene.light_list);
+		ed_renderer->GetRenderCache().UpdateLighting(lightDict);
 	}
 
 	NEURUS_LOG("[Editor] Uploaded scene resources to GPU");

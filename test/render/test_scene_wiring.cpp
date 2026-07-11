@@ -323,9 +323,6 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 	light->SetPosition(glm::vec3(2.0f, 2.0f, 5.0f));
 	scene.UseLight(light);
 
-	// Upload lights to renderer
-	m_renderer->UploadLights(scene);
-
 	// Draw a frame
 	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));
 

@@ -10,6 +10,7 @@
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
+#include "../resources/LightingGPU.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
 #include "Texture.h"
@@ -36,12 +37,9 @@ namespace neurus {
 LightingPass::LightingPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice,
                            uint32_t numSets,
-                           vk::Queue graphicsQueue,
                            uint32_t queueFamilyIndex)
 	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
-	, p_graphicsQueue(graphicsQueue)
-	, p_queueFamilyIndex(queueFamilyIndex)
 	, p_pipeline(nullptr)
 	// --- Self-load compute shader via ShaderLibrary ---
 	, p_computeShader(
@@ -57,7 +55,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	NEURUS_LOG("[LightingPass] numSets=" << numSets << " qfi=" << queueFamilyIndex
 	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
 
-	// --- Create fallback IBL cubemaps (4×4 black) for bindings 7-8 ---
+	// --- Create fallback IBL cubemaps (4×4 black) for bindings 8-9 ---
 	//     These ensure the descriptor bindings are always valid even when
 	//     no Environment is present in the scene (no IBL to sample).
 	//     Using 4×4 faces to satisfy minimum cubemap dimension requirements.
@@ -85,9 +83,11 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 		// Transition fallback cubemaps from UNDEFINED to SHADER_READ_ONLY_OPTIMAL
 		// so that the descriptor image layout matches the actual image layout.
 		{
+			vk::Queue graphicsQueue = device.getQueue(queueFamilyIndex, 0);
+
 			vk::CommandPoolCreateInfo poolCI(
 				vk::CommandPoolCreateFlagBits::eTransient,
-				p_queueFamilyIndex);
+				queueFamilyIndex);
 			vk::raii::CommandPool cmdPool(*p_device, poolCI);
 
 			vk::CommandBufferAllocateInfo allocInfo(
@@ -104,8 +104,8 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			cmdBufs[0].end();
 
 			vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-			p_graphicsQueue.submit(submitInfo);
-			p_graphicsQueue.waitIdle();
+			graphicsQueue.submit(submitInfo);
+			graphicsQueue.waitIdle();
 		}
 
 		// Sampler for fallback cubemaps (maxLod=0 - only mip 0 exists)
@@ -135,159 +135,6 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 }
 
 LightingPass::~LightingPass() = default;
-
-// ---------------------------------------------------------------------------
-// Light SSBO management
-// ---------------------------------------------------------------------------
-
-void LightingPass::UploadLights(const Scene& scene,
-                               const std::unordered_map<int32_t, int>* shadowIndexMap)
-{
-	// Collect only point lights
-	std::vector<PointLightGpu> gpuLights;
-	gpuLights.reserve(scene.light_list.size());
-
-	for (const auto& [id, light] : scene.light_list)
-	{
-		if (light->light_type != LightType::POINTLIGHT)
-		{
-			continue;
-		}
-
-		PointLightGpu gpu = {};
-		const auto& pos = light->GetPosition();
-
-		// Position (world-space, from Transform3D)
-		gpu.posX = pos.x;
-		gpu.posY = pos.y;
-		gpu.posZ = pos.z;
-
-		// Color (linear RGB)
-		gpu.colorR = light->light_color.r;
-		gpu.colorG = light->light_color.g;
-		gpu.colorB = light->light_color.b;
-
-		// Lighting parameters
-		gpu.power = light->light_power;
-		gpu.radius = light->light_radius;
-
-		// Shadow map index lookup
-		if (shadowIndexMap)
-		{
-			const auto it = shadowIndexMap->find(id);
-			gpu.shadowMapIndex = (it != shadowIndexMap->end()) ? it->second : -1;
-		}
-
-		gpuLights.push_back(gpu);
-	}
-
-	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
-	p_lightCount = newCount;
-
-	if (newCount == 0)
-	{
-		p_lightSSBO.reset();
-		NEURUS_LOG("[LightingPass] No point lights in scene - SSBO released (PARTIALLY_BOUND)");
-		return;
-	}
-
-	// Create or re-create the SSBO
-	const vk::DeviceSize bufferSize = newCount * sizeof(PointLightGpu);
-
-	p_lightSSBO = std::make_unique<GPUBuffer>(
-		*p_device, *p_physicalDevice, p_graphicsQueue, p_queueFamilyIndex,
-		bufferSize,
-		vk::BufferUsageFlagBits::eStorageBuffer,
-		"LightSSBO");
-	p_lightSSBO->Upload(gpuLights.data(), bufferSize);
-
-	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " point lights"
-	           << " (" << bufferSize << " bytes)");
-}
-
-const GPUBuffer* LightingPass::GetLightSSBO() const
-{
-	return p_lightSSBO ? p_lightSSBO.get() : nullptr;
-}
-
-uint32_t LightingPass::GetLightCount() const
-{
-	return p_lightCount;
-}
-
-void LightingPass::UploadSunLights(const Scene& scene,
-                                   const std::unordered_map<int32_t, int>* shadowIndexMap)
-{
-	// Collect only sun (directional) lights
-	std::vector<SunLightGpu> gpuLights;
-	gpuLights.reserve(scene.light_list.size());
-
-	for (const auto& [id, light] : scene.light_list)
-	{
-		if (light->light_type != LightType::SUNLIGHT)
-		{
-			continue;
-		}
-
-		SunLightGpu gpu = {};
-		const auto& dir = light->GetDirection();
-
-		// Direction (world-space forward vector from Transform3D rotation)
-		gpu.directionX = dir.x;
-		gpu.directionY = dir.y;
-		gpu.directionZ = dir.z;
-
-		// Color (linear RGB)
-		gpu.colorR = light->light_color.r;
-		gpu.colorG = light->light_color.g;
-		gpu.colorB = light->light_color.b;
-
-		// Power
-		gpu.power = light->light_power;
-
-		// Shadow map index lookup
-		if (shadowIndexMap)
-		{
-			const auto it = shadowIndexMap->find(id);
-			gpu.shadowMapIndex = (it != shadowIndexMap->end()) ? it->second : -1;
-		}
-
-		gpuLights.push_back(gpu);
-	}
-
-	const uint32_t newCount = static_cast<uint32_t>(gpuLights.size());
-	p_sunLightCount = newCount;
-
-	if (newCount == 0)
-	{
-		p_sunLightSSBO.reset();
-		NEURUS_LOG("[LightingPass] No sun lights in scene - SunLight SSBO released (PARTIALLY_BOUND)");
-		return;
-	}
-
-	// Create or re-create the SSBO
-	const vk::DeviceSize bufferSize = newCount * sizeof(SunLightGpu);
-
-	p_sunLightSSBO = std::make_unique<GPUBuffer>(
-		*p_device, *p_physicalDevice, p_graphicsQueue, p_queueFamilyIndex,
-		bufferSize,
-		vk::BufferUsageFlagBits::eStorageBuffer,
-		"SunLightSSBO");
-	p_sunLightSSBO->Upload(gpuLights.data(), bufferSize);
-
-	NEURUS_LOG("[LightingPass] Uploaded " << newCount << " sun lights"
-	           << " (" << bufferSize << " bytes)");
-}
-
-const GPUBuffer* LightingPass::GetSunLightSSBO() const
-{
-	return p_sunLightSSBO ? p_sunLightSSBO.get() : nullptr;
-}
-
-uint32_t LightingPass::GetSunLightCount() const
-{
-	return p_sunLightCount;
-}
 
 // ---------------------------------------------------------------------------
 // Descriptor set layout
@@ -361,7 +208,7 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device)
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute,
 		0,
-		sizeof(LightingPushConstants));  // 176 bytes
+		sizeof(LightingPushConstants));  // 176 bytes, from LightingGPU.h
 
 	// --- Build compute pipeline ---
 	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
@@ -415,26 +262,32 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		                  vk::DescriptorType::eStorageImage);
 	}
 
-	// --- Write light SSBO (skipped when no lights, PARTIALLY_BOUND) ---
+	// --- Write light SSBO (from RenderCache::LightingGPU) ---
 	{
-		if (p_lightSSBO)
+		const auto* lightingGPU = cache.GetLightingGPU();
+		const GPUBuffer* pointSSBO = lightingGPU ? lightingGPU->GetPointLightSSBO() : nullptr;
+
+		if (pointSSBO)
 		{
-			dstSet.WriteBuffer(5, GetLightSSBO()->GetDescriptorInfo(),
+			dstSet.WriteBuffer(5, pointSSBO->GetDescriptorInfo(),
 			                   vk::DescriptorType::eStorageBuffer);
 		}
-		// When p_lightSSBO is nullptr, binding 5 is left un-updated.
+		// When pointSSBO is nullptr, binding 5 is left un-updated.
 		// PARTIALLY_BOUND flag makes this safe because lightCount=0
 		// guarantees the shader never accesses binding 5.
 	}
 
-	// --- Write sun light SSBO (skipped when no sun lights, PARTIALLY_BOUND) ---
+	// --- Write sun light SSBO (from RenderCache::LightingGPU) ---
 	{
-		if (p_sunLightSSBO)
+		const auto* lightingGPU = cache.GetLightingGPU();
+		const GPUBuffer* sunSSBO = lightingGPU ? lightingGPU->GetSunLightSSBO() : nullptr;
+
+		if (sunSSBO)
 		{
-			dstSet.WriteBuffer(6, GetSunLightSSBO()->GetDescriptorInfo(),
+			dstSet.WriteBuffer(6, sunSSBO->GetDescriptorInfo(),
 			                   vk::DescriptorType::eStorageBuffer);
 		}
-		// When p_sunLightSSBO is nullptr, PARTIALLY_BOUND makes this safe
+		// When sunSSBO is nullptr, PARTIALLY_BOUND makes this safe
 		// because sunLightCount=0 guarantees the shader never accesses binding 6.
 	}
 
@@ -605,8 +458,12 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 5. Push constants ---
 	{
 		LightingPushConstants pc = {};
-		pc.lightCount = static_cast<int32_t>(p_lightCount);
-		pc.sunLightCount = static_cast<int32_t>(p_sunLightCount);
+
+		// Get light counts from RenderCache::LightingGPU
+		const auto* lightingGPU = cache.GetLightingGPU();
+		pc.lightCount    = lightingGPU ? static_cast<int32_t>(lightingGPU->GetPointLightCount()) : 0;
+		pc.sunLightCount = lightingGPU ? static_cast<int32_t>(lightingGPU->GetSunLightCount()) : 0;
+
 		pc.camX = cameraPos.x;
 		pc.camY = cameraPos.y;
 		pc.camZ = cameraPos.z;

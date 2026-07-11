@@ -4,10 +4,12 @@
 #include "resources/MeshGPU.h"
 #include "resources/EnvironmentGPU.h"
 #include "resources/LightGPU.h"
+#include "resources/LightingGPU.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace neurus {
@@ -51,13 +53,17 @@ class RenderCache
 {
 public:
 	/**
-	 * @brief Constructs the render cache.
+	 * @brief Constructs the render cache and initializes LightingGPU.
 	 *
-	 * @param device         Logical device (retained reference).
-	 * @param physicalDevice Physical device (retained reference, used for format/memory queries).
+	 * @param device            Logical device (retained reference).
+	 * @param physicalDevice    Physical device (retained reference, used for format/memory queries).
+	 * @param graphicsQueue     Graphics queue for staging uploads.
+	 * @param queueFamilyIndex  Queue family index for staging command pool.
 	 */
 	RenderCache(const vk::raii::Device& device,
-	            const vk::raii::PhysicalDevice& physicalDevice);
+	            const vk::raii::PhysicalDevice& physicalDevice,
+	            vk::Queue graphicsQueue,
+	            uint32_t queueFamilyIndex);
 
 	~RenderCache() = default;
 
@@ -273,6 +279,54 @@ public:
 	 */
 	void RemoveEnvironmentGPU(int envId);
 
+	// --- Lighting GPU resources (SSBO owner) ---
+
+	/**
+	 * @brief Returns the cached LightingGPU, or nullptr if not yet initialized.
+	 * @return Non-owning pointer, or nullptr.
+	 */
+	LightingGPU* GetLightingGPU();
+
+	/** @brief const overload of GetLightingGPU(). */
+	const LightingGPU* GetLightingGPU() const;
+
+	/**
+	 * @brief Updates the point light and sun light SSBOs from pre-converted GPU structs.
+	 *
+	 * Asserts that InitLightingGPU() has been called first.
+	 * When a vector is empty, the corresponding SSBO is released.
+	 *
+	 * @param pointLights  Pre-converted point light GPU structs.
+	 * @param sunLights    Pre-converted sun light GPU structs.
+	 */
+	void UpdateLighting(const std::vector<PointLightStruct>& pointLights,
+	                    const std::vector<SunLightStruct>& sunLights);
+
+	/**
+	 * @brief Updates the point light and sun light SSBOs from a variant-based light dict.
+	 *
+	 * Uses std::holds_alternative<> to separate PointLightStruct and SunLightStruct
+	 * entries.  Assigns sequential SSBO indices (point lights first, then sun lights)
+	 * and assigns shadow map indices (shared pool, point first then sun, max 4).
+	 *
+	 * Stores uid→index mappings for later lookup via GetShadowIndex().
+	 *
+	 * @param lightDict  Map: light UID → variant<PointLightStruct, SunLightStruct>.
+	 */
+	void UpdateLighting(const std::unordered_map<int,
+	                    std::variant<PointLightStruct, SunLightStruct>>& lightDict);
+
+	/**
+	 * @brief Returns the shadow map index for a light UID.
+	 *
+	 * Looks up the UID in the shadow index map populated by
+	 * UpdateLighting(variant).  Returns 0 if the UID is not found.
+	 *
+	 * @param lightUID  Unique light identifier.
+	 * @return Shadow map index (0-based), or 0 if not found.
+	 */
+	uint32_t GetShadowIndex(int lightUID) const;
+
 	void CleanScreenSpace();
 
 private:
@@ -308,6 +362,14 @@ private:
 
 	// --- Per-light GPU resources (key = light UID as int) ---
 	std::unordered_map<int, LightGPU> rc_lightGPUs;
+
+	// --- Lighting SSBO storage (owned) ---
+	std::unique_ptr<LightingGPU> rc_lightingGPU;
+
+	// --- Light UID → SSBO index / shadow index maps (populated by variant UpdateLighting) ---
+	std::unordered_map<int, uint32_t> rc_uidToPointLightIndex;
+	std::unordered_map<int, uint32_t> rc_uidToSunLightIndex;
+	std::unordered_map<int, uint32_t> rc_uidToShadowIndex;
 };
 
 /**

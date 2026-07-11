@@ -23,6 +23,7 @@
 #include "passes/ComputePass.h"
 #include "../DescriptorManager.h"
 #include "../buffers/GPUBuffer.h"
+#include "../resources/LightingGPU.h"
 #include "../shaders/ShaderLibrary.h"
 #include "../shaders/ComputeShader.h"
 
@@ -38,83 +39,6 @@ namespace neurus {
 class RenderCache;
 class ComputePipelineBuilder;
 class Image;
-class Scene;
-
-// ---------------------------------------------------------------------------
-// GPU-side data structures (std140-compatible)
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Point light data uploaded to the GPU SSBO.
- *
- * Layout matches the GLSL PointLight struct (std140, 48 bytes per element):
- *   vec3 color  (offset 0,  padded to 16)
- *   vec3 pos    (offset 16, padded to 16)
- *   float power (offset 32)
- *   float radius(offset 36)
- *   int32_t shadowMapIndex(offset 48)
- *   float _pad3(offset 52)
- *   Total: 64 bytes (aligned to 16, sizeof rounded up to 16-byte boundary).
- */
-struct alignas(16) PointLightGpu
-{
-	float colorR, colorG, colorB;   ///< RGB colour (linear)
-	float power;                     ///< Luminous intensity
-	float posX, posY, posZ;         ///< World-space position
-	float radius;                    ///< Physical radius
-	int32_t shadowMapIndex = -1;     ///< Index into shadow maps array; -1 = no shadow
-	float _pad3[3];                 ///< Padding to 48 bytes (16-byte aligned struct)
-};
-static_assert(sizeof(PointLightGpu) == 48, "PointLightGpu must be 48 bytes (std140)");
-
-/**
- * @brief Sun (directional) light data uploaded to the GPU SSBO.
- *
- * Layout matches the GLSL SunLight struct (std140, 48 bytes per element):
- *   vec3 direction (offset 0,  padded to 16)
- *   float power    (offset 12)
- *   vec3 color     (offset 16, padded to 16)
- *   int32_t shadowMapIndex (offset 28)
- *   float _pad     (offset 32)
- *   Total: 48 bytes (16-byte aligned struct).
- */
-struct alignas(16) SunLightGpu
-{
-	float directionX, directionY, directionZ; ///< Light direction (world-space)
-	float power;                               ///< Luminous intensity
-	float colorR, colorG, colorB;              ///< RGB colour (linear)
-	int32_t shadowMapIndex = -1;               ///< Index into shadow maps array; -1 = no shadow
-	float _pad[4];                             ///< Padding to 48 bytes (16-byte aligned struct)
-};
-static_assert(sizeof(SunLightGpu) == 48, "SunLightGpu must be 48 bytes (std140)");
-
-/**
- * @brief Push constants for the PBR lighting compute shader.
- *
- * Layout (matches GLSL push_constant block with std430 alignment):
- *   int  lightCount    offset 0   (4 bytes)
- *   int  sunLightCount offset 4   (4 bytes — reuses former padding slot)
- *          padding     offset 8   (8 bytes)
- *   vec4 cameraPos     offset 16  (16 bytes)
- *   mat4 view          offset 32  (64 bytes)
- *   int  iblEnabled    offset 96  (4 bytes)
- *          padding     offset 100 (12 bytes, aligns mat4 to 16)
- *   mat4 invProjView   offset 112 (64 bytes - inverse(proj * view) for skybox ray)
- *   Total: 176 bytes. Must NOT use alignas.
- */
-struct LightingPushConstants
-{
-	int32_t  lightCount;            ///< Number of active point lights in SSBO
-	int32_t  sunLightCount;         ///< Number of active sun (directional) lights in SSBO
-	float    _pad0[2];              ///< Padding to align cameraPos at offset 16
-	float    camX, camY, camZ;      ///< Camera world-space position
-	float    _pad1;                 ///< Padding (vec4 → 16 bytes)
-	float    view[16];              ///< View matrix (for normal transform VS→WS)
-	int32_t  iblEnabled;            ///< IBL enabled flag (0 = disabled, 1 = enabled)
-	float    _pad2[3];              ///< Padding to align invProjView at offset 112 (16-byte alignment)
-	float    invProjView[16];       ///< Inverse of (projection * view) matrix for skybox ray
-};
-static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must be 176 bytes");
 
 // ---------------------------------------------------------------------------
 // LightingPass
@@ -124,8 +48,9 @@ static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must 
  * @brief PBR lighting compute pass.
  *
  * Reads the G-Buffer (Position, Normal, Albedo, MetallicRoughness) as
- * combined image samplers, iterates point lights from an own SSBO, evaluates
- * the Cook-Torrance GGX BRDF, and writes HDR colour to the output image.
+ * combined image samplers, dispatches the PBR lighting compute shader,
+ * and writes HDR colour to the output image.  Light SSBOs are now owned
+ * by LightingGPU (stored in RenderCache) rather than LightingPass itself.
  *
  * Non-copyable, movable.
  */
@@ -142,15 +67,13 @@ public:
 	 * @param numSets           Number of descriptor sets to allocate (one per
 	 *                          in-flight frame). Must match kMaxFramesInFlight
 	 *                          in the renderer.
-	 * @param graphicsQueue     Graphics queue for light SSBO staging uploads.
-	 * @param queueFamilyIndex  Queue family index for staging command pool.
+	 * @param queueFamilyIndex  Queue family index for fallback cubemap command pool.
 	 *
 	 * @throws std::runtime_error if shader or pipeline creation fails.
 	 */
 	LightingPass(const vk::raii::Device& device,
 	             const vk::raii::PhysicalDevice& physicalDevice,
 	             uint32_t numSets,
-	             vk::Queue graphicsQueue,
 	             uint32_t queueFamilyIndex);
 
 	~LightingPass() override;
@@ -160,79 +83,6 @@ public:
 
 	/// @brief Maximum number of shadow-casting lights (sampler2DArray layers).
 	static constexpr uint32_t MAX_SHADOW_LIGHTS = 4;
-
-	// -------------------------------------------------------------------
-	// Light SSBO management
-	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Converts scene point lights to PointLightGpu and uploads as SSBO.
-	 *
-	 * Iterates scene.light_list, filters to POINTLIGHT type, converts
-	 * each Light to a PointLightGpu struct (std140, 64 bytes), and
-	 * uploads the array as a device-local storage buffer.
-	 *
-	 * If the scene has no point lights, the light SSBO is released,
-	 * the descriptor binding uses PARTIALLY_BOUND (no update when null),
-	 * and GetLightCount() returns 0.
-	 *
-	 * @param scene           Scene containing the light list.
-	 * @param shadowIndexMap  Optional map from light UID → shadow map index.
-	 *                        If non-null, each PointLightGpu's shadowMapIndex
-	 *                        is set from the lookup; otherwise remains -1.
-	 */
-	void UploadLights(const Scene& scene,
-	                  const std::unordered_map<int32_t, int>* shadowIndexMap = nullptr);
-
-	/**
-	 * @brief Returns the light SSBO or nullptr when no lights are present.
-	 *
-	 * When nullptr, descriptor binding 5 uses PARTIALLY_BOUND and is
-	 * not updated — the shader never reads it because lightCount=0.
-	 *
-	 * @return Non-owning pointer to GPUBuffer, or nullptr.
-	 */
-	const GPUBuffer* GetLightSSBO() const;
-
-	/**
-	 * @brief Returns the number of point lights in the SSBO.
-	 * @return Light count (0 if no lights uploaded).
-	 */
-	uint32_t GetLightCount() const;
-
-	// --- Sun (directional) light SSBO management ---
-
-	/**
-	 * @brief Converts scene sun lights to SunLightGpu and uploads as SSBO.
-	 *
-	 * Iterates scene.light_list, filters to SUNLIGHT type, converts
-	 * each Light to a SunLightGpu struct (std140, 48 bytes), and
-	 * uploads the array as a device-local storage buffer.
-	 *
-	 * If the scene has no sun lights, the SSBO is released,
-	 * the descriptor binding uses PARTIALLY_BOUND (no update when null),
-	 * and GetSunLightCount() returns 0.
-	 *
-	 * @param scene           Scene containing the light list.
-	 * @param shadowIndexMap  Optional map from light UID → shadow map index.
-	 *                        If non-null, each SunLightGpu's shadowMapIndex
-	 *                        is set from the lookup; otherwise remains -1.
-	 */
-	void UploadSunLights(const Scene& scene,
-	                     const std::unordered_map<int32_t, int>* shadowIndexMap = nullptr);
-
-	/**
-	 * @brief Returns the sun light SSBO or nullptr when no sun lights are present.
-	 *
-	 * @return Non-owning pointer to GPUBuffer, or nullptr.
-	 */
-	const GPUBuffer* GetSunLightSSBO() const;
-
-	/**
-	 * @brief Returns the number of sun lights in the SSBO.
-	 * @return Sun light count (0 if no sun lights uploaded).
-	 */
-	uint32_t GetSunLightCount() const;
 
 	// -------------------------------------------------------------------
 	// Recording
@@ -282,28 +132,18 @@ private:
 	/**
 	 * @brief Writes all descriptors (image + buffer) into the specified set.
 	 *
-	 * Called every frame during Record(). One set per in-flight frame
-	 * prevents updating a set while the GPU is still reading it.
+	 * Light SSBOs are read from RenderCache::GetLightingGPU() at binding
+	 * time, not stored locally.
 	 *
 	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).
 	 */
 	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
-
-	// --- Queue handles for SSBO creation ---
-	vk::Queue p_graphicsQueue;
-	uint32_t p_queueFamilyIndex;
 
 	// --- Pipeline ---
 	vk::raii::Pipeline p_pipeline;
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
 	std::shared_ptr<ComputeShader> p_computeShader;
-
-	// --- Owned light SSBO ---
-	std::unique_ptr<GPUBuffer> p_lightSSBO;
-	uint32_t p_lightCount = 0;
-	std::unique_ptr<GPUBuffer> p_sunLightSSBO;
-	uint32_t p_sunLightCount = 0;
 
 	// --- IBL cubemap fallback (4×4 black cubemap, valid when no IBL set) ---
 	std::unique_ptr<Image> p_fallbackIrradianceCube;

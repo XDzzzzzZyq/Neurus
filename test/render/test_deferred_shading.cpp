@@ -22,6 +22,8 @@
 // --- Render layer ---
 #include "render/RenderCache.h"
 #include "render/RenderContext.h"
+#include "render/UploadManager.h"
+#include "render/resources/LightingGPU.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
 #include "scene/Material.h"
@@ -89,7 +91,10 @@ protected:
 		}
 
 		// --- Render pass infrastructure (attachments created lazily) ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+		                                             m_queue, m_graphicsQueueFamily);
+
+		// --- Upload manager for CPU→GPU struct conversion ---
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -99,7 +104,7 @@ protected:
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
 			2u,
-			m_queue, m_graphicsQueueFamily);
+			m_graphicsQueueFamily);
 	}
 
 	void TearDown() override
@@ -109,6 +114,7 @@ protected:
 
 	// --- Render pass infrastructure ---
 	std::unique_ptr<RenderCache>  m_renderCache;
+
 	std::unique_ptr<GeometryPass>       m_geometryPass;
 	std::unique_ptr<LightingPass>       m_lightingPass;
 };
@@ -166,7 +172,8 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	{
 		Scene testScene;
 		testScene.UseLight(resources.light);
-		m_lightingPass->UploadLights(testScene);
+		auto lightDict = m_uploadManager->UploadLighting(testScene.light_list);
+		m_renderCache->UpdateLighting(lightDict);
 	}
 
 	{

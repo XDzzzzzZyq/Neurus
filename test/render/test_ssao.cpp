@@ -53,7 +53,8 @@ protected:
 		auto& pd = PhysicalDevice();
 
 		// --- Render pass infrastructure (attachments created lazily) ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+		                                             m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(

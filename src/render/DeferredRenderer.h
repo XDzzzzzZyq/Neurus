@@ -112,21 +112,6 @@ public:
 	 */
 	void DrawFrame(const Scene& scene);
 
-	/**
-	 * @brief Uploads scene point lights to the LightingPass SSBO and configures
-	 *        the shadow passes for the first point light found.
-	 *
-	 * Converts scene.light_list to GPU-compatible PointLightGpu structs
-	 * and uploads them as a storage buffer. Must be called before the
-	 * first DrawFrame() and after any scene light changes.
-	 *
-	 * If a point light with use_shadow enabled is found, configures
-	 * ShadowDepthPass accordingly.
-	 *
-	 * @param scene Scene containing the light list.
-	 */
-	void UploadLights(const Scene& scene);
-
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
 

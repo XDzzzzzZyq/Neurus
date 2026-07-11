@@ -267,4 +267,7 @@ protected:
 	vk::Queue m_queue = nullptr;
 	std::unique_ptr<vk::raii::CommandPool> m_commandPool;
 	vk::raii::CommandBuffers m_commandBuffers = nullptr;
+
+	/// @brief Reusable upload manager for CPU→GPU struct conversion.
+	std::unique_ptr<neurus::UploadManager> m_uploadManager;
 };

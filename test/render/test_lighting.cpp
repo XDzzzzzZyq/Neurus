@@ -7,7 +7,7 @@
  *   - Single point light dispatch produces non-zero HDR output
  *   - G-Buffer reading and HDR writing work correctly
  *   - Push constants (light count, camera pos, view matrix) are consumed
- *   - PointLightGpu SSBO layout matches shader expectation
+ *   - PointLightStruct SSBO layout matches shader expectation
  *
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
  */
@@ -18,6 +18,8 @@
 
 #include "render/RenderCache.h"
 #include "render/RenderContext.h"
+#include "render/UploadManager.h"
+#include "render/resources/LightingGPU.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
 #include "render/buffers/GPUBuffer.h"
@@ -67,7 +69,10 @@ protected:
 		}
 
 		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+		                                             m_queue, m_graphicsQueueFamily);
+
+		// --- Upload manager for CPU→GPU struct conversion ---
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -77,7 +82,7 @@ protected:
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd,
 			2u,                          // numSets = kMaxFramesInFlight
-			m_queue, m_graphicsQueueFamily);
+			m_graphicsQueueFamily);
 	}
 
 	/**
@@ -131,46 +136,13 @@ protected:
 		return camera;
 	}
 
-	/**
-	 * @brief Creates a point light SSBO with a single light.
-	 */
-	std::unique_ptr<GPUBuffer> CreateLightSSBO(const glm::vec3& pos,
-	                                              float power = 50.0f,
-	                                              const glm::vec3& color = glm::vec3(1.0f))
-	{
-		const auto& pd = m_physicalDevices[m_selectedPdIndex];
-
-		PointLightGpu light = {};
-		light.colorR = color.r;
-		light.colorG = color.g;
-		light.colorB = color.b;
-		light.posX   = pos.x;
-		light.posY   = pos.y;
-		light.posZ   = pos.z;
-		light.power  = power;
-		light.radius = 0.05f;
-
-		auto ssbo = std::make_unique<GPUBuffer>(
-			*m_device, pd, m_queue, m_graphicsQueueFamily,
-			sizeof(PointLightGpu),
-			vk::BufferUsageFlagBits::eStorageBuffer);
-
-		ssbo->Upload(&light, sizeof(PointLightGpu));
-		return ssbo;
-	}
-
-	/**
-	 * @brief Reads back HDR colour output into a float array.
-	 *
-	 * Assumes RGBA16F format (8 bytes per pixel). Converts half-floats to
-	 * single-precision floats.
-	 */
 	// --- Constants ---
 	static constexpr uint32_t kRenderWidth  = 128;
 	static constexpr uint32_t kRenderHeight = 128;
 
 	// --- Render pass infrastructure ---
 	std::unique_ptr<RenderCache>  m_renderCache;
+
 
 	// --- Systems under test ---
 	std::unique_ptr<GeometryPass>  m_geometryPass;
@@ -197,16 +169,16 @@ TEST_F(LightingPassTest, Constructor_CreatesValidPipeline)
 }
 
 // ---------------------------------------------------------------------------
-// 2. PointLightGpu - size matches shader expectation (std140, 48 bytes)
+// 2. PointLightStruct - size matches shader expectation (std140, 48 bytes)
 // ---------------------------------------------------------------------------
 
-TEST_F(LightingPassTest, PointLightGpu_SizeIs48Bytes)
+TEST_F(LightingPassTest, PointLightStruct_SizeIs48Bytes)
 {
-	EXPECT_EQ(sizeof(PointLightGpu), 48u);
+	EXPECT_EQ(sizeof(PointLightStruct), 48u);
 }
 
 // ---------------------------------------------------------------------------
-// 3. LightingPushConstants - size matches shader expectation (100 bytes)
+// 3. LightingPushConstants - size matches shader expectation (176 bytes)
 // ---------------------------------------------------------------------------
 
 TEST_F(LightingPassTest, PushConstants_SizeIs176Bytes)
@@ -250,13 +222,15 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	// --- Step 1: Render test triangle into G-Buffer ---
 	const auto camera = RenderTestTriangle();
 
-	// --- Step 2: Upload point light to LightingPass ---
+	// --- Step 2: Upload point light via UploadManager → RenderCache ---
 	{
 		Scene scene;
 		auto light = std::make_shared<Light>(LightType::POINTLIGHT, 50.0f, glm::vec3(1.0f, 1.0f, 1.0f));
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 3.0f));  // Z-up: above the triangle
 		scene.UseLight(light);
-		m_lightingPass->UploadLights(scene);
+
+		auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
+		m_renderCache->UpdateLighting(lightDict);
 	}
 
 	// --- Step 3: Record lighting pass ---
@@ -268,7 +242,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
-			.		cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
+			.cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
 			.invProjView = glm::inverse(testCam.viewProj),
 		});
 
@@ -281,8 +255,6 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 		*m_renderCache, kRenderWidth, kRenderHeight);
 
 	// --- Step 5: Verify at least one pixel has non-zero colour ---
-	// The triangle covers roughly the center of the framebuffer.
-	// Scan all pixels for any non-zero RGB values.
 	bool foundNonZero = false;
 	for (size_t i = 0; i < hdrPixels.size(); i += 4)
 	{
@@ -317,7 +289,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 // ---------------------------------------------------------------------------
 // 6. Zero lights with PARTIALLY_BOUND descriptor — validates that the
 //    VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT on the SSBO binding works
-//    correctly. When m_lightSSBO is null, the shader must not crash because
+//    correctly. When the point SSBO is null, the shader must not crash because
 //    lightCount=0 prevents any SSBO reads.
 // ---------------------------------------------------------------------------
 
@@ -331,10 +303,9 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 	// --- Render triangle ---
 	const auto camera = RenderTestTriangle();
 
-	// --- Upload zero lights (empty scene — m_lightSSBO becomes null) ---
+	// --- Upload zero lights (empty vectors — SSBOs become null) ---
 	{
-		Scene emptyScene;
-		m_lightingPass->UploadLights(emptyScene);
+		m_renderCache->UpdateLighting({}, {});
 	}
 
 	// --- Record lighting pass with 0 lights (PARTIALLY_BOUND SSBO) ---
@@ -346,7 +317,7 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
 			.view = testCam.view,
-			.		cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
+			.cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
 			.invProjView = glm::inverse(testCam.viewProj),
 		};
 		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
@@ -359,9 +330,6 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 		*m_renderCache, kRenderWidth, kRenderHeight);
 
 	// --- Verify: the GPU didn't crash, no VUID errors, HDR data is valid ---
-	// With zero lights the shader still produces ambient output (~0.03).
-	// This test primarily validates that the PARTIALLY_BOUND SSBO binding
-	// doesn't cause a crash or validation error when m_lightSSBO is null.
 	bool foundLit = false;
 	for (size_t i = 0; i < hdrPixels.size(); i += 4)
 	{

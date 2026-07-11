@@ -13,6 +13,7 @@
 #include "resources/MeshGPU.h"
 #include "resources/EnvironmentGPU.h"
 #include "resources/LightGPU.h"
+#include "resources/LightingGPU.h"
 
 #include "asset/ImageData.h"
 #include "asset/MeshData.h"
@@ -24,6 +25,7 @@
 #include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
+#include "scene/Scene.h"
 
 namespace neurus {
 
@@ -288,6 +290,71 @@ LightGPU UploadManager::UploadLight(const Light& light)
 		NEURUS_LOG("[UploadManager] Created shadow map for light type=" << static_cast<int>(type));
 		return lgpu;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Variant-based UploadLighting (batch)
+// ---------------------------------------------------------------------------
+
+std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>>
+UploadManager::UploadLighting(const std::unordered_map<int, std::shared_ptr<Light>>& lights)
+{
+	std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>> result;
+
+	for (const auto& [uid, light] : lights)
+	{
+		if (!light) continue;
+		result[uid] = UploadLighting(*light);
+	}
+
+	NEURUS_LOG("[UploadManager] UploadLighting(batch): " << result.size() << " lights converted");
+	return result;
+}
+
+// ---------------------------------------------------------------------------
+// Variant-based UploadLighting (single)
+// ---------------------------------------------------------------------------
+
+std::variant<PointLightStruct, SunLightStruct>
+UploadManager::UploadLighting(const Light& light)
+{
+	if (light.light_type == LightType::POINTLIGHT)
+	{
+		PointLightStruct gpu = {};
+		const auto& pos = light.GetPosition();
+
+		gpu.posX = pos.x;
+		gpu.posY = pos.y;
+		gpu.posZ = pos.z;
+		gpu.colorR = light.light_color.r;
+		gpu.colorG = light.light_color.g;
+		gpu.colorB = light.light_color.b;
+		gpu.power = light.light_power;
+		gpu.radius = light.light_radius;
+		gpu.shadowMapIndex = -1;
+
+		return gpu;
+	}
+	else if (light.light_type == LightType::SUNLIGHT)
+	{
+		SunLightStruct gpu = {};
+		const auto& dir = light.GetDirection();
+
+		gpu.directionX = dir.x;
+		gpu.directionY = dir.y;
+		gpu.directionZ = dir.z;
+		gpu.colorR = light.light_color.r;
+		gpu.colorG = light.light_color.g;
+		gpu.colorB = light.light_color.b;
+		gpu.power = light.light_power;
+		gpu.shadowMapIndex = -1;
+
+		return gpu;
+	}
+
+	// NONELIGHT — return default PointLightStruct (empty variant alternative)
+	NEURUS_ERR("[UploadManager] Unhandled light type: " << static_cast<int>(light.light_type));
+	return PointLightStruct{};
 }
 
 } // namespace neurus

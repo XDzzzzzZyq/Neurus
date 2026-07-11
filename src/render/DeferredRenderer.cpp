@@ -11,6 +11,8 @@
 #include "RenderContext.h"
 #include "Swapchain.h"
 
+#include "resources/LightingGPU.h"
+
 #include "passes/GeometryPass.h"
 #include "passes/LightingPass.h"
 #include "passes/SSAOPass.h"
@@ -56,7 +58,8 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	const auto extent = r_swapchain->extent();
 
 	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
-	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
+	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice,
+	                                              graphicsQueue, queueFamilyIndex);
 
 	// --- 3. Create geometry pass ---
 	{
@@ -71,7 +74,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		auto lightPass = std::make_unique<LightingPass>(
 			device, physicalDevice,
 			kMaxFramesInFlight,
-			r_graphicsQueue, r_queueFamilyIndex);
+			r_queueFamilyIndex);
 		r_lightingPass = lightPass.get();
 		r_passes.push_back(std::move(lightPass));
 	}
@@ -163,62 +166,6 @@ DeferredRenderer::~DeferredRenderer()
 	// vk::raii destructors clean up automatically in reverse declaration order.
 	// r_passes vector destroys all passes in construction order (GeometryPass → LightingPass →
 	//   SSAOPass → IBLPass), before RenderCache.
-}
-
-// ---------------------------------------------------------------------------
-// Light upload delegation
-// ---------------------------------------------------------------------------
-
-void DeferredRenderer::UploadLights(const Scene& scene)
-{
-	// --- Collect shadow-casting point light UIDs (allocated first, indices 0..N-1) ---
-	std::vector<int32_t> pointShadowUIDs;
-	// --- Collect shadow-casting sun light UIDs (allocated after point lights, indices N..N+M-1) ---
-	std::vector<int32_t> sunShadowUIDs;
-
-	if (r_shadowDepthPass)
-	{
-		for (const auto& [id, light] : scene.light_list)
-		{
-			if (!light) continue;
-			if (light->light_type == LightType::POINTLIGHT && light->use_shadow)
-			{
-				pointShadowUIDs.push_back(id);
-			}
-			else if (light->light_type == LightType::SUNLIGHT && light->use_shadow)
-			{
-				sunShadowUIDs.push_back(id);
-			}
-		}
-	}
-
-	// Sort each group for deterministic shadowMapIndex assignment
-	std::sort(pointShadowUIDs.begin(), pointShadowUIDs.end());
-	std::sort(sunShadowUIDs.begin(), sunShadowUIDs.end());
-
-	// --- Build combined shadow index map: point lights first, sun lights second ---
-	// MAX_SHADOW_LIGHTS=4 is shared between point and sun; point lights get priority
-	constexpr int kMaxShadowLayers = 4;
-	std::unordered_map<int32_t, int> uidToShadowIndex;
-
-	int nextIndex = 0;
-	for (const auto uid : pointShadowUIDs)
-	{
-		if (nextIndex >= kMaxShadowLayers) break;
-		uidToShadowIndex[uid] = nextIndex++;
-	}
-	for (const auto uid : sunShadowUIDs)
-	{
-		if (nextIndex >= kMaxShadowLayers) break;
-		uidToShadowIndex[uid] = nextIndex++;
-	}
-
-	// --- Upload lights to GPU, assigning shadowMapIndex per light ---
-	if (r_lightingPass)
-	{
-		r_lightingPass->UploadLights(scene, &uidToShadowIndex);
-		r_lightingPass->UploadSunLights(scene, &uidToShadowIndex);
-	}
 }
 
 // ---------------------------------------------------------------------------

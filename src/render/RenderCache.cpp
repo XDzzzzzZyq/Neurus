@@ -2,6 +2,7 @@
 
 #include "Log.h"
 
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 
@@ -12,10 +13,15 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 
 RenderCache::RenderCache(const vk::raii::Device& device,
-                       const vk::raii::PhysicalDevice& physicalDevice)
+                       const vk::raii::PhysicalDevice& physicalDevice,
+                       vk::Queue graphicsQueue,
+                       uint32_t queueFamilyIndex)
 	: rc_device(&device)
 	, rc_physicalDevice(&physicalDevice)
 {
+	rc_lightingGPU = std::make_unique<LightingGPU>(
+		device, physicalDevice, graphicsQueue, queueFamilyIndex);
+	NEURUS_LOG("[RenderCache] LightingGPU initialized in constructor");
 }
 
 // ---------------------------------------------------------------------------
@@ -203,6 +209,10 @@ void RenderCache::Clean()
 	rc_meshGPUs.clear();
 	rc_environmentGPUs.clear();
 	rc_lightGPUs.clear();
+	rc_uidToPointLightIndex.clear();
+	rc_uidToSunLightIndex.clear();
+	rc_uidToShadowIndex.clear();
+	rc_lightingGPU.reset();
 }
 
 void RenderCache::CleanScreenSpace()
@@ -210,6 +220,7 @@ void RenderCache::CleanScreenSpace()
 	rc_attachments.clear();
 	rc_shadowIntensityArray.reset();
 	rc_shadowIntensityLayerIndex.clear();
+	// rc_uidTo*Index maps preserved — shadow indexing survives resize
 	// rc_meshGPUs preserved — mesh GPU buffers survive resize
 	// rc_environmentGPUs preserved — IBL cubemaps survive resize
 	// rc_lightGPUs preserved — shadow depth maps survive resize
@@ -267,6 +278,123 @@ const LightGPU* RenderCache::GetLightGPU(const int lightUID) const
 void RenderCache::RemoveLightGPU(const int lightUID)
 {
 	rc_lightGPUs.erase(lightUID);
+}
+
+// ---------------------------------------------------------------------------
+// Lighting GPU resources
+// ---------------------------------------------------------------------------
+
+void RenderCache::UpdateLighting(const std::vector<PointLightStruct>& pointLights,
+                                 const std::vector<SunLightStruct>& sunLights)
+{
+	assert(rc_lightingGPU && "InitLightingGPU must be called before UpdateLighting");
+	rc_lightingGPU->UpdatePointLights(pointLights);
+	rc_lightingGPU->UpdateSunLights(sunLights);
+}
+
+void RenderCache::UpdateLighting(const std::unordered_map<int,
+                                 std::variant<PointLightStruct, SunLightStruct>>& lightDict)
+{
+	assert(rc_lightingGPU && "InitLightingGPU must be called before UpdateLighting");
+
+	// --- Clear index maps ---
+	rc_uidToPointLightIndex.clear();
+	rc_uidToSunLightIndex.clear();
+	rc_uidToShadowIndex.clear();
+
+	// --- Separate point and sun lights, sorted by UID for determinism ---
+	std::vector<std::pair<int, PointLightStruct>> pointEntries;
+	std::vector<std::pair<int, SunLightStruct>> sunEntries;
+
+	for (const auto& [uid, lightVariant] : lightDict)
+	{
+		if (std::holds_alternative<PointLightStruct>(lightVariant))
+		{
+			pointEntries.push_back({uid, std::get<PointLightStruct>(lightVariant)});
+		}
+		else if (std::holds_alternative<SunLightStruct>(lightVariant))
+		{
+			sunEntries.push_back({uid, std::get<SunLightStruct>(lightVariant)});
+		}
+	}
+
+	// Sort by UID for deterministic SSBO ordering
+	std::sort(pointEntries.begin(), pointEntries.end(),
+	          [](const auto& a, const auto& b) { return a.first < b.first; });
+	std::sort(sunEntries.begin(), sunEntries.end(),
+	          [](const auto& a, const auto& b) { return a.first < b.first; });
+
+	// --- Build SSBO vectors and assign SSBO indices ---
+	std::vector<PointLightStruct> pointVec;
+	std::vector<SunLightStruct> sunVec;
+
+	for (size_t i = 0; i < pointEntries.size(); ++i)
+	{
+		rc_uidToPointLightIndex[pointEntries[i].first] = static_cast<uint32_t>(i);
+		pointVec.push_back(pointEntries[i].second);
+	}
+	for (size_t i = 0; i < sunEntries.size(); ++i)
+	{
+		rc_uidToSunLightIndex[sunEntries[i].first] = static_cast<uint32_t>(i);
+		sunVec.push_back(sunEntries[i].second);
+	}
+
+	// --- Build combined shadow index pool: point lights first, then sun lights, max 4 ---
+	uint32_t shadowIdx = 0;
+	for (const auto& [uid, pl] : pointEntries)
+	{
+		if (shadowIdx >= MAX_SHADOW_LAYERS) break;
+		rc_uidToShadowIndex[uid] = shadowIdx++;
+	}
+	for (const auto& [uid, sl] : sunEntries)
+	{
+		if (shadowIdx >= MAX_SHADOW_LAYERS) break;
+		rc_uidToShadowIndex[uid] = shadowIdx++;
+	}
+
+	// --- Assign shadowMapIndex on each struct from the shadow index map ---
+	for (size_t i = 0; i < pointEntries.size(); ++i)
+	{
+		const int uid = pointEntries[i].first;
+		auto it = rc_uidToShadowIndex.find(uid);
+		if (it != rc_uidToShadowIndex.end())
+		{
+			pointVec[i].shadowMapIndex = static_cast<int32_t>(it->second);
+		}
+	}
+	for (size_t i = 0; i < sunEntries.size(); ++i)
+	{
+		const int uid = sunEntries[i].first;
+		auto it = rc_uidToShadowIndex.find(uid);
+		if (it != rc_uidToShadowIndex.end())
+		{
+			sunVec[i].shadowMapIndex = static_cast<int32_t>(it->second);
+		}
+	}
+
+	// --- Upload to GPU ---
+	rc_lightingGPU->UpdatePointLights(pointVec);
+	rc_lightingGPU->UpdateSunLights(sunVec);
+
+	NEURUS_LOG("[RenderCache] UpdateLighting(variant): " << pointVec.size()
+	           << " point lights, " << sunVec.size() << " sun lights, "
+	           << rc_uidToShadowIndex.size() << " shadow casters");
+}
+
+uint32_t RenderCache::GetShadowIndex(int lightUID) const
+{
+	auto it = rc_uidToShadowIndex.find(lightUID);
+	return (it != rc_uidToShadowIndex.end()) ? it->second : 0;
+}
+
+LightingGPU* RenderCache::GetLightingGPU()
+{
+	return rc_lightingGPU.get();
+}
+
+const LightingGPU* RenderCache::GetLightingGPU() const
+{
+	return rc_lightingGPU.get();
 }
 
 // ---------------------------------------------------------------------------

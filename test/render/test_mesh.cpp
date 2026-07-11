@@ -108,7 +108,8 @@ protected:
 		VulkanTestShared::SetUp();
 		if (!m_hasVulkan) return;
 
-		m_cache = std::make_unique<RenderCache>(*m_device, PhysicalDevice());
+		m_cache = std::make_unique<RenderCache>(*m_device, PhysicalDevice(),
+		                                       m_queue, m_graphicsQueueFamily);
 	}
 
 	void TearDown() override

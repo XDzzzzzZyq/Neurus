@@ -33,18 +33,6 @@ namespace neurus
 class Scene;
 
 /**
- * @brief Per-mesh push-constant block sent to the vertex shader.
- *
- * Packed as two mat4s (128 bytes total) to satisfy Vulkan's
- * 16-byte alignment requirement for push constants.
- */
-struct alignas(16) PushConstants
-{
-	glm::mat4 model;           ///< Local-to-world transform (offset 0)
-	glm::mat4 normalMatrix;    ///< 3x3 in upper-left of mat4 (offset 64)
-};
-
-/**
  * @brief Per-frame context for all render passes.
  *
  * Populated once per frame by the renderer and passed (typically as const&)

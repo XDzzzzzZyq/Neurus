@@ -26,6 +26,8 @@
 // --- Render layer ---
 #include "render/RenderCache.h"
 #include "render/RenderContext.h"
+#include "render/UploadManager.h"
+#include "render/resources/LightingGPU.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/ShadowDepthPass.h"
 #include "render/passes/ShadowIntensityPass.h"
@@ -78,7 +80,8 @@ protected:
 		}
 
 		// --- Render pass infrastructure (attachments created lazily) ---
-		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
+		m_renderCache = std::make_unique<RenderCache>(*m_device, pd,
+		                                             m_queue, m_graphicsQueueFamily);
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -96,7 +99,9 @@ protected:
 		// --- Lighting pass (2 sets = matches test_deferred_shading) ---
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd, 2u,
-			m_queue, m_graphicsQueueFamily);
+			m_graphicsQueueFamily);
+
+		// --- Upload manager for CPU→GPU struct conversion ---
 	}
 
 	void TearDown() override
@@ -105,6 +110,7 @@ protected:
 	}
 
 	std::unique_ptr<RenderCache>         m_renderCache;
+
 	std::unique_ptr<GeometryPass>        m_geometryPass;
 	std::unique_ptr<ShadowDepthPass>     m_shadowDepthPass;
 	std::unique_ptr<ShadowIntensityPass> m_shadowIntensityPass;
@@ -167,23 +173,11 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 		*m_renderCache, renderExtent, *this);
 
 	// -------------------------------------------------------------------
-	// Step 4: Build shadow index map and upload lights to LightingPass
+	// Step 4: Upload lights to RenderCache via UploadManager
 	// -------------------------------------------------------------------
-	// Collect shadow-casting POINTLIGHT UIDs, sort for deterministic ordering
 	{
-		std::vector<int32_t> shadowUIDs;
-		for (const auto& [id, light] : shadowRes.scene->light_list)
-		{
-			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
-				shadowUIDs.push_back(id);
-		}
-		std::sort(shadowUIDs.begin(), shadowUIDs.end());
-
-		std::unordered_map<int32_t, int> shadowIndexMap;
-		for (size_t i = 0; i < shadowUIDs.size(); ++i)
-			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
-
-		m_lightingPass->UploadLights(*shadowRes.scene, &shadowIndexMap);
+		auto lightDict = m_uploadManager->UploadLighting(shadowRes.scene->light_list);
+		m_renderCache->UpdateLighting(lightDict);
 	}
 
 	// -------------------------------------------------------------------
@@ -278,19 +272,8 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 		*m_renderCache, renderExtent, *this);
 
 	{
-		std::vector<int32_t> shadowUIDs;
-		for (const auto& [id, light] : shadowRes.scene->light_list)
-		{
-			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
-				shadowUIDs.push_back(id);
-		}
-		std::sort(shadowUIDs.begin(), shadowUIDs.end());
-
-		std::unordered_map<int32_t, int> shadowIndexMap;
-		for (size_t i = 0; i < shadowUIDs.size(); ++i)
-			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
-
-		m_lightingPass->UploadLights(*shadowRes.scene, &shadowIndexMap);
+		auto lightDict = m_uploadManager->UploadLighting(shadowRes.scene->light_list);
+		m_renderCache->UpdateLighting(lightDict);
 	}
 
 	{
@@ -497,22 +480,11 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 		*m_renderCache, renderExtent, *this);
 
 	// -------------------------------------------------------------------
-	// Upload lights
+	// Upload lights to RenderCache via UploadManager
 	// -------------------------------------------------------------------
 	{
-		std::vector<int32_t> shadowUIDs;
-		for (const auto& [id, light] : shadowRes.scene->light_list)
-		{
-			if (light && light->light_type == LightType::POINTLIGHT && light->use_shadow)
-				shadowUIDs.push_back(id);
-		}
-		std::sort(shadowUIDs.begin(), shadowUIDs.end());
-
-		std::unordered_map<int32_t, int> shadowIndexMap;
-		for (size_t i = 0; i < shadowUIDs.size(); ++i)
-			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
-
-		m_lightingPass->UploadLights(*shadowRes.scene, &shadowIndexMap);
+		auto lightDict = m_uploadManager->UploadLighting(shadowRes.scene->light_list);
+		m_renderCache->UpdateLighting(lightDict);
 	}
 
 	// -------------------------------------------------------------------
@@ -721,7 +693,8 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 		for (size_t i = 0; i < shadowUIDs.size(); ++i)
 			shadowIndexMap[shadowUIDs[i]] = static_cast<int>(i);
 
-		m_lightingPass->UploadSunLights(*shadowRes.scene, &shadowIndexMap);
+		auto lightDict = m_uploadManager->UploadLighting(shadowRes.scene->light_list);
+		m_renderCache->UpdateLighting(lightDict);
 	}
 
 	// -------------------------------------------------------------------

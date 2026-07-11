@@ -51,7 +51,7 @@ protected:
 	void SetUp() override { VulkanTestShared::SetUp(); if (!m_hasVulkan) return;
 		auto& pd = PhysicalDevice();
 		m_pass = std::make_unique<ShadowDepthPass>(*m_device,pd,m_queue,m_graphicsQueueFamily,kRes);
-		m_cache = std::make_unique<RenderCache>(*m_device,pd); }
+		m_cache = std::make_unique<RenderCache>(*m_device,pd,m_queue,m_graphicsQueueFamily); }
 	void TearDown() override { VulkanTestShared::TearDown(); }
 
 	static float ExpectedDepth() {
