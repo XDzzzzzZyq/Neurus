@@ -24,7 +24,7 @@
 #include <memory>
 
 #include "editor/controllers/CameraController.h"
-#include "editor/events/EventBus.h"
+#include "editor/events/CameraEvents.h"
 #include "scene/Camera.h"
 
 using namespace neurus;

@@ -77,6 +77,18 @@ public:
 	void Edit(const InputState& input);
 
 	/**
+	 * @brief Handles viewport resize by dispatching a CameraResizeEvent.
+	 *
+	 * Enqueues a CameraResizeEvent with the active camera and new width/height,
+	 * then processes the event queue so CameraController applies the aspect
+	 * ratio change immediately.
+	 *
+	 * @param width  New viewport width in pixels.
+	 * @param height New viewport height in pixels.
+	 */
+	void HandleResize(uint32_t width, uint32_t height);
+
+	/**
 	 * @brief Uploads all scene meshes and shadow-casting lights to GPU.
 	 *
 	 * Must be called AFTER the window is shown and the surface is ready,

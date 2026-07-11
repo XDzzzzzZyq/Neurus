@@ -4,7 +4,6 @@
 #include "VulkanWidget.h"
 
 #include "editor/events/UIEvents.h"
-#include "scene/Scene.h"
 
 #include <QApplication>
 #include <QFile>
@@ -65,14 +64,6 @@ int NeurusMainWindow::getViewportHeight() const
 VulkanWidget* NeurusMainWindow::getVulkanWidget() const
 {
 	return win_viewportWidget;
-}
-
-void NeurusMainWindow::SetScene(Scene* scene)
-{
-	if (win_propertyEditor)
-	{
-		win_propertyEditor->SetScene(scene);
-	}
 }
 
 // =========================================================================
@@ -232,9 +223,9 @@ void NeurusMainWindow::CreateDocks()
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
 
 	// --- Right: Property Editor ---
-	win_propertyEditor = new PropertyEditor(nullptr);  // Scene set later via SetScene()
+	auto* propertyEditor = new PropertyEditor(nullptr);
 	auto* propDock = new ads::CDockWidget(win_dockManager, "Property Editor");
-	propDock->setWidget(win_propertyEditor);
+	propDock->setWidget(propertyEditor);
 	propDock->resize(280, 300);
 	propDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());

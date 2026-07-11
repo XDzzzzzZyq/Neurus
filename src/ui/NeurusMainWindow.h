@@ -12,8 +12,6 @@ class CDockWidget;
 
 namespace neurus {
 
-class Scene;
-class PropertyEditor;
 class VulkanWidget;
 
 class NeurusMainWindow : public QMainWindow
@@ -39,12 +37,6 @@ public:
     /** @brief Returns the viewport dock widget (for layout / restoreState). */
     ads::CDockWidget* getViewportDock() const { return win_viewportDock; }
 
-    /**
-     * @brief Sets the active scene on the property editor.
-     * @param scene Non-owning pointer to the Scene.
-     */
-    void SetScene(Scene* scene);
-
 private:
 	void CreateMenus();
 	void CreateDocks();
@@ -55,7 +47,6 @@ private:
     ads::CDockManager* win_dockManager = nullptr;
     ads::CDockWidget*  win_viewportDock = nullptr;
     VulkanWidget*      win_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
-    PropertyEditor*    win_propertyEditor = nullptr;  // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus

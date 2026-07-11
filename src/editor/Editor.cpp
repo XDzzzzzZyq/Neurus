@@ -6,7 +6,7 @@
 #include "editor/events/EditorEvents.h"
 #include "editor/events/EventBus.h"
 #include "editor/events/UIEvents.h"
-#include "project/Project.h"
+#include "asset/Project.h"
 
 #include "app/VulkanContext.h"
 #include "render/DeferredRenderer.h"
@@ -430,6 +430,21 @@ void Editor::UploadSceneResources()
 	}
 
 	NEURUS_LOG("[Editor] Uploaded scene resources to GPU");
+}
+
+// =========================================================================
+// HandleResize() – dispatch CameraResizeEvent via event bus
+// =========================================================================
+
+void Editor::HandleResize(uint32_t width, uint32_t height)
+{
+	auto* cam = GetScene().GetActiveCamera();
+	if (!cam) return;
+
+	eventQueue().enqueue(CameraResizeEvent{const_cast<Camera*>(cam),
+	                                       static_cast<int>(width),
+	                                       static_cast<int>(height)});
+	eventQueue().Process();
 }
 
 // =========================================================================

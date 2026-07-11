@@ -53,13 +53,12 @@ add_executable(neurus_test
 	scene/test_scene.cpp
 	scene/test_scene_integration.cpp
 	scene/test_debug.cpp
-	project/test_project_roundtrip.cpp
-	project/test_default_project.cpp
+	asset/test_project_roundtrip.cpp
+	asset/test_default_project.cpp
 	core/test_graph.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE
-	neurus_project
 	neurus_scene
 	neurus_app
 	neurus_render

@@ -2,49 +2,63 @@
  * @file CameraController.cpp
  * @brief Event-driven camera navigation: orbit (rotate), dolly (push), pan (slide), zoom.
  *
- * Each event handler receives a discrete camera event, extracts the camera
+ * Stateless — all handlers are free functions in an anonymous namespace.
+ * Each handler receives a discrete camera event, extracts the camera
  * pointer and delta values, and applies the corresponding transform math.
  * Speed control is external — Editor scales deltas before enqueuing events.
  */
 
 #include "editor/controllers/CameraController.h"
+#include "editor/events/CameraEvents.h"
 #include "editor/events/EventBus.h"
+#include "editor/Input.h"
 #include "scene/Camera.h"
 
 #include <algorithm>
 #include <cmath>
 
-namespace neurus {
+namespace {
+
+// ---------------------------------------------------------------------------
+// Sensitivity constants
+// ---------------------------------------------------------------------------
+
+/** @brief Base sensitivity for orbit rotation (radians per pixel). */
+constexpr float kOrbitSensitivity = 0.005f;
+
+/** @brief Base sensitivity for pan translation (world units per pixel). */
+constexpr float kPanSensitivity = 0.01f;
+
+/** @brief Base sensitivity for zoom (dolly factor per scroll notch). */
+constexpr float kZoomSensitivity = 1.0f;
+
+/** @brief Base sensitivity for dolly translation (world units per pixel). */
+constexpr float kDollySensitivity = 0.05f;
 
 // ---------------------------------------------------------------------------
 // Event notification
 // ---------------------------------------------------------------------------
 
-void CameraController::NotifyCameraChanged(const Camera& camera)
+/**
+ * @brief Notifies downstream systems of a camera transform change.
+ * @param camera Camera that was modified.
+ * @note Stub — will enqueue a CameraTransformChanged event in the future.
+ */
+void NotifyCameraChanged(const neurus::Camera& camera)
 {
-	// Stub — will enqueue CameraTransformChanged event in the future
 	(void)camera;
 }
 
 // ---------------------------------------------------------------------------
-// Init — subscribe to camera events
+// Event handlers
 // ---------------------------------------------------------------------------
 
-void CameraController::Init(class EventQueue& bus)
+/**
+ * @brief Handles CameraZoomEvent — moves camera toward/away from target.
+ */
+void OnCameraZoom(const neurus::CameraZoomEvent& e)
 {
-	bus.subscribe<CameraZoomEvent>([this](const CameraZoomEvent& e) { OnCameraZoom(e); });
-	bus.subscribe<CameraRotateEvent>([this](const CameraRotateEvent& e) { OnCameraRotate(e); });
-	bus.subscribe<CameraPushEvent>([this](const CameraPushEvent& e) { OnCameraPush(e); });
-	bus.subscribe<CameraSlideEvent>([this](const CameraSlideEvent& e) { OnCameraSlide(e); });
-}
-
-// ---------------------------------------------------------------------------
-// OnCameraZoom — scroll wheel → move camera toward/away from target
-// ---------------------------------------------------------------------------
-
-void CameraController::OnCameraZoom(const CameraZoomEvent& e)
-{
-	Camera& camera = *e.cam;
+	neurus::Camera& camera = *e.cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -54,7 +68,6 @@ void CameraController::OnCameraZoom(const CameraZoomEvent& e)
 	if (radius < 1e-6f) return;
 
 	// Zoom factor: scroll up → closer, scroll down → farther
-	// Speed = 1.0f (Editor scales e.scroll_dir before enqueuing)
 	const float factor = std::pow(0.8f, e.scroll_dir * kZoomSensitivity);
 	const float newRadius = radius * factor;
 
@@ -69,13 +82,12 @@ void CameraController::OnCameraZoom(const CameraZoomEvent& e)
 	NotifyCameraChanged(camera);
 }
 
-// ---------------------------------------------------------------------------
-// OnCameraRotate — orbit camera around look-at target
-// ---------------------------------------------------------------------------
-
-void CameraController::OnCameraRotate(const CameraRotateEvent& e)
+/**
+ * @brief Handles CameraRotateEvent — orbits camera around target.
+ */
+void OnCameraRotate(const neurus::CameraRotateEvent& e)
 {
-	Camera& camera = *e.cam;
+	neurus::Camera& camera = *e.cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -91,7 +103,6 @@ void CameraController::OnCameraRotate(const CameraRotateEvent& e)
 	const float azimuth   = std::atan2(dir.x, dir.y);             // [-PI, PI] — angle from +Y (forward)
 
 	// Apply mouse delta (inverted for natural drag feel)
-	// Speed = 1.0f (Editor scales deltas before enqueuing)
 	const float deltaAzimuth   = e.mouse_delta_x * kOrbitSensitivity;
 	const float deltaElevation = e.mouse_delta_y * kOrbitSensitivity;
 
@@ -109,18 +120,16 @@ void CameraController::OnCameraRotate(const CameraRotateEvent& e)
 	);
 
 	camera.SetCamPos(target + newDir * radius);
-	// Target stays fixed — camera continues looking at same point
 
 	NotifyCameraChanged(camera);
 }
 
-// ---------------------------------------------------------------------------
-// OnCameraPush — dolly camera forward/back along view direction (Ctrl+MMB)
-// ---------------------------------------------------------------------------
-
-void CameraController::OnCameraPush(const CameraPushEvent& e)
+/**
+ * @brief Handles CameraPushEvent — dollies camera along view direction (Ctrl+MMB).
+ */
+void OnCameraPush(const neurus::CameraPushEvent& e)
 {
-	Camera& camera = *e.cam;
+	neurus::Camera& camera = *e.cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -132,23 +141,20 @@ void CameraController::OnCameraPush(const CameraPushEvent& e)
 	dir /= len;
 
 	// Positive mouse_delta_y = move forward (toward target)
-	// Speed = 1.0f (Editor scales deltas before enqueuing)
 	const float dollyAmount = e.mouse_delta_y * kDollySensitivity;
 	const glm::vec3 offset = dir * dollyAmount;
 
 	camera.SetCamPos(pos + offset);
-	// Target stays fixed — Dolly moves only camera along view axis
 
 	NotifyCameraChanged(camera);
 }
 
-// ---------------------------------------------------------------------------
-// OnCameraSlide — pan camera parallel to view plane (Shift+MMB)
-// ---------------------------------------------------------------------------
-
-void CameraController::OnCameraSlide(const CameraSlideEvent& e)
+/**
+ * @brief Handles CameraSlideEvent — pans camera parallel to view plane (Shift+MMB).
+ */
+void OnCameraSlide(const neurus::CameraSlideEvent& e)
 {
-	Camera& camera = *e.cam;
+	neurus::Camera& camera = *e.cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -173,7 +179,6 @@ void CameraController::OnCameraSlide(const CameraSlideEvent& e)
 	const glm::vec3 up = glm::cross(right, forward);
 
 	// Compute translation: horizontal mouse = right, vertical mouse = up
-	// Speed = 1.0f (Editor scales deltas before enqueuing)
 	const glm::vec3 delta = e.mouse_delta_x * kPanSensitivity * right
 	                        + e.mouse_delta_y * kPanSensitivity * up;
 
@@ -181,6 +186,33 @@ void CameraController::OnCameraSlide(const CameraSlideEvent& e)
 	camera.SetTarPos(target + delta);
 
 	NotifyCameraChanged(camera);
+}
+
+/**
+ * @brief Handles CameraResizeEvent — updates camera aspect ratio on viewport resize.
+ */
+void OnCameraResize(const neurus::CameraResizeEvent& e)
+{
+	neurus::Camera& camera = *e.cam;
+	camera.ChangeCamRatio(static_cast<float>(e.width), static_cast<float>(e.height));
+	NotifyCameraChanged(camera);
+}
+
+} // anonymous namespace
+
+namespace neurus {
+
+// ---------------------------------------------------------------------------
+// Init — subscribe to camera events
+// ---------------------------------------------------------------------------
+
+void CameraController::Init(EventQueue& bus)
+{
+	bus.subscribe<CameraZoomEvent>([](const CameraZoomEvent& e) { OnCameraZoom(e); });
+	bus.subscribe<CameraRotateEvent>([](const CameraRotateEvent& e) { OnCameraRotate(e); });
+	bus.subscribe<CameraPushEvent>([](const CameraPushEvent& e) { OnCameraPush(e); });
+	bus.subscribe<CameraSlideEvent>([](const CameraSlideEvent& e) { OnCameraSlide(e); });
+	bus.subscribe<CameraResizeEvent>([](const CameraResizeEvent& e) { OnCameraResize(e); });
 }
 
 } // namespace neurus

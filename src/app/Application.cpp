@@ -33,7 +33,7 @@
 #include "render/Screenshot.h"
 #include "render/Texture.h"
 #include "render/shaders/ShaderLibrary.h"
-#include "project/Project.h"
+#include "asset/Project.h"
 #include "scene/Scene.h"
 #include "ui/NeurusMainWindow.h"
 #include "ui/VulkanWidget.h"
@@ -76,6 +76,7 @@ Application::Application(int argc, char* argv[])
 	// --- Qt Application ---
 	app_qtApp = std::make_unique<QApplication>(argc, argv);
 	app_renderTimer = std::make_unique<QTimer>();
+	app_renderTimer->setInterval(16);  // ~60 FPS
 	app_qtApp->setApplicationName("Neurus");
 	app_qtApp->setApplicationVersion("0.1.0");
 }
@@ -112,8 +113,6 @@ int Application::Run()
 
 	InitEditor(std::move(project));
 
-	// Wire scene to Property Editor for object property display
-	app_mainWindow->SetScene(&app_editor->GetScene());
 	app_mainWindow->show();
 	ResizeViewport(app_mainWindow->getViewportWidth(), app_mainWindow->getViewportHeight());
 
@@ -123,9 +122,9 @@ int Application::Run()
 	app_editor->UploadSceneResources();
 
 	WireSignals();
-	StartRenderLoop();
 
 	NEURUS_LOG("[Application] Entering event loop");
+	app_renderTimer->start();
 	int result = app_qtApp->exec();
 	return result;
 }
@@ -198,25 +197,6 @@ std::unique_ptr<project::Project> Application::LoadProject()
 		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
 	}
 
-	auto& scene = project->GetScene();
-
-	// Load BAKED.png texture (for future albedo sampling; not yet wired to gbuffer.frag)
-	{
-		const QString texPath = resolveResourcePath("tex/BAKED.png");
-		auto bakedTex = neurus::Texture::FromFile(
-			app_vkContext->device(),
-			app_vkContext->physicalDevice(),
-			app_vkContext->graphicsQueue(),
-			app_vkContext->graphicsQueueFamily(),
-			texPath.toStdString().c_str(),
-			vk::Format::eR8G8B8A8Srgb);
-
-		if (!bakedTex.IsValid())
-		{
-			std::cerr << "Warning: Failed to load texture: " << texPath.toStdString() << "\n";
-		}
-	}
-
 	// GPU resources created lazily by RenderCache on first use
 	return project;
 }
@@ -258,7 +238,7 @@ bool Application::InitRenderer(const project::Project& project)
 void Application::ResizeViewport(int width, int height)
 {
 	app_renderer->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-	app_editor->GetProject().GetScene().GetActiveCamera()->ChangeCamRatio(width, height);
+	app_editor->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
 
 // =========================================================================
@@ -290,8 +270,7 @@ void Application::WireSignals()
 	                     {
 	                         Input::UpdateState();
 	                         app_editor->Edit(Input::GetInputState());
-	                         try { app_renderer->DrawFrame(app_editor->GetScene()); }
-	                         catch (const std::exception& e) { NEURUS_ERR("DrawFrame failed: " << e.what()); }
+	                         app_renderer->DrawFrame(app_editor->GetScene());
 	                     }
 	                 });
 
@@ -325,20 +304,10 @@ void Application::WireSignals()
 	                             app_renderer->GetExtent(), 1024);
 	                     }
 	                 });
-}
 
-// =========================================================================
-// StartRenderLoop – timer-driven ~60 FPS render loop
-// =========================================================================
-
-void Application::StartRenderLoop()
-{
-	app_renderTimer->setInterval(16);  // ~60 FPS
-	auto& uiEvents = neurus::UIEvents::instance();
+	// StartRenderLoop – timer-driven ~60 FPS render loop
 	QObject::connect(app_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
 		emit uiEvents.newFrame();
 	});
-	app_renderTimer->start();
 }
-
 } // namespace neurus

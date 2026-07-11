@@ -9,7 +9,7 @@
 
 #include "app/VulkanContext.h"
 #include "editor/Editor.h"
-#include "project/Project.h"
+#include "asset/Project.h"
 #include "render/DeferredRenderer.h"
 #include "render/Screenshot.h"
 #include "ui/NeurusMainWindow.h"
@@ -61,7 +61,6 @@ private:
 	void InitEditor(std::unique_ptr<project::Project> project);
 	void ResizeViewport(int width, int height);
 	void WireSignals();
-	void StartRenderLoop();
 
 	// --- Qt infrastructure (destroyed after GPU stack) ---
 	std::unique_ptr<QApplication>         app_qtApp;

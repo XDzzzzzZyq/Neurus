@@ -13,7 +13,7 @@
 
 #include <cstdio>   // std::remove
 
-#include "project/Project.h"
+#include "asset/Project.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"

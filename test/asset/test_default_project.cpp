@@ -13,7 +13,7 @@
 
 #include <string>
 
-#include "project/Project.h"
+#include "asset/Project.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
 #include "scene/Light.h"
