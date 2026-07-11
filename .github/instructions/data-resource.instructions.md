@@ -24,10 +24,12 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 - `src/render/buffers/UniformBuffer.h` - Template uniform buffer (UniformBuffer<T>) for host-visible struct upload
 - `src/render/buffers/VertexBuffer.h/cpp` - Vertex buffer (VertexBuffer, inherits GPUBuffer)
 - `src/render/buffers/IndexBuffer.h/cpp` - Index buffer (IndexBuffer, inherits GPUBuffer)
-- `src/render/Image.h/cpp` - GPU image with ImageState tracking, FromImageData factory, mipmap gen
-- `src/render/Barrier.h/cpp` - Centralized image barrier: ImageState → Vulkan layout/stage/access
+- `src/render/Image.h/cpp` - GPU image with ImageState tracking (including Invalid), FromImageData factory (returns shared_ptr), mipmap gen
+- `src/render/Barrier.h/cpp` - Centralized image barrier: ImageState → Vulkan layout/stage/access (maps Invalid → Undefined)
 - `src/render/Texture.h/cpp` - Texture resource (combines Image + sampler + descriptor)
 - `src/render/DescriptorManager.h/cpp` - Descriptor pool/set lifecycle management
+- `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
+- `src/render/resources/LightingGPU.h/cpp` - GPU-side light SSBO storage (point + sun, push constants)
 
 ## Core Responsibilities
 
@@ -108,11 +110,13 @@ All image layout transitions go through `Barrier::Transition()`.
 - PNG/HDR image decoding via ImageData (owns pixel data, member SavePNG/SaveHDR)
 - `PixelFormat` enum for CPU-side format queries (PixelByteSize, ChannelCount, IsSRGB, IsHDR) -- zero Vulkan includes
 - Buffer hierarchy (Buffer, StagingBuffer, GPUBuffer, UniformBuffer<T>) for vertex, index, uniform, and storage buffers
-- Image for GPU image allocation with ImageState tracking and Barrier::Transition for layout changes
+- Image for GPU image allocation with ImageState tracking (including Invalid) and Barrier::Transition for layout changes; FromImageData returns shared_ptr<Image>
 - Texture class combining image + sampler + descriptor
-- Barrier for centralized image barrier management (ImageState → Vulkan layout/stage/access)
+- Barrier for centralized image barrier management (ImageState → Vulkan layout/stage/access, maps Invalid → Undefined)
 - DescriptorManager with per-frame descriptor pool rotation
-- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`), and cross-frame GPU resources for meshes (`MeshGPU` via `GetMeshGPU()`) and environments (`EnvironmentGPU` via `CreateEnvironmentGPU()`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
+- UploadManager for CPU-to-GPU uploads (meshes, lights, environments, IBL cubemaps)
+- LightingGPU for point/sun light SSBO management (owned by RenderCache)
+- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`), cross-frame GPU resources for meshes (`MeshGPU` via `GetMeshGPU()`) and environments (`EnvironmentGPU` via `CreateEnvironmentGPU()`), and LightingGPU for light SSBOs (`InitLightingGPU()`, `GetLightingGPU()`, `UpdateLighting(variantDict)`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
 
 ## Future Enhancements
 

@@ -161,19 +161,25 @@ Neurus/
 │   │   ├── Barrier.h/cpp            # Centralized image barrier management
 │   │   ├── DeferredRenderer.h/cpp   # Deferred PBR pipeline (active renderer)
 │   │   ├── Image.h/cpp              # GPU image with state tracking (ImageState)
-│   │   ├── resources/MeshGPU.h       # GPU-side mesh resources (owned by RenderCache)
+│   │   ├── RenderCache.h/cpp        # Cross-frame mutable resource pool
+│   │   ├── RenderConfig.h           # User-settable pipeline options
+│   │   ├── RenderContext.h          # Per-frame immutable scene snapshot
 │   │   ├── ShaderProgram.h/cpp
 │   │   ├── Swapchain.h/cpp
+│   │   ├── UploadManager.h/cpp      # CPU-to-GPU upload service
 │   │   ├── VulkanContext.h/cpp
-│   │   └── passes/          # Render passes
-│   │       ├── RenderCache.h/cpp     # Cross-frame mutable resource pool
-│   │       ├── RenderContext.h       # Per-frame immutable scene snapshot
-│   │       ├── SyncObjects.h/cpp     # Fence, Semaphore, FrameSync, BufferBarrier
-│   │       ├── GeometryPass.h/cpp
-│   │       ├── SSAOPass.h/cpp
-│   │       ├── LightingPass.h/cpp
-│   │       ├── IBLPass.h/cpp
-│   │       └── ShadowDepthPass.h/cpp
+│   │   ├── resources/        # GPU resource structs (owned by RenderCache)
+│   │   │   ├── EnvironmentGPU.h     # IBL cubemap Textures
+│   │   │   ├── LightGPU.h           # Per-light shadow resources
+│   │   │   ├── LightingGPU.h/cpp    # Light SSBO storage (point + sun)
+│   │   │   └── MeshGPU.h           # GPU-side mesh + MeshPushConstants
+│   │   ├── passes/          # Render passes
+│   │   │   ├── GeometryPass.h/cpp
+│   │   │   ├── SSAOPass.h/cpp
+│   │   │   ├── LightingPass.h/cpp
+│   │   │   ├── IBLPass.h/cpp
+│   │   │   ├── ShadowDepthPass.h/cpp
+│   │   │   └── ShadowIntensityPass.h/cpp
 │   │   └── buffers/          # Buffer class hierarchy
 │   │       ├── Buffer.h/cpp         # Virtual base class (Buffer)
 │   │       ├── StagingBuffer.h/cpp  # Host-visible staging

@@ -18,6 +18,7 @@ Responsibilities:
 - Find graphics queue family
 - Create `vk::raii::Device` + `vk::Queue`
 - Create `vk::raii::CommandPool` + one-shot command buffers
+- Own shared `UploadManager` (`m_uploadManager`) for mesh/light/environment uploads
 - Provide helpers: `BeginCmd()`, `EndSubmitWait(cmd)`, `ResolveAssetPath()`
 
 ```cpp
@@ -34,6 +35,7 @@ protected:
     std::unique_ptr<vk::raii::Device> m_device;
     vk::Queue m_queue = nullptr;
     uint32_t m_graphicsQueueFamily = 0;
+    std::unique_ptr<UploadManager> m_uploadManager;  // Shared upload service
     // ... (full state in header)
 };
 ```

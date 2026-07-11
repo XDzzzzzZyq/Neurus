@@ -54,6 +54,7 @@ are shared across layers.
 - Centralized image barrier management via `Barrier::Transition` (ImageState → Vulkan layout/stage/access)
 - Owns `MeshGPU` (GPU-side mesh resources: VertexBuffer + IndexBuffer) via `RenderCache::GetMeshGPU()`
 - Owns `EnvironmentGPU` (GPU-side IBL resources: diffuse + specular cubemap Textures) via `RenderCache::CreateEnvironmentGPU()`
+- Owns `LightingGPU` (light SSBOs: point + sun) via `RenderCache::InitLightingGPU()` / `GetLightingGPU()`
 - Must NOT mutate application state
 - Must NOT depend on Editor or UI layers
 
@@ -132,6 +133,7 @@ Renderer Layer owns:
    Barrier::Transition (centralized layout transitions, ImageState → Vulkan mapping)
    MeshGPU (GPU-side mesh resources: VertexBuffer + IndexBuffer, owned by RenderCache)
    EnvironmentGPU (GPU-side IBL resources: diffuse + specular cubemap Textures, owned by RenderCache)
+   LightingGPU (GPU-side light SSBOs: point + sun light, owned by RenderCache)
 ```
 
 Scene and Asset layers own NO GPU resources. `Mesh::UploadToGPU()` delegates to

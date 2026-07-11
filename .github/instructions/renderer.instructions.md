@@ -9,13 +9,17 @@ renders frames. It must remain stateless with respect to application logic.
 
 - `src/render/VulkanContext.h` - Instance, physical device, logical device, queues
 - `src/render/Swapchain.h` - Swapchain creation, image acquisition, presentation, recreation
-- `src/render/Image.h/cpp` - GPU image with ImageState tracking and mipmap generation
+- `src/render/Image.h/cpp` - GPU image with ImageState tracking (including Invalid) and mipmap generation
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
-- `src/render/MeshGPU.h` - GPU-side mesh resources (VertexBuffer + IndexBuffer), owned by RenderCache
-- `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, attachments, shadow maps
+- `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
+- `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
 - `src/render/Texture.h/cpp` - Texture resource (Image + sampler + descriptor)
+- `src/render/resources/LightingGPU.h/cpp` - GPU-side light SSBO storage (point + sun, push constants)
+- `src/render/resources/MeshGPU.h` - GPU-side mesh resources (VertexBuffer + IndexBuffer) + MeshPushConstants
+- `src/render/resources/EnvironmentGPU.h` - GPU-side IBL resources (diffuse + specular cubemap Textures)
+- `src/render/resources/LightGPU.h` - Per-light shadow GPU resources (shadow depth cubemap/map)
 
 ## Core Responsibilities
 
@@ -149,10 +153,10 @@ ShadowIntensityPass (compute: per-light shadow eval → layered R8_UNORM 2D_ARRA
     └── Sun light:   sampler2D depth comparison, ortho PCF, NDC Z in [0,1]
     │
     ▼
-LightingPass (compute: reads G-Buffer + AO + shadow intensity array, dual SSBO,
-              writes HDRColor)
-    ├── Binding 5: PointLight SSBO
-    └── Binding 6: SunLight SSBO
+LightingPass (compute: reads G-Buffer + AO + shadow intensity array,
+              reads LightingGPU SSBOs from RenderCache, writes HDRColor)
+    ├── Binding 5: PointLight SSBO (from RenderCache::GetLightingGPU())
+    └── Binding 6: SunLight SSBO   (from RenderCache::GetLightingGPU())
     │
     ▼
 IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
@@ -183,6 +187,17 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - Raw `vk::ImageMemoryBarrier2` is acceptable **only** for:
   - Raw `VkImage` handles not wrapped in `Image` (e.g. swapchain images)
   - Same-layout memory barriers (`eGeneral → eGeneral`) within compute passes
+
+### ImageState::Invalid Convention
+
+- `ImageState::Invalid` signals an image whose GPU creation failed (e.g.
+  missing source data, unsupported format). The image has no valid GPU resources.
+- `Barrier::Transition` maps `Invalid` → `Undefined` layout (safe no-op barrier).
+- `Image::FromImageData()` returns `std::shared_ptr<Image>` — on failure, returns
+  a shared_ptr containing an empty Image with `ImageState::Invalid`.
+- Callers should check `image.State() != ImageState::Invalid` before using the image.
+- Default-constructed `Image` is empty (all handles null, `Undefined` state);
+  factory functions set `Invalid` explicitly on failure.
 
 ### SSAO Convention
 - **AO value**: 1.0 = fully occluded (black), 0.0 = no occlusion (lit)
@@ -238,13 +253,28 @@ These resources separate GPU ownership from the Vulkan-free scene and asset laye
 - Scene `Mesh` objects call `RenderCache::GetMeshGPU()` through `Mesh::UploadToGPU()`;
   the scene layer never owns GPU buffers directly
 
-**EnvironmentGPU** (`src/render/RenderCache.h`)
+**EnvironmentGPU** (`src/render/resources/EnvironmentGPU.h`)
 - Holds diffuse irradiance and specular prefiltered cubemap `Texture` objects
   (each wraps `Image` + sampler + descriptor)
 - Created lazily via `RenderCache::CreateEnvironmentGPU(envId, device, pd, queue, qfi, env)`
   from an `Environment` scene object
 - Read per-frame by `LightingPass` via `RenderCache::GetEnvironmentGPU(envId)`
 - Destroyed via `RenderCache::RemoveEnvironmentGPU(envId)`
+
+**LightingGPU** (`src/render/resources/LightingGPU.h`)
+- Manages point light and sun light SSBOs (device-local GPUBuffers)
+- Created by `RenderCache` via `InitLightingGPU(queue, qfi)` (separated from constructor
+  so queue/qfi don't need to be stored as members)
+- Updated via `RenderCache::UpdateLighting(variantDict)` — accepts a map of
+  `variant<PointLightStruct, SunLightStruct>` keyed by light UID
+- `RenderCache::GetLightingGPU()` returns the LightingGPU for per-frame SSBO binding
+  by `LightingPass`
+- Also defines `PointLightStruct`, `SunLightStruct` (std140-compatible, 48 bytes),
+  and `LightingPushConstants` (176 bytes) — byte-for-byte matches with GLSL shaders
+
+**MeshPushConstants** (`src/render/resources/MeshGPU.h`)
+- Per-mesh push-constant block sent to the vertex shader (128 bytes total)
+- Two mat4s: `model` (local-to-world transform) and `normalMatrix`
 
 **GeometryRenderItem** (removed)
 - Previously mixed CPU (MeshData) and GPU (VertexBuffer, IndexBuffer) concerns in one struct
