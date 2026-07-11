@@ -1,22 +1,20 @@
 #pragma once
 
+#include <QApplication>
+#include <QTimer>
+
+#include <vulkan/vulkan_raii.hpp>
+
 #include <memory>
 
-class QApplication;
-class QTimer;
-
-// Forward declarations
-namespace vk::raii { class SurfaceKHR; }
+#include "app/VulkanContext.h"
+#include "editor/Editor.h"
+#include "project/Project.h"
+#include "render/DeferredRenderer.h"
+#include "render/Screenshot.h"
+#include "ui/NeurusMainWindow.h"
 
 namespace neurus {
-
-class VulkanContext;
-class Screenshot;
-class DeferredRenderer;
-class Editor;
-class NeurusMainWindow;
-
-namespace project { class Project; }
 
 /**
  * @brief Application lifecycle manager – fully RAII.

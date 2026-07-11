@@ -91,16 +91,4 @@ ApplicationWindow {
         }
     }
 
-    // --- Render Loop Timer ---
-    Timer {
-        id: renderTimer
-        interval: 16  // ~60 FPS
-        running: true
-        repeat: true
-        onTriggered: {
-            if (EventBus) {
-                EventBus.newFrame();
-            }
-        }
-    }
 }
