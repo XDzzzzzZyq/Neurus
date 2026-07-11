@@ -27,12 +27,14 @@ const float INV_2PI = 1.0 / (2.0 * PI);
 const float INV_PI  = 1.0 / PI;
 
 // ---------------------------------------------------------------------------
-// Convert direction vector to equirectangular UV [0,1]
+// Convert direction vector to equirectangular UV [0,1] (Z-up: +Z=up, +Y=forward)
+// Note: Z negated because the view matrix from glm::lookAt produces
+// view-space +Y = world +Z, but the camera forward maps to -Z in view space.
 // ---------------------------------------------------------------------------
 vec2 genHdrUV(vec3 dir)
 {
-	float longitude = atan(dir.x, dir.z);
-	float latitude  = asin(dir.y);
+	float longitude = atan(dir.x, dir.y);
+	float latitude  = asin(-dir.z);
 	return vec2(longitude * INV_2PI, latitude * INV_PI) + 0.5;
 }
 

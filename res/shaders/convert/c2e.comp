@@ -26,14 +26,15 @@ void main()
 
 	vec2 uv = (vec2(gid) + 0.5) / vec2(imgSize);
 
-	// Convert UV to direction
+	// Convert UV to direction (Z-up: +Z=up, +Y=forward)
+	// Note: Z negated to match genHdrUV's asin(-dir.z)
 	float longitude = (uv.x - 0.5) * 2.0 * PI;
 	float latitude  = (uv.y - 0.5) * PI;
 
 	vec3 dir;
 	dir.x = cos(latitude) * sin(longitude);
-	dir.y = sin(latitude);
-	dir.z = cos(latitude) * cos(longitude);
+	dir.y = cos(latitude) * cos(longitude);
+	dir.z = -sin(latitude);
 
 	vec4 color = texture(u_CubeInput, dir);
 
