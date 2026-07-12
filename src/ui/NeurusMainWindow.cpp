@@ -1,6 +1,7 @@
 #include "NeurusMainWindow.h"
 #include "OutlinerPanel.h"
 #include "PropertyEditor.h"
+#include "RenderConfigPanel.h"
 #include "Viewport.h"
 
 #include "editor/events/UIEvents.h"
@@ -233,10 +234,12 @@ void NeurusMainWindow::CreateDocks()
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
 
 	// --- Right: Render Config ---
+	auto* renderConfigPanel = new RenderConfigPanel(nullptr);
+	win_renderConfigPanel = renderConfigPanel;
 	auto* configDock = new ads::CDockWidget(win_dockManager, "Render Config");
-	configDock->setWidget(makePlaceholder("Render Config"));
-	configDock->resize(280, 300);
-	configDock->setMinimumSize(200, 200);
+	configDock->setWidget(renderConfigPanel, ads::CDockWidget::ForceNoScrollArea);
+	configDock->resize(280, 400);
+	configDock->setMinimumSize(220, 300);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
 
 	// --- Bottom: Texture Viewer ---

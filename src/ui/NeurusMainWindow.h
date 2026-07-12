@@ -44,6 +44,9 @@ public:
     /** @brief Returns the PropertyEditor for signal wiring. */
     class PropertyEditor* getPropertyEditor() const { return win_propertyEditor; }
 
+    /** @brief Returns the RenderConfigPanel for signal wiring. */
+    class RenderConfigPanel* getRenderConfigPanel() const { return win_renderConfigPanel; }
+
 private:
 	void CreateMenus();
 	void CreateDocks();
@@ -55,7 +58,8 @@ private:
     ads::CDockWidget*  win_viewportDock = nullptr;
     Viewport*          win_viewportWidget = nullptr;
     OutlinerPanel*     win_outlinerPanel = nullptr;
-    class PropertyEditor* win_propertyEditor = nullptr;  // Non-owning — Qt parent-child handles cleanup
+    class PropertyEditor* win_propertyEditor = nullptr;       // Non-owning — Qt parent-child handles cleanup
+    class RenderConfigPanel* win_renderConfigPanel = nullptr; // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus

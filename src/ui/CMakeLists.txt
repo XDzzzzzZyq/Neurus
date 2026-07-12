@@ -7,6 +7,8 @@ add_library(neurus_ui STATIC
 	OutlinerPanel.cpp
 	PropertyEditor.h
 	PropertyEditor.cpp
+	RenderConfigPanel.h
+	RenderConfigPanel.cpp
 	Viewport.h
 	Viewport.cpp
 )
