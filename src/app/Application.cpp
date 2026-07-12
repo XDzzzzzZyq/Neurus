@@ -156,13 +156,24 @@ bool Application::InitVulkan()
 		app_surface = std::make_unique<vk::raii::SurfaceKHR>(app_vkContext->instance(), surfaceCreateInfo);
 
 		// Step 4: Create logical device
-		app_vkContext->initDevice(*app_surface);
+		app_vkContext->InitDevice();
 
 		uiEvents.setGpuName(QString::fromStdString(app_vkContext->gpuName()));
 	}
 	catch (const std::exception& e)
 	{
 		NEURUS_ERR("Vulkan initialization failed: " << e.what());
+		return false;
+	}
+
+	try
+	{
+		// Step 5: Validate queue family supports presentation, get queue handle
+		app_vkContext->InitQueue(*app_surface);
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("Queue initialization failed: " << e.what());
 		return false;
 	}
 
@@ -288,24 +299,6 @@ void Application::WireSignals()
 			                 [this](int objectId) {
 			                     app_eventBus.enqueue(neurus::ObjectSelected{objectId});
 			                 });
-		}
-	}
-
-	// --- PropertyEditor selection → EventBus subscriptions ---
-	// Subscribe to ObjectSelected / ObjectDeselected on behalf of PropertyEditor
-	// so that the UI layer remains EventBus-free.
-	{
-		auto* propEditor = app_mainWindow->getPropertyEditor();
-		if (propEditor)
-		{
-			app_eventBus.subscribe<neurus::ObjectSelected>(
-				[propEditor](const neurus::ObjectSelected& e) {
-					propEditor->LoadObject(e.objectId);
-				});
-			app_eventBus.subscribe<neurus::ObjectDeselected>(
-				[propEditor](const neurus::ObjectDeselected& /*e*/) {
-					propEditor->Clear();
-				});
 		}
 	}
 
