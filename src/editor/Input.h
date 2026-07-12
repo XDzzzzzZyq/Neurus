@@ -3,7 +3,7 @@
  * @brief Static input capture system - bridges Qt events to per-frame queryable state.
  *
  * Input provides a unified, double-buffered interface for querying keyboard and
- * mouse state each frame. Qt events (pushed from VulkanWidget) write into a
+ * mouse state each frame. Qt events (pushed from Viewport) write into a
  * *pending* buffer; UpdateState() snapshots pending→current and current→previous,
  * enabling "clicked" / "released" transition detection.
  *
@@ -16,8 +16,8 @@
  *
  * Usage Pattern:
  * @code
- *   // --- VulkanWidget (Qt event dispatch) ---
- *   void VulkanWidget::keyPressEvent(QKeyEvent* e) {
+*   // --- Viewport (Qt event dispatch) ---
+*   void Viewport::keyPressEvent(QKeyEvent* e) {
  *       Input::RecordKeyPress(e->key());
  *       QWidget::keyPressEvent(e);
  *   }
@@ -85,7 +85,7 @@ public:
     };
 
     // -----------------------------------------------------------------------
-    // Recording - called from VulkanWidget Qt event handlers
+    // Recording - called from Viewport Qt event handlers
     // -----------------------------------------------------------------------
 
     /**

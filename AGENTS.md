@@ -201,7 +201,7 @@ Neurus/
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager
 │   │   ├── MainWindow.h/cpp       # (legacy QWindow subclass)
-│   │   ├── VulkanWidget.h/cpp     # (legacy vk::raii widget)
+│   │   ├── Viewport.h/cpp         # (legacy vk::raii widget)
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)

@@ -1,7 +1,7 @@
 #include "NeurusMainWindow.h"
 #include "OutlinerPanel.h"
 #include "PropertyEditor.h"
-#include "VulkanWidget.h"
+#include "Viewport.h"
 
 #include "editor/events/UIEvents.h"
 
@@ -61,7 +61,7 @@ int NeurusMainWindow::getViewportHeight() const
 	return win_viewportWidget ? win_viewportWidget->height() : 0;
 }
 
-VulkanWidget* NeurusMainWindow::getVulkanWidget() const
+Viewport* NeurusMainWindow::getViewport() const
 {
 	return win_viewportWidget;
 }
@@ -194,8 +194,8 @@ static QWidget* makePlaceholder(const QString& text)
 void NeurusMainWindow::CreateDocks()
 {
 	if (!win_viewportWidget){
-		// Create VulkanWidget after docks — CreateDocks() places it as viewport content
-		win_viewportWidget = new VulkanWidget();
+		// Create Viewport after docks — CreateDocks() places it as viewport content
+		win_viewportWidget = new Viewport();
 		win_viewportWidget->resize(800, 600);
 		win_viewportWidget->winId();  // Force native window handle creation
 

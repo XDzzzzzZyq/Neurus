@@ -24,22 +24,22 @@ namespace neurus {
  * @note This class owns no Vulkan resources. It provides the HWND only;
  *       surface creation is the Renderer's responsibility.
  */
-class VulkanWidget : public QWidget
+class Viewport : public QWidget
 {
 	Q_OBJECT
 
 public:
 	/**
-	 * @brief Constructs a VulkanWidget with native window attributes.
+	 * @brief Constructs a Viewport with native window attributes.
 	 * @param parent Optional parent widget.
 	 */
-	explicit VulkanWidget(QWidget* parent = nullptr);
+	explicit Viewport(QWidget* parent = nullptr);
 
 	/** @brief Default destructor. */
-	~VulkanWidget() override;
+	~Viewport() override;
 
-	VulkanWidget(const VulkanWidget&) = delete;
-	VulkanWidget& operator=(const VulkanWidget&) = delete;
+	Viewport(const Viewport&) = delete;
+	Viewport& operator=(const Viewport&) = delete;
 
 	/**
 	 * @brief Returns the native Win32 window handle (HWND).

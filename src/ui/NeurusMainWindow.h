@@ -12,7 +12,7 @@ class CDockWidget;
 
 namespace neurus {
 
-class VulkanWidget;
+class Viewport;
 
 class NeurusMainWindow : public QMainWindow
 {
@@ -22,7 +22,7 @@ public:
 	explicit NeurusMainWindow(QWidget* parent = nullptr);
 	~NeurusMainWindow() override;
 
-	/** @brief Returns the VulkanWidget's native HWND for VkSurface creation. */
+	/** @brief Returns the Viewport's native HWND for VkSurface creation. */
 	HWND getViewportHwnd() const;
 
 	/** @brief Returns viewport widget width in pixels. */
@@ -31,8 +31,8 @@ public:
 	/** @brief Returns viewport widget height in pixels. */
 	int getViewportHeight() const;
 
-	/** @brief Returns non-owning raw pointer to the VulkanWidget (for signal connections). */
-	VulkanWidget* getVulkanWidget() const;
+	/** @brief Returns non-owning raw pointer to the Viewport (for signal connections). */
+	Viewport* getViewport() const;
 
     /** @brief Returns the viewport dock widget (for layout / restoreState). */
     ads::CDockWidget* getViewportDock() const { return win_viewportDock; }
@@ -46,7 +46,7 @@ private:
 
     ads::CDockManager* win_dockManager = nullptr;
     ads::CDockWidget*  win_viewportDock = nullptr;
-    VulkanWidget*      win_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
+    Viewport*          win_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus

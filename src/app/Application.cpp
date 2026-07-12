@@ -6,9 +6,9 @@
  *   1. QApplication - Qt event loop (Widgets)
  *   2. EventBus - singleton cross-layer communication
  *   3. VulkanContext (Phase 1) - VkInstance creation
- *   4. NeurusMainWindow + VulkanWidget - Qt window with dockable Viewport
+ *   4. NeurusMainWindow + Viewport - Qt window with dockable Viewport
  *   5. Show main window - apply layout so widget has final size
- *   6. VkSurfaceKHR - created from VulkanWidget's native HWND
+ *   6. VkSurfaceKHR - created from Viewport's native HWND
  *   7. VulkanContext (Phase 2) - logical device + queue selection
  *   8. Project::Open/Project::CreateDefault - load or create project scene + load BAKED.png texture
  *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
@@ -36,7 +36,7 @@
 #include "asset/Project.h"
 #include "scene/Scene.h"
 #include "ui/NeurusMainWindow.h"
-#include "ui/VulkanWidget.h"
+#include "ui/Viewport.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -143,11 +143,11 @@ bool Application::InitVulkan()
 		auto vkInstance = neurus::VulkanContext::CreateInstance();
 		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
-		// Step 2: Create Qt window with VulkanWidget
+		// Step 2: Create Qt window with Viewport
 		app_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
-		// VulkanWidget is created internally by NeurusMainWindow constructor
+		// Viewport is created internally by NeurusMainWindow constructor
 
-		// Step 3: Create VkSurfaceKHR from VulkanWidget's native HWND
+		// Step 3: Create VkSurfaceKHR from Viewport's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
 		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, app_mainWindow->getViewportHwnd());
 		app_surface = std::make_unique<vk::raii::SurfaceKHR>(app_vkContext->instance(), surfaceCreateInfo);
@@ -274,10 +274,10 @@ void Application::WireSignals()
 	                     }
 	                 });
 
-	// Handle VulkanWidget resize - proactively recreate swapchain so the
+	// Handle Viewport resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
-	QObject::connect(app_mainWindow->getVulkanWidget(), &neurus::VulkanWidget::resized,
+	QObject::connect(app_mainWindow->getViewport(), &neurus::Viewport::resized,
 	                 [this](int width, int height) {
 	                     ResizeViewport(width, height);
 	                 });

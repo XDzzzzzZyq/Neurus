@@ -1,4 +1,4 @@
-#include "VulkanWidget.h"
+#include "Viewport.h"
 
 #include "core/Log.h"
 #include "editor/Input.h"
@@ -12,7 +12,7 @@
 
 namespace neurus {
 
-VulkanWidget::VulkanWidget(QWidget* parent)
+Viewport::Viewport(QWidget* parent)
 	: QWidget(parent)
 {
 	// Ensure a dedicated native window handle exists for Vulkan surface creation
@@ -30,15 +30,15 @@ VulkanWidget::VulkanWidget(QWidget* parent)
 	setMouseTracking(true);
 }
 
-VulkanWidget::~VulkanWidget() = default;
+Viewport::~Viewport() = default;
 
-void VulkanWidget::paintEvent(QPaintEvent* /*event*/)
+void Viewport::paintEvent(QPaintEvent* /*event*/)
 {
 	// No-op: all rendering is handled by Vulkan. This override prevents
 	// Qt from drawing a default widget background behind the Vulkan content.
 }
 
-void VulkanWidget::resizeEvent(QResizeEvent* event)
+void Viewport::resizeEvent(QResizeEvent* event)
 {
 	// Emit the resized signal with the new dimensions so the Renderer
 	// can recreate the swapchain at the correct size.
@@ -48,7 +48,7 @@ void VulkanWidget::resizeEvent(QResizeEvent* event)
 	QWidget::resizeEvent(event);
 }
 
-void VulkanWidget::keyPressEvent(QKeyEvent* event)
+void Viewport::keyPressEvent(QKeyEvent* event)
 {
 	// Forward all key presses to the Input system for per-frame querying
 	Input::RecordKeyPress(event->key());
@@ -75,20 +75,20 @@ void VulkanWidget::keyPressEvent(QKeyEvent* event)
 	QWidget::keyPressEvent(event);
 }
 
-void VulkanWidget::keyReleaseEvent(QKeyEvent* event)
+void Viewport::keyReleaseEvent(QKeyEvent* event)
 {
 	Input::RecordKeyRelease(event->key());
 	QWidget::keyReleaseEvent(event);
 }
 
-void VulkanWidget::mouseMoveEvent(QMouseEvent* event)
+void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
 	const QPointF pos = event->position();
 	Input::RecordMouseMove(static_cast<float>(pos.x()), static_cast<float>(pos.y()));
 	QWidget::mouseMoveEvent(event);
 }
 
-void VulkanWidget::mousePressEvent(QMouseEvent* event)
+void Viewport::mousePressEvent(QMouseEvent* event)
 {
 	const auto button = event->button();
 	if (button == Qt::LeftButton)
@@ -101,7 +101,7 @@ void VulkanWidget::mousePressEvent(QMouseEvent* event)
 	QWidget::mousePressEvent(event);
 }
 
-void VulkanWidget::mouseReleaseEvent(QMouseEvent* event)
+void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
 	const auto button = event->button();
 	if (button == Qt::LeftButton)
@@ -114,7 +114,7 @@ void VulkanWidget::mouseReleaseEvent(QMouseEvent* event)
 	QWidget::mouseReleaseEvent(event);
 }
 
-void VulkanWidget::wheelEvent(QWheelEvent* event)
+void Viewport::wheelEvent(QWheelEvent* event)
 {
 	// angleDelta().y() is typically ±120 per notch → divide by 120 for
 	// notches, then by 8 for the common "lines per notch" factor ≈ ±1.
