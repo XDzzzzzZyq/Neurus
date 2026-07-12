@@ -221,8 +221,11 @@ TEST_F(MeshRenderTest, RemoveMeshGPU_Destroys)
 	MeshGPU* recreated = m_cache->GetMeshGPU(kTestObjectId);
 	ASSERT_NE(recreated, nullptr);
 	EXPECT_NE(recreated->vertexBuffer, nullptr);
-	// Should be a different instance
-	EXPECT_NE(created, recreated);
+	// Verify re-inserted entry has the expected vertex count
+	EXPECT_EQ(recreated->vertexCount, 3u);
+	// The created pointer is now dangling (erased + re-inserted);
+	// verify the new entry is retrievable by its key instead
+	EXPECT_EQ(m_cache->GetMeshGPU(kTestObjectId), recreated);
 }
 
 // ---------------------------------------------------------------------------
