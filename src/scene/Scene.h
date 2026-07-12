@@ -35,6 +35,7 @@
 #include <cereal/types/unordered_map.hpp>
 
 #include "UID.h"
+#include "core/Selections.h"
 
 #include "Camera.h"
 #include "DebugLine.h"
@@ -145,7 +146,7 @@ public:
 	{
 		ar(CEREAL_NVP(cam_list), CEREAL_NVP(mesh_list), CEREAL_NVP(light_list),
 		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list),
-		   CEREAL_NVP(env_list));
+		   CEREAL_NVP(env_list), CEREAL_NVP(selections));
 	}
 
 	// -------------------------------------------------------------------
@@ -192,6 +193,9 @@ public:
 	ResPool<DebugLine>   dLine_list;    ///< Debug line primitives
 	ResPool<DebugPoints> dPoints_list;  ///< Debug point primitives
 	ResPool<Environment> env_list;      ///< Environment objects (IBL)
+
+	/// Selection state for scene objects (serialized via cereal).
+	Selections<ObjectID> selections;
 
 	// -------------------------------------------------------------------
 	// Registration - store in both type-specific pool AND obj_list

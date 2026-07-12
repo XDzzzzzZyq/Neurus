@@ -32,8 +32,8 @@
                                         "z": 1.0
                                     }
                                 },
-                                "cam_w": 1.0,
-                                "cam_h": 1.0,
+                                "cam_w": 1144.0,
+                                "cam_h": 679.0,
                                 "cam_pers": 60.0,
                                 "cam_near": 0.10000000149011612,
                                 "cam_far": 100.0,
@@ -202,13 +202,13 @@
                                 "light_type": 0,
                                 "light_power": 10.0,
                                 "light_color": {
-                                    "x": 0.3,
-                                    "y": 0.3,
+                                    "x": 0.30000001192092898,
+                                    "y": 0.30000001192092898,
                                     "z": 1.0
                                 },
-                                "light_radius": 0.05,
-                                "spot_cutoff": 0.9,
-                                "spot_outer_cutoff": 0.8,
+                                "light_radius": 0.05000000074505806,
+                                "spot_cutoff": 0.8999999761581421,
+                                "spot_outer_cutoff": 0.800000011920929,
                                 "area_ratio": 1.0
                             }
                         }
@@ -248,13 +248,13 @@
                                 "light_type": 0,
                                 "light_power": 10.0,
                                 "light_color": {
-                                    "x": 0.3,
+                                    "x": 0.30000001192092898,
                                     "y": 1.0,
-                                    "z": 0.3
+                                    "z": 0.30000001192092898
                                 },
-                                "light_radius": 0.05,
-                                "spot_cutoff": 0.9,
-                                "spot_outer_cutoff": 0.8,
+                                "light_radius": 0.05000000074505806,
+                                "spot_cutoff": 0.8999999761581421,
+                                "spot_outer_cutoff": 0.800000011920929,
                                 "area_ratio": 1.0
                             }
                         }
@@ -280,7 +280,7 @@
                                         "z": 10.0
                                     },
                                     "m_rotation": {
-                                        "x": -90,
+                                        "x": -90.0,
                                         "y": 0.0,
                                         "z": 0.0
                                     },
@@ -295,12 +295,12 @@
                                 "light_power": 0.5,
                                 "light_color": {
                                     "x": 1.0,
-                                    "y": 0.3,
-                                    "z": 0.3
+                                    "y": 0.30000001192092898,
+                                    "z": 0.30000001192092898
                                 },
-                                "light_radius": 0.05,
-                                "spot_cutoff": 0.9,
-                                "spot_outer_cutoff": 0.8,
+                                "light_radius": 0.05000000074505806,
+                                "spot_cutoff": 0.8999999761581421,
+                                "spot_outer_cutoff": 0.800000011920929,
                                 "area_ratio": 1.0
                             }
                         }
@@ -310,7 +310,21 @@
             "sprite_list": [],
             "dLine_list": [],
             "dPoints_list": [],
-            "env_list": []
+            "env_list": [],
+            "selections": {
+                "selectedIds": []
+            }
+        },
+        "proj_config": {
+            "r_pipeline": 1,
+            "r_aa": 0,
+            "r_ao": 1,
+            "r_shadow": 1,
+            "r_ssr": 0,
+            "r_gamma": 1.0,
+            "r_ao_ksize": 16,
+            "r_ao_radius": 0.5,
+            "r_sample_pf": 128
         }
     }
 }

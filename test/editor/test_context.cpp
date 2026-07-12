@@ -193,11 +193,11 @@ TEST_F(EditorContextRefactoredTest, DirtyTracking_MarkAndClear)
 	EXPECT_FALSE(m_editor->IsDirty());
 }
 
-TEST_F(EditorContextRefactoredTest, SelectionManager_InitiallyEmpty)
+TEST_F(EditorContextRefactoredTest, Selections_InitiallyEmpty)
 {
-	EXPECT_EQ(m_editor->selections.GetActiveObject(), nullptr);
-	EXPECT_EQ(m_editor->selections.GetSelectedObjects(), nullptr);
-	EXPECT_EQ(m_editor->selections.GetSelectionCount(), 0u);
+	EXPECT_EQ(m_editor->selections->GetActiveObject(), nullptr);
+	EXPECT_EQ(m_editor->selections->GetSelectedObjects(), nullptr);
+	EXPECT_EQ(m_editor->selections->GetSelectionCount(), 0u);
 }
 
 TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventQueue)

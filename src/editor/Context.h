@@ -17,7 +17,7 @@
 #include <QObject>
 #include <vector>
 
-#include "SelectionManager.h"
+#include "core/Selections.h"
 
 namespace neurus {
 
@@ -127,9 +127,15 @@ public:
 	 */
 	const Scene* activeScene() const;
 
-	// --- Selection state ---
+	// --- Selection state (delegated to Scene::selections) ---
 
-	SelectionManager<ObjectID> selections; ///< Currently selected objects
+	/**
+	 * @brief Pointer to active selection state.
+	 *
+	 * Points to Scene::selections when a scene is set, or to
+	 * m_fallbackSelections when no scene is active.
+	 */
+	Selections<ObjectID>* selections;
 
 	// --- Dirty tracking ---
 
@@ -153,6 +159,7 @@ private:
 	friend class Context;
 	SceneContext* ctx_sceneCtx = nullptr; ///< Back-pointer to owning Context's SceneContext
 	bool ctx_dirty = false;               ///< Unsaved editor modifications flag
+	Selections<ObjectID> m_fallbackSelections; ///< Fallback when no Scene is set
 };
 
 // ===========================================================================

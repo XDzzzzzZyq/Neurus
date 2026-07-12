@@ -7,7 +7,6 @@ add_library(neurus_editor STATIC
 	Input.cpp
 	Context.h
 	Context.cpp
-	SelectionManager.h
 	SelectionController.h
 	SelectionController.cpp
 	controllers/Controllers.h

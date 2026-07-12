@@ -57,6 +57,7 @@ std::vector<const ObjectID*> SceneContext::GetObjectIDs() const
 
 EditorContext::EditorContext(QObject* parent)
 	: QObject(parent)
+	, selections(&m_fallbackSelections)
 {
 }
 
@@ -65,6 +66,7 @@ void EditorContext::SetScene(Scene* scene)
 	if (ctx_sceneCtx)
 	{
 		ctx_sceneCtx->UseScene(scene);
+		selections = scene ? &scene->selections : &m_fallbackSelections;
 	}
 }
 

@@ -23,6 +23,8 @@
 
 #include <cereal/cereal.hpp>
 
+#include "core/Log.h"
+
 #include "scene/Scene.h"
 #include "render/RenderConfig.h"
 
@@ -162,14 +164,26 @@ public:
 	template<class Archive>
 	void load(Archive& ar)
 	{
-		ar(cereal::make_nvp("m_scene", *proj_scene));
+		// Scene — selections field added later, backward-compat
+		try
+		{
+			ar(cereal::make_nvp("m_scene", *proj_scene));
+		}
+		catch (const cereal::Exception& e)
+		{
+			NEURUS_ERR("Project::load: " << e.what()
+				<< " - selections defaulted (old project format).");
+		}
+
 		// Config is optional — old files won't have it
 		try
 		{
 			ar(CEREAL_NVP(proj_config));
 		}
-		catch (const cereal::Exception&)
+		catch (const cereal::Exception& e)
 		{
+			NEURUS_ERR("Project::load: " << e.what()
+				<< " - proj_config defaulted (old project format).");
 			proj_config = RenderConfig{};
 		}
 	}
