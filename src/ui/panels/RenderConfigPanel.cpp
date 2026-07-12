@@ -3,7 +3,7 @@
  * @brief RenderConfigPanel implementation — hard-coded UI layout for render settings.
  */
 
-#include "ui/RenderConfigPanel.h"
+#include "panels/RenderConfigPanel.h"
 
 #include "render/RenderConfig.h"
 
@@ -26,7 +26,7 @@ namespace neurus
 // =========================================================================
 
 RenderConfigPanel::RenderConfigPanel(QWidget* parent)
-	: QWidget(parent)
+	: UIPanel(parent)
 {
 	// --- Main layout ---
 	auto* mainLayout = new QVBoxLayout(this);

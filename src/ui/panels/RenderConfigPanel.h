@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <QWidget>
+#include "UIPanel.h"
 
 // Forward declarations
 class QCheckBox;
@@ -33,7 +33,7 @@ namespace neurus
 
 class RenderConfig;
 
-class RenderConfigPanel : public QWidget
+class RenderConfigPanel : public UIPanel
 {
 	Q_OBJECT
 

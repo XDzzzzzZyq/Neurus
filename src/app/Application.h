@@ -13,7 +13,7 @@
 #include "asset/Project.h"
 #include "render/DeferredRenderer.h"
 #include "render/Screenshot.h"
-#include "ui/NeurusMainWindow.h"
+#include "ui/UIManager.h"
 
 namespace neurus {
 
@@ -67,13 +67,13 @@ private:
 	std::unique_ptr<QApplication>         app_qtApp;
 	std::unique_ptr<QTimer>               app_renderTimer;
 
-	// --- Application-owned EventBus (shared references to Editor, OutlinerPanel, etc.) ---
+	// --- Application-owned EventBus (shared references to Editor, Outliner, etc.) ---
 	EventQueue app_eventBus;
 
 	// --- GPU / UI stack (destroyed in REVERSE order: renderer first, vkContext last) ---
 	// Screenshot holds refs to RenderCache (owned by DeferredRenderer) — must be destroyed BEFORE renderer.
 	std::unique_ptr<VulkanContext>        app_vkContext;       // 1st declared → destroyed 6th (LAST)
-	std::unique_ptr<NeurusMainWindow>     app_mainWindow;      // 2nd declared → destroyed 5th
+	std::unique_ptr<UIManager>     app_mainWindow;      // 2nd declared → destroyed 5th
 	std::unique_ptr<vk::raii::SurfaceKHR> app_surface;         // 3rd declared → destroyed 4th
 	std::unique_ptr<Screenshot>           app_screenshot;      // 4th declared → destroyed 3rd
 	std::unique_ptr<Editor>               app_editor;          // 5th declared → destroyed 2nd

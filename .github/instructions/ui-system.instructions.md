@@ -6,7 +6,7 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 
 ## Location
 
-- `src/ui/NeurusMainWindow.h/cpp` - QMainWindow subclass with ADS dock manager + menus
+- `src/ui/UIManager.h/cpp` - QMainWindow subclass with ADS dock manager + menus
 - `src/ui/VulkanWindow.h/cpp` - QVulkanWindow subclass hosting the triangle renderer
 - `src/ui/MainWindow.h/cpp` - (legacy) QWindow subclass
 - `src/ui/VulkanWidget.h/cpp` - (legacy) QWidget subclass with native HWND for vk::raii surface

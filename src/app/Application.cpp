@@ -6,7 +6,7 @@
  *   1. QApplication - Qt event loop (Widgets)
  *   2. EventBus - singleton cross-layer communication
  *   3. VulkanContext (Phase 1) - VkInstance creation
- *   4. NeurusMainWindow + Viewport - Qt window with dockable Viewport
+ *   4. UIManager + Viewport - Qt window with dockable Viewport
  *   5. Show main window - apply layout so widget has final size
  *   6. VkSurfaceKHR - created from Viewport's native HWND
  *   7. VulkanContext (Phase 2) - logical device + queue selection
@@ -36,9 +36,9 @@
 #include "render/shaders/ShaderLibrary.h"
 #include "asset/Project.h"
 #include "scene/Scene.h"
-#include "ui/NeurusMainWindow.h"
-#include "ui/OutlinerPanel.h"
-#include "ui/PropertyEditor.h"
+#include "ui/UIManager.h"
+#include "ui/panels/Outliner.h"
+#include "ui/panels/PropertyEditor.h"
 #include "ui/Viewport.h"
 
 #include <QApplication>
@@ -147,8 +147,8 @@ bool Application::InitVulkan()
 		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
 		// Step 2: Create Qt window with Viewport
-		app_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
-		// Viewport is created internally by NeurusMainWindow constructor
+		app_mainWindow = std::make_unique<neurus::UIManager>();
+		// Viewport is created internally by UIManager constructor
 
 		// Step 3: Create VkSurfaceKHR from Viewport's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
@@ -278,13 +278,13 @@ void Application::WireSignals()
 	                     }
 	                 });
 
-	// --- OutlinerPanel object selection → EventBus ---
+	// --- Outliner object selection → EventBus ---
 	// UI layer emits Qt signal; Application translates to typed EventQueue event
 	{
-		auto* outliner = app_mainWindow->getOutlinerPanel();
+		auto* outliner = app_mainWindow->getOutliner();
 		if (outliner)
 		{
-			QObject::connect(outliner, &neurus::OutlinerPanel::objectSelected,
+			QObject::connect(outliner, &neurus::Outliner::objectSelected,
 			                 [this](int objectId) {
 			                     app_eventBus.enqueue(neurus::ObjectSelected{objectId});
 			                 });

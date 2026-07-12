@@ -198,9 +198,13 @@ Neurus/
 │   │   │   ├── CameraController.h/cpp  # Event-driven camera controls
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
-│   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager
-│   │   ├── MainWindow.h/cpp       # (legacy QWindow subclass)
-│   │   ├── Viewport.h/cpp         # (legacy vk::raii widget)
+│   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
+│   │   ├── Viewport.h/cpp        # Native HWND Vulkan surface widget
+│   │   ├── panels/               # Dock panel widgets
+│   │   │   ├── UIPanel.h         # Base class for all panels
+│   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
+│   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
+│   │   │   └── RenderConfigPanel.h/cpp  # Live render setting controls
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)

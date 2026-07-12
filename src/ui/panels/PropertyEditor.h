@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include "UIPanel.h"
 #include <QFormLayout>
 #include <QDoubleSpinBox>
 #include <QLabel>
@@ -25,9 +25,9 @@ namespace neurus {
  * Supports Transform (all objects), Camera, and Light properties for MVP.
  *
  * @note Properties are read-only for MVP. Editing will be added via Controllers.
- * @note Owned by NeurusMainWindow as a right dock widget.
+ * @note Owned by UIManager as a right dock widget.
  */
-class PropertyEditor : public QWidget
+class PropertyEditor : public UIPanel
 {
 	Q_OBJECT
 

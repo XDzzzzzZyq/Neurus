@@ -1,4 +1,4 @@
-#include "ui/PropertyEditor.h"
+#include "panels/PropertyEditor.h"
 
 #include "scene/Camera.h"
 #include "scene/Light.h"
@@ -16,7 +16,7 @@ namespace neurus {
 // =========================================================================
 
 PropertyEditor::PropertyEditor(Scene* scene, QWidget* parent)
-	: QWidget(parent)
+	: UIPanel(parent)
 	, m_scene(scene)
 {
 	// --- Main layout ---

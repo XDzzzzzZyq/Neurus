@@ -1,7 +1,7 @@
-#include "NeurusMainWindow.h"
-#include "OutlinerPanel.h"
-#include "PropertyEditor.h"
-#include "RenderConfigPanel.h"
+#include "UIManager.h"
+#include "panels/Outliner.h"
+#include "panels/PropertyEditor.h"
+#include "panels/RenderConfigPanel.h"
 #include "Viewport.h"
 
 #include "editor/events/UIEvents.h"
@@ -24,7 +24,7 @@ namespace neurus {
 // Constructor / Destructor
 // =========================================================================
 
-NeurusMainWindow::NeurusMainWindow(QWidget* parent)
+UIManager::UIManager(QWidget* parent)
 	: QMainWindow(parent)
 {
 	setWindowTitle("Neurus");
@@ -41,28 +41,28 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	CreateMenus();
 }
 
-NeurusMainWindow::~NeurusMainWindow() = default;
+UIManager::~UIManager() = default;
 
 // =========================================================================
 // Viewport accessors
 // =========================================================================
 
-HWND NeurusMainWindow::getViewportHwnd() const
+HWND UIManager::getViewportHwnd() const
 {
 	return win_viewportWidget ? win_viewportWidget->hwnd() : nullptr;
 }
 
-int NeurusMainWindow::getViewportWidth() const
+int UIManager::getViewportWidth() const
 {
 	return win_viewportWidget ? win_viewportWidget->width() : 0;
 }
 
-int NeurusMainWindow::getViewportHeight() const
+int UIManager::getViewportHeight() const
 {
 	return win_viewportWidget ? win_viewportWidget->height() : 0;
 }
 
-Viewport* NeurusMainWindow::getViewport() const
+Viewport* UIManager::getViewport() const
 {
 	return win_viewportWidget;
 }
@@ -71,7 +71,7 @@ Viewport* NeurusMainWindow::getViewport() const
 // Menus
 // =========================================================================
 
-void NeurusMainWindow::CreateMenus()
+void UIManager::CreateMenus()
 {
 	auto* fileMenu = menuBar()->addMenu("&File");
 
@@ -115,10 +115,10 @@ void NeurusMainWindow::CreateMenus()
 
 	auto* saveLayoutAction = viewMenu->addAction("&Save Layout");
 	saveLayoutAction->setShortcut(QKeySequence("Ctrl+Shift+L"));
-	connect(saveLayoutAction, &QAction::triggered, this, &NeurusMainWindow::SaveLayout);
+	connect(saveLayoutAction, &QAction::triggered, this, &UIManager::SaveLayout);
 
 	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
-	connect(resetLayoutAction, &QAction::triggered, this, &NeurusMainWindow::RestoreDefaultLayout);
+	connect(resetLayoutAction, &QAction::triggered, this, &UIManager::RestoreDefaultLayout);
 
 	auto* editMenu = menuBar()->addMenu("&Edit");
 
@@ -192,7 +192,7 @@ static QWidget* makePlaceholder(const QString& text)
 	return widget;
 }
 
-void NeurusMainWindow::CreateDocks()
+void UIManager::CreateDocks()
 {
 	if (!win_viewportWidget){
 		// Create Viewport after docks — CreateDocks() places it as viewport content
@@ -217,9 +217,9 @@ void NeurusMainWindow::CreateDocks()
 
 	// --- Left: Outliner ---
 	auto* outlinerDock = new ads::CDockWidget(win_dockManager, "Outliner");
-	auto* outlinerPanel = new OutlinerPanel();
-	win_outlinerPanel = outlinerPanel;
-	outlinerDock->setWidget(outlinerPanel);
+	auto* outliner = new Outliner();
+	win_outliner = outliner;
+	outlinerDock->setWidget(outliner);
 	outlinerDock->resize(280, 300);
 	outlinerDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
@@ -254,7 +254,7 @@ void NeurusMainWindow::CreateDocks()
 // Layout persistence
 // =========================================================================
 
-void NeurusMainWindow::SaveLayout()
+void UIManager::SaveLayout()
 {
 	QString path = QApplication::applicationDirPath() + "/layout.ads";
 	QFile file(path);
@@ -266,7 +266,7 @@ void NeurusMainWindow::SaveLayout()
 	}
 }
 
-void NeurusMainWindow::LoadLayout()
+void UIManager::LoadLayout()
 {
 	QString path = QApplication::applicationDirPath() + "/layout.ads";
 	QFile file(path);
@@ -278,7 +278,7 @@ void NeurusMainWindow::LoadLayout()
 	}
 }
 
-void NeurusMainWindow::RestoreDefaultLayout()
+void UIManager::RestoreDefaultLayout()
 {
 	// Delete all non-viewport docks
 	auto docks = win_dockManager->dockWidgetsMap();
