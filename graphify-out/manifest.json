@@ -1,12 +1,12 @@
 {
   "src/app/Application.cpp": {
-    "mtime": 1783744438.737935,
-    "ast_hash": "99a5a56f03005cbf34f81b17790f0d48",
+    "mtime": 1783784598.908654,
+    "ast_hash": "4586f75e52fecde1995e5a30904eb1e6",
     "semantic_hash": ""
   },
   "src/app/Application.h": {
-    "mtime": 1783174792.7699575,
-    "ast_hash": "b74199de92564a8a94d17713c3b122ad",
+    "mtime": 1783783746.8503876,
+    "ast_hash": "f414a9c6e6c2d1c904dc021046cb22a1",
     "semantic_hash": ""
   },
   "src/asset/ImageData.cpp": {
@@ -45,13 +45,13 @@
     "semantic_hash": "883a3235d50e03c08c22c52b0babf980"
   },
   "src/editor/Context.cpp": {
-    "mtime": 1783670513.0204697,
-    "ast_hash": "accae7a617aae22bacc91b0d8c2eb6a3",
+    "mtime": 1783786442.0739326,
+    "ast_hash": "9dada2f15f12eab4cb61601c00da8e97",
     "semantic_hash": ""
   },
   "src/editor/Context.h": {
-    "mtime": 1783609851.7754958,
-    "ast_hash": "905c13f3f7daa5323be29b03b7a3438d",
+    "mtime": 1783786425.259373,
+    "ast_hash": "b87a679d47742805b87f6fcd4a30a9c5",
     "semantic_hash": ""
   },
   "src/editor/Input.cpp": {
@@ -73,11 +73,6 @@
     "mtime": 1782873155.4817271,
     "ast_hash": "ee7c48d6246062e10ff6d1fc456841cb",
     "semantic_hash": ""
-  },
-  "src/editor/SelectionManager.h": {
-    "mtime": 1781872147.6291378,
-    "ast_hash": "3dd4f583c015b1d7b70ac7158a4f4078",
-    "semantic_hash": "3dd4f583c015b1d7b70ac7158a4f4078"
   },
   "src/editor/events/EditorEvents.h": {
     "mtime": 1781928668.9013848,
@@ -103,21 +98,6 @@
     "mtime": 1782006698.7073967,
     "ast_hash": "0cdf2249290d6350a6703094ee16d281",
     "semantic_hash": "0cdf2249290d6350a6703094ee16d281"
-  },
-  "src/project/Project.cpp": {
-    "mtime": 1782873649.1602304,
-    "ast_hash": "877b6a6e73989526dfeb0f30d352fb85",
-    "semantic_hash": ""
-  },
-  "src/project/Project.h": {
-    "mtime": 1783667359.723895,
-    "ast_hash": "83bf14d48a52788b7433df3a51c3bc98",
-    "semantic_hash": ""
-  },
-  "src/project/TypeRegistration.cpp": {
-    "mtime": 1782043359.749485,
-    "ast_hash": "a6aceb65b081f45891529b2b0f504a15",
-    "semantic_hash": "a6aceb65b081f45891529b2b0f504a15"
   },
   "src/render/CommandBuffer.h": {
     "mtime": 1782873379.928332,
@@ -325,8 +305,8 @@
     "semantic_hash": ""
   },
   "src/scene/Scene.h": {
-    "mtime": 1782873560.5354824,
-    "ast_hash": "c07abeea74c06cf094299ecddb750707",
+    "mtime": 1783786918.1574433,
+    "ast_hash": "401919f1a551e8ca2c0c37b8fd1565a5",
     "semantic_hash": ""
   },
   "src/scene/Sprite.cpp": {
@@ -355,13 +335,13 @@
     "semantic_hash": ""
   },
   "src/ui/NeurusMainWindow.cpp": {
-    "mtime": 1782873556.1389616,
-    "ast_hash": "dfdbc734e25d2f2c3aaa81ee4f8ce1b5",
+    "mtime": 1783771777.2964022,
+    "ast_hash": "ca79eb0e714000742db2c9e353b2392b",
     "semantic_hash": ""
   },
   "src/ui/NeurusMainWindow.h": {
-    "mtime": 1782873544.3378377,
-    "ast_hash": "cb0b2ab442812fb50b8af9c4a8c31b5e",
+    "mtime": 1783771758.3967733,
+    "ast_hash": "1bfd94f6e846092849647c4bcbc91bee",
     "semantic_hash": ""
   },
   "src/ui/VulkanWidget.cpp": {
@@ -399,11 +379,6 @@
     "ast_hash": "d884c2f955a92afa4d530e6b166e8361",
     "semantic_hash": "d884c2f955a92afa4d530e6b166e8361"
   },
-  "src/project/CMakeLists.txt": {
-    "mtime": 1781779314.5211253,
-    "ast_hash": "ece1a462ef95c06e094c517c7d8bae7d",
-    "semantic_hash": "ece1a462ef95c06e094c517c7d8bae7d"
-  },
   "src/render/CMakeLists.txt": {
     "mtime": 1781783511.9825892,
     "ast_hash": "df048c90df5427862c436d7ccf3f5af9",
@@ -420,23 +395,23 @@
     "semantic_hash": "5652a251657a9652e36d046135c9e72d"
   },
   "src/editor/Editor.cpp": {
-    "mtime": 1783749093.85791,
-    "ast_hash": "f4b5d2c680759aaee42e11e0a0a03dc8",
+    "mtime": 1783784597.11682,
+    "ast_hash": "6026068ab9b4529f7d6a30e01374c99c",
     "semantic_hash": ""
   },
   "src/editor/Editor.h": {
-    "mtime": 1783699845.8853927,
-    "ast_hash": "d256307eb041f89163964491b19ad8f9",
+    "mtime": 1783784594.7565942,
+    "ast_hash": "af01dd6b140681371e80cd5c70f31847",
     "semantic_hash": ""
   },
   "src/editor/controllers/CameraController.cpp": {
-    "mtime": 1782800962.286184,
-    "ast_hash": "3f027d9e6f998e583789c78978342d97",
+    "mtime": 1783785348.0443952,
+    "ast_hash": "44056c07788e8f305f8cbead6257462b",
     "semantic_hash": ""
   },
   "src/editor/controllers/CameraController.h": {
-    "mtime": 1783670513.023476,
-    "ast_hash": "eab29782e74471010e29401916c71733",
+    "mtime": 1783785532.5169835,
+    "ast_hash": "448fdacce0355e4dc14734f153bceb63",
     "semantic_hash": ""
   },
   "src/editor/controllers/Controllers.h": {
@@ -767,6 +742,26 @@
   "src/render/resources/MeshGPU.h": {
     "mtime": 1783741939.1938767,
     "ast_hash": "644ce15af81482a82ef4b2e3e38fec72",
+    "semantic_hash": ""
+  },
+  "src/asset/Project.cpp": {
+    "mtime": 1783783790.5522783,
+    "ast_hash": "3f0ada93f57ac2fa46806a99b7534aed",
+    "semantic_hash": ""
+  },
+  "src/asset/Project.h": {
+    "mtime": 1783787413.9420073,
+    "ast_hash": "47533bbde00d1bc32e1bcc00b9ac49e7",
+    "semantic_hash": ""
+  },
+  "src/asset/TypeRegistration.cpp": {
+    "mtime": 1783783790.5613139,
+    "ast_hash": "a6aceb65b081f45891529b2b0f504a15",
+    "semantic_hash": ""
+  },
+  "src/core/Selections.h": {
+    "mtime": 1783786330.0924053,
+    "ast_hash": "d95b7618b1de1c49214ffcda54d6f3ea",
     "semantic_hash": ""
   }
 }
