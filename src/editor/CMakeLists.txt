@@ -5,8 +5,6 @@ add_library(neurus_editor STATIC
 	Editor.cpp
 	Input.h
 	Input.cpp
-	Context.h
-	Context.cpp
 	SelectionController.h
 	SelectionController.cpp
 	controllers/Controllers.h
@@ -31,5 +29,5 @@ target_include_directories(neurus_editor PRIVATE
 	${Vulkan_INCLUDE_DIRS}
 )
 
-# Enable Qt MOC for QObject subclasses (UIEvents, EditorContext)
+# Enable Qt MOC for QObject subclasses (UIEvents)
 set_target_properties(neurus_editor PROPERTIES AUTOMOC ON)

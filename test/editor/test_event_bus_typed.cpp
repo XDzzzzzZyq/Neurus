@@ -380,7 +380,7 @@ TEST_F(TypedEventQueueExpandedTest, ActiveCameraChanged_EmitReceivesCorrectId)
 	EXPECT_EQ(receivedId, 3);
 }
 
-// --- SceneStatusChanged: propagation (mimics EditorContext::NotifySceneChanged) ---
+// --- SceneStatusChanged: propagation via EventQueue ---
 
 TEST_F(TypedEventQueueExpandedTest, SceneStatusChanged_EmitReceivesCorrectStatus)
 {
@@ -389,7 +389,7 @@ TEST_F(TypedEventQueueExpandedTest, SceneStatusChanged_EmitReceivesCorrectStatus
 	m_queue->subscribe<SceneStatusChanged>(
 		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
 
-	// Simulate what EditorContext::NotifySceneChanged does
+	// Simulate scene status change notification
 	m_queue->enqueue(SceneStatusChanged{1 << 2});
 	m_queue->Process();
 

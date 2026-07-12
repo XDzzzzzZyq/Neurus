@@ -10,7 +10,7 @@
  * Architecture:
  * - Template-based for use with any object type (ObjectID, Mesh, etc.)
  * - Scene owns Selections<ObjectID> for scene object selection (serializable)
- * - EditorContext delegates to Scene::selections via pointer, with a
+ * - Editor delegates to Scene::selections via pointer, with a
  *   fallback instance for standalone (no-scene) usage
  * - UI queries selections to highlight/display selected objects
  * - Controllers mutate selections in response to user input

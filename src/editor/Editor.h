@@ -11,7 +11,6 @@
 namespace neurus {
 class VulkanContext;
 class DeferredRenderer;
-class Context;
 class Scene;
 class Environment;
 class UploadManager;
@@ -28,7 +27,7 @@ namespace neurus {
  * @brief Editor orchestrator — owns project lifecycle, scene mutations, and UI signal wiring.
  *
  * Extracted from Application.cpp to separate application logic (Editor)
- * from GPU infrastructure (Application). Owns Project + Context.
+ * from GPU infrastructure (Application). Owns Project.
  * Accesses VulkanContext and DeferredRenderer via non-owning pointers
  * for mesh/light/IBL GPU uploads.
  */
@@ -115,7 +114,6 @@ private:
 
 	// --- Owned ---
 	std::unique_ptr<neurus::project::Project> ed_project;
-	std::unique_ptr<Context> ed_context;
 	std::unique_ptr<UploadManager> ed_uploadManager;
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 

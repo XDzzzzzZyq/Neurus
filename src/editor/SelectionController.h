@@ -8,7 +8,6 @@
  *
  * Architecture:
  * - Pure logic class - no Qt, no Vulkan, no viewport dependency
- * - Owned by EditorContext
  * - Consumes Scene (read-only mesh iteraction) and Camera (for unproject)
  * - Emits typed events via EventBus singleton for Editor↔Renderer communication
  *
@@ -16,7 +15,7 @@
  * - Click-select: Raycast from screen coords through scene meshes (sphere test)
  * - Box-select: Stub - full implementation in Phase 6 with viewport
  *
- * @note Editor Layer - owned by EditorContext, no viewport/rendering dependency.
+ * @note Editor Layer - no viewport/rendering dependency.
  * @note Thread-safety: Not thread-safe. Must be used from main thread only.
  */
 

@@ -35,7 +35,7 @@ isolation. Use this file as the high-level reference; detailed rules live in
                       ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ Editor Layer                                                │
-│  owns: Controllers, SelectionManager, EditorContext         │
+│  owns: Project, UploadManager, Controllers                   │
 │  Application logic, scene mutation, event orchestration     │
 └─────────────────────┬────────────────────────────────────────┘
                       │
@@ -196,7 +196,6 @@ Neurus/
 │   │   ├── controllers/     # Controller implementations
 │   │   │   ├── Controllers.h     # Base class for all controllers
 │   │   │   ├── CameraController.h/cpp  # Event-driven camera controls
-│   │   ├── EditorContext.h/cpp
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager

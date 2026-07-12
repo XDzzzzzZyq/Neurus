@@ -19,7 +19,7 @@ with modern rendering algorithms.
                       ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ Editor Layer                                                │
-│  owns: Controllers, SelectionManager, EditorContext         │
+│  owns: Project, UploadManager, Controllers                   │
 └─────────────────────┬────────────────────────────────────────┘
                       │
             ┌─────────┴──────────┐
@@ -112,7 +112,7 @@ screen-space ambient occlusion, image-based lighting, and full G-Buffer pipeline
 - Swapchain recreation on window resize
 - Validation layers in Debug builds
 - Embedded SPIR-V shaders (compiled at CMake time)
-- Non-GPU Google Test samples (UIEvents, EventQueue, EditorContext)
+- Non-GPU Google Test samples (UIEvents, EventQueue)
 - Event-driven CameraController (orbit/zoom/dolly/pan via EventQueue)
 - OBJ mesh loading with MeshData (icosphere, cube, etc.)
 - Deferred PBR pipeline: ShadowDepthPass → GeometryPass → SSAOPass → LightingPass → IBLPass

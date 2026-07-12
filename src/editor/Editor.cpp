@@ -1,6 +1,5 @@
 #include "Editor.h"
 
-#include "editor/Context.h"
 #include "editor/controllers/CameraController.h"
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"
@@ -71,8 +70,6 @@ void Editor::SetProject(std::unique_ptr<neurus::project::Project> project)
 
 Editor::~Editor()
 {
-	// Destroy in order: Context (references scene) → Project (owns scene)
-	ed_context.reset();
 	ed_project.reset();
 }
 
@@ -84,10 +81,6 @@ void Editor::Initialize(Scene& scene)
 	// Note: Mesh/light GPU upload happens AFTER window is shown and surface
 	// is ready — see UploadSceneResources() called from Application::Run()
 	// and from OnProjectOpen() / OnProjectNew().
-
-	// Create Context with Application-owned EventQueue reference
-	ed_context = std::make_unique<Context>(ed_eventBus);
-	ed_context->editor.SetScene(&scene);
 
 	// --- Wire project file signal handlers ---
 	auto& uiEvents = neurus::UIEvents::instance();
@@ -180,11 +173,6 @@ void Editor::OnProjectNew()
 
 		UploadSceneResources();
 
-		if (ed_context)
-		{
-			ed_context->editor.SetScene(&projectScene);
-		}
-
 		// Generate IBL for the new environment
 		OnIBLLoad();
 	}
@@ -214,11 +202,6 @@ void Editor::OnProjectOpen(const QString& path)
 		ed_ownerScene = &projectScene;
 
 		UploadSceneResources();
-
-		if (ed_context)
-		{
-			ed_context->editor.SetScene(&projectScene);
-		}
 
 		// Regenerate IBL for the new environment (BuildIBLTextures, load HDR,
 		// run IBLPass convolution).

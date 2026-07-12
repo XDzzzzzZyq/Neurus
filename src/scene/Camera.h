@@ -7,7 +7,7 @@
  *
  * Architecture:
  * - Owned by scene graph containers
- * - Active camera selected via SceneContext
+ * - Active camera selected via scene manager
  * - Renderer reads camera matrices as immutable data
  * - Editor manipulates camera via CameraController events
  *
