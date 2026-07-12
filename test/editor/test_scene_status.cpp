@@ -13,7 +13,7 @@ using namespace neurus;
  * @brief Tests for SceneStatusChanged propagation from EditorContext
  *        to the typed EventQueue.
  *
- * TDD: RED (test written first) â†’ GREEN (after implementing method).
+ * TDD: RED (test written first) â†?GREEN (after implementing method).
  * All tests are pure CPU - no GPU required.
  */
 class SceneStatusTest : public ::testing::Test
@@ -23,22 +23,21 @@ protected:
 	{
 		m_context = std::make_unique<EditorContext>();
 		m_scene = std::make_unique<Scene>();
-		m_queue = &eventQueue();
 	}
 
 	void TearDown() override
 	{
-		// Process any remaining events
 		m_queue->Process();
 	}
 
+	EventQueue m_eventBus;
+	class EventQueue* m_queue = &m_eventBus;
 	std::unique_ptr<EditorContext> m_context;
 	std::unique_ptr<Scene> m_scene;
-	class EventQueue* m_queue = nullptr;
 };
 
 // -----------------------------------------------------------------------
-// NotifySceneChanged â†’ EventQueue::emit(SceneStatusChanged{...})
+// NotifySceneChanged â†?EventQueue::emit(SceneStatusChanged{...})
 // -----------------------------------------------------------------------
 
 TEST_F(SceneStatusTest, NotifySceneChanged_EmitsViaEventQueue)
@@ -48,7 +47,7 @@ TEST_F(SceneStatusTest, NotifySceneChanged_EmitsViaEventQueue)
 	m_queue->subscribe<SceneStatusChanged>(
 		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
 
-	m_context->NotifySceneChanged(Scene::SceneChanged);
+	m_context->NotifySceneChanged(Scene::SceneChanged, m_eventBus);
 
 	// Event is enqueued, not yet dispatched
 	m_queue->Process();
@@ -63,9 +62,9 @@ TEST_F(SceneStatusTest, NotifySceneChanged_MultipleStatusValues)
 	m_queue->subscribe<SceneStatusChanged>(
 		[&](const SceneStatusChanged& e) { receivedStatuses.push_back(e.status); });
 
-	m_context->NotifySceneChanged(Scene::ObjectTransChanged);
-	m_context->NotifySceneChanged(Scene::LightChanged | Scene::CameraChanged);
-	m_context->NotifySceneChanged(Scene::NoChanges);
+	m_context->NotifySceneChanged(Scene::ObjectTransChanged, m_eventBus);
+	m_context->NotifySceneChanged(Scene::LightChanged | Scene::CameraChanged, m_eventBus);
+	m_context->NotifySceneChanged(Scene::NoChanges, m_eventBus);
 
 	m_queue->Process();
 
@@ -101,7 +100,7 @@ TEST_F(SceneStatusTest, NoCrossContaminationWithOtherSignals)
 	m_queue->subscribe<SceneStatusChanged>([&](const SceneStatusChanged&) { sceneStatusCount++; });
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { objectSelectedCount++; });
 
-	m_context->NotifySceneChanged(Scene::MaterialChanged);
+	m_context->NotifySceneChanged(Scene::MaterialChanged, m_eventBus);
 
 	m_queue->Process();
 

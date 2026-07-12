@@ -70,9 +70,9 @@ void EditorContext::SetScene(Scene* scene)
 	}
 }
 
-void EditorContext::NotifySceneChanged(int status)
+void EditorContext::NotifySceneChanged(int status, EventQueue& bus)
 {
-	eventQueue().enqueue(SceneStatusChanged{status});
+	bus.enqueue(SceneStatusChanged{status});
 }
 
 const Scene* EditorContext::activeScene() const
@@ -90,8 +90,9 @@ const Scene* EditorContext::activeScene() const
 
 Context::Context(class EventQueue& pool)
 {
-	// Wire back-pointer: EditorContext needs access to its sibling SceneContext
+	// Wire back-pointers: EditorContext needs access to its sibling SceneContext and EventBus
 	editor.ctx_sceneCtx = &scene;
+	editor.ctx_eventBus = &pool;
 
 	// Subscribe to scene status changes → propagate to EditorContext signal
 	pool.subscribe<SceneStatusChanged>([this](const SceneStatusChanged& e) {

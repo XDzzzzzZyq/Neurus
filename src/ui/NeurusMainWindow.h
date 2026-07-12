@@ -13,6 +13,7 @@ class CDockWidget;
 namespace neurus {
 
 class Viewport;
+class OutlinerPanel;
 
 class NeurusMainWindow : public QMainWindow
 {
@@ -37,6 +38,12 @@ public:
     /** @brief Returns the viewport dock widget (for layout / restoreState). */
     ads::CDockWidget* getViewportDock() const { return win_viewportDock; }
 
+    /** @brief Returns the OutlinerPanel for signal wiring. */
+    class OutlinerPanel* getOutlinerPanel() const { return win_outlinerPanel; }
+
+    /** @brief Returns the PropertyEditor for signal wiring. */
+    class PropertyEditor* getPropertyEditor() const { return win_propertyEditor; }
+
 private:
 	void CreateMenus();
 	void CreateDocks();
@@ -46,7 +53,9 @@ private:
 
     ads::CDockManager* win_dockManager = nullptr;
     ads::CDockWidget*  win_viewportDock = nullptr;
-    Viewport*          win_viewportWidget = nullptr;  // Non-owning — Qt parent-child handles cleanup
+    Viewport*          win_viewportWidget = nullptr;
+    OutlinerPanel*     win_outlinerPanel = nullptr;
+    class PropertyEditor* win_propertyEditor = nullptr;  // Non-owning — Qt parent-child handles cleanup
 };
 
 } // namespace neurus

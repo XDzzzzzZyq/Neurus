@@ -117,9 +117,10 @@ public:
 	/**
 	 * @brief Notifies that scene modification status changed.
 	 * @param status Bitfield of Scene::SceneModifStatus flags.
-	 * @note Enqueues SceneStatusChanged event on EventBus.
+	 * @param bus EventQueue to enqueue the SceneStatusChanged event on.
+	 * @note Enqueues SceneStatusChanged event on the given EventBus.
 	 */
-	void NotifySceneChanged(int status);
+	void NotifySceneChanged(int status, EventQueue& bus);
 
 	/**
 	 * @brief Returns the currently active scene.
@@ -158,6 +159,7 @@ signals:
 private:
 	friend class Context;
 	SceneContext* ctx_sceneCtx = nullptr; ///< Back-pointer to owning Context's SceneContext
+	EventQueue* ctx_eventBus = nullptr;   ///< EventBus reference (set by owning Context)
 	bool ctx_dirty = false;               ///< Unsaved editor modifications flag
 	Selections<ObjectID> m_fallbackSelections; ///< Fallback when no Scene is set
 };

@@ -27,6 +27,7 @@
 #include "core/Log.h"
 #include "editor/Editor.h"
 #include "editor/Input.h"
+#include "editor/events/EditorEvents.h"
 #include "editor/events/UIEvents.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
@@ -36,6 +37,8 @@
 #include "asset/Project.h"
 #include "scene/Scene.h"
 #include "ui/NeurusMainWindow.h"
+#include "ui/OutlinerPanel.h"
+#include "ui/PropertyEditor.h"
 #include "ui/Viewport.h"
 
 #include <QApplication>
@@ -248,7 +251,7 @@ void Application::ResizeViewport(int width, int height)
 void Application::InitEditor(std::unique_ptr<project::Project> project)
 {
 	auto& scene = project->GetScene();  // Grab reference before ownership transfer
-	app_editor = std::make_unique<neurus::Editor>(app_vkContext.get(), app_renderer.get());
+	app_editor = std::make_unique<neurus::Editor>(app_vkContext.get(), app_renderer.get(), app_eventBus);
 	app_editor->SetProject(std::move(project));
 	app_editor->Initialize(scene);
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
@@ -270,9 +273,41 @@ void Application::WireSignals()
 	                     {
 	                         Input::UpdateState();
 	                         app_editor->Edit(Input::GetInputState());
+	                         app_eventBus.Process();  // Dispatch all enqueued events before drawing
 	                         app_renderer->DrawFrame(app_editor->GetScene());
 	                     }
 	                 });
+
+	// --- OutlinerPanel object selection → EventBus ---
+	// UI layer emits Qt signal; Application translates to typed EventQueue event
+	{
+		auto* outliner = app_mainWindow->getOutlinerPanel();
+		if (outliner)
+		{
+			QObject::connect(outliner, &neurus::OutlinerPanel::objectSelected,
+			                 [this](int objectId) {
+			                     app_eventBus.enqueue(neurus::ObjectSelected{objectId});
+			                 });
+		}
+	}
+
+	// --- PropertyEditor selection → EventBus subscriptions ---
+	// Subscribe to ObjectSelected / ObjectDeselected on behalf of PropertyEditor
+	// so that the UI layer remains EventBus-free.
+	{
+		auto* propEditor = app_mainWindow->getPropertyEditor();
+		if (propEditor)
+		{
+			app_eventBus.subscribe<neurus::ObjectSelected>(
+				[propEditor](const neurus::ObjectSelected& e) {
+					propEditor->LoadObject(e.objectId);
+				});
+			app_eventBus.subscribe<neurus::ObjectDeselected>(
+				[propEditor](const neurus::ObjectDeselected& /*e*/) {
+					propEditor->Clear();
+				});
+		}
+	}
 
 	// Handle Viewport resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR

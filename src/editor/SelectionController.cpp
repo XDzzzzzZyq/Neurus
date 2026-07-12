@@ -22,7 +22,7 @@ namespace neurus
 // Core selection API
 // ---------------------------------------------------------------------------
 
-void SelectionController::Select(int objectId)
+void SelectionController::Select(int objectId, EventQueue& bus)
 {
 	if (objectId < 0) return;
 
@@ -45,16 +45,16 @@ void SelectionController::Select(int objectId)
 
 	for (int id : previous)
 	{
-		eventQueue().enqueue(ObjectDeselected{id});
+		bus.enqueue(ObjectDeselected{id});
 	}
 
 	sel_selection.insert(objectId);
 	sel_activeId = objectId;
 
-	eventQueue().enqueue(ObjectSelected{objectId});
+	bus.enqueue(ObjectSelected{objectId});
 }
 
-void SelectionController::Deselect(int objectId)
+void SelectionController::Deselect(int objectId, EventQueue& bus)
 {
 	if (objectId < 0) return;
 
@@ -70,10 +70,10 @@ void SelectionController::Deselect(int objectId)
 	}
 
 	// Emit event
-	eventQueue().enqueue(ObjectDeselected{objectId});
+	bus.enqueue(ObjectDeselected{objectId});
 }
 
-void SelectionController::ClearSelection()
+void SelectionController::ClearSelection(EventQueue& bus)
 {
 	std::set<int> toRemove;
 	toRemove.swap(sel_selection);
@@ -83,7 +83,7 @@ void SelectionController::ClearSelection()
 	// Emit deselect events for every previously selected object
 	for (int id : toRemove)
 	{
-		eventQueue().enqueue(ObjectDeselected{id});
+		bus.enqueue(ObjectDeselected{id});
 	}
 }
 

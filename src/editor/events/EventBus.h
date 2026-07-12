@@ -13,7 +13,7 @@ class EventQueue
 public:
 	EventQueue() = default;
 
-	// Non-copyable - singleton semantics
+	// Non-copyable - moved via Application ownership
 	EventQueue(const EventQueue&) = delete;
 	EventQueue& operator=(const EventQueue&) = delete;
 
@@ -76,17 +76,10 @@ private:
 	> evt_handlers;
 
 	std::queue<std::function<void()> > evt_eventQueue;
+	/**
+	 * @brief Returns the number of pending events in the queue.
+	 */
+	size_t PendingCount() const { return evt_eventQueue.size(); }
 };
-
-inline EventQueue& GetEventQueue()
-{
-	static EventQueue queue;
-	return queue;
-}
-
-inline EventQueue& eventQueue()
-{
-	return GetEventQueue();
-}
 
 } // namespace neurus

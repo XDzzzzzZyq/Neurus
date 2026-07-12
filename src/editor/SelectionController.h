@@ -32,6 +32,7 @@ namespace neurus
 
 class Scene;
 class Camera;
+class EventQueue;
 
 /**
  * @brief Pure-logic selection controller with raycast-based click-select.
@@ -66,7 +67,7 @@ public:
 	 *
 	 * @param objectId Unique ID of scene object to select (-1 ignored).
 	 */
-	void Select(int objectId);
+	void Select(int objectId, EventQueue& bus);
 
 	/**
 	 * @brief Deselects an object by ID.
@@ -76,14 +77,14 @@ public:
 	 *
 	 * @param objectId Unique ID of scene object to deselect (-1 ignored).
 	 */
-	void Deselect(int objectId);
+	void Deselect(int objectId, EventQueue& bus);
 
 	/**
 	 * @brief Clears all selections.
 	 *
 	 * Emits ObjectDeselected for each previously selected object via EventBus.
 	 */
-	void ClearSelection();
+	void ClearSelection(EventQueue& bus);
 
 	/**
 	 * @brief Returns the current selection set.

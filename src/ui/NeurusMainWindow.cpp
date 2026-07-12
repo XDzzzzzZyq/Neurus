@@ -217,6 +217,7 @@ void NeurusMainWindow::CreateDocks()
 	// --- Left: Outliner ---
 	auto* outlinerDock = new ads::CDockWidget(win_dockManager, "Outliner");
 	auto* outlinerPanel = new OutlinerPanel();
+	win_outlinerPanel = outlinerPanel;
 	outlinerDock->setWidget(outlinerPanel);
 	outlinerDock->resize(280, 300);
 	outlinerDock->setMinimumSize(200, 200);
@@ -224,6 +225,7 @@ void NeurusMainWindow::CreateDocks()
 
 	// --- Right: Property Editor ---
 	auto* propertyEditor = new PropertyEditor(nullptr);
+	win_propertyEditor = propertyEditor;
 	auto* propDock = new ads::CDockWidget(win_dockManager, "Property Editor");
 	propDock->setWidget(propertyEditor);
 	propDock->resize(280, 300);

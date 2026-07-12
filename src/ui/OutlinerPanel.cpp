@@ -5,8 +5,6 @@
 
 #include "OutlinerPanel.h"
 
-#include "editor/events/EditorEvents.h"
-#include "editor/events/EventBus.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -128,7 +126,7 @@ void OutlinerPanel::OnItemClicked(const QModelIndex& index)
 	int objectId = index.data(Qt::UserRole + 1).toInt();
 	if (objectId > 0)
 	{
-		eventQueue().enqueue(ObjectSelected{objectId});
+		emit objectSelected(objectId);
 	}
 }
 

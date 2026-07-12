@@ -49,7 +49,7 @@ TEST_F(SceneContextTest, GetActiveCamera_EmptyScene)
 {
 	SceneContext sc;
 	sc.UseScene(m_scene.get());
-	// No cameras registered â€” returns nullptr
+	// No cameras registered â€?returns nullptr
 	EXPECT_EQ(sc.GetActiveCamera(), nullptr);
 }
 
@@ -128,6 +128,7 @@ protected:
 		m_editor = std::make_unique<EditorContext>();
 	}
 
+	EventQueue m_eventBus;
 	std::unique_ptr<EditorContext> m_editor;
 };
 
@@ -202,13 +203,13 @@ TEST_F(EditorContextRefactoredTest, Selections_InitiallyEmpty)
 
 TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventQueue)
 {
-	auto& pool = eventQueue();
+	auto& pool = m_eventBus;
 	int receivedStatus = -1;
 
 	pool.subscribe<SceneStatusChanged>(
 		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
 
-	m_editor->NotifySceneChanged(Scene::SceneChanged);
+	m_editor->NotifySceneChanged(Scene::SceneChanged, pool);
 
 	pool.Process();
 
@@ -216,7 +217,7 @@ TEST_F(EditorContextRefactoredTest, NotifySceneChanged_EmitsViaEventQueue)
 }
 
 // ===========================================================================
-// SceneStatusTest â€” SceneStatusChanged propagation from EditorContext
+// SceneStatusTest â€?SceneStatusChanged propagation from EditorContext
 // ===========================================================================
 
 class SceneStatusTest : public ::testing::Test
@@ -226,18 +227,17 @@ protected:
 	{
 		m_context = std::make_unique<EditorContext>();
 		m_scene = std::make_unique<Scene>();
-		m_queue = &eventQueue();
 	}
 
 	void TearDown() override
 	{
-		// Process any remaining events
 		m_queue->Process();
 	}
 
+	EventQueue m_eventBus;
+	class EventQueue* m_queue = &m_eventBus;
 	std::unique_ptr<EditorContext> m_context;
 	std::unique_ptr<Scene> m_scene;
-	class EventQueue* m_queue = nullptr;
 };
 
 TEST_F(SceneStatusTest, NotifySceneChanged_EmitsViaEventQueue)
@@ -247,7 +247,7 @@ TEST_F(SceneStatusTest, NotifySceneChanged_EmitsViaEventQueue)
 	m_queue->subscribe<SceneStatusChanged>(
 		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
 
-	m_context->NotifySceneChanged(Scene::SceneChanged);
+	m_context->NotifySceneChanged(Scene::SceneChanged, m_eventBus);
 
 	// Event is enqueued, not yet dispatched
 	m_queue->Process();
@@ -262,9 +262,9 @@ TEST_F(SceneStatusTest, NotifySceneChanged_MultipleStatusValues)
 	m_queue->subscribe<SceneStatusChanged>(
 		[&](const SceneStatusChanged& e) { receivedStatuses.push_back(e.status); });
 
-	m_context->NotifySceneChanged(Scene::ObjectTransChanged);
-	m_context->NotifySceneChanged(Scene::LightChanged | Scene::CameraChanged);
-	m_context->NotifySceneChanged(Scene::NoChanges);
+	m_context->NotifySceneChanged(Scene::ObjectTransChanged, m_eventBus);
+	m_context->NotifySceneChanged(Scene::LightChanged | Scene::CameraChanged, m_eventBus);
+	m_context->NotifySceneChanged(Scene::NoChanges, m_eventBus);
 
 	m_queue->Process();
 
@@ -292,7 +292,7 @@ TEST_F(SceneStatusTest, NoCrossContaminationWithOtherSignals)
 	m_queue->subscribe<SceneStatusChanged>([&](const SceneStatusChanged&) { sceneStatusCount++; });
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { objectSelectedCount++; });
 
-	m_context->NotifySceneChanged(Scene::MaterialChanged);
+	m_context->NotifySceneChanged(Scene::MaterialChanged, m_eventBus);
 
 	m_queue->Process();
 
@@ -311,9 +311,8 @@ class ContextTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_queue = &eventQueue();
 		m_scene = std::make_unique<Scene>();
-		m_context = std::make_unique<Context>(*m_queue);
+		m_context = std::make_unique<Context>(m_eventBus);
 	}
 
 	void TearDown() override
@@ -321,7 +320,8 @@ protected:
 		m_queue->Process();
 	}
 
-	class EventQueue* m_queue = nullptr;
+	EventQueue m_eventBus;
+	class EventQueue* m_queue = &m_eventBus;
 	std::unique_ptr<Scene> m_scene;
 	std::unique_ptr<Context> m_context;
 };
@@ -329,7 +329,7 @@ protected:
 TEST_F(ContextTest, ConstructsWithoutCrash)
 {
 	ASSERT_NO_THROW({
-		Context ctx(eventQueue());
+		Context ctx(m_eventBus);
 	});
 }
 
@@ -355,7 +355,7 @@ TEST_F(ContextTest, SceneStatusChanged_UpdatesSceneAndEmitsSignal)
 	QObject::connect(&m_context->editor, &EditorContext::sceneChanged,
 	                 [&signalCalled]() { signalCalled = true; });
 
-	// Enqueue a scene status change event â€” Context constructor subscribed to it
+	// Enqueue a scene status change event â€?Context constructor subscribed to it
 	m_queue->enqueue(SceneStatusChanged{Scene::LightChanged});
 	m_queue->Process();
 

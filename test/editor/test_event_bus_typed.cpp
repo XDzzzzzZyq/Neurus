@@ -18,17 +18,16 @@ class TypedEventQueueTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		// eventQueue() returns the global singleton EventQueue
-		m_queue = &eventQueue();
+		// Each test gets a fresh EventQueue via fixture construction
 	}
 
 	void TearDown() override
 	{
-		// Each test starts fresh - Process any remaining events
 		m_queue->Process();
 	}
 
-	class EventQueue* m_queue = nullptr;
+	EventQueue m_eventBus;
+	class EventQueue* m_queue = &m_eventBus;
 };
 
 /**
@@ -43,7 +42,6 @@ class TypedEventQueueExpandedTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_queue = &eventQueue();
 	}
 
 	void TearDown() override
@@ -51,7 +49,8 @@ protected:
 		m_queue->Process();
 	}
 
-	class EventQueue* m_queue = nullptr;
+	EventQueue m_eventBus;
+	class EventQueue* m_queue = &m_eventBus;
 };
 
 // ---------------------------------------------------------------------------

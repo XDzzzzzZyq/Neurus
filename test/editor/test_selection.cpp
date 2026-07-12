@@ -1,14 +1,14 @@
 /**
  * @file test_selection.cpp
- * @brief Unit tests for SelectionController — click-select via raycast.
+ * @brief Unit tests for SelectionController �?click-select via raycast.
  *
  * Tests cover:
  * - Selection API: Select, Deselect, ClearSelection, IsSelected, GetActiveObject
  * - EventQueue emission: ObjectSelected / ObjectDeselected on selection changes
- * - RaycastSelect: screen → world ray → sphere intersection against mesh objects
+ * - RaycastSelect: screen �?world ray �?sphere intersection against mesh objects
  * - BoxSelect: stub returns empty vector
  *
- * All tests are pure CPU — no GPU required.
+ * All tests are pure CPU �?no GPU required.
  */
 
 #include <gtest/gtest.h>
@@ -25,7 +25,7 @@
 using namespace neurus;
 
 // ===========================================================================
-// SelectionControllerTest — basic API (no EventQueue dependency needed)
+// SelectionControllerTest �?basic API (no EventQueue dependency needed)
 // ===========================================================================
 
 class SelectionControllerTest : public ::testing::Test
@@ -36,6 +36,7 @@ protected:
 		m_sel = std::make_unique<SelectionController>();
 	}
 
+	EventQueue m_eventBus;
 	std::unique_ptr<SelectionController> m_sel;
 };
 
@@ -51,7 +52,7 @@ TEST_F(SelectionControllerTest, DefaultConstruction_NoSelection)
 
 TEST_F(SelectionControllerTest, Select_SingleObject_AddedToSelection)
 {
-	m_sel->Select(42);
+	m_sel->Select(42, m_eventBus);
 
 	EXPECT_TRUE(m_sel->IsSelected(42));
 	EXPECT_EQ(m_sel->GetActiveObject(), 42);
@@ -60,7 +61,7 @@ TEST_F(SelectionControllerTest, Select_SingleObject_AddedToSelection)
 
 TEST_F(SelectionControllerTest, Select_NegativeId_Ignored)
 {
-	m_sel->Select(-1);
+	m_sel->Select(-1, m_eventBus);
 
 	EXPECT_TRUE(m_sel->GetSelection().empty());
 	EXPECT_EQ(m_sel->GetActiveObject(), -1);
@@ -68,7 +69,7 @@ TEST_F(SelectionControllerTest, Select_NegativeId_Ignored)
 
 TEST_F(SelectionControllerTest, Select_ZeroId_Accepted)
 {
-	m_sel->Select(0);
+	m_sel->Select(0, m_eventBus);
 
 	EXPECT_TRUE(m_sel->IsSelected(0));
 	EXPECT_EQ(m_sel->GetActiveObject(), 0);
@@ -76,8 +77,8 @@ TEST_F(SelectionControllerTest, Select_ZeroId_Accepted)
 
 TEST_F(SelectionControllerTest, Select_SameIdTwice_NoDuplicate)
 {
-	m_sel->Select(10);
-	m_sel->Select(10);
+	m_sel->Select(10, m_eventBus);
+	m_sel->Select(10, m_eventBus);
 
 	EXPECT_EQ(m_sel->GetSelection().size(), 1u);
 	EXPECT_EQ(m_sel->GetActiveObject(), 10);
@@ -85,9 +86,9 @@ TEST_F(SelectionControllerTest, Select_SameIdTwice_NoDuplicate)
 
 TEST_F(SelectionControllerTest, Select_MultipleIds_ReplacesSelection)
 {
-	m_sel->Select(1);
-	m_sel->Select(2);
-	m_sel->Select(3);
+	m_sel->Select(1, m_eventBus);
+	m_sel->Select(2, m_eventBus);
+	m_sel->Select(3, m_eventBus);
 
 	// Each Select replaces the previous (single selection)
 	EXPECT_EQ(m_sel->GetSelection().size(), 1u);
@@ -101,8 +102,8 @@ TEST_F(SelectionControllerTest, Select_MultipleIds_ReplacesSelection)
 
 TEST_F(SelectionControllerTest, Deselect_RemovesFromSelection)
 {
-	m_sel->Select(7);
-	m_sel->Deselect(7);
+	m_sel->Select(7, m_eventBus);
+	m_sel->Deselect(7, m_eventBus);
 
 	EXPECT_FALSE(m_sel->IsSelected(7));
 	EXPECT_EQ(m_sel->GetActiveObject(), -1);
@@ -111,8 +112,8 @@ TEST_F(SelectionControllerTest, Deselect_RemovesFromSelection)
 
 TEST_F(SelectionControllerTest, Deselect_NegativeId_Ignored)
 {
-	m_sel->Select(5);
-	m_sel->Deselect(-1);
+	m_sel->Select(5, m_eventBus);
+	m_sel->Deselect(-1, m_eventBus);
 
 	EXPECT_TRUE(m_sel->IsSelected(5));
 	EXPECT_EQ(m_sel->GetSelection().size(), 1u);
@@ -120,8 +121,8 @@ TEST_F(SelectionControllerTest, Deselect_NegativeId_Ignored)
 
 TEST_F(SelectionControllerTest, Deselect_NotInSelection_NoOp)
 {
-	m_sel->Select(1);
-	m_sel->Deselect(99);
+	m_sel->Select(1, m_eventBus);
+	m_sel->Deselect(99, m_eventBus);
 
 	EXPECT_TRUE(m_sel->IsSelected(1));
 	EXPECT_EQ(m_sel->GetSelection().size(), 1u);
@@ -131,13 +132,13 @@ TEST_F(SelectionControllerTest, Deselect_NotInSelection_NoOp)
 
 TEST_F(SelectionControllerTest, ClearSelection_RemovesAll)
 {
-	m_sel->Select(1);
-	m_sel->Select(2);
-	m_sel->Select(3);
+	m_sel->Select(1, m_eventBus);
+	m_sel->Select(2, m_eventBus);
+	m_sel->Select(3, m_eventBus);
 
 	EXPECT_EQ(m_sel->GetSelection().size(), 1u);
 
-	m_sel->ClearSelection();
+	m_sel->ClearSelection(m_eventBus);
 
 	EXPECT_TRUE(m_sel->GetSelection().empty());
 	EXPECT_EQ(m_sel->GetActiveObject(), -1);
@@ -145,7 +146,7 @@ TEST_F(SelectionControllerTest, ClearSelection_RemovesAll)
 
 TEST_F(SelectionControllerTest, ClearSelection_EmptyNoOp)
 {
-	EXPECT_NO_THROW({ m_sel->ClearSelection(); });
+	EXPECT_NO_THROW({ m_sel->ClearSelection(m_eventBus); });
 	EXPECT_TRUE(m_sel->GetSelection().empty());
 }
 
@@ -153,8 +154,8 @@ TEST_F(SelectionControllerTest, ClearSelection_EmptyNoOp)
 
 TEST_F(SelectionControllerTest, IsSelected_ReturnsTrueForSelected)
 {
-	m_sel->Select(42);
-	m_sel->Select(99);
+	m_sel->Select(42, m_eventBus);
+	m_sel->Select(99, m_eventBus);
 
 	EXPECT_TRUE(m_sel->IsSelected(99));  // last select replaced 42
 	EXPECT_FALSE(m_sel->IsSelected(42));
@@ -168,14 +169,14 @@ TEST_F(SelectionControllerTest, GetActiveObject_AfterDeselectActive_FallsBack)
 {
 	// Current design: Select replaces, so only one item.
 	// After deselect, active becomes -1.
-	m_sel->Select(1);
-	m_sel->Deselect(1);
+	m_sel->Select(1, m_eventBus);
+	m_sel->Deselect(1, m_eventBus);
 
 	EXPECT_EQ(m_sel->GetActiveObject(), -1);
 }
 
 // ===========================================================================
-// SelectionControllerEventTest — EventQueue emission
+// SelectionControllerEventTest �?EventQueue emission
 // ===========================================================================
 
 class SelectionControllerEventTest : public ::testing::Test
@@ -184,17 +185,16 @@ protected:
 	void SetUp() override
 	{
 		m_sel = std::make_unique<SelectionController>();
-		m_queue = &eventQueue();
 	}
 
 	void TearDown() override
 	{
-		// Drain any remaining events to keep queue clean
 		m_queue->Process();
 	}
 
+	EventQueue m_eventBus;
+	class EventQueue* m_queue = &m_eventBus;
 	std::unique_ptr<SelectionController> m_sel;
-	class EventQueue* m_queue = nullptr;
 };
 
 TEST_F(SelectionControllerEventTest, Select_EmitsObjectSelected)
@@ -207,7 +207,7 @@ TEST_F(SelectionControllerEventTest, Select_EmitsObjectSelected)
 		receivedId = e.objectId;
 	});
 
-	m_sel->Select(42);
+	m_sel->Select(42, m_eventBus);
 
 	// Event is enqueued, must Process to dispatch
 	EXPECT_FALSE(received); // not yet dispatched
@@ -228,10 +228,10 @@ TEST_F(SelectionControllerEventTest, Deselect_EmitsObjectDeselected)
 		receivedId = e.objectId;
 	});
 
-	m_sel->Select(7);
+	m_sel->Select(7, m_eventBus);
 	m_queue->Process(); // drain the select event
 
-	m_sel->Deselect(7);
+	m_sel->Deselect(7, m_eventBus);
 	m_queue->Process();
 
 	EXPECT_TRUE(received);
@@ -246,7 +246,7 @@ TEST_F(SelectionControllerEventTest, Deselect_NotSelected_NoEventEmitted)
 		received = true;
 	});
 
-	m_sel->Deselect(99); // not in selection
+	m_sel->Deselect(99, m_eventBus); // not in selection
 	m_queue->Process();
 
 	EXPECT_FALSE(received);
@@ -262,10 +262,10 @@ TEST_F(SelectionControllerEventTest, ClearSelection_EmitsDeselectedForAll)
 
 	// Select 42 (single selection replaces), so we need to test multiple deselections
 	// by selecting sequentially and tracking what was selected
-	m_sel->Select(10);
+	m_sel->Select(10, m_eventBus);
 	m_queue->Process(); // drain select event
 
-	m_sel->ClearSelection();
+	m_sel->ClearSelection(m_eventBus);
 	m_queue->Process();
 
 	ASSERT_EQ(deselectedIds.size(), 1u);
@@ -280,8 +280,8 @@ TEST_F(SelectionControllerEventTest, SelectSameId_NoDuplicateEvent)
 		selectCount++;
 	});
 
-	m_sel->Select(1);
-	m_sel->Select(1); // same ID again
+	m_sel->Select(1, m_eventBus);
+	m_sel->Select(1, m_eventBus); // same ID again
 	m_queue->Process();
 
 	// Only one ObjectSelected event should be emitted (first time)
@@ -289,7 +289,7 @@ TEST_F(SelectionControllerEventTest, SelectSameId_NoDuplicateEvent)
 }
 
 // ===========================================================================
-// SelectionControllerRaycastTest — raycast sphere intersection
+// SelectionControllerRaycastTest �?raycast sphere intersection
 // ===========================================================================
 
 class SelectionControllerRaycastTest : public ::testing::Test
@@ -330,7 +330,7 @@ TEST_F(SelectionControllerRaycastTest, MeshAtOrigin_CenterClick_Hits)
 	int meshId = mesh->GetObjectID();
 	m_scene->UseMesh(mesh);
 
-	// Click at viewport center → ray from (0,0,5) toward (0,0,0)
+	// Click at viewport center �?ray from (0,0,5) toward (0,0,0)
 	// Mesh at origin should be hit
 	int hit = m_sel->RaycastSelect(*m_scene, *m_camera, 400.0f, 300.0f, 800, 600);
 
@@ -343,13 +343,13 @@ TEST_F(SelectionControllerRaycastTest, MeshOffScreen_ClickMisses)
 	mesh->SetPosition(glm::vec3(100.0f, 0.0f, 0.0f)); // far off to the right
 	m_scene->UseMesh(mesh);
 
-	// Click at center — ray points at origin, mesh is way off
+	// Click at center �?ray points at origin, mesh is way off
 	int hit = m_sel->RaycastSelect(*m_scene, *m_camera, 400.0f, 300.0f, 800, 600);
 
 	// The sphere test may still hit if the ray passes within radius 1.0 of (100,0,0)
 	// To ensure miss, place mesh far enough away
 	// Actually with a 1.0 radius sphere at (100,0,0), the ray from (0,0,5) to (0,0,0)
-	// has direction (0,1,0) — it stays at x=0, so it misses the sphere at x=100
+	// has direction (0,1,0) �?it stays at x=0, so it misses the sphere at x=100
 	EXPECT_EQ(hit, -1);
 }
 
@@ -365,7 +365,7 @@ TEST_F(SelectionControllerRaycastTest, MultipleMeshes_ReturnsClosest)
 	int idNear = meshNear->GetObjectID();
 	m_scene->UseMesh(meshNear);
 
-	// Click center → ray hits both, should return the closer one (at origin)
+	// Click center �?ray hits both, should return the closer one (at origin)
 	int hit = m_sel->RaycastSelect(*m_scene, *m_camera, 400.0f, 300.0f, 800, 600);
 
 	EXPECT_EQ(hit, idNear);
@@ -378,8 +378,8 @@ TEST_F(SelectionControllerRaycastTest, MeshBehindCamera_NotHit)
 	int meshId = mesh->GetObjectID();
 	m_scene->UseMesh(mesh);
 
-	// Click center — ray from (0,0,5) toward (0,0,0) (points toward -Z)
-	// Mesh at z=10 is behind the camera → tca < 0 → no hit
+	// Click center �?ray from (0,0,5) toward (0,0,0) (points toward -Z)
+	// Mesh at z=10 is behind the camera �?tca < 0 �?no hit
 	int hit = m_sel->RaycastSelect(*m_scene, *m_camera, 400.0f, 300.0f, 800, 600);
 
 	EXPECT_EQ(hit, -1);
@@ -391,17 +391,17 @@ TEST_F(SelectionControllerRaycastTest, ScreenToRay_CornerProducesValidRay)
 	mesh->SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
 	m_scene->UseMesh(mesh);
 
-	// Click at top-left corner — ray should still be valid (no crash)
+	// Click at top-left corner �?ray should still be valid (no crash)
 	int hit = m_sel->RaycastSelect(*m_scene, *m_camera, 0.0f, 0.0f, 800, 600);
 
-	// May or may not hit depending on FOV — just verify no crash
+	// May or may not hit depending on FOV �?just verify no crash
 	EXPECT_NO_THROW({
 		m_sel->RaycastSelect(*m_scene, *m_camera, 0.0f, 0.0f, 800, 600);
 	});
 }
 
 // ===========================================================================
-// SelectionControllerBoxSelectTest — box-select stub
+// SelectionControllerBoxSelectTest �?box-select stub
 // ===========================================================================
 
 class SelectionControllerBoxSelectTest : public ::testing::Test
@@ -436,7 +436,7 @@ TEST_F(SelectionControllerBoxSelectTest, BoxSelect_ReturnsEmpty)
 	                                           100.0f, 100.0f, 300.0f, 300.0f,
 	                                           800, 600);
 
-	// Stub — always returns empty
+	// Stub �?always returns empty
 	EXPECT_TRUE(result.empty());
 }
 

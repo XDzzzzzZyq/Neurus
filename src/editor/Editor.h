@@ -15,6 +15,7 @@ class Context;
 class Scene;
 class Environment;
 class UploadManager;
+class EventQueue;
 }
 
 namespace neurus::project {
@@ -34,7 +35,7 @@ namespace neurus {
 class Editor
 {
 public:
-	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer);
+	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer, EventQueue& eventBus);
 	~Editor();
 
 	Editor(const Editor&) = delete;
@@ -121,6 +122,7 @@ private:
 	// --- Non-owning references ---
 	VulkanContext* ed_vkContext = nullptr;
 	DeferredRenderer* ed_renderer = nullptr;
+	EventQueue& ed_eventBus;                     ///< Application-owned EventBus (non-owning reference)
 	Scene* ed_ownerScene = nullptr;  ///< Scene passed to Initialize()
 };
 

@@ -49,12 +49,16 @@ private slots:
 	/**
 	 * @brief Handles tree view item click.
 	 *
-	 * Extracts the object ID from Qt::UserRole+1 and enqueues an
-	 * ObjectSelected event via EventBus.
+	 * Extracts the object ID from Qt::UserRole+1 and emits the
+	 * objectSelected signal, which Application wires to EventBus.
 	 *
 	 * @param index Model index of the clicked item.
 	 */
 	void OnItemClicked(const QModelIndex& index);
+
+signals:
+	/** @brief Emitted when a user clicks on a scene object in the outliner. */
+	void objectSelected(int objectId);
 
 private:
 	QTreeView*         m_treeView = nullptr;

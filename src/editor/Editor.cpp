@@ -50,9 +50,10 @@ static QString resolveResourcePath(const char* relativePath)
 
 namespace neurus {
 
-Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer)
+Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer, EventQueue& eventBus)
 	: ed_vkContext(vkCtx)
 	, ed_renderer(renderer)
+	, ed_eventBus(eventBus)
 {
 	if (ed_vkContext && ed_renderer)
 	{
@@ -84,8 +85,8 @@ void Editor::Initialize(Scene& scene)
 	// is ready — see UploadSceneResources() called from Application::Run()
 	// and from OnProjectOpen() / OnProjectNew().
 
-	// Create Context with EventQueue singleton
-	ed_context = std::make_unique<Context>(eventQueue());
+	// Create Context with Application-owned EventQueue reference
+	ed_context = std::make_unique<Context>(ed_eventBus);
 	ed_context->editor.SetScene(&scene);
 
 	// --- Wire project file signal handlers ---
@@ -129,10 +130,10 @@ void Editor::Initialize(Scene& scene)
 	OnIBLLoad();
 
 	// --- Register controllers ---
-	RegisterController<CameraController>(eventQueue());
+	RegisterController<CameraController>(ed_eventBus);
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
-	eventQueue().subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
+	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
 		auto it = GetScene().env_list.find(e.envId);
 		if (it != GetScene().env_list.end())
 		{
@@ -441,10 +442,9 @@ void Editor::HandleResize(uint32_t width, uint32_t height)
 	auto* cam = GetScene().GetActiveCamera();
 	if (!cam) return;
 
-	eventQueue().enqueue(CameraResizeEvent{const_cast<Camera*>(cam),
+	ed_eventBus.enqueue(CameraResizeEvent{const_cast<Camera*>(cam),
 	                                       static_cast<int>(width),
 	                                       static_cast<int>(height)});
-	eventQueue().Process();
 }
 
 // =========================================================================
@@ -457,22 +457,20 @@ void Editor::Edit(const InputState& input)
 	auto* cam = const_cast<Camera*>(scene.GetActiveCamera());
 	if (!cam) return;
 
-	auto& bus = eventQueue();
-
 	// Translate InputState → CameraEvents (matching OpenGL Viewport.cpp:178-198)
 	if (input.middleMouseHeld)
 	{
 		if (input.ctrlHeld)
-			bus.enqueue(CameraPushEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+			ed_eventBus.enqueue(CameraPushEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
 		else if (input.shiftHeld)
-			bus.enqueue(CameraSlideEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+			ed_eventBus.enqueue(CameraSlideEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
 		else
-			bus.enqueue(CameraRotateEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+			ed_eventBus.enqueue(CameraRotateEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
 	}
 	if (std::abs(input.scrollDelta) > 0.001f)
-		bus.enqueue(CameraZoomEvent{cam, input.scrollDelta});
+		ed_eventBus.enqueue(CameraZoomEvent{cam, input.scrollDelta});
 
-	bus.Process(); // Dispatch to CameraController event handlers
+	// Process() is called once at the end of newFrame, not here.
 }
 
 } // namespace neurus

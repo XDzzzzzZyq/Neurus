@@ -6,9 +6,6 @@
 #include "scene/Transform.h"
 #include "scene/UID.h"
 
-#include "editor/events/EditorEvents.h"
-#include "editor/events/EventBus.h"
-
 #include <QFont>
 #include <QVBoxLayout>
 
@@ -35,18 +32,8 @@ PropertyEditor::PropertyEditor(Scene* scene, QWidget* parent)
 	// --- Initial form container ---
 	ClearFormLayout();
 
-	// --- Subscribe to selection events ---
-	GetEventQueue().subscribe<ObjectSelected>(
-		[this](const ObjectSelected& e) {
-			LoadObject(e.objectId);
-		}
-	);
-
-	GetEventQueue().subscribe<ObjectDeselected>(
-		[this](const ObjectDeselected& /*e*/) {
-			Clear();
-		}
-	);
+	// Note: EventBus subscriptions (ObjectSelected / ObjectDeselected) are
+	// wired by Application::WireSignals() to keep the UI layer EventBus-free.
 }
 
 // =========================================================================
