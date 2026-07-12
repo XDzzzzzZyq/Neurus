@@ -277,7 +277,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
+	// (camUBO removed; passes get camera from ctx.scene->GetActiveCamera())
 
 	// -------------------------------------------------------------------
 	// Step 3: Create point light (for mixed direct + IBL lighting)
@@ -304,9 +304,10 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
 	Scene scene;
-	scene.UseMesh(mesh);
-	scene.UseLight(light);
-	scene.env_list[m_env->GetObjectID()] = m_env;
+				scene.UseMesh(mesh);
+				scene.UseLight(light);
+				scene.UseCamera(camera);
+				scene.env_list[m_env->GetObjectID()] = m_env;
 
 	// Pre-register GPU resources before pass recording
 	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
@@ -318,10 +319,6 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
 		.frameIndex = 0,
-		.viewProj = camUBO.viewProj,
-		.view = camUBO.view,
-		.cameraPos = camera->GetPosition(),
-		.invProjView = glm::inverse(camUBO.viewProj),
 		.scene = &scene,
 	};
 
@@ -404,7 +401,6 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		60.0f, 0.1f, 100.0f);
 	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// --- Light ---
 	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 10.0f, glm::vec3(1.0f));
@@ -429,6 +425,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	Scene scene;
 				scene.UseMesh(mesh);
 				scene.UseLight(light);
+				scene.UseCamera(camera);
 				scene.env_list[m_env->GetObjectID()] = m_env;
 				// Pre-register GPU resources before pass recording
 				VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
@@ -436,15 +433,11 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
 				m_renderCache->UpdateLighting(lightDict);
 
-				RenderContext ctx{
-					.renderExtent = {kRenderWidth, kRenderHeight},
-					.frameIndex = 0,
-					.viewProj = camUBO.viewProj,
-					.view = camUBO.view,
-					.cameraPos = camera->GetPosition(),
-					.invProjView = glm::inverse(camUBO.viewProj),
-					.scene = &scene,
-				};
+			RenderContext ctx{
+				.renderExtent = {kRenderWidth, kRenderHeight},
+				.frameIndex = 0,
+				.scene = &scene,
+			};
 
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
@@ -575,6 +568,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	Scene scene;
 				scene.UseMesh(mesh);
 				scene.UseLight(light);
+				scene.UseCamera(camera);
 				scene.env_list[m_env->GetObjectID()] = m_env;
 				// Pre-register GPU resources before pass recording
 				VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
@@ -582,15 +576,11 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				auto lightDict = m_uploadManager->UploadLighting(scene.light_list);
 				m_renderCache->UpdateLighting(lightDict);
 
-				RenderContext ctx{
-					.renderExtent = {kRenderWidth, kRenderHeight},
-					.frameIndex = 0,
-					.viewProj = camUBO.viewProj,
-					.view = camUBO.view,
-					.cameraPos = camera->GetPosition(),
-					.invProjView = glm::inverse(camUBO.viewProj),
-					.scene = &scene,
-				};
+			RenderContext ctx{
+				.renderExtent = {kRenderWidth, kRenderHeight},
+				.frameIndex = 0,
+				.scene = &scene,
+			};
 
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, ctx);

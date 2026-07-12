@@ -144,7 +144,6 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	// Update camera aspect ratio to match render extent
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 	const glm::vec3 cameraPos = camera->GetPosition();
 
 	NEURUS_LOG("[MultiLightShadow] Camera@("
@@ -157,10 +156,6 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
 	ctx.frameIndex   = 0;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = cameraPos;
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -249,17 +244,12 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -------------------------------------------------------------------
 	// Build context
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = camera->GetPosition();
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -321,17 +311,12 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -------------------------------------------------------------------
 	// Build context
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = camera->GetPosition();
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -457,17 +442,12 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -------------------------------------------------------------------
 	// Build context
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = camera->GetPosition();
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -649,7 +629,6 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 
 	// Update camera aspect ratio to match render extent
 	camera->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 	const glm::vec3 cameraPos = camera->GetPosition();
 
 	NEURUS_LOG("[SunMultiShadowHDR] Camera@("
@@ -662,10 +641,6 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
 	ctx.frameIndex   = 0;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = cameraPos;
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 

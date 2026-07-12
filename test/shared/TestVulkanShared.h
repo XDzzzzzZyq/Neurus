@@ -111,6 +111,15 @@ protected:
 	static neurus::CameraUBOData MakeTestCamera(uint32_t width, uint32_t height);
 
 	/**
+	 * @brief Creates a test Camera object with 60° FOV, positioned at (0,-2,0)
+	 *        looking at origin. Ready to register via scene.UseCamera().
+	 * @param width  Render target width (for aspect ratio).
+	 * @param height Render target height (for aspect ratio).
+	 * @return Non-null shared_ptr to a configured Camera.
+	 */
+	static std::shared_ptr<neurus::Camera> CreateTestCamera(uint32_t width, uint32_t height);
+
+	/**
 	 * @brief Creates a test triangle in the XY plane facing +Z.
 	 * @return Pair of (vertices, indices).
 	 */

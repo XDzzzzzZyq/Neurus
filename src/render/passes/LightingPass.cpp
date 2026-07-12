@@ -266,9 +266,10 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 
 void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	const glm::vec3& cameraPos = ctx.cameraPos;
-	const glm::mat4& viewMatrix = ctx.view;
-	const glm::mat4& invProjView = ctx.invProjView;
+	const Camera* cam = ctx.scene->GetActiveCamera();
+	const glm::vec3 cameraPos = cam->GetPosition();
+	const glm::mat4 viewMatrix = cam->GetViewMatrix();
+	const glm::mat4 invProjView = glm::inverse(cam->GetProjectionMatrix() * cam->GetViewMatrix());
 	const vk::Extent2D renderExtent = ctx.renderExtent;
 	const uint32_t frameIndex = ctx.frameIndex;
 

@@ -87,10 +87,11 @@ protected:
 	/**
 	 * @brief Renders the test triangle into the G-Buffer.
 	 *
-	 * Transitions attachments, creates buffers, records geometry pass.
-	 * Returns the camera UBO data used for the rendering.
+	 * Creates a test scene with camera, uploads meshes, and records
+	 * the geometry pass. Camera is registered on the scene so passes
+	 * can retrieve it via scene->GetActiveCamera().
 	 */
-	CameraUBOData RenderTestTriangle()
+	void RenderTestTriangle()
 	{
 		// Transition GBuffer → renderable
 		VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
@@ -119,20 +120,17 @@ protected:
 
 		VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, testScene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
-		const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
+		auto testCam = VulkanTestShared::CreateTestCamera(kRenderWidth, kRenderHeight);
+		testScene.UseCamera(testCam);
 
 		{
 			auto& cmd = BeginCmd();
 			m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 				.renderExtent = {kRenderWidth, kRenderHeight},
-				.viewProj = camera.viewProj,
-				.view = camera.view,
 				.scene = &testScene,
 			});
 			EndSubmitWait(cmd);
 		}
-
-		return camera;
 	}
 
 	// --- Constants ---
@@ -219,7 +217,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	}
 
 	// --- Step 1: Render test triangle into G-Buffer ---
-	const auto camera = RenderTestTriangle();
+	RenderTestTriangle();
 
 	// --- Step 2: Upload point light via UploadManager → RenderCache ---
 	{
@@ -235,14 +233,15 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 	// --- Step 3: Record lighting pass ---
 	{
 		auto& cmd = BeginCmd();
-		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
+
+		Scene scene;
+		auto testCam = VulkanTestShared::CreateTestCamera(kRenderWidth, kRenderHeight);
+		scene.UseCamera(testCam);
 
 		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
-			.view = testCam.view,
-			.cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
-			.invProjView = glm::inverse(testCam.viewProj),
+			.scene = &scene,
 		});
 
 		EndSubmitWait(cmd);
@@ -300,7 +299,7 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 	}
 
 	// --- Render triangle ---
-	const auto camera = RenderTestTriangle();
+	RenderTestTriangle();
 
 	// --- Upload zero lights (empty vectors — SSBOs become null) ---
 	{
@@ -310,14 +309,15 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 	// --- Record lighting pass with 0 lights (PARTIALLY_BOUND SSBO) ---
 	{
 		auto& cmd = BeginCmd();
-		const auto testCam = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
+
+		Scene scene;
+		auto testCam = VulkanTestShared::CreateTestCamera(kRenderWidth, kRenderHeight);
+		scene.UseCamera(testCam);
 
 		RenderContext ctx{
 			.renderExtent = {kRenderWidth, kRenderHeight},
 			.frameIndex = 0,
-			.view = testCam.view,
-			.cameraPos = glm::vec3(0.0f, -2.0f, 0.0f),  // Z-up: camera behind origin along -Y
-			.invProjView = glm::inverse(testCam.viewProj),
+			.scene = &scene,
 		};
 		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);

@@ -173,9 +173,6 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = cameraPos;
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------

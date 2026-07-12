@@ -46,21 +46,9 @@ struct RenderContext
 	/// @brief Ring-buffer slot index for per-frame descriptor pools / UBOs.
 	uint32_t frameIndex = 0;
 
-	/// @brief Combined view-projection matrix (clip-space transform).
-	glm::mat4 viewProj{1.0f};
-
-	/// @brief View matrix (world-to-view, used for normal transforms).
-	glm::mat4 view{1.0f};
-
-	/// @brief Camera position in world-space (for specular, falloff, etc.).
-	glm::vec3 cameraPos{0.0f};
-
-	/// @brief Inverse of (projection * view) for reconstructing world rays from depth.
-	glm::mat4 invProjView{1.0f};
-
-	/// @brief Scene data for mesh and light iteration (nullable).
-	/// GeometryPass and ShadowDepthPass iterate scene->mesh_list for drawing;
-	/// LightingPass and ShadowIntensityPass read scene->light_list.
+	/// @brief Scene data for mesh, light, and camera access (nullable).
+	/// Passes access camera via scene->GetActiveCamera(), iterate scene->mesh_list
+	/// for meshes, and scene->light_list for lights.
 	const Scene* scene = nullptr;
 
 };

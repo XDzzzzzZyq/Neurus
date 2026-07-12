@@ -458,10 +458,6 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	RenderContext ctx{};
 	ctx.renderExtent = extent;
 	ctx.frameIndex = r_currentFrame;
-	ctx.view = activeCam->GetViewMatrix();
-	ctx.viewProj = activeCam->GetProjectionMatrix() * ctx.view;
-	ctx.cameraPos = activeCam->GetPosition();
-	ctx.invProjView = glm::inverse(ctx.viewProj);
 	ctx.scene = &scene;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---

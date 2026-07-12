@@ -137,8 +137,6 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	auto resources = neurus::test::BuildDeferredScene(
 		ResolveAssetPath("res/obj/sphere.obj"));
 
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*resources.camera);
-
 	// -------------------------------------------------------------------
 	// Step 7: Transition G-Buffer attachments & build RenderContext
 	// -------------------------------------------------------------------
@@ -148,13 +146,11 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *resources.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, *resources.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
+	resources.scene->UseCamera(resources.camera);
+
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
 		.frameIndex = 0,
-		.viewProj = camUBO.viewProj,
-		.view = camUBO.view,
-		.cameraPos = resources.camera->GetPosition(),
-		.invProjView = glm::inverse(camUBO.viewProj),
 		.scene = resources.scene.get(),
 	};
 

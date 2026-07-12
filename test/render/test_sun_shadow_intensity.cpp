@@ -135,15 +135,10 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 	ASSERT_FALSE(shadowRes.scene->cam_list.empty()) << "Scene must have a camera";
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
 	ctx.frameIndex   = 0;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = camera->GetPosition();
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -259,15 +254,10 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_ReferenceImage)
 	ASSERT_FALSE(shadowRes.scene->cam_list.empty());
 	const auto& camera = shadowRes.scene->cam_list.begin()->second;
 	camera->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	RenderContext ctx{};
 	ctx.renderExtent = renderExtent;
 	ctx.frameIndex   = 0;
-	ctx.viewProj     = camUBO.viewProj;
-	ctx.view         = camUBO.view;
-	ctx.cameraPos    = camera->GetPosition();
-	ctx.invProjView  = glm::inverse(camUBO.viewProj);
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------

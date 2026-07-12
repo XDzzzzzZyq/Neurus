@@ -15,6 +15,9 @@
 
 #include "Log.h"
 
+#include "scene/Camera.h"
+#include "scene/Scene.h"
+
 #include <array>
 #include <cstring>
 #include <stdexcept>
@@ -326,13 +329,18 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	// --- 0. Update per-frame SSAO params UBO (camera matrices + kernel) ---
 	{
 		SSAOParamsGpu params{};
-		const float* vp = &ctx.viewProj[0][0];
+		const Camera* cam = ctx.scene->GetActiveCamera();
+		const glm::mat4 viewProj = cam->GetProjectionMatrix() * cam->GetViewMatrix();
+		const glm::mat4 view = cam->GetViewMatrix();
+		const glm::vec3 cameraPos = cam->GetPosition();
+
+		const float* vp = &viewProj[0][0];
 		for (int i = 0; i < 16; ++i) params.viewProj[i] = vp[i];
-		const float* vm = &ctx.view[0][0];
+		const float* vm = &view[0][0];
 		for (int i = 0; i < 16; ++i) params.view[i] = vm[i];
-		params.camX = ctx.cameraPos.x;
-		params.camY = ctx.cameraPos.y;
-		params.camZ = ctx.cameraPos.z;
+		params.camX = cameraPos.x;
+		params.camY = cameraPos.y;
+		params.camZ = cameraPos.z;
 		params.camW = 0.0f;
 		for (size_t i = 0; i < kMaxKernelSamples; ++i)
 			params.kernelSamples[i] = p_kernelSamples[i];

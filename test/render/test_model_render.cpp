@@ -237,9 +237,8 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	VulkanTestShared::EnsureLightShadowsUploaded(*m_renderCache, scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 	// -----------------------------------------------------------------------
-	// Step 8: Build CameraUBOData from the Camera
+	// Step 8: Camera registered via scene.UseCamera(); passes get it from ctx.scene->GetActiveCamera()
 	// -----------------------------------------------------------------------
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*camera);
 
 	// -----------------------------------------------------------------------
 	// Step 9: GPU buffers created lazily by RenderCache::GetMeshGPU()
@@ -257,10 +256,6 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
 		.frameIndex = 0,
-		.viewProj = camUBO.viewProj,
-		.view = camUBO.view,
-		.cameraPos = camera->GetPosition(),
-		.invProjView = glm::inverse(camUBO.viewProj),
 		.scene = &scene,
 	};
 

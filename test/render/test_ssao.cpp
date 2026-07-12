@@ -103,8 +103,6 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 		static_cast<float>(kRenderWidth),
 		static_cast<float>(kRenderHeight));
 
-	const CameraUBOData camUBO = VulkanTestShared::ComputeCameraUBO(*cb.camera);
-
 	// -------------------------------------------------------------------
 	// Step 2: Transition G-Buffer & build RenderContext
 	// -------------------------------------------------------------------
@@ -113,11 +111,10 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	// Pre-register mesh GPU resources before pass recording
 	VulkanTestShared::EnsureMeshesUploaded(*m_renderCache, *cb.scene, *m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
+	cb.scene->UseCamera(cb.camera);
+
 	RenderContext ctx{
 		.renderExtent = {kRenderWidth, kRenderHeight},
-		.viewProj = camUBO.viewProj,
-		.view = camUBO.view,
-		.cameraPos = cb.camera->GetPosition(),
 		.scene = cb.scene.get(),
 	};
 

@@ -175,7 +175,11 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device)
 void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
 	// --- Extract per-frame context ---
-	const CameraUBOData cameraData{ctx.viewProj, ctx.view};
+	const Camera* cam = ctx.scene->GetActiveCamera();
+	const CameraUBOData cameraData{
+		cam->GetProjectionMatrix() * cam->GetViewMatrix(),
+		cam->GetViewMatrix()
+	};
 	const auto& renderExtent = ctx.renderExtent;
 
 	// --- 1. Upload camera data to UBO ---

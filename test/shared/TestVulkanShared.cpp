@@ -247,17 +247,20 @@ CameraUBOData VulkanTestShared::ComputeCameraUBO(Camera& cam)
 
 CameraUBOData VulkanTestShared::MakeTestCamera(uint32_t width, uint32_t height)
 {
-	CameraUBOData cam;
-	const glm::mat4 proj = glm::perspective(
-		glm::radians(60.0f),
-		static_cast<float>(width) / static_cast<float>(height),
-		0.1f, 100.0f);
-	const glm::mat4 view = glm::lookAt(
-		glm::vec3(0.0f, -2.0f, 0.0f),
-		glm::vec3(0.0f, 0.0f, 0.0f),
-		glm::vec3(0.0f, 0.0f, 1.0f));
-	cam.viewProj = proj * view;
-	cam.view = view;
+	auto cam = CreateTestCamera(width, height);
+	return ComputeCameraUBO(*cam);
+}
+
+// ===========================================================================
+// CreateTestCamera
+// ===========================================================================
+
+std::shared_ptr<Camera> VulkanTestShared::CreateTestCamera(uint32_t width, uint32_t height)
+{
+	auto cam = std::make_shared<Camera>(
+		static_cast<float>(width), static_cast<float>(height), 60.0f, 0.1f, 100.0f);
+	cam->SetCamPos(glm::vec3(0.0f, -2.0f, 0.0f));
+	cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	return cam;
 }
 

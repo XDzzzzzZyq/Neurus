@@ -164,7 +164,8 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 	testScene.UseMesh(mesh);
 
 	// --- Camera ---
-	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
+	auto testCam = VulkanTestShared::CreateTestCamera(kRenderWidth, kRenderHeight);
+	testScene.UseCamera(testCam);
 
 	// --- Record ---
 	{
@@ -172,8 +173,6 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camera.viewProj,
-			.view = camera.view,
 			.scene = &testScene,
 		});
 
@@ -215,14 +214,13 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 	testScene.UseMesh(mesh0);
 	testScene.UseMesh(mesh1);
 
-	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
+	auto testCam = VulkanTestShared::CreateTestCamera(kRenderWidth, kRenderHeight);
+	testScene.UseCamera(testCam);
 
 	{
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camera.viewProj,
-			.view = camera.view,
 			.scene = &testScene,
 		});
 		EndSubmitWait(cmd);
@@ -244,15 +242,15 @@ TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 
 	VulkanTestShared::TransitionGbufferToColorAttachment(*m_renderCache, {kRenderWidth, kRenderHeight}, *this);
 
-	const auto camera = VulkanTestShared::MakeTestCamera(kRenderWidth, kRenderHeight);
+	Scene testScene;
+	auto testCam = VulkanTestShared::CreateTestCamera(kRenderWidth, kRenderHeight);
+	testScene.UseCamera(testCam);
 
 	{
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.renderExtent = {kRenderWidth, kRenderHeight},
-			.viewProj = camera.viewProj,
-			.view = camera.view,
-			.scene = nullptr,  // No scene → no geometry drawn (should not crash)
+			.scene = &testScene,  // Scene has camera but no meshes → no geometry drawn (should not crash)
 		});
 		EndSubmitWait(cmd);
 	}
