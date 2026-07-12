@@ -20,6 +20,7 @@
 #include "render/RenderCache.h"
 #include "render/Image.h"
 #include "render/Barrier.h"
+#include "scene/Camera.h"
 #include "scene/Scene.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
@@ -76,6 +77,12 @@ protected:
 	struct TS { std::shared_ptr<Scene> s; int uid=-1; };
 	TS BuildScene() {
 		TS r; r.s=std::make_shared<Scene>();
+		// Camera at origin targeting (0,0,0) - used for orthographic center computation
+		auto cam=std::make_shared<Camera>();
+		cam->SetCamPos(glm::vec3(0.f, -5.f, 2.f));
+		cam->SetTarPos(glm::vec3(0.f, 0.f, 0.f));
+		cam->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
+		r.s->UseCamera(cam);
 		// Quad at y=-5 in XZ plane, 5 units forward from the sun shadow camera at (0,-10,0)
 		const char* ob =
 			"v -2.5 -5 -2.5\n"

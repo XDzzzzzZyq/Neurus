@@ -175,6 +175,16 @@ public:
 				<< " - selections defaulted (old project format).");
 		}
 
+		// If no camera was deserialized, add a default one
+		if (proj_scene->cam_list.empty())
+		{
+			NEURUS_ERR("[Project] No camera in scene, adding default camera.");
+			auto defaultCam = std::make_shared<Camera>();
+			defaultCam->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+			defaultCam->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+			proj_scene->UseCamera(defaultCam);
+		}
+
 		// Config is optional — old files won't have it
 		try
 		{

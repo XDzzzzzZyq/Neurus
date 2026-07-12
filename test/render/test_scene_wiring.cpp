@@ -238,11 +238,12 @@ protected:
 };
 
 // ---------------------------------------------------------------------------
-// 1. DrawFrame with empty scene — no crash
+// 1. DrawFrame with scene containing only a camera — no crash
 // ---------------------------------------------------------------------------
 
 /**
- * @test Constructing DeferredRenderer and calling DrawFrame with an empty scene does not crash.
+ * @test Constructing DeferredRenderer and calling DrawFrame with a scene
+ * that has a camera but no meshes/lights does not crash.
  */
 TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 {
@@ -254,10 +255,12 @@ TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 	ASSERT_NO_FATAL_FAILURE(CreateRenderer(kRenderWidth, kRenderHeight));
 	ASSERT_NE(m_renderer, nullptr);
 
-	Scene emptyScene;
+	Scene scene;
+	auto cam = CreateDefaultCamera();
+	scene.UseCamera(cam);
 
 	// DrawFrame must not throw or cause a fatal failure
-	EXPECT_NO_THROW(m_renderer->DrawFrame(emptyScene));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));
 
 	// Ensure GPU is idle before teardown
 	m_renderer->WaitIdle();

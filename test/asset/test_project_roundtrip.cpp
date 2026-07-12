@@ -54,7 +54,7 @@ TEST(ProjectRoundtrip, EmptyScene)
 	auto loaded = project::Project::Open(tmp.path);
 	auto& scene = loaded.GetScene();
 
-	EXPECT_TRUE(scene.cam_list.empty());
+	EXPECT_EQ(scene.cam_list.size(), 1u);
 	EXPECT_TRUE(scene.mesh_list.empty());
 	EXPECT_TRUE(scene.light_list.empty());
 	EXPECT_TRUE(scene.sprite_list.empty());

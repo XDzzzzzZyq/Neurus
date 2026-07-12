@@ -94,21 +94,11 @@ public:
 	/**
 	 * @brief Draws a single frame: acquire → record → submit → present.
 	 *
-	 * Uses a fallback default camera (positioned at (0,2,5), looking at origin).
-	 * Handles swapchain recreation on VK_ERROR_OUT_OF_DATE_KHR.
-	 * Safe to call repeatedly (fence-guarded, max kMaxFramesInFlight in flight).
+	 * Reads camera and geometry from the scene. Handles swapchain recreation
+	 * on VK_ERROR_OUT_OF_DATE_KHR. Safe to call repeatedly (fence-guarded,
+	 * max kMaxFramesInFlight in flight).
 	 *
-	 * @deprecated Use DrawFrame(const Scene&) to provide scene-defined camera.
-	 */
-	void DrawFrame();
-
-	/**
-	 * @brief Draws a single frame using the scene's active camera.
-	 *
-	 * Reads camera transform and projection from scene.GetActiveCamera().
-	 * Falls back to default camera if no active camera is set.
-	 *
-	 * @param scene Scene providing the active camera for this frame.
+	 * @param scene Scene providing active camera and mesh/light lists.
 	 */
 	void DrawFrame(const Scene& scene);
 

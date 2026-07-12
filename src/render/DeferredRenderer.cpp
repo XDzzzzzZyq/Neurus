@@ -19,11 +19,8 @@
 #include "passes/ShadowDepthPass.h"
 #include "passes/ShadowIntensityPass.h"
 
-#include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Scene.h"
-
-#include <glm/gtc/matrix_transform.hpp>
 
 #include "Log.h"
 
@@ -182,112 +179,8 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::DrawFrame()
-{
-	// Fallback camera matching the old hardcoded defaults.
-	Camera fallbackCam;
-	fallbackCam.SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
-	fallbackCam.cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-
-	auto& fence = r_inFlightFences[r_currentFrame];
-	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
-
-	// --- Wait for this frame slot's fence ---
-	if (r_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
-	{
-		return;  // Timeout - skip this frame
-	}
-
-	// --- Acquire next swapchain image ---
-	uint32_t imageIndex = 0;
-	bool skipFrame = false;
-	try
-	{
-		imageIndex = r_swapchain->AcquireNextImage(imageAvailable);
-		r_lastImageIndex = imageIndex;
-	}
-	catch (const vk::OutOfDateKHRError&)
-	{
-		NEURUS_ERR("AcquireNextImage: swapchain out of date");
-		skipFrame = true;
-	}
-	catch (const std::exception& e)
-	{
-		NEURUS_ERR("AcquireNextImage failed: " << e.what());
-		skipFrame = true;
-	}
-
-	// --- Handle swapchain recreation (from out-of-date acquire or external resize) ---
-	if (r_swapchain->generation() != r_swapchainGeneration)
-	{
-		recreateSwapchain();
-		skipFrame = true;
-	}
-
-	if (skipFrame)
-	{
-		// Don't advance r_currentFrame - retry same slot next frame
-		return;
-	}
-
-	// Only reset fence after successful acquire
-	r_device.resetFences(*fence);
-
-	// --- Record and submit (reuse pre-allocated command buffer) ---
-	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
-
-	// No-args DrawFrame is deprecated and used only as camera-fallback.
-	// Pass empty scene (no geometry drawn) - the fallback exists only
-	// to prevent a crash when no camera is configured.
-	{
-		Scene emptyScene;
-		recordFrame(r_commandBuffers[imageIndex], imageIndex, emptyScene);
-	}
-
-	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
-	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
-
-	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBufRaw, *renderFinished);
-	r_graphicsQueue.submit(submitInfo, *fence);
-
-	// --- Present ---
-	bool presentFailed = false;
-	try
-	{
-		r_swapchain->Present(renderFinished, imageIndex, r_graphicsQueue);
-	}
-	catch (const std::exception& e)
-	{
-		NEURUS_ERR("Present failed: " << e.what());
-		presentFailed = true;
-	}
-
-	// --- Handle swapchain recreation after present ---
-	if (r_swapchain->generation() != r_swapchainGeneration)
-	{
-		recreateSwapchain();
-		presentFailed = true;
-	}
-
-	if (presentFailed)
-	{
-		// Don't advance frame - retry same slot next iteration
-		return;
-	}
-
-	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
-}
-
 void DeferredRenderer::DrawFrame(const Scene& scene)
 {
-	const Camera* activeCam = scene.GetActiveCamera();
-	if (!activeCam)
-	{
-		NEURUS_ERR("DrawFrame(Scene): No active camera in scene, falling back to default camera");
-		DrawFrame();
-		return;
-	}
-
 	auto& fence = r_inFlightFences[r_currentFrame];
 	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
 
@@ -449,10 +342,6 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	cmdBuf.reset();
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBuf.begin(beginInfo);
-
-	// --- Compute camera matrices for this frame ---
-	const Camera* activeCam = scene.GetActiveCamera();
-	if (!activeCam) { cmdBuf.end(); return; }
 
 	// --- Build per-frame render context (constructed once, passed to all passes) ---
 	RenderContext ctx{};

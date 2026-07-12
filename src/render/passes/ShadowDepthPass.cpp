@@ -429,7 +429,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 		// Get camera target for shadow ortho center
 		const Camera* activeCam = ctx.scene->GetActiveCamera();
-		const glm::vec3 center = activeCam ? activeCam->cam_tar : glm::vec3(0.0f);
+		const glm::vec3 center = activeCam->cam_tar;
 
 		const float field = Light::sun_shadow_field;
 		const float nearPlane = Light::sun_shadow_near;
