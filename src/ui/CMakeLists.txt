@@ -3,8 +3,6 @@
 add_library(neurus_ui STATIC
 	UIManager.h
 	UIManager.cpp
-	Viewport.h
-	Viewport.cpp
 	panels/UIPanel.h
 	panels/Outliner.h
 	panels/Outliner.cpp
@@ -12,6 +10,8 @@ add_library(neurus_ui STATIC
 	panels/PropertyEditor.cpp
 	panels/RenderConfigPanel.h
 	panels/RenderConfigPanel.cpp
+	panels/Viewport.h
+	panels/Viewport.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC

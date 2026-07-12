@@ -2,7 +2,7 @@
 #include "panels/Outliner.h"
 #include "panels/PropertyEditor.h"
 #include "panels/RenderConfigPanel.h"
-#include "Viewport.h"
+#include "panels/Viewport.h"
 
 #include "editor/events/UIEvents.h"
 

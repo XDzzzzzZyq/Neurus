@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include "UIPanel.h"
 
 class QKeyEvent;
 class QMouseEvent;
@@ -24,7 +24,7 @@ namespace neurus {
  * @note This class owns no Vulkan resources. It provides the HWND only;
  *       surface creation is the Renderer's responsibility.
  */
-class Viewport : public QWidget
+class Viewport : public UIPanel
 {
 	Q_OBJECT
 
@@ -51,7 +51,7 @@ public:
 	 */
 	HWND hwnd() const { return reinterpret_cast<HWND>(winId()); }
 
-Q_SIGNALS:
+signals:
 	/**
 	 * @brief Emitted when the widget is resized.
 	 * @param width New width in pixels.

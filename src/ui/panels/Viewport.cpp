@@ -1,4 +1,4 @@
-#include "Viewport.h"
+#include "panels/Viewport.h"
 
 #include "core/Log.h"
 #include "editor/Input.h"
@@ -13,7 +13,7 @@
 namespace neurus {
 
 Viewport::Viewport(QWidget* parent)
-	: QWidget(parent)
+	: UIPanel(parent)
 {
 	// Ensure a dedicated native window handle exists for Vulkan surface creation
 	setAttribute(Qt::WA_NativeWindow);

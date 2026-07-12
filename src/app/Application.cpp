@@ -39,7 +39,7 @@
 #include "ui/UIManager.h"
 #include "ui/panels/Outliner.h"
 #include "ui/panels/PropertyEditor.h"
-#include "ui/Viewport.h"
+#include "ui/panels/Viewport.h"
 
 #include <QApplication>
 #include <QCoreApplication>
