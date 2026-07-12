@@ -134,4 +134,33 @@ void Barrier::Transition(VkCommandBuffer cmd,
 	vk::CommandBuffer(cmd).pipelineBarrier2(depInfo);
 }
 
+// ---------------------------------------------------------------------------
+// Transition (raw vk::Image with explicit before/after — no state tracking)
+// ---------------------------------------------------------------------------
+
+void Barrier::Transition(VkCommandBuffer cmd,
+                         vk::Image image,
+                         ImageState before,
+                         ImageState after,
+                         const vk::ImageSubresourceRange& subresourceRange)
+{
+	const auto beforeState = ToVulkanImageState(before);
+	const auto afterState  = ToVulkanImageState(after);
+
+	const vk::ImageMemoryBarrier2 barrier(
+		beforeState.stage,
+		beforeState.access,
+		afterState.stage,
+		afterState.access,
+		beforeState.layout,
+		afterState.layout,
+		VK_QUEUE_FAMILY_IGNORED,
+		VK_QUEUE_FAMILY_IGNORED,
+		image,
+		subresourceRange);
+
+	const vk::DependencyInfo depInfo({}, {}, {}, barrier);
+	vk::CommandBuffer(cmd).pipelineBarrier2(depInfo);
+}
+
 } // namespace neurus

@@ -94,6 +94,36 @@ public:
 	{
 		Transition(*cmd, image, after, subresourceRange);
 	}
+
+	/**
+	 * @brief Records a pipeline barrier for a raw vk::Image with explicit before/after states.
+	 *
+	 * For images not wrapped in a neurus::Image (e.g. swapchain images), provides
+	 * the same centralized state→layout mapping without tracking state.
+	 *
+	 * @param cmd               Command buffer handle (raw VkCommandBuffer).
+	 * @param image             Raw Vulkan image handle.
+	 * @param before            Source logical state.
+	 * @param after             Target logical state.
+	 * @param subresourceRange  Subresource range for the barrier.
+	 */
+	static void Transition(VkCommandBuffer cmd,
+	                       vk::Image image,
+	                       ImageState before,
+	                       ImageState after,
+	                       const vk::ImageSubresourceRange& subresourceRange);
+
+	/**
+	 * @brief Convenience overload for vk::raii::CommandBuffer.
+	 */
+	static void Transition(const vk::raii::CommandBuffer& cmd,
+	                       vk::Image image,
+	                       ImageState before,
+	                       ImageState after,
+	                       const vk::ImageSubresourceRange& subresourceRange)
+	{
+		Transition(*cmd, image, before, after, subresourceRange);
+	}
 };
 
 } // namespace neurus

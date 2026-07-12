@@ -485,20 +485,9 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	{
 		Barrier::Transition(*cmdBuf, hdrColor, ImageState::TransferSrc);
 
-		const auto scBarrier = vk::ImageMemoryBarrier2(
-			vk::PipelineStageFlagBits2::eTopOfPipe,
-			vk::AccessFlagBits2::eNone,
-			vk::PipelineStageFlagBits2::eTransfer,
-			vk::AccessFlagBits2::eTransferWrite,
-			vk::ImageLayout::eUndefined,
-			vk::ImageLayout::eTransferDstOptimal,
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			swapchainImage,
+		Barrier::Transition(*cmdBuf, swapchainImage,
+			ImageState::Undefined, ImageState::TransferDst,
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-
-		const vk::DependencyInfo depInfo({}, {}, {}, scBarrier);
-		cmdBuf.pipelineBarrier2(depInfo);
 	}
 
 	// --- Blit: HDRColor → swapchain image ---
@@ -522,22 +511,9 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	}
 
 	// --- Transition swapchain image to PRESENT_SRC_KHR ---
-	{
-		const auto barrier = vk::ImageMemoryBarrier2(
-			vk::PipelineStageFlagBits2::eTransfer,
-			vk::AccessFlagBits2::eTransferWrite,
-			vk::PipelineStageFlagBits2::eBottomOfPipe,
-			vk::AccessFlagBits2::eNone,
-			vk::ImageLayout::eTransferDstOptimal,
-			vk::ImageLayout::ePresentSrcKHR,
-			VK_QUEUE_FAMILY_IGNORED,
-			VK_QUEUE_FAMILY_IGNORED,
-			swapchainImage,
-			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
-
-		const vk::DependencyInfo depInfo({}, {}, {}, barrier);
-		cmdBuf.pipelineBarrier2(depInfo);
-	}
+	Barrier::Transition(*cmdBuf, swapchainImage,
+		ImageState::TransferDst, ImageState::Present,
+		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
 	// --- End command buffer ---
 	cmdBuf.end();
