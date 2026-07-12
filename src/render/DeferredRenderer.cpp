@@ -277,6 +277,27 @@ void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
 	}
 }
 
+void DeferredRenderer::HandleSurfaceChange(const vk::raii::SurfaceKHR& newSurface)
+{
+	r_device.waitIdle();
+
+	// Preserve current extent to pass to the new swapchain
+	uint32_t width = r_swapchain ? r_swapchain->extent().width : 800;
+	uint32_t height = r_swapchain ? r_swapchain->extent().height : 600;
+
+	// Destroy old swapchain (which held a reference to the old surface)
+	r_swapchain.reset();
+
+	// Create new swapchain bound to the new surface
+	r_swapchain = std::make_unique<Swapchain>(r_physicalDevice, r_device, newSurface, width, height);
+
+	// Rebuild dependent resources for the new swapchain
+	recreateSwapchain();
+
+	NEURUS_LOG("[DeferredRenderer] Surface changed — swapchain rebuilt "
+	           << r_swapchain->extent().width << "x" << r_swapchain->extent().height);
+}
+
 // ---------------------------------------------------------------------------
 // Swapchain recreation
 // ---------------------------------------------------------------------------

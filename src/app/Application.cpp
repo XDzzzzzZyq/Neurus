@@ -310,6 +310,28 @@ void Application::WireSignals()
 	                     ResizeViewport(width, height);
 	                 });
 
+	// Handle Viewport recreation (new native HWND → new surface → new swapchain)
+	QObject::connect(&uiEvents, &neurus::UIEvents::viewportRecreated,
+	                 [this](quintptr newHwnd) {
+	                     if (!app_vkContext || !app_renderer)
+	                         return;
+	                     try
+	                     {
+	                         HINSTANCE hinstance = GetModuleHandle(nullptr);
+	                         vk::Win32SurfaceCreateInfoKHR surfaceCI({}, hinstance,
+	                             reinterpret_cast<HWND>(newHwnd));
+	                         auto new_surface = std::make_unique<vk::raii::SurfaceKHR>(
+	                             app_vkContext->instance(), surfaceCI);
+	                         app_renderer->HandleSurfaceChange(*new_surface);
+	                         app_surface = std::move(new_surface);  // Old surface destroyed AFTER swapchain drops its ref
+	                         NEURUS_LOG("[Application] Viewport recreated — new surface + swapchain");
+	                     }
+	                     catch (const std::exception& e)
+	                     {
+	                         NEURUS_ERR("Viewport recreation failed: " << e.what());
+	                     }
+	                 });
+
 	// Handle screenshot requests (F12 / menu action) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotRequested,
 	                 [this]() {

@@ -147,6 +147,17 @@ public:
 	 */
 	void HandleResize(uint32_t width, uint32_t height);
 
+	/**
+	 * @brief Handles viewport recreation by rebuilding the swapchain with a new surface.
+	 *
+	 * Destroy the old swapchain and create a new one bound to the given surface.
+	 * Rebuilds all dependent resources (attachments, semaphores, command buffers).
+	 * Used when the Viewport widget is recreated with a new native HWND.
+	 *
+	 * @param newSurface New presentation surface (from the recreated Viewport).
+	 */
+	void HandleSurfaceChange(const vk::raii::SurfaceKHR& newSurface);
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.

@@ -10,48 +10,7 @@
 - Only master agent can commit and merge. If the tasks of subagents may have
   code overlaps, use Branches and Git Worktree for parallelism and isolation.
   Don't forget to remove the branch and worktree after the task is completed.
-
-## Git Worktree Parallel Workflow
-
-For isolated feature work, use git worktrees on separate branches:
-
-```
-# 1. CREATE worktree + branch (from clean master)
-git worktree add ../Neurus_Feature -b feature/my-feature
-
-# 2. WORK EXCLUSIVELY in the worktree directory
-#    NEVER touch files in the main workspace (D:\Projects\Neurus)
-#    All edits, commits happen in D:\Projects\Neurus_Feature
-#    The main workspace stays on master, clean.
-
-# 3. COMMIT in worktree
-cd ../Neurus_Feature
-git add <files>
-git commit -m "feat(scope): description"
-
-# 4. MERGE back to master (from main workspace)
-cd ../Neurus                  # back to main workspace (on master)
-git merge feature/my-feature
-
-# 5. RESOLVE merge conflicts if any
-#    - Read all conflicted files with conflict markers
-#    - Combine both sides intelligently (keep new features from master,
-#      keep your refactoring from the feature branch)
-#    - Verify no <<<<<< / ====== / >>>>>> markers remain
-#    git add <resolved-files>
-#    git commit -m "merge: feature/my-feature into master"
-
-# 6. RUN FULL TEST SUITE (never skip)
-cmake --preset default
-cmake --build build/debug
-cd build/debug && ctest --output-on-failure
-
-# 7. CLEAN UP
-git branch -d feature/my-feature
-git worktree remove ../Neurus_Feature
-# If worktree directory is locked (Permission denied), remove with --force
-# If already unregistered from git, manually delete: Remove-Item -Recurse -Force
-```
+- Use `worktree_create` tools for creating worktree. The worktree directory should be outside the main workspace.
 
 ## Lessons Learned
 

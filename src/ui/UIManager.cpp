@@ -194,19 +194,20 @@ static QWidget* makePlaceholder(const QString& text)
 
 void UIManager::CreateDocks()
 {
-	if (!win_viewportWidget){
-		// Create Viewport after docks — CreateDocks() places it as viewport content
-		win_viewportWidget = new Viewport();
-		win_viewportWidget->resize(800, 600);
-		win_viewportWidget->winId();  // Force native window handle creation
+	// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
+	win_viewportWidget = new Viewport();
+	win_viewportWidget->resize(800, 600);
+	win_viewportWidget->winId();  // Force native window handle creation
 
-		// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
-		win_viewportDock = new ads::CDockWidget(win_dockManager, "Viewport");
-		win_viewportDock->setWidget(win_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
-		win_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-		// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
-		win_dockManager->addDockWidget(ads::LeftDockWidgetArea, win_viewportDock);
-	}
+	HWND newHwnd = win_viewportWidget->hwnd();
+
+	win_viewportDock = new ads::CDockWidget(win_dockManager, "Viewport");
+	win_viewportDock->setWidget(win_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
+	win_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, win_viewportDock);
+
+	// Notify Application of the new native HWND for surface recreation
+	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
 
 	// --- Left: Shader Editor ---
 	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
@@ -280,17 +281,14 @@ void UIManager::LoadLayout()
 
 void UIManager::RestoreDefaultLayout()
 {
-	// Delete all non-viewport docks
+	// Delete all docks — viewport will be recreated in CreateDocks() with a new HWND
 	auto docks = win_dockManager->dockWidgetsMap();
 	for (auto it = docks.begin(); it != docks.end(); ++it)
 	{
-		if (it.value() != win_viewportDock)
-		{
-			it.value()->deleteDockWidget();
-		}
+		it.value()->deleteDockWidget();
 	}
 
-	// Re-create the default dock arrangement
+	// Re-create the default dock arrangement (emits viewportRecreated)
 	CreateDocks();
 }
 
