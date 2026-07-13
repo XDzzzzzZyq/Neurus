@@ -81,6 +81,8 @@ _VULKAN_HPP_LABELS = {
 _GLM_LABELS = {'vec3', 'vec2', 'vec4', 'mat4', 'mat3', 'mat2', 'quat'}
 _QT_LABELS = {
     'QString', 'QWidget', 'QObject', 'QWindow', 'QVulkanInstance',
+    'QComboBox', 'QFormLayout', 'QCheckBox', 'QSlider', 'QSpinBox',
+    'QStringList',
     'QModelIndex', 'QDoubleSpinBox', 'QKeyEvent', 'QMouseEvent',
     'QPaintEvent', 'QResizeEvent', 'QWheelEvent', 'HWND',
 }
