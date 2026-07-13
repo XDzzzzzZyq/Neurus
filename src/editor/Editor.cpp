@@ -14,6 +14,8 @@
 #include "render/resources/LightGPU.h"
 #include "render/resources/LightingGPU.h"
 #include "render/resources/MeshGPU.h"
+
+#include "render/RenderContext.h"
 #include "ui/UIContext.h"
 
 #include "core/Log.h"
@@ -145,6 +147,13 @@ void Editor::Initialize(Scene& scene)
 Scene& Editor::GetScene()
 {
 	return ed_project->GetScene();
+}
+
+RenderContext Editor::GetRenderContext() const
+{
+	RenderContext ctx;
+	ctx.scene = &ed_project->GetScene();
+	return ctx;
 }
 
 neurus::project::Project& Editor::GetProject()

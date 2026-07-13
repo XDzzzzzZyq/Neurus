@@ -286,7 +286,7 @@ void Application::WireSignals()
 	                         Input::UpdateState();
 	                         app_editor->Edit(Input::GetInputState());
 	                         app_eventBus.Process();  // Dispatch all enqueued events before drawing
-	                         app_renderer->DrawFrame(app_editor->GetScene());
+	                         app_renderer->DrawFrame(app_editor->GetRenderContext());
 	                         app_mainWindow->Refresh(app_editor->GetUIContext());
 	                     }
 	                 });

@@ -179,7 +179,7 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::DrawFrame(const Scene& scene)
+void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 {
 	auto& fence = r_inFlightFences[r_currentFrame];
 	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
@@ -227,7 +227,7 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
-	recordFrame(r_commandBuffers[imageIndex], imageIndex, scene);
+	recordFrame(r_commandBuffers[imageIndex], imageIndex, ctx);
 
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -355,7 +355,7 @@ void DeferredRenderer::recreateSwapchain()
 // ---------------------------------------------------------------------------
 
 void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
-                                   const Scene& scene)
+                                   const RenderContext& editorCtx)
 {
 	const vk::Extent2D extent = r_swapchain->extent();
 
@@ -364,12 +364,12 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBuf.begin(beginInfo);
 
-	// --- Build per-frame render context (constructed once, passed to all passes) ---
-	RenderContext ctx{};
+	// --- Build per-frame render context ---
+	// Copy the editor-produced context (scene) and fill in render-specific fields.
+	RenderContext ctx = editorCtx;
 	ctx.width = extent.width;
 	ctx.height = extent.height;
 	ctx.frameIndex = r_currentFrame;
-	ctx.scene = &scene;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---
 	r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);

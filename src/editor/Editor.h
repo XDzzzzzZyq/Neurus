@@ -16,6 +16,7 @@ class Environment;
 class UploadManager;
 class EventQueue;
 struct UIContext;
+struct RenderContext;
 }
 
 namespace neurus::project {
@@ -52,6 +53,17 @@ public:
 
 	Scene& GetScene();
 	neurus::project::Project& GetProject();
+
+	/**
+	 * @brief Builds a RenderContext from the current Editor state.
+	 *
+	 * Sets the scene pointer but leaves width, height, and frameIndex
+	 * at their default (0). The DeferredRenderer fills in the render-
+	 * specific fields from the swapchain before dispatching to passes.
+	 *
+	 * @return RenderContext with scene populated and render fields blank.
+	 */
+	RenderContext GetRenderContext() const;
 
 	/**
 	 * @brief Builds a UIContext snapshot from the current Editor/Project state.
