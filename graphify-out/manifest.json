@@ -1,12 +1,12 @@
 {
   "src/app/Application.cpp": {
-    "mtime": 1783827400.6592996,
-    "ast_hash": "22278a2f55ff902a5a4e95f6fe604220",
+    "mtime": 1783928508.2035408,
+    "ast_hash": "a0a3ff4f65b91f249e5c434e4199da82",
     "semantic_hash": ""
   },
   "src/app/Application.h": {
-    "mtime": 1783826812.5577164,
-    "ast_hash": "9c5ef02ea17988c91cf8f94209602b69",
+    "mtime": 1783858241.794549,
+    "ast_hash": "0d0831577346fef43ce54b6dd4a66872",
     "semantic_hash": ""
   },
   "src/asset/ImageData.cpp": {
@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "src/editor/events/UIEvents.h": {
-    "mtime": 1782873151.7946918,
-    "ast_hash": "7f7706b6381effdcfb01c3a5f9fe8933",
+    "mtime": 1783870890.843374,
+    "ast_hash": "a86396c3c781e3c360fb66faea962f78",
     "semantic_hash": ""
   },
   "src/main.cpp": {
@@ -105,13 +105,13 @@
     "semantic_hash": ""
   },
   "src/render/DeferredRenderer.cpp": {
-    "mtime": 1783844981.6307993,
-    "ast_hash": "55e82f9b7a7aa7161e1f27930062f3a3",
+    "mtime": 1783870849.6132731,
+    "ast_hash": "cb7733da0b495a9382e7f3dd739eaeaf",
     "semantic_hash": ""
   },
   "src/render/DeferredRenderer.h": {
-    "mtime": 1783844869.031124,
-    "ast_hash": "f44ea5f39e19dc9f975f2b082180ce46",
+    "mtime": 1783870828.3473055,
+    "ast_hash": "e41eeeece0a4ad5e689b9e127dab9e65",
     "semantic_hash": ""
   },
   "src/render/DescriptorManager.cpp": {
@@ -324,16 +324,6 @@
     "ast_hash": "6d2e680a3b21ce6c72f7ce9c76754605",
     "semantic_hash": ""
   },
-  "src/ui/NeurusMainWindow.cpp": {
-    "mtime": 1783827370.075819,
-    "ast_hash": "c109962ede453835f4d263d9b22a1b93",
-    "semantic_hash": ""
-  },
-  "src/ui/NeurusMainWindow.h": {
-    "mtime": 1783827364.904817,
-    "ast_hash": "38dbbc100c84c6197032457a63f1bb85",
-    "semantic_hash": ""
-  },
   "src/CMakeLists.txt": {
     "mtime": 1781796416.8357513,
     "ast_hash": "a5180652761cb1e4f6dd4138c584dbf5",
@@ -479,26 +469,6 @@
     "ast_hash": "226f485122710ab7fc110b2fdc5d2d6e",
     "semantic_hash": ""
   },
-  "src/ui/OutlinerPanel.cpp": {
-    "mtime": 1783827065.7431378,
-    "ast_hash": "53f458932f5add4f45263a9fdbf9eaa7",
-    "semantic_hash": ""
-  },
-  "src/ui/OutlinerPanel.h": {
-    "mtime": 1783827022.1586466,
-    "ast_hash": "336ffccacf93afc7d4ea7ed01c8e2786",
-    "semantic_hash": ""
-  },
-  "src/ui/PropertyEditor.cpp": {
-    "mtime": 1783827357.5745902,
-    "ast_hash": "5c8eb62036ca8f93b79c508b4997857c",
-    "semantic_hash": ""
-  },
-  "src/ui/PropertyEditor.h": {
-    "mtime": 1782052741.4739797,
-    "ast_hash": "370c118b2379ead4c39d27d6d8c4be45",
-    "semantic_hash": "370c118b2379ead4c39d27d6d8c4be45"
-  },
   "src/render/buffers/Buffer.cpp": {
     "mtime": 1782873073.489748,
     "ast_hash": "15bd4395ab0ffe001b09069386e3c796",
@@ -535,13 +505,13 @@
     "semantic_hash": ""
   },
   "src/app/VulkanContext.cpp": {
-    "mtime": 1782873425.7039852,
-    "ast_hash": "59bf5915a6a13ed6a78b93047812104d",
+    "mtime": 1783870136.4065404,
+    "ast_hash": "4428f4abadbf4d076752f07cfbfb8300",
     "semantic_hash": ""
   },
   "src/app/VulkanContext.h": {
-    "mtime": 1782873410.1145115,
-    "ast_hash": "f81fdcba9ba1f9d911e33c5c8df85eed",
+    "mtime": 1783870110.0074449,
+    "ast_hash": "671c7529b9947b104db1ee77759d96f7",
     "semantic_hash": ""
   },
   "src/render/Barrier.cpp": {
@@ -744,14 +714,59 @@
     "ast_hash": "98441532221ff3a932702c02f6c271a4",
     "semantic_hash": ""
   },
-  "src/ui/Viewport.cpp": {
-    "mtime": 1783823659.6689177,
-    "ast_hash": "ebfc4166e3d9fb00a0373fc575850d3e",
+  "src/ui/UIManager.cpp": {
+    "mtime": 1783928334.8562472,
+    "ast_hash": "be5c6d7e92973ac13ec385a449e4b399",
     "semantic_hash": ""
   },
-  "src/ui/Viewport.h": {
-    "mtime": 1783823635.1956425,
-    "ast_hash": "2a4ffea0a24f34ad222ecab00e493d09",
+  "src/ui/UIManager.h": {
+    "mtime": 1783927931.601196,
+    "ast_hash": "5c7e71a20ec53d794f699b27a745f09b",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/Outliner.cpp": {
+    "mtime": 1783927997.3543696,
+    "ast_hash": "1eeed47f41c63a5eead751511f428707",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/Outliner.h": {
+    "mtime": 1783927938.545669,
+    "ast_hash": "f591417e53f9dc26ea1f642b975b8bf1",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/PropertyEditor.cpp": {
+    "mtime": 1783927998.3705814,
+    "ast_hash": "5895936eed16c7174a5b1a52577c0e45",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/PropertyEditor.h": {
+    "mtime": 1783927939.5077548,
+    "ast_hash": "9d5fb22ebc4a83e98d1dde4354bc0af7",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/RenderConfigPanel.cpp": {
+    "mtime": 1783927999.3193593,
+    "ast_hash": "1977a1aefa33406ce839224af60c4845",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/RenderConfigPanel.h": {
+    "mtime": 1783927940.5183527,
+    "ast_hash": "3e860e46842a1b4d0108bb3ee764cb28",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/UIPanel.h": {
+    "mtime": 1783927891.3768134,
+    "ast_hash": "7d9f00dcde4d0cc470a220fa6f309722",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/Viewport.cpp": {
+    "mtime": 1783928134.6397343,
+    "ast_hash": "972b4963ae7aa4971e7347560a650232",
+    "semantic_hash": ""
+  },
+  "src/ui/panels/Viewport.h": {
+    "mtime": 1783927941.8572645,
+    "ast_hash": "f6fc3bd5ec5b55d27f89373e2efead9b",
     "semantic_hash": ""
   }
 }
