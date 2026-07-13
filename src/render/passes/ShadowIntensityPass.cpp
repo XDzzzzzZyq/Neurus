@@ -5,6 +5,7 @@
 
 #include "RenderCache.h"
 #include "passes/ShadowIntensityPass.h"
+#include "render/RenderConfig.h"
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
@@ -107,8 +108,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	}
 
 	NEURUS_LOG("[ShadowIntensityPass] numSets=" << numSets
-	           << " farPlane=" << Light::point_shadow_far
-	           << " bias=" << p_bias);
+	           << " farPlane=" << Light::point_shadow_far);
 
 	// --- Sun pipeline builder (owns the sun pipeline layout) ---
 	p_sunPipelineBuilder = std::make_unique<ComputePipelineBuilder>(device);
@@ -400,6 +400,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
 	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* config = static_cast<const RenderConfig*>(ctx.config);
+	const float shadowBias = config ? config->r_shadow_bias : 0.0005f;
 
 	{
 		int shadowCount = 0;
@@ -481,7 +483,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.lightPosY  = pos.y;
 			pc.lightPosZ  = pos.z;
 			pc.farPlane   = Light::point_shadow_far;
-			pc.bias       = p_bias;
+			pc.bias       = shadowBias;
 			pc.layerIndex = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
@@ -561,7 +563,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 			SunShadowEvalPushConstants pc = {};
 			pc.lightViewProj = lightViewProj;
-			pc.bias          = p_bias;
+			pc.bias          = shadowBias;
 			pc.layerIndex    = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(

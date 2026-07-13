@@ -80,6 +80,7 @@ private:
 	QGroupBox*  m_shadowsGroup      = nullptr;
 	QComboBox*  m_shadowAlgCombo    = nullptr;
 	QComboBox*  m_shadowPCFCombo    = nullptr;  ///< PCF filter mode (Hard/Soft16/Soft64)
+	ScalarSlider* m_shadowBiasSlider = nullptr;
 
 	// --- Ambient Occlusion ---
 	QGroupBox*  m_aoGroup           = nullptr;

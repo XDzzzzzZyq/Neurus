@@ -111,6 +111,9 @@ void RenderConfigPanel::BuildShadowsSection()
 
 	m_shadowPCFCombo = addComboRow(form, "PCF Filter",
 		{"Hard", "Soft PCF 16", "Soft PCF 64"});
+
+	m_shadowBiasSlider = new ScalarSlider(0.0f, 0.01f, 0.0001f, 1000, 0.0005f, this);
+	form->addRow("Bias", m_shadowBiasSlider);
 }
 
 // =========================================================================
@@ -215,6 +218,8 @@ void RenderConfigPanel::ConnectAllSignals()
 		this, emitCfg);
 	connect(m_shadowPCFCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 		this, emitCfg);
+	connect(m_shadowBiasSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
 
 	// --- Ambient Occlusion ---
 	connect(m_aoGroup, &QGroupBox::toggled, this, emitCfg);
@@ -266,6 +271,8 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 		case ShadowAlg::VSSM:           m_shadowAlgCombo->setCurrentIndex(3); break;
 		}
 		m_shadowsGroup->setChecked(config->r_shadow != ShadowAlg::None);
+
+		m_shadowBiasSlider->setValue(config->r_shadow_bias);
 	}
 
 	// --- Ambient Occlusion ---
@@ -337,6 +344,8 @@ RenderConfig RenderConfigPanel::Save() const
 	}
 	if (!m_shadowsGroup->isChecked())
 		config.r_shadow = ShadowAlg::None;
+
+	config.r_shadow_bias = static_cast<float>(m_shadowBiasSlider->value());
 
 	// --- Ambient Occlusion ---
 	switch (m_aoAlgCombo->currentIndex())
