@@ -50,6 +50,10 @@ struct RenderContext
 	/// GetActiveCamera(), mesh_list, light_list, and env_list.
 	const UID* scene = nullptr;
 
+	/// @brief Opaque pointer to RenderConfig (lifetime managed by Editor/UI layer).
+	/// Passes cast to RenderConfig* to read quality/feature flags set by the user.
+	void* config = nullptr;
+
 };
 
 } // namespace neurus

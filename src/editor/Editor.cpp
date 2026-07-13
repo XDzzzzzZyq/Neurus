@@ -153,6 +153,7 @@ RenderContext Editor::GetRenderContext() const
 {
 	RenderContext ctx;
 	ctx.scene = &ed_project->GetScene();
+	ctx.config = &ed_project->GetRenderConfig();
 	return ctx;
 }
 

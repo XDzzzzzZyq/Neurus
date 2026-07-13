@@ -5,7 +5,9 @@
 #include <QString>
 
 #include "controllers/Controllers.h"
-#include "editor/Input.h"   // InputState
+#include "editor/Input.h"        // InputState
+#include "render/RenderContext.h" // RenderContext (pure data, no Vulkan)
+#include "ui/UIContext.h"
 
 // Forward declarations (no render headers!)
 namespace neurus {
@@ -15,8 +17,6 @@ class Scene;
 class Environment;
 class UploadManager;
 class EventQueue;
-struct UIContext;
-struct RenderContext;
 }
 
 namespace neurus::project {
