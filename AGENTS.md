@@ -120,7 +120,7 @@ Key rules:
 - Plan by tracing the closest existing feature
 - Break into 4 waves: Foundation → Core → Integration → Tests/Docs
 - Verify EVERY wave: build, ctest, VUID check, Python PIL for references
-- Never commit until user approves, unless user notified you in advanced.
+- Never commit until user approves, unless user notified you in advance.
 
 ## Development Guidelines
 
@@ -250,7 +250,7 @@ Neurus/
 - Keep classes lean. Prefer composition over inheritance. Avoid sprawling
   god classes that mix rendering, logic, and I/O. If a class has more
   than 8-10 public methods, question whether it's doing too much.
-- If a file or function feels "clumpsy", refactor it early. Technical debt
+- If a file or function feels "clumsy", refactor it early. Technical debt
   compounds fast in rendering code, where debugging GPU state is already
   complex enough.
 - Do not add global state unless a file already uses it and there is no
@@ -298,7 +298,7 @@ The entire codebase uses a **Z-up, +Y forward, right-hand** coordinate system
 ## Subagent Racing Prevention
 
 Multiple parallel subagents can race on `cmake --build` or launching
-`Neurus.exe` or the tests, causing file lock contention and false test failures. Moreover, subagent may use `git stash` to revet the changes, this will interrupt the editing of other subagents.
+`Neurus.exe` or the tests, causing file lock contention and false test failures. Moreover, subagent may use `git stash` to revert the changes, this will interrupt the editing of other subagents.
 
 **Rules:**
 1. **Only the master agent runs `cmake --build build/debug`** for the final

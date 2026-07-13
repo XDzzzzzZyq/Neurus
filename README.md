@@ -12,13 +12,13 @@ with modern rendering algorithms.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ UI Layer (Qt6 QML)                                          │
+│ UI Layer (Qt6 Widgets + ADS)                                 │
 │  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
 └─────────────────────┬────────────────────────────────────────┘
                       │ Qt Signals/Slots
                       ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ Editor Layer                                                │
+│ Editor Layer                                                 │
 │  owns: Project, UploadManager, Controllers                   │
 └─────────────────────┬────────────────────────────────────────┘
                       │
