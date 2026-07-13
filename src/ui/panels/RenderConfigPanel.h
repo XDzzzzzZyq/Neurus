@@ -47,10 +47,14 @@ public:
 	RenderConfigPanel& operator=(const RenderConfigPanel&) = delete;
 
 	/**
-	 * @brief Populates all controls from a RenderConfig snapshot.
-	 * @param config Read-only reference to the current render config.
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Extracts the RenderConfig pointer from the context and populates
+	 * all controls with current values. Emits no signals (QSignalBlocker).
+	 *
+	 * @param ctx Read-only UI context carrying the current RenderConfig.
 	 */
-	void LoadFromConfig(const RenderConfig& config);
+	void Refresh(const UIContext& ctx) override;
 
 	/**
 	 * @brief Writes current UI values back into a RenderConfig struct.

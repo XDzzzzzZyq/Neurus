@@ -31,6 +31,17 @@ public:
 	int getViewportHeight() const;
 
 	/**
+	 * @brief Refreshes all UIPanel subclasses with the current UIContext.
+	 *
+	 * Iterates over all registered panels and calls Refresh(ctx) on each.
+	 * Called from the newFrame loop after DrawFrame() to keep UI widgets
+	 * in sync with Editor/Project state.
+	 *
+	 * @param ctx Read-only UI context carrying Editor/Project state.
+	 */
+	void Refresh(const UIContext& ctx);
+
+	/**
 	 * @brief Returns typed pointer to a panel by its type.
 	 *
 	 * Each panel class must provide static constexpr PanelType kType

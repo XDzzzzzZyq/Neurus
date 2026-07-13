@@ -47,6 +47,16 @@ public:
 	PropertyEditor& operator=(const PropertyEditor&) = delete;
 
 	/**
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Currently a no-op — the PropertyEditor updates on ObjectSelected events
+	 * rather than per-frame refresh.
+	 *
+	 * @param ctx Read-only UI context (unused).
+	 */
+	void Refresh(const UIContext& ctx) override;
+
+	/**
 	 * @brief Sets the active scene for object lookups.
 	 * @param scene Non-owning pointer to the Scene.
 	 */

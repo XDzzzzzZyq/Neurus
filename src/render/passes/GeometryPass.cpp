@@ -174,8 +174,11 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device)
 
 void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	// --- Cast scene UID to Scene* for access to Scene-specific members ---
+	const auto* scene = static_cast<const Scene*>(ctx.scene);
+
 	// --- Extract per-frame context ---
-	const Camera* cam = ctx.scene->GetActiveCamera();
+	const Camera* cam = scene->GetActiveCamera();
 	const CameraUBOData cameraData{
 		cam->GetProjectionMatrix() * cam->GetViewMatrix(),
 		cam->GetViewMatrix()
@@ -232,9 +235,9 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	                          {});
 
 	// --- 7. Draw each mesh from scene.mesh_list ---
-	if (ctx.scene)
+	if (scene)
 	{
-		for (const auto& [id, mesh] : ctx.scene->mesh_list)
+		for (const auto& [id, mesh] : scene->mesh_list)
 		{
 			if (!mesh || !mesh->o_mesh) continue;
 

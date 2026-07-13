@@ -5,6 +5,7 @@
 
 #include "Outliner.h"
 
+#include "UIContext.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -43,6 +44,16 @@ Outliner::Outliner(QWidget* parent)
 
 	connect(m_treeView, &QTreeView::clicked,
 		this, &Outliner::OnItemClicked);
+}
+
+// =========================================================================
+// Refresh(const UIContext&) - no-op per-frame refresh
+// =========================================================================
+
+void Outliner::Refresh(const UIContext& /*ctx*/)
+{
+	// Outliner data is rebuilt on project load/change via Refresh(const Scene&),
+	// not on a per-frame basis.
 }
 
 // =========================================================================

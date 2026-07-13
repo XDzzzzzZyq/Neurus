@@ -3,6 +3,7 @@
 #include "panels/PropertyEditor.h"
 #include "panels/RenderConfigPanel.h"
 #include "panels/Viewport.h"
+#include "UIContext.h"
 
 #include "editor/events/UIEvents.h"
 
@@ -70,6 +71,21 @@ int UIManager::getViewportHeight() const
 {
 	auto* vp = GetPanel<Viewport>();
 	return vp ? vp->height() : 0;
+}
+
+// =========================================================================
+// Refresh – push UIContext to all registered panels
+// =========================================================================
+
+void UIManager::Refresh(const UIContext& ctx)
+{
+	for (auto& [type, widget] : m_panels)
+	{
+		if (auto* panel = qobject_cast<UIPanel*>(widget))
+		{
+			panel->Refresh(ctx);
+		}
+	}
 }
 
 // =========================================================================

@@ -398,9 +398,12 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		return;
 	}
 
+	// --- Cast scene UID to Scene* for access to Scene-specific members ---
+	const auto* scene = static_cast<const Scene*>(ctx.scene);
+
 	{
 		int shadowCount = 0;
-		for (const auto& [uid, light] : ctx.scene->light_list)
+		for (const auto& [uid, light] : scene->light_list)
 		{
 			if (light && light->use_shadow)
 			{
@@ -431,7 +434,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	//     from light N-1.  Without this alternation, updating a bound descriptor
 	//     set invalidates the command buffer (VUID-00059 chain).
 	uint32_t lightIndex = 0;
-	for (const auto& [uid, light] : ctx.scene->light_list)
+	for (const auto& [uid, light] : scene->light_list)
 	{
 		// Skip non-shadow-casting lights and non-point lights (sun lights handled separately)
 		if (!light || !light->use_shadow) continue;
@@ -499,7 +502,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	// --- 4b. Dispatch sun (directional) shadow evaluation for each shadow-casting sun light ---
 	//        Uses a separate pipeline and descriptor sets for the 2D shadow path.
 	uint32_t sunLightIndex = 0;
-	for (const auto& [uid, light] : ctx.scene->light_list)
+	for (const auto& [uid, light] : scene->light_list)
 	{
 		// Only process sun lights that cast shadows
 		if (!light || !light->use_shadow) continue;
@@ -548,7 +551,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 				? kAltUp : kWorldUp;
 
 			// Use camera target as ortho centre (same as ShadowDepthPass)
-			const Camera* activeCam = ctx.scene->GetActiveCamera();
+			const Camera* activeCam = scene->GetActiveCamera();
 			const glm::vec3 center = activeCam->cam_tar;
 			const glm::vec3 lightEye = center - lightDir * farPlane;
 			const glm::mat4 lightView = glm::lookAt(lightEye, center, up);

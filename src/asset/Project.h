@@ -137,6 +137,20 @@ public:
 	 */
 	const Scene& GetScene() const { return *proj_scene; }
 
+	// --- Render config access ---
+
+	/**
+	 * @brief Returns a mutable reference to the render configuration.
+	 * @return Reference to the owned RenderConfig.
+	 */
+	RenderConfig& GetRenderConfig() { return proj_config; }
+
+	/**
+	 * @brief Returns a const reference to the render configuration.
+	 * @return Const reference to the owned RenderConfig.
+	 */
+	const RenderConfig& GetRenderConfig() const { return proj_config; }
+
 	// --- File path ---
 
 	/**

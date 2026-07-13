@@ -21,6 +21,8 @@
 #include <QWidget>
 #include <cstdint>
 
+#include "UIContext.h"
+
 namespace neurus
 {
 
@@ -59,6 +61,17 @@ public:
 
 	/** @brief Returns the human-readable panel name (e.g. "Viewport", "Outliner"). */
 	const QString& PanelName() const { return m_name; }
+
+	/**
+	 * @brief Refreshes the panel's display from a UIContext snapshot.
+	 *
+	 * Called by UIManager::Refresh() each frame. Each subclass implements
+	 * this to extract the data it needs from the context (RenderConfig,
+	 * Scene, etc.) and update its widgets.
+	 *
+	 * @param ctx Read-only UI context carrying Editor/Project state.
+	 */
+	virtual void Refresh(const neurus::UIContext& ctx) = 0;
 
 private:
 	/** @brief Returns the default display name for a given PanelType. */

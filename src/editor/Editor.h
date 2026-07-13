@@ -15,6 +15,7 @@ class Scene;
 class Environment;
 class UploadManager;
 class EventQueue;
+struct UIContext;
 }
 
 namespace neurus::project {
@@ -51,6 +52,17 @@ public:
 
 	Scene& GetScene();
 	neurus::project::Project& GetProject();
+
+	/**
+	 * @brief Builds a UIContext snapshot from the current Editor/Project state.
+	 *
+	 * Called each frame from the newFrame loop to carry RenderConfig and
+	 * other editor state to the UI layer. The returned UIContext carries
+	 * opaque pointers that panels cast to their concrete types.
+	 *
+	 * @return UIContext populated with pointers into Project-owned data.
+	 */
+	UIContext GetUIContext() const;
 
 	/**
 	 * @brief Registers a controller of type T, calls Init(bus), and stores it.

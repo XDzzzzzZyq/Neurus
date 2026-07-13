@@ -37,6 +37,7 @@
 #include "asset/Project.h"
 #include "scene/Scene.h"
 #include "ui/UIManager.h"
+#include "ui/UIContext.h"
 #include "ui/panels/Outliner.h"
 #include "ui/panels/PropertyEditor.h"
 #include "ui/panels/Viewport.h"
@@ -277,7 +278,7 @@ void Application::WireSignals()
 	auto& uiEvents = neurus::UIEvents::instance();
 
 	// --- Render request (manual frame trigger) ---
-	// 3-line newFrame pattern: update input → translate to events → draw
+	// 3-line newFrame pattern: update input → translate to events → draw → refresh UI
 	QObject::connect(&uiEvents, &neurus::UIEvents::newFrame,
 	                 [this]() {
 	                     if (app_renderer && app_editor)
@@ -286,6 +287,7 @@ void Application::WireSignals()
 	                         app_editor->Edit(Input::GetInputState());
 	                         app_eventBus.Process();  // Dispatch all enqueued events before drawing
 	                         app_renderer->DrawFrame(app_editor->GetScene());
+	                         app_mainWindow->Refresh(app_editor->GetUIContext());
 	                     }
 	                 });
 

@@ -37,6 +37,16 @@ public:
 	 */
 	explicit Viewport(QWidget* parent = nullptr);
 
+	/**
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Currently a no-op — the Viewport is event-driven (input forwarding)
+	 * and renders via Vulkan outside the Qt widget hierarchy.
+	 *
+	 * @param ctx Read-only UI context (unused).
+	 */
+	void Refresh(const UIContext& ctx) override;
+
 	/** @brief Default destructor. */
 	~Viewport() override;
 

@@ -6,6 +6,7 @@
 #include "panels/RenderConfigPanel.h"
 
 #include "render/RenderConfig.h"
+#include "UIContext.h"
 
 #include <QCheckBox>
 #include <QComboBox>
@@ -292,45 +293,48 @@ void RenderConfigPanel::ConnectAllSignals()
 // RenderConfig ↔ UI sync
 // =========================================================================
 
-void RenderConfigPanel::LoadFromConfig(const RenderConfig& config)
+void RenderConfigPanel::Refresh(const UIContext& ctx)
 {
+	const auto* config = static_cast<const RenderConfig*>(ctx.renderConfig);
+	if (!config) return;
+
 	// --- Shadows ---
 	{
 		QSignalBlocker b1(m_shadowAlgCombo);
 		QSignalBlocker b2(m_shadowsGroup);
-		switch (config.r_shadow)
+		switch (config->r_shadow)
 		{
 		case ShadowAlg::None:           m_shadowAlgCombo->setCurrentIndex(0); break;
 		case ShadowAlg::ShadowMapping:  m_shadowAlgCombo->setCurrentIndex(1); break;
 		case ShadowAlg::SDFSoftShadow:  m_shadowAlgCombo->setCurrentIndex(2); break;
 		case ShadowAlg::VSSM:           m_shadowAlgCombo->setCurrentIndex(3); break;
 		}
-		m_shadowsGroup->setChecked(config.r_shadow != ShadowAlg::None);
+		m_shadowsGroup->setChecked(config->r_shadow != ShadowAlg::None);
 	}
 
 	// --- Ambient Occlusion ---
 	{
 		QSignalBlocker b1(m_aoAlgCombo);
 		QSignalBlocker b2(m_aoGroup);
-		switch (config.r_ao)
+		switch (config->r_ao)
 		{
 		case AOAlg::None: m_aoAlgCombo->setCurrentIndex(0); break;
 		case AOAlg::SSAO: m_aoAlgCombo->setCurrentIndex(1); break;
 		}
-		m_aoGroup->setChecked(config.r_ao != AOAlg::None);
+		m_aoGroup->setChecked(config->r_ao != AOAlg::None);
 
 		QSignalBlocker b3(m_aoKernelSpin);
-		m_aoKernelSpin->setValue(config.r_ao_ksize);
+		m_aoKernelSpin->setValue(config->r_ao_ksize);
 
 		QSignalBlocker b4(m_aoRadiusSlider.spin);
 		QSignalBlocker b5(m_aoRadiusSlider.slider);
-		m_aoRadiusSlider.spin->setValue(config.r_ao_radius);
+		m_aoRadiusSlider.spin->setValue(config->r_ao_radius);
 	}
 
 	// --- Post-Processing ---
 	{
 		QSignalBlocker b1(m_aaCombo);
-		switch (config.r_aa)
+		switch (config->r_aa)
 		{
 		case AAAlg::None: m_aaCombo->setCurrentIndex(0); break;
 		case AAAlg::MSAA: m_aaCombo->setCurrentIndex(1); break;
@@ -339,13 +343,13 @@ void RenderConfigPanel::LoadFromConfig(const RenderConfig& config)
 
 		QSignalBlocker b2(m_gammaSlider.spin);
 		QSignalBlocker b3(m_gammaSlider.slider);
-		m_gammaSlider.spin->setValue(config.r_gamma);
+		m_gammaSlider.spin->setValue(config->r_gamma);
 	}
 
 	// --- Pipeline ---
 	{
 		QSignalBlocker b1(m_pipelineCombo);
-		switch (config.r_pipeline)
+		switch (config->r_pipeline)
 		{
 		case RenderPipeLine::Forward:  m_pipelineCombo->setCurrentIndex(0); break;
 		case RenderPipeLine::Deferred: m_pipelineCombo->setCurrentIndex(1); break;
@@ -353,7 +357,7 @@ void RenderConfigPanel::LoadFromConfig(const RenderConfig& config)
 		}
 
 		QSignalBlocker b2(m_ssrCombo);
-		switch (config.r_ssr)
+		switch (config->r_ssr)
 		{
 		case SSRAlg::None:                    m_ssrCombo->setCurrentIndex(0); break;
 		case SSRAlg::RayMarching:             m_ssrCombo->setCurrentIndex(1); break;
@@ -362,7 +366,7 @@ void RenderConfigPanel::LoadFromConfig(const RenderConfig& config)
 		}
 
 		QSignalBlocker b3(m_samplesPerFrameSpin);
-		m_samplesPerFrameSpin->setValue(config.r_sample_pf);
+		m_samplesPerFrameSpin->setValue(config->r_sample_pf);
 	}
 }
 

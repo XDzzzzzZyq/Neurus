@@ -14,6 +14,7 @@
 #include "render/resources/LightGPU.h"
 #include "render/resources/LightingGPU.h"
 #include "render/resources/MeshGPU.h"
+#include "ui/UIContext.h"
 
 #include "core/Log.h"
 #include "scene/Camera.h"
@@ -149,6 +150,20 @@ Scene& Editor::GetScene()
 neurus::project::Project& Editor::GetProject()
 {
 	return *ed_project;
+}
+
+// =========================================================================
+// GetUIContext – build UI context from Editor/Project state
+// =========================================================================
+
+UIContext Editor::GetUIContext() const
+{
+	UIContext ctx;
+	if (ed_project)
+	{
+		ctx.renderConfig = &ed_project->GetRenderConfig();
+	}
+	return ctx;
 }
 
 // --- Project signal handlers ---

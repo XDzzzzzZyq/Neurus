@@ -38,6 +38,16 @@ public:
 	~Outliner() override = default;
 
 	/**
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Currently a no-op — the Outliner rebuilds via Refresh(const Scene&)
+	 * on project load/change events rather than per-frame.
+	 *
+	 * @param ctx Read-only UI context (unused).
+	 */
+	void Refresh(const UIContext& ctx) override;
+
+	/**
 	 * @brief Rebuilds the tree view from the given scene's object pools.
 	 *
 	 * Clears existing items and repopulates with current cameras, meshes,
