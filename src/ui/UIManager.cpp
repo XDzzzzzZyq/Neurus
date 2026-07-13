@@ -18,6 +18,8 @@
 #include <DockWidget.h>
 #include <DockAreaWidget.h>
 
+#include <memory>
+
 namespace neurus {
 
 // =========================================================================
@@ -41,7 +43,12 @@ UIManager::UIManager(QWidget* parent)
 	CreateMenus();
 }
 
-UIManager::~UIManager() = default;
+UIManager::~UIManager()
+{
+	// Release panel/dock pointers before Qt parent-child cleanup destroys them.
+	m_panels.clear();
+	m_docks.clear();
+}
 
 // =========================================================================
 // Viewport accessors
@@ -49,22 +56,20 @@ UIManager::~UIManager() = default;
 
 HWND UIManager::getViewportHwnd() const
 {
-	return win_viewportWidget ? win_viewportWidget->hwnd() : nullptr;
+	auto* vp = GetPanel<Viewport>();
+	return vp ? vp->hwnd() : nullptr;
 }
 
 int UIManager::getViewportWidth() const
 {
-	return win_viewportWidget ? win_viewportWidget->width() : 0;
+	auto* vp = GetPanel<Viewport>();
+	return vp ? vp->width() : 0;
 }
 
 int UIManager::getViewportHeight() const
 {
-	return win_viewportWidget ? win_viewportWidget->height() : 0;
-}
-
-Viewport* UIManager::getViewport() const
-{
-	return win_viewportWidget;
+	auto* vp = GetPanel<Viewport>();
+	return vp ? vp->height() : 0;
 }
 
 // =========================================================================
@@ -195,21 +200,25 @@ static QWidget* makePlaceholder(const QString& text)
 void UIManager::CreateDocks()
 {
 	// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
-	win_viewportWidget = new Viewport();
-	win_viewportWidget->resize(800, 600);
-	win_viewportWidget->winId();  // Force native window handle creation
+	auto viewport = std::make_unique<Viewport>();
+	viewport->resize(800, 600);
+	viewport->winId();  // Force native window handle creation
+	HWND newHwnd = viewport->hwnd();
 
-	HWND newHwnd = win_viewportWidget->hwnd();
+	auto* viewportDock = new ads::CDockWidget(win_dockManager, viewport->PanelName());
+	viewportDock->setWidget(viewport.get(), ads::CDockWidget::ForceNoScrollArea);
+	viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, viewportDock);
 
-	win_viewportDock = new ads::CDockWidget(win_dockManager, "Viewport");
-	win_viewportDock->setWidget(win_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
-	win_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, win_viewportDock);
+	// Transfer panel ownership to CDockWidget (Qt parent-child).
+	// After setWidget(), the dock owns the panel; release unique_ptr to avoid double-delete.
+	m_panels[PanelType::Viewport] = viewport.release();
+	m_docks[PanelType::Viewport] = viewportDock;
 
 	// Notify Application of the new native HWND for surface recreation
 	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
 
-	// --- Left: Shader Editor ---
+	// --- Left: Shader Editor (placeholder, not a UIPanel) ---
 	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
 	shaderDock->setWidget(makePlaceholder("Shader Editor"));
 	shaderDock->resize(280, 300);
@@ -217,33 +226,36 @@ void UIManager::CreateDocks()
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
 
 	// --- Left: Outliner ---
-	auto* outlinerDock = new ads::CDockWidget(win_dockManager, "Outliner");
-	auto* outliner = new Outliner();
-	win_outliner = outliner;
-	outlinerDock->setWidget(outliner);
+	auto outliner = std::make_unique<Outliner>();
+	auto* outlinerDock = new ads::CDockWidget(win_dockManager, outliner->PanelName());
+	outlinerDock->setWidget(outliner.get());
 	outlinerDock->resize(280, 300);
 	outlinerDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
+	m_panels[PanelType::Outliner] = outliner.release();
+	m_docks[PanelType::Outliner] = outlinerDock;
 
 	// --- Right: Property Editor ---
-	auto* propertyEditor = new PropertyEditor(nullptr);
-	win_propertyEditor = propertyEditor;
-	auto* propDock = new ads::CDockWidget(win_dockManager, "Property Editor");
-	propDock->setWidget(propertyEditor);
+	auto propertyEditor = std::make_unique<PropertyEditor>(nullptr);
+	auto* propDock = new ads::CDockWidget(win_dockManager, propertyEditor->PanelName());
+	propDock->setWidget(propertyEditor.get());
 	propDock->resize(280, 300);
 	propDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
+	m_panels[PanelType::PropertyEditor] = propertyEditor.release();
+	m_docks[PanelType::PropertyEditor] = propDock;
 
 	// --- Right: Render Config ---
-	auto* renderConfigPanel = new RenderConfigPanel(nullptr);
-	win_renderConfigPanel = renderConfigPanel;
-	auto* configDock = new ads::CDockWidget(win_dockManager, "Render Config");
-	configDock->setWidget(renderConfigPanel, ads::CDockWidget::ForceNoScrollArea);
+	auto renderConfigPanel = std::make_unique<RenderConfigPanel>();
+	auto* configDock = new ads::CDockWidget(win_dockManager, renderConfigPanel->PanelName());
+	configDock->setWidget(renderConfigPanel.get(), ads::CDockWidget::ForceNoScrollArea);
 	configDock->resize(280, 400);
 	configDock->setMinimumSize(220, 300);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
+	m_panels[PanelType::RenderConfig] = renderConfigPanel.release();
+	m_docks[PanelType::RenderConfig] = configDock;
 
-	// --- Bottom: Texture Viewer ---
+	// --- Bottom: Texture Viewer (placeholder, not a UIPanel) ---
 	auto* textureDock = new ads::CDockWidget(win_dockManager, "Texture Viewer");
 	textureDock->setWidget(makePlaceholder("Texture Viewer"));
 	textureDock->resize(300, 200);
@@ -281,7 +293,12 @@ void UIManager::LoadLayout()
 
 void UIManager::RestoreDefaultLayout()
 {
-	// Delete all docks — viewport will be recreated in CreateDocks() with a new HWND
+	// Clear panel/dock maps before dock manager destroys its children.
+	// Dock widgets and their contained panels are owned by CDockManager
+	// via Qt parent-child; clearing the maps just drops our non-owning pointers.
+	m_panels.clear();
+	m_docks.clear();
+
 	auto docks = win_dockManager->dockWidgetsMap();
 	for (auto it = docks.begin(); it != docks.end(); ++it)
 	{

@@ -292,7 +292,7 @@ void Application::WireSignals()
 	// --- Outliner object selection → EventBus ---
 	// UI layer emits Qt signal; Application translates to typed EventQueue event
 	{
-		auto* outliner = app_mainWindow->getOutliner();
+		auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>();
 		if (outliner)
 		{
 			QObject::connect(outliner, &neurus::Outliner::objectSelected,
@@ -305,7 +305,7 @@ void Application::WireSignals()
 	// Handle Viewport resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
-	QObject::connect(app_mainWindow->getViewport(), &neurus::Viewport::resized,
+	QObject::connect(app_mainWindow->GetPanel<neurus::Viewport>(), &neurus::Viewport::resized,
 	                 [this](int width, int height) {
 	                     ResizeViewport(width, height);
 	                 });
@@ -313,6 +313,12 @@ void Application::WireSignals()
 	// Handle Viewport recreation (new native HWND → new surface → new swapchain)
 	QObject::connect(&uiEvents, &neurus::UIEvents::viewportRecreated,
 	                 [this](quintptr newHwnd) {
+	                     // Reconnect resize signal to the new Viewport widget
+	                     QObject::connect(app_mainWindow->GetPanel<neurus::Viewport>(), &neurus::Viewport::resized,
+	                                      [this](int width, int height) {
+	                                          ResizeViewport(width, height);
+	                                      });
+
 	                     if (!app_vkContext || !app_renderer)
 	                         return;
 	                     try

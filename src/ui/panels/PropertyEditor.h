@@ -32,6 +32,8 @@ class PropertyEditor : public UIPanel
 	Q_OBJECT
 
 public:
+	static constexpr PanelType kType = PanelType::PropertyEditor;
+
 	/**
 	 * @brief Constructs the Property Editor.
 	 * @param scene Non-owning pointer to the active Scene (nullable - set later via SetScene).

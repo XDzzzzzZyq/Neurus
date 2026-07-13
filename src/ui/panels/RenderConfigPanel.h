@@ -38,6 +38,8 @@ class RenderConfigPanel : public UIPanel
 	Q_OBJECT
 
 public:
+	static constexpr PanelType kType = PanelType::RenderConfig;
+
 	explicit RenderConfigPanel(QWidget* parent = nullptr);
 	~RenderConfigPanel() override = default;
 

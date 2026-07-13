@@ -26,7 +26,7 @@ namespace neurus
 // =========================================================================
 
 RenderConfigPanel::RenderConfigPanel(QWidget* parent)
-	: UIPanel(parent)
+	: UIPanel(PanelType::RenderConfig, QString(), parent)
 {
 	// --- Main layout ---
 	auto* mainLayout = new QVBoxLayout(this);

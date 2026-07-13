@@ -22,7 +22,7 @@ namespace neurus
 // =========================================================================
 
 Outliner::Outliner(QWidget* parent)
-	: UIPanel(parent)
+	: UIPanel(PanelType::Outliner, QString(), parent)
 {
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);

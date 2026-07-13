@@ -2,8 +2,9 @@
 
 #include <QMainWindow>
 #include <Windows.h>
+#include <map>
 
-class QDockWidget;  // forward decl for QWidget param
+#include "panels/UIPanel.h"
 
 namespace ads {
 class CDockManager;
@@ -11,9 +12,6 @@ class CDockWidget;
 }
 
 namespace neurus {
-
-class Viewport;
-class Outliner;
 
 class UIManager : public QMainWindow
 {
@@ -32,20 +30,34 @@ public:
 	/** @brief Returns viewport widget height in pixels. */
 	int getViewportHeight() const;
 
-	/** @brief Returns non-owning raw pointer to the Viewport (for signal connections). */
-	Viewport* getViewport() const;
+	/**
+	 * @brief Returns typed pointer to a panel by its type.
+	 *
+	 * Each panel class must provide static constexpr PanelType kType
+	 * (e.g. Viewport::kType == PanelType::Viewport).
+	 *
+	 * @tparam PanelClass UIPanel subclass (Viewport, Outliner, etc.)
+	 * @return Non-owning pointer to the panel, or nullptr if not found.
+	 */
+	template<typename PanelClass>
+	PanelClass* GetPanel() const
+	{
+		auto it = m_panels.find(PanelClass::kType);
+		if (it != m_panels.end())
+			return qobject_cast<PanelClass*>(it->second);
+		return nullptr;
+	}
 
-    /** @brief Returns the viewport dock widget (for layout / restoreState). */
-    ads::CDockWidget* getViewportDock() const { return win_viewportDock; }
-
-    /** @brief Returns the Outliner for signal wiring. */
-    class Outliner* getOutliner() const { return win_outliner; }
-
-    /** @brief Returns the PropertyEditor for signal wiring. */
-    class PropertyEditor* getPropertyEditor() const { return win_propertyEditor; }
-
-    /** @brief Returns the RenderConfigPanel for signal wiring. */
-    class RenderConfigPanel* getRenderConfigPanel() const { return win_renderConfigPanel; }
+	/**
+	 * @brief Returns a dock widget by its PanelType.
+	 * @param type PanelType enum value.
+	 * @return Non-owning pointer, or nullptr if not found.
+	 */
+	ads::CDockWidget* GetDock(PanelType type) const
+	{
+		auto it = m_docks.find(type);
+		return (it != m_docks.end()) ? it->second : nullptr;
+	}
 
 private:
 	void CreateMenus();
@@ -54,12 +66,13 @@ private:
 	void LoadLayout();
 	void RestoreDefaultLayout();
 
-    ads::CDockManager* win_dockManager = nullptr;
-    ads::CDockWidget*  win_viewportDock = nullptr;
-    Viewport*          win_viewportWidget = nullptr;
-    Outliner*          win_outliner = nullptr;
-    class PropertyEditor* win_propertyEditor = nullptr;       // Non-owning — Qt parent-child handles cleanup
-    class RenderConfigPanel* win_renderConfigPanel = nullptr; // Non-owning — Qt parent-child handles cleanup
+	ads::CDockManager* win_dockManager = nullptr;
+
+	// --- Panel registry (raw pointers; Qt parent-child manages lifetime) ---
+	std::map<PanelType, QWidget*> m_panels;
+
+	// --- Dock registry (raw pointers; CDockManager owns via Qt parent-child) ---
+	std::map<PanelType, ads::CDockWidget*> m_docks;
 };
 
 } // namespace neurus

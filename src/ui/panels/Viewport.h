@@ -29,6 +29,8 @@ class Viewport : public UIPanel
 	Q_OBJECT
 
 public:
+	static constexpr PanelType kType = PanelType::Viewport;
+
 	/**
 	 * @brief Constructs a Viewport with native window attributes.
 	 * @param parent Optional parent widget.

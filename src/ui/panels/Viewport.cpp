@@ -13,7 +13,7 @@
 namespace neurus {
 
 Viewport::Viewport(QWidget* parent)
-	: UIPanel(parent)
+	: UIPanel(PanelType::Viewport, QString(), parent)
 {
 	// Ensure a dedicated native window handle exists for Vulkan surface creation
 	setAttribute(Qt::WA_NativeWindow);

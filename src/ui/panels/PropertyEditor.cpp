@@ -16,7 +16,7 @@ namespace neurus {
 // =========================================================================
 
 PropertyEditor::PropertyEditor(Scene* scene, QWidget* parent)
-	: UIPanel(parent)
+	: UIPanel(PanelType::PropertyEditor, QString(), parent)
 	, m_scene(scene)
 {
 	// --- Main layout ---

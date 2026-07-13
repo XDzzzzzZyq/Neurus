@@ -32,6 +32,8 @@ class Outliner : public UIPanel
 	Q_OBJECT
 
 public:
+	static constexpr PanelType kType = PanelType::Outliner;
+
 	explicit Outliner(QWidget* parent = nullptr);
 	~Outliner() override = default;
 
