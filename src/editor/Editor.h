@@ -6,6 +6,7 @@
 
 #include "controllers/Controllers.h"
 #include "editor/Input.h"        // InputState
+#include "render/RenderConfig.h"
 #include "render/RenderContext.h" // RenderContext (pure data, no Vulkan)
 #include "ui/UIContext.h"
 
@@ -120,6 +121,17 @@ public:
 	 * and from OnProjectOpen() / OnProjectNew().
 	 */
 	void UploadSceneResources();
+
+	/**
+	 * @brief Updates the active RenderConfig and writes it into the project.
+	 *
+	 * Called from the UI layer when RenderConfigPanel emits a changed config.
+	 * The config is stored in the Project so it persists across saves and is
+	 * read by GetRenderContext() / GetUIContext() each frame.
+	 *
+	 * @param cfg New render configuration from the UI panel.
+	 */
+	void SetRenderConfig(const RenderConfig& cfg);
 
 private:
 	// --- Signal handlers (implemented in later tasks) ---

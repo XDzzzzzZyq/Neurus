@@ -40,6 +40,7 @@
 #include "ui/UIContext.h"
 #include "ui/panels/Outliner.h"
 #include "ui/panels/PropertyEditor.h"
+#include "ui/panels/RenderConfigPanel.h"
 #include "ui/panels/Viewport.h"
 
 #include <QApplication>
@@ -334,6 +335,16 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		QObject::connect(viewport, &neurus::Viewport::resized,
 		                 [this](int width, int height) {
 		                     ResizeViewport(width, height);
+		                 });
+	}
+
+	// Handle RenderConfig changes — update Editor/Project config in real time
+	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
+	{
+		QObject::connect(cfgPanel, &neurus::RenderConfigPanel::configValueChanged,
+		                 [this](const neurus::RenderConfig& cfg) {
+		                     if (app_editor)
+		                         app_editor->SetRenderConfig(cfg);
 		                 });
 	}
 }

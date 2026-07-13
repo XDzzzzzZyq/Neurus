@@ -19,6 +19,7 @@
 #pragma once
 
 #include "UIPanel.h"
+#include "render/RenderConfig.h"
 
 // Forward declarations
 class QCheckBox;
@@ -30,8 +31,6 @@ class QSpinBox;
 
 namespace neurus
 {
-
-class RenderConfig;
 
 class RenderConfigPanel : public UIPanel
 {
@@ -57,10 +56,10 @@ public:
 	void Refresh(const UIContext& ctx) override;
 
 	/**
-	 * @brief Writes current UI values back into a RenderConfig struct.
-	 * @param config [out] RenderConfig to populate.
+	 * @brief Builds and returns a RenderConfig from current UI values.
+	 * @return RenderConfig populated from all controls.
 	 */
-	void SaveToConfig(RenderConfig& config) const;
+	RenderConfig Save() const;
 
 	// --- Helper: slider + spinbox pair for float values ---
 	struct SliderSpinPair
@@ -70,8 +69,8 @@ public:
 	};
 
 signals:
-	/** @brief Emitted whenever any control value changes. */
-	void configValueChanged();
+	/** @brief Emitted whenever any control value changes, carrying the new config. */
+	void configValueChanged(RenderConfig cfg);
 
 private:
 	// --- Section builders ---

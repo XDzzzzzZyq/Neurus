@@ -253,40 +253,48 @@ void RenderConfigPanel::BuildPipelineSection()
 
 void RenderConfigPanel::ConnectAllSignals()
 {
+	auto emitCfg = [this]() { emit configValueChanged(Save()); };
+
 	// --- Shadows ---
-	connect(m_shadowsGroup, &QGroupBox::toggled, this, &RenderConfigPanel::configValueChanged);
+	connect(m_shadowsGroup, &QGroupBox::toggled, this, emitCfg);
 	connect(m_shadowAlgCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 	connect(m_shadowPCFCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 
 	// --- Ambient Occlusion ---
-	connect(m_aoGroup, &QGroupBox::toggled, this, &RenderConfigPanel::configValueChanged);
+	connect(m_aoGroup, &QGroupBox::toggled, this, emitCfg);
 	connect(m_aoAlgCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 	connect(m_aoKernelSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 	connect(m_aoRadiusSlider.spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
+	connect(m_aoRadiusSlider.slider, &QSlider::valueChanged,
+		this, emitCfg);
 
 	// --- Lighting ---
-	connect(m_iblCheckBox, &QCheckBox::toggled, this, &RenderConfigPanel::configValueChanged);
+	connect(m_iblCheckBox, &QCheckBox::toggled, this, emitCfg);
 	connect(m_exposureSlider.spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
+	connect(m_exposureSlider.slider, &QSlider::valueChanged,
+		this, emitCfg);
 
 	// --- Post-Processing ---
 	connect(m_aaCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 	connect(m_gammaSlider.spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
+	connect(m_gammaSlider.slider, &QSlider::valueChanged,
+		this, emitCfg);
 
 	// --- Pipeline ---
 	connect(m_pipelineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 	connect(m_ssrCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 	connect(m_samplesPerFrameSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-		this, &RenderConfigPanel::configValueChanged);
+		this, emitCfg);
 }
 
 // =========================================================================
@@ -370,8 +378,10 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 	}
 }
 
-void RenderConfigPanel::SaveToConfig(RenderConfig& config) const
+RenderConfig RenderConfigPanel::Save() const
 {
+	RenderConfig config{};
+
 	// --- Shadows ---
 	switch (m_shadowAlgCombo->currentIndex())
 	{
@@ -419,6 +429,8 @@ void RenderConfigPanel::SaveToConfig(RenderConfig& config) const
 	case 3: config.r_ssr = SSRAlg::SDFResolvedRayMarching;  break;
 	}
 	config.r_sample_pf = m_samplesPerFrameSpin->value();
+
+	return config;
 }
 
 } // namespace neurus

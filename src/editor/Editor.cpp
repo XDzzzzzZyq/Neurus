@@ -176,6 +176,15 @@ UIContext Editor::GetUIContext() const
 	return ctx;
 }
 
+// =========================================================================
+// SetRenderConfig – update project config from UI panel
+// =========================================================================
+
+void Editor::SetRenderConfig(const RenderConfig& cfg)
+{
+	ed_project->GetRenderConfig() = cfg;
+}
+
 // --- Project signal handlers ---
 
 void Editor::OnProjectNew()
