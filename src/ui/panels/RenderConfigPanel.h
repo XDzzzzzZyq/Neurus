@@ -24,13 +24,13 @@
 // Forward declarations
 class QCheckBox;
 class QComboBox;
-class QDoubleSpinBox;
 class QGroupBox;
-class QSlider;
 class QSpinBox;
 
 namespace neurus
 {
+
+class ScalarSlider;
 
 class RenderConfigPanel : public UIPanel
 {
@@ -61,13 +61,6 @@ public:
 	 */
 	RenderConfig Save() const;
 
-	// --- Helper: slider + spinbox pair for float values ---
-	struct SliderSpinPair
-	{
-		QSlider*         slider = nullptr;
-		QDoubleSpinBox*  spin   = nullptr;
-	};
-
 signals:
 	/** @brief Emitted whenever any control value changes, carrying the new config. */
 	void configValueChanged(RenderConfig cfg);
@@ -79,8 +72,6 @@ private:
 	void BuildLightingSection();
 	void BuildPostProcessingSection();
 	void BuildPipelineSection();
-
-	SliderSpinPair CreateFloatSlider(double min, double max, double step, int sliderSteps, double initial);
 
 	// --- Signal forwarders ---
 	void ConnectAllSignals();
@@ -94,17 +85,17 @@ private:
 	QGroupBox*  m_aoGroup           = nullptr;
 	QComboBox*  m_aoAlgCombo        = nullptr;
 	QSpinBox*   m_aoKernelSpin      = nullptr;
-	SliderSpinPair m_aoRadiusSlider;
+	ScalarSlider* m_aoRadiusSlider   = nullptr;
 
 	// --- Lighting ---
 	QGroupBox*  m_lightingGroup     = nullptr;
 	QCheckBox*  m_iblCheckBox       = nullptr;
-	SliderSpinPair m_exposureSlider;
+	ScalarSlider* m_exposureSlider   = nullptr;
 
 	// --- Post-Processing ---
 	QGroupBox*  m_postGroup         = nullptr;
 	QComboBox*  m_aaCombo           = nullptr;
-	SliderSpinPair m_gammaSlider;
+	ScalarSlider* m_gammaSlider      = nullptr;
 
 	// --- Pipeline ---
 	QGroupBox*  m_pipelineGroup     = nullptr;

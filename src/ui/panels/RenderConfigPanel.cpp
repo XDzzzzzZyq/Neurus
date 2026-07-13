@@ -5,17 +5,16 @@
 
 #include "panels/RenderConfigPanel.h"
 
+#include "items/ScalarSlider.h"
 #include "render/RenderConfig.h"
 #include "UIContext.h"
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QGroupBox>
 #include <QLabel>
 #include <QScrollArea>
-#include <QSlider>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -93,53 +92,6 @@ static QSpinBox* addSpinRow(QFormLayout* form, const QString& label, int min, in
 	return spin;
 }
 
-// --- Helper: slider + spinbox pair for float values ---
-RenderConfigPanel::SliderSpinPair RenderConfigPanel::CreateFloatSlider(
-	double min, double max, double step, int sliderSteps, double initial)
-{
-	SliderSpinPair pair{};
-
-	pair.spin = new QDoubleSpinBox();
-	pair.spin->setRange(min, max);
-	pair.spin->setSingleStep(step);
-	pair.spin->setDecimals(2);
-	pair.spin->setValue(initial);
-	pair.spin->setMinimumWidth(70);
-
-	pair.slider = new QSlider(Qt::Horizontal);
-	pair.slider->setRange(0, sliderSteps);
-	pair.slider->setValue(static_cast<int>((initial - min) / (max - min) * sliderSteps));
-
-	// Bidirectional sync: slider ↔ spinbox
-	QObject::connect(pair.slider, &QSlider::valueChanged, [=](int val) {
-		double d = min + (max - min) * val / sliderSteps;
-		pair.spin->blockSignals(true);
-		pair.spin->setValue(d);
-		pair.spin->blockSignals(false);
-	});
-
-	QObject::connect(pair.spin,
-		QOverload<double>::of(&QDoubleSpinBox::valueChanged), [=](double val) {
-			int s = static_cast<int>((val - min) / (max - min) * sliderSteps);
-			pair.slider->blockSignals(true);
-			pair.slider->setValue(s);
-			pair.slider->blockSignals(false);
-		});
-
-	return pair;
-}
-
-// --- Helper: add a slider+spin pair row ---
-static void addSliderSpinRow(QFormLayout* form, const QString& label,
-	const RenderConfigPanel::SliderSpinPair& pair)
-{
-	auto* row = new QHBoxLayout();
-	row->setSpacing(4);
-	row->addWidget(pair.slider);
-	row->addWidget(pair.spin);
-	form->addRow(label, row);
-}
-
 // =========================================================================
 // Shadows
 // =========================================================================
@@ -180,8 +132,8 @@ void RenderConfigPanel::BuildAmbientOcclusionSection()
 
 	m_aoKernelSpin = addSpinRow(form, "Kernel Size", 1, 64, 16);
 
-	m_aoRadiusSlider = CreateFloatSlider(0.01, 5.0, 0.01, 500, 0.5);
-	addSliderSpinRow(form, "Radius", m_aoRadiusSlider);
+	m_aoRadiusSlider = new ScalarSlider(0.01, 5.0, 0.01, 500, 0.5, this);
+	form->addRow("Radius", m_aoRadiusSlider);
 }
 
 // =========================================================================
@@ -201,8 +153,8 @@ void RenderConfigPanel::BuildLightingSection()
 	m_iblCheckBox->setChecked(true);
 	form->addRow(m_iblCheckBox);
 
-	m_exposureSlider = CreateFloatSlider(0.0, 5.0, 0.05, 100, 1.0);
-	addSliderSpinRow(form, "Exposure", m_exposureSlider);
+	m_exposureSlider = new ScalarSlider(0.0, 5.0, 0.05, 100, 1.0, this);
+	form->addRow("Exposure", m_exposureSlider);
 }
 
 // =========================================================================
@@ -220,8 +172,8 @@ void RenderConfigPanel::BuildPostProcessingSection()
 
 	m_aaCombo = addComboRow(form, "Anti-Aliasing", {"None", "MSAA", "FXAA"});
 
-	m_gammaSlider = CreateFloatSlider(1.0, 3.0, 0.01, 200, 1.0);
-	addSliderSpinRow(form, "Gamma", m_gammaSlider);
+	m_gammaSlider = new ScalarSlider(1.0, 3.0, 0.01, 200, 1.0, this);
+	form->addRow("Gamma", m_gammaSlider);
 }
 
 // =========================================================================
@@ -253,7 +205,9 @@ void RenderConfigPanel::BuildPipelineSection()
 
 void RenderConfigPanel::ConnectAllSignals()
 {
-	auto emitCfg = [this]() { emit configValueChanged(Save()); };
+	auto emitCfg = [this]() { 
+		emit configValueChanged(Save()); 
+		};
 
 	// --- Shadows ---
 	connect(m_shadowsGroup, &QGroupBox::toggled, this, emitCfg);
@@ -268,24 +222,18 @@ void RenderConfigPanel::ConnectAllSignals()
 		this, emitCfg);
 	connect(m_aoKernelSpin, QOverload<int>::of(&QSpinBox::valueChanged),
 		this, emitCfg);
-	connect(m_aoRadiusSlider.spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-		this, emitCfg);
-	connect(m_aoRadiusSlider.slider, &QSlider::valueChanged,
+	connect(m_aoRadiusSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
 
 	// --- Lighting ---
 	connect(m_iblCheckBox, &QCheckBox::toggled, this, emitCfg);
-	connect(m_exposureSlider.spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-		this, emitCfg);
-	connect(m_exposureSlider.slider, &QSlider::valueChanged,
+	connect(m_exposureSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
 
 	// --- Post-Processing ---
 	connect(m_aaCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 		this, emitCfg);
-	connect(m_gammaSlider.spin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-		this, emitCfg);
-	connect(m_gammaSlider.slider, &QSlider::valueChanged,
+	connect(m_gammaSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
 
 	// --- Pipeline ---
@@ -334,9 +282,7 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 		QSignalBlocker b3(m_aoKernelSpin);
 		m_aoKernelSpin->setValue(config->r_ao_ksize);
 
-		QSignalBlocker b4(m_aoRadiusSlider.spin);
-		QSignalBlocker b5(m_aoRadiusSlider.slider);
-		m_aoRadiusSlider.spin->setValue(config->r_ao_radius);
+		m_aoRadiusSlider->setValue(config->r_ao_radius);
 	}
 
 	// --- Post-Processing ---
@@ -349,9 +295,8 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 		case AAAlg::FXAA: m_aaCombo->setCurrentIndex(2); break;
 		}
 
-		QSignalBlocker b2(m_gammaSlider.spin);
-		QSignalBlocker b3(m_gammaSlider.slider);
-		m_gammaSlider.spin->setValue(config->r_gamma);
+		QSignalBlocker b2(m_gammaSlider);
+		m_gammaSlider->setValue(config->r_gamma);
 	}
 
 	// --- Pipeline ---
@@ -403,7 +348,7 @@ RenderConfig RenderConfigPanel::Save() const
 		config.r_ao = AOAlg::None;
 
 	config.r_ao_ksize  = m_aoKernelSpin->value();
-	config.r_ao_radius = static_cast<float>(m_aoRadiusSlider.spin->value());
+	config.r_ao_radius = static_cast<float>(m_aoRadiusSlider->value());
 
 	// --- Post-Processing ---
 	switch (m_aaCombo->currentIndex())
@@ -412,7 +357,7 @@ RenderConfig RenderConfigPanel::Save() const
 	case 1: config.r_aa = AAAlg::MSAA; break;
 	case 2: config.r_aa = AAAlg::FXAA; break;
 	}
-	config.r_gamma = static_cast<float>(m_gammaSlider.spin->value());
+	config.r_gamma = static_cast<float>(m_gammaSlider->value());
 
 	// --- Pipeline ---
 	switch (m_pipelineCombo->currentIndex())

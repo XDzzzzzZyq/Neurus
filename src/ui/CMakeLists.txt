@@ -3,6 +3,8 @@
 add_library(neurus_ui STATIC
 	UIManager.h
 	UIManager.cpp
+	items/ScalarSlider.h
+	items/ScalarSlider.cpp
 	panels/UIPanel.h
 	panels/Outliner.h
 	panels/Outliner.cpp
