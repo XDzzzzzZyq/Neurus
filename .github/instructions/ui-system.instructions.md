@@ -7,6 +7,13 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 ## Location
 
 - `src/ui/UIManager.h/cpp` - QMainWindow subclass with ADS dock manager + menus
+- `src/ui/panels/UIPanel.h` - Base class for all dock panels with PanelType enum
+- `src/ui/panels/Viewport.h/cpp` - Native HWND Vulkan surface widget (Viewport dock)
+- `src/ui/panels/Outliner.h/cpp` - Scene object hierarchy tree (Outliner dock)
+- `src/ui/panels/PropertyEditor.h/cpp` - Object property inspector (Property Editor dock)
+- `src/ui/panels/RenderConfigPanel.h/cpp` - Live render config controls (Render Config dock)
+- `src/ui/items/ScalarSlider.h/cpp` - Reusable slider+spinbox composite widget with auto-derived step/decimals
+- `src/ui/UIContext.h` - Per-frame UI data snapshot (carries RenderConfig pointer)
 - `src/ui/VulkanWindow.h/cpp` - QVulkanWindow subclass hosting the triangle renderer
 - `src/ui/MainWindow.h/cpp` - (legacy) QWindow subclass
 - `src/ui/VulkanWidget.h/cpp` - (legacy) QWidget subclass with native HWND for vk::raii surface
@@ -103,19 +110,47 @@ target_link_libraries(Neurus PRIVATE ads::qtadvanceddocking-qt6 ...)
 target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 ```
 
-## Layer Isolation
+
+## Panel System
+
+All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
+- `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig)
+- `virtual void Refresh(const UIContext& ctx)` — called per-frame to sync panel UI with application state
+- `UIContext` carries a `const void* renderConfig` pointer; panels cast to `const RenderConfig*`
+- `UIManager` stores panels in `std::map<PanelType, ads::CDockWidget*> m_panelDocks`
+
+### RenderConfigPanel
+
+`RenderConfigPanel` provides live-adjustable render settings organized in collapsible `QGroupBox` sections:
+- **Shadows**: Algorithm (None/ShadowMapping/SDFSoftShadow/VSSM), PCF filter mode, bias `ScalarSlider` (0.0–0.1, derived step 0.0001, 4 decimals)
+- **Ambient Occlusion**: Algorithm (None/SSAO), kernel size spinbox, radius `ScalarSlider` (0.0–5.0)
+- **Lighting**: IBL toggle, exposure `ScalarSlider` (0.0–5.0)
+- **Post-Processing**: Anti-aliasing combo, gamma `ScalarSlider` (1.0–3.0)
+- **Pipeline**: Pipeline type (Forward/Deferred), SSR mode, samples per frame
+
+Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Application` to `Editor::SetRenderConfig(cfg)`.
+
+### ScalarSlider
+
+`ScalarSlider` (`src/ui/items/ScalarSlider.h`) is a reusable composite `QWidget`:
+- Pairs a `QSlider` (int) with a `QDoubleSpinBox` in a `QHBoxLayout`
+- Bidirectional sync with `blockSignals` to prevent feedback loops
+- Emits a single `valueChanged()` signal regardless of which control moved
+- Step and decimals auto-derived: `step = (max-min)/sliderSteps`, `decimals = ceil(-log10(step))`
+- Tick marks enabled with interval = `max(1, sliderSteps/10)`
 
 ### ✅ UI MAY:
-- Own QVulkanInstance, VulkanWindow, QMainWindow
 - Emit EventBus signals
 - Handle Qt events (resize, close, menu actions)
 - Manage ADS dock layout
 
 ### ❌ UI MUST NOT:
+- Own QVulkanInstance, VulkanWindow, QMainWindow
 - Directly call Renderer methods (go through EventBus)
 - Create Vulkan objects beyond QVulkanInstance
 - Mutate scene state directly
 - Access GPU resources directly
+- Redefine the UI elements that are already in `ui/items`
 
 ## Legacy Code
 

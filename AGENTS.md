@@ -77,6 +77,7 @@ UI Layer (Qt6) → UIEvents (Qt Signals) → Editor → EventQueue (typed events
   mutate application-level state.
 - **Editor**: application logic and scene mutation; owns Controllers;
   communicates via Context, UIEvents (Qt signals), and EventQueue (typed events).
+  Owns `RenderConfig` via `Project`; exposes `SetRenderConfig()` for UI→project sync.
 - **UI**: Qt6 Widgets presentation only; owns surface; emits signals.
 - **Asset** (`src/asset/`): Vulkan-free CPU-side asset loading (MeshData,
   ImageData, PixelFormat enum). No GPU resources.
@@ -199,9 +200,12 @@ Neurus/
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
-│   │   ├── Viewport.h/cpp        # Native HWND Vulkan surface widget
+│   │   ├── UIContext.h          # Per-frame UI data snapshot
+│   │   ├── items/               # Reusable composite widgets
+│   │   │   └── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
 │   │   ├── panels/               # Dock panel widgets
 │   │   │   ├── UIPanel.h         # Base class for all panels
+│   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
 │   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
 │   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
 │   │   │   └── RenderConfigPanel.h/cpp  # Live render setting controls
