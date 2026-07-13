@@ -149,7 +149,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	resources.scene->UseCamera(resources.camera);
 
 	RenderContext ctx{
-		.renderExtent = {kRenderWidth, kRenderHeight},
+			.width = kRenderWidth, .height = kRenderHeight,
 		.frameIndex = 0,
 		.scene = resources.scene.get(),
 	};

@@ -137,7 +137,7 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 	camera->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
 
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
 	ctx.scene        = shadowRes.scene.get();
 
@@ -256,7 +256,7 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_ReferenceImage)
 	camera->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
 
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
 	ctx.scene        = shadowRes.scene.get();
 

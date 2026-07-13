@@ -434,7 +434,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				m_renderCache->UpdateLighting(lightDict);
 
 			RenderContext ctx{
-				.renderExtent = {kRenderWidth, kRenderHeight},
+				.width = kRenderWidth, .height = kRenderHeight,
 				.frameIndex = 0,
 				.scene = &scene,
 			};
@@ -577,7 +577,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 				m_renderCache->UpdateLighting(lightDict);
 
 			RenderContext ctx{
-				.renderExtent = {kRenderWidth, kRenderHeight},
+				.width = kRenderWidth, .height = kRenderHeight,
 				.frameIndex = 0,
 				.scene = &scene,
 			};

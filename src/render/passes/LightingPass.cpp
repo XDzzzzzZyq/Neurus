@@ -273,7 +273,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const glm::vec3 cameraPos = cam->GetPosition();
 	const glm::mat4 viewMatrix = cam->GetViewMatrix();
 	const glm::mat4 invProjView = glm::inverse(cam->GetProjectionMatrix() * cam->GetViewMatrix());
-	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t frameIndex = ctx.frameIndex;
 
 	// --- 1. Write descriptor set for this frame slot ---

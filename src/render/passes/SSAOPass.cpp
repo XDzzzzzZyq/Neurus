@@ -323,7 +323,7 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 
 void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---

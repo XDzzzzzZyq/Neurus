@@ -118,7 +118,7 @@ TEST_F(SunShadowDepthTest, OrthoDepthMap)
 
 	{ auto& cmd=BeginCmd();
 		RenderContext ctx{};
-		ctx.renderExtent=vk::Extent2D(kRes,kRes);
+		ctx.width=kRes; ctx.height=kRes;
 		ctx.scene=ts.s.get();
 		m_pass->Record(*cmd,*m_cache,ctx);
 		EndSubmitWait(cmd); }

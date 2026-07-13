@@ -183,7 +183,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		cam->GetProjectionMatrix() * cam->GetViewMatrix(),
 		cam->GetViewMatrix()
 	};
-	const auto& renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 
 	// --- 1. Upload camera data to UBO ---
 	p_cameraUBO.Upload(cameraData);

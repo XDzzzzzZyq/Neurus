@@ -366,7 +366,8 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 
 	// --- Build per-frame render context (constructed once, passed to all passes) ---
 	RenderContext ctx{};
-	ctx.renderExtent = extent;
+	ctx.width = extent.width;
+	ctx.height = extent.height;
 	ctx.frameIndex = r_currentFrame;
 	ctx.scene = &scene;
 

@@ -388,7 +388,7 @@ void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D ex
 
 void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Early out: no scene ---
