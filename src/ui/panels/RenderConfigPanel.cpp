@@ -112,7 +112,7 @@ void RenderConfigPanel::BuildShadowsSection()
 	m_shadowPCFCombo = addComboRow(form, "PCF Filter",
 		{"Hard", "Soft PCF 16", "Soft PCF 64"});
 
-	m_shadowBiasSlider = new ScalarSlider(0.0f, 0.01f, 0.0001f, 1000, 0.0005f, this);
+	m_shadowBiasSlider = new ScalarSlider(0.0, 0.01, 1000, 0.0005, this);
 	form->addRow("Bias", m_shadowBiasSlider);
 }
 
@@ -135,7 +135,7 @@ void RenderConfigPanel::BuildAmbientOcclusionSection()
 
 	m_aoKernelSpin = addSpinRow(form, "Kernel Size", 1, 64, 16);
 
-	m_aoRadiusSlider = new ScalarSlider(0.01, 5.0, 0.01, 500, 0.5, this);
+	m_aoRadiusSlider = new ScalarSlider(0.0, 5.0, 500, 0.5, this);
 	form->addRow("Radius", m_aoRadiusSlider);
 }
 
@@ -156,7 +156,7 @@ void RenderConfigPanel::BuildLightingSection()
 	m_iblCheckBox->setChecked(true);
 	form->addRow(m_iblCheckBox);
 
-	m_exposureSlider = new ScalarSlider(0.0, 5.0, 0.05, 100, 1.0, this);
+	m_exposureSlider = new ScalarSlider(0.0, 5.0, 100, 1.0, this);
 	form->addRow("Exposure", m_exposureSlider);
 }
 
@@ -175,7 +175,7 @@ void RenderConfigPanel::BuildPostProcessingSection()
 
 	m_aaCombo = addComboRow(form, "Anti-Aliasing", {"None", "MSAA", "FXAA"});
 
-	m_gammaSlider = new ScalarSlider(1.0, 3.0, 0.01, 200, 1.0, this);
+	m_gammaSlider = new ScalarSlider(1.0, 3.0, 200, 1.0, this);
 	form->addRow("Gamma", m_gammaSlider);
 }
 

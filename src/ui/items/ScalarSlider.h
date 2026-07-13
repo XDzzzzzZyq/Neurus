@@ -31,17 +31,16 @@ public:
 	/**
 	 * @brief Constructs a ScalarSlider with the given range and initial value.
 	 *
-	 * The slider uses @p sliderSteps discrete steps; the spinbox uses
-	 * @p step as its increment. The initial value is set on both controls.
+	 * The spinbox step and decimal places are derived from the range and
+	 * slider resolution: step = (max - min) / sliderSteps.
 	 *
 	 * @param min         Minimum value (spinbox lower bound).
 	 * @param max         Maximum value (spinbox upper bound).
-	 * @param step        Spinbox single-step increment.
 	 * @param sliderSteps Number of discrete slider positions (resolution).
 	 * @param initial     Initial value for both controls.
 	 * @param parent      Parent widget.
 	 */
-	explicit ScalarSlider(double min, double max, double step, int sliderSteps,
+	explicit ScalarSlider(double min, double max, int sliderSteps,
 	                      double initial, QWidget* parent = nullptr);
 	~ScalarSlider() override = default;
 

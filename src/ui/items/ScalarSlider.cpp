@@ -9,6 +9,8 @@
 #include <QHBoxLayout>
 #include <QSlider>
 
+#include <cmath>
+
 namespace neurus
 {
 
@@ -16,7 +18,7 @@ namespace neurus
 // Constructor
 // =========================================================================
 
-ScalarSlider::ScalarSlider(double min, double max, double step, int sliderSteps,
+ScalarSlider::ScalarSlider(double min, double max, int sliderSteps,
                            double initial, QWidget* parent)
 	: QWidget(parent)
 	, m_min(min)
@@ -31,12 +33,17 @@ ScalarSlider::ScalarSlider(double min, double max, double step, int sliderSteps,
 	m_slider = new QSlider(Qt::Horizontal, this);
 	m_slider->setRange(0, sliderSteps);
 	m_slider->setValue(static_cast<int>((initial - min) / (max - min) * sliderSteps));
+	m_slider->setTickPosition(QSlider::TicksBelow);
+	m_slider->setTickInterval(std::max(1, sliderSteps / 10));
 
 	// --- Spinbox ---
+	const double step = (max - min) / sliderSteps;
+	const int decimals = static_cast<int>(std::ceil(-std::log10(step)));
+
 	m_spin = new QDoubleSpinBox(this);
 	m_spin->setRange(min, max);
 	m_spin->setSingleStep(step);
-	m_spin->setDecimals(2);
+	m_spin->setDecimals(decimals);
 	m_spin->setValue(initial);
 	m_spin->setMinimumWidth(70);
 
