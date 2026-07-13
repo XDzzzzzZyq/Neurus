@@ -276,7 +276,18 @@ void Application::InitEditor(std::unique_ptr<project::Project> project)
 void Application::WireSignals()
 {
 	auto& uiEvents = neurus::UIEvents::instance();
+	NewFrameSignals(uiEvents);
+	PanelSignals(uiEvents);
+	RecreateSignals(uiEvents);
+	ScreenShotSignals(uiEvents);
+}
 
+// =========================================================================
+// NewFrameSignals – render request + timer-driven loop
+// =========================================================================
+
+void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
+{
 	// --- Render request (manual frame trigger) ---
 	// 3-line newFrame pattern: update input → translate to events → draw → refresh UI
 	QObject::connect(&uiEvents, &neurus::UIEvents::newFrame,
@@ -291,35 +302,53 @@ void Application::WireSignals()
 	                     }
 	                 });
 
+	// StartRenderLoop – timer-driven ~60 FPS render loop
+	QObject::connect(app_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
+		emit uiEvents.newFrame();
+	});
+}
+
+// =========================================================================
+// PanelSignals – Outliner selection + Viewport resize
+// =========================================================================
+
+void Application::PanelSignals(neurus::UIEvents& uiEvents)
+{
+	(void)uiEvents;  // Unused in current panel signals; kept for symmetry
+
 	// --- Outliner object selection → EventBus ---
 	// UI layer emits Qt signal; Application translates to typed EventQueue event
+	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
-		auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>();
-		if (outliner)
-		{
-			QObject::connect(outliner, &neurus::Outliner::objectSelected,
-			                 [this](int objectId) {
-			                     app_eventBus.enqueue(neurus::ObjectSelected{objectId});
-			                 });
-		}
+		QObject::connect(outliner, &neurus::Outliner::objectSelected,
+			             [this](int objectId) {
+			                 app_eventBus.enqueue(neurus::ObjectSelected{objectId});
+			                });
 	}
 
 	// Handle Viewport resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
-	QObject::connect(app_mainWindow->GetPanel<neurus::Viewport>(), &neurus::Viewport::resized,
-	                 [this](int width, int height) {
-	                     ResizeViewport(width, height);
-	                 });
+	if (auto* viewport = app_mainWindow->GetPanel<neurus::Viewport>())
+	{
+		QObject::connect(viewport, &neurus::Viewport::resized,
+		                 [this](int width, int height) {
+		                     ResizeViewport(width, height);
+		                 });
+	}
+}
 
+// =========================================================================
+// RecreateSignals – Viewport recreation (new HWND → new surface → new swapchain)
+// =========================================================================
+
+void Application::RecreateSignals(neurus::UIEvents& uiEvents)
+{
 	// Handle Viewport recreation (new native HWND → new surface → new swapchain)
 	QObject::connect(&uiEvents, &neurus::UIEvents::viewportRecreated,
 	                 [this](quintptr newHwnd) {
-	                     // Reconnect resize signal to the new Viewport widget
-	                     QObject::connect(app_mainWindow->GetPanel<neurus::Viewport>(), &neurus::Viewport::resized,
-	                                      [this](int width, int height) {
-	                                          ResizeViewport(width, height);
-	                                      });
+	                     // Reconnect panel signals (Viewport resize) to the new widget
+	                     PanelSignals(neurus::UIEvents::instance());
 
 	                     if (!app_vkContext || !app_renderer)
 	                         return;
@@ -339,7 +368,14 @@ void Application::WireSignals()
 	                         NEURUS_ERR("Viewport recreation failed: " << e.what());
 	                     }
 	                 });
+}
 
+// =========================================================================
+// ScreenShotSignals – screenshot + attachment dump requests
+// =========================================================================
+
+void Application::ScreenShotSignals(neurus::UIEvents& uiEvents)
+{
 	// Handle screenshot requests (F12 / menu action) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotRequested,
 	                 [this]() {
@@ -362,10 +398,5 @@ void Application::WireSignals()
 	                             app_renderer->GetExtent(), 1024);
 	                     }
 	                 });
-
-	// StartRenderLoop – timer-driven ~60 FPS render loop
-	QObject::connect(app_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
-		emit uiEvents.newFrame();
-	});
 }
 } // namespace neurus

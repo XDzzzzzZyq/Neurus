@@ -17,6 +17,8 @@
 
 namespace neurus {
 
+class UIEvents;
+
 /**
  * @brief Application lifecycle manager – fully RAII.
  *
@@ -62,6 +64,10 @@ private:
 	void InitEditor(std::unique_ptr<project::Project> project);
 	void ResizeViewport(int width, int height);
 	void WireSignals();
+	void NewFrameSignals(UIEvents& uiEvents);
+	void PanelSignals(UIEvents& uiEvents);
+	void RecreateSignals(UIEvents& uiEvents);
+	void ScreenShotSignals(UIEvents& uiEvents);
 
 	// --- Qt infrastructure (destroyed after GPU stack) ---
 	std::unique_ptr<QApplication>         app_qtApp;
