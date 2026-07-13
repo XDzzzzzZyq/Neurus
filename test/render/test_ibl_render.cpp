@@ -317,7 +317,8 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 	m_renderCache->UpdateLighting(lightDict);
 
 	RenderContext ctx{
-		.renderExtent = {kRenderWidth, kRenderHeight},
+		.width = kRenderWidth,
+		.height = kRenderHeight,
 		.frameIndex = 0,
 		.scene = &scene,
 	};

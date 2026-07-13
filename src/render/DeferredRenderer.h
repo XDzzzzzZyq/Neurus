@@ -20,6 +20,7 @@
 
 #include "passes/Pass.h"
 #include "RenderConfig.h"
+#include "RenderContext.h"
 #include "Swapchain.h"
 
 #include <vulkan/vulkan_raii.hpp>
