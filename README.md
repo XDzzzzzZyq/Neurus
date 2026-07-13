@@ -65,9 +65,7 @@ make nobuild
 # Opens: ../Neurus_VS2022/Neurus.sln
 
 # Run tests
-make test
-# Or manually:
-cd build/debug && ctest --output-on-failure
+make check
 ```
 
 ## Project Structure

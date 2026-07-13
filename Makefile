@@ -5,18 +5,35 @@
 # Requires: cmake >= 3.27, Visual Studio 2022 with C++20 toolchain
 # ---------------------------------------------------------------------------
 
-.PHONY: configure build test clean nobuild release help
+.PHONY: configure build test clean nobuild release help app check
 
 # --- Debug (default) ---
 
 configure:
 	cmake --preset default
 
+# Full build only when no sub-target (app/test) is specified.
+#   make build       → full build
+#   make build app   → Neurus.exe only
+#   make build test  → neurus_test only
 build:
+ifeq ($(filter app test,$(MAKECMDGOALS)),)
 	cmake --build build/debug --config Debug
+endif
 
+# Build Neurus.exe only (make app  or  make build app)
+app:
+	cmake --build build/debug --target Neurus --config Debug
+
+# Build neurus_test only (make test  or  make build test)
 test:
-	cd build/debug && ctest -C Debug --output-on-failure
+	cmake --build build/debug --target neurus_test --config Debug
+
+# Run tests. Pass FILTER for specific tests.
+#   make check                          → all tests
+#   make check FILTER="-R DeferredShading" → filtered
+check:
+	cd build/debug && ctest -C Debug --output-on-failure $(FILTER)
 
 clean:
 	cmake --build build/debug --target clean
@@ -41,10 +58,15 @@ help:
 	@echo "Neurus Build System"
 	@echo "==================="
 	@echo ""
-	@echo "  make configure   - Configure Debug build (VS 2022)"
-	@echo "  make build       - Build Debug"
-	@echo "  make test        - Run tests (Debug)"
-	@echo "  make clean       - Clean Debug build"
-	@echo "  make release     - Configure + Build Release"
-	@echo "  make nobuild     - Generate VS 2022 solution at ../Neurus_VS2022"
+	@echo "  make configure      - Configure Debug build (VS 2022)"
+	@echo "  make build          - Build everything (Debug)"
+	@echo "  make build app      - Build Neurus.exe only"
+	@echo "  make build test     - Build neurus_test only"
+	@echo "  make app            - Alias: build Neurus.exe only"
+	@echo "  make test           - Alias: build neurus_test only"
+	@echo "  make check          - Run all tests"
+	@echo "  make check FILTER=\"-R Pattern\" - Run specific tests"
+	@echo "  make clean          - Clean Debug build"
+	@echo "  make release        - Configure + Build Release"
+	@echo "  make nobuild        - Generate VS 2022 solution at ../Neurus_VS2022"
 	@echo ""

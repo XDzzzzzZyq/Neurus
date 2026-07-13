@@ -29,7 +29,7 @@
 
 **Build and test from the main workspace after merge.**
 - After merging, the main workspace contains the combined code.
-- Run `cmake --build build/debug` and `ctest` from the main workspace.
+- Run `cmake --build build/debug` and `make check` from the main workspace.
 - The worktree's build directory is separate - do not rely on stale worktree builds.
 
 **Worktree cleanup can be tricky.**

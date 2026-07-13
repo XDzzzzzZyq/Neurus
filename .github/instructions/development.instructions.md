@@ -112,7 +112,7 @@ Wire everything into the render loop and editor:
 
 ```powershell
 cmake --build build/debug                       # 0 errors
-ctest --output-on-failure                        # ALL pass, including regression
+make check                                       # ALL pass, including regression
 $output = & "build/debug/Debug/Neurus.exe" 2>&1 # capture output
 $output | Select-String "VUID-"                  # ZERO matches
 ```
@@ -159,7 +159,7 @@ Bugs encountered during Sun Light implementation and their fixes:
 
 - [ ] All 4 waves complete
 - [ ] Build: 0 errors, 0 warnings
-- [ ] All tests pass (existing + new) -- `ctest --output-on-failure`
+- [ ] All tests pass (existing + new) -- `make check`
 - [ ] Zero VUID validation errors -- `Neurus.exe 2>&1 | grep VUID-`
 - [ ] Every reference image verified with Python PIL
 - [ ] User reviewed and approved
