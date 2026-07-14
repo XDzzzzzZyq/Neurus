@@ -17,6 +17,7 @@
 #include "UIContext.h"
 #include "items/OutlinerRow.h"
 
+#include "scene/Scene.h"
 #include "scene/UID.h"  // ObjectID, GOType
 
 #include <QGroupBox>
@@ -147,6 +148,14 @@ void Outliner::Refresh(const UIContext& ctx)
 		m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
 	}
 
+	// --- Query selection state from the scene's Selections<const ObjectID*> ---
+	const Scene* scene = static_cast<const Scene*>(ctx.scene);
+	const ObjectID* activeObj = nullptr;
+	if (scene)
+	{
+		activeObj = scene->selections.GetActiveObject();
+	}
+
 	// Count valid (non-null) objects.
 	std::size_t validCount = 0;
 	for (const auto* obj : ids)
@@ -165,10 +174,18 @@ void Outliner::Refresh(const UIContext& ctx)
 		if (!obj) continue;
 
 		auto [letter, color] = TypeInfo(obj->o_type);
+
+		// Phase 1 — bind object identity data (name, id, icon).
 		m_rowPool[poolIndex]->SetObject(
 			letter, color,
 			QString::fromStdString(obj->o_name),
-			obj->GetObjectID(), rowIndex);
+			obj->GetObjectID());
+
+		// Phase 2 — apply visual styling (selection highlight + row bg).
+		bool isActive   = (activeObj == obj);
+		bool isSelected = scene && scene->selections.IsSelected(obj);
+		m_rowPool[poolIndex]->SetStyle(isActive, isSelected && !isActive, rowIndex);
+
 		m_rowPool[poolIndex]->setVisible(true);
 		++poolIndex;
 		++rowIndex;

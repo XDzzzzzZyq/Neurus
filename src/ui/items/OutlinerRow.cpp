@@ -1,7 +1,6 @@
 /**
  * @file OutlinerRow.cpp
- * @brief OutlinerRow implementation — constructor creates widgets once,
- *        SetObject() reconfigure for any scene object (pool-friendly).
+ * @brief OutlinerRow implementation — two-phase config: SetObject (data) then SetStyle (visual).
  */
 
 #include "items/OutlinerRow.h"
@@ -13,6 +12,28 @@
 
 namespace neurus
 {
+
+// =========================================================================
+// Shared name-button stylesheet template (color injected by SetStyle)
+// =========================================================================
+
+static const QString kNameBtnColorStyle = QString::fromUtf8(
+	"QPushButton {"
+	"  text-align: left;"
+	"  border: 1px solid transparent;"
+	"  border-radius: 10px;"
+	"  background: transparent;"
+	"  padding: 1px 4px;"
+	"  font-size: 11px;"
+	"  color: %1;"
+	"}"
+	"QPushButton:hover {"
+	"  border-color: #313131;"
+	"}"
+	"QPushButton:pressed {"
+	"  color: #676767;"
+	"  background: rgba(0, 0, 0, 0.1);"
+	"}");
 
 // =========================================================================
 // Constructor — create layout + child widgets once
@@ -38,23 +59,6 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_nameBtn->setFlat(true);
 	m_nameBtn->setCursor(Qt::PointingHandCursor);
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-	m_nameBtn->setStyleSheet(
-		"QPushButton {"
-		"  text-align: left;"
-		"  border: 1px solid transparent;"
-		"  border-radius: 10px;"
-		"  background: transparent;"
-		"  padding: 1px 4px;"
-		"  font-size: 11px;"
-		"}"
-		"QPushButton:hover {"
-		"  color: #000000;"
-		"  border-color: #313131;"
-		"}"
-		"QPushButton:pressed {"
-		"  color: #676767;"
-		"  background: rgba(0, 0, 0, 0.1);"
-		"}");
 	// Lambda reads m_objectId at emission time — works after SetObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
 		emit objectSelected(m_objectId);
@@ -118,27 +122,14 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 }
 
 // =========================================================================
-// SetObject — reconfigure an existing row for a different scene object
+// SetObject — bind object identity data, reset toggles
 // =========================================================================
 
 void OutlinerRow::SetObject(const QString& typeLetter, const QString& typeColor,
-                            const QString& name, int objectId, int rowIndex)
+                            const QString& name, int objectId)
 {
 	m_objectId = objectId;
 	setProperty("objectId", objectId);
-
-	// Alternating row backgrounds for readability
-	if (rowIndex % 2 == 1)
-	{
-		QPalette pal = palette();
-		pal.setColor(QPalette::Window, QColor(255, 255, 255, 100));
-		setPalette(pal);
-		setAutoFillBackground(true);
-	}
-	else
-	{
-		setAutoFillBackground(false);
-	}
 
 	// Update type icon
 	m_typeLabel->setText(typeLetter);
@@ -154,9 +145,44 @@ void OutlinerRow::SetObject(const QString& typeLetter, const QString& typeColor,
 	// Update name text
 	m_nameBtn->setText(name);
 
-	// Reset visibility toggles to default (visible)
+	// Reset visibility toggles to default (visible), block signals to
+	// avoid false visibilityChanged emissions during pool recycling.
+	m_eyeBtn->blockSignals(true);
 	m_eyeBtn->setChecked(true);
+	m_eyeBtn->blockSignals(false);
+	m_renderBtn->blockSignals(true);
 	m_renderBtn->setChecked(true);
+	m_renderBtn->blockSignals(false);
+}
+
+// =========================================================================
+// SetStyle — apply selection text color + alternating row background
+// =========================================================================
+
+void OutlinerRow::SetStyle(bool isActive, bool isSelected, int rowIndex)
+{
+	// --- Selection text color ---
+	QString color;
+	if (isActive)
+		color = QString::fromUtf8("#ff6f00");    // bright white — active
+	else if (isSelected)
+		color = QString::fromUtf8("#4A90D9");    // blue — selected, not active
+	else
+		color = QString::fromUtf8("#000000");    // dim gray — deselected
+	m_nameBtn->setStyleSheet(kNameBtnColorStyle.arg(color));
+
+	// --- Alternating row background ---
+	if (rowIndex % 2 == 1)
+	{
+		QPalette pal = palette();
+		pal.setColor(QPalette::Window, QColor(255, 255, 255, 100));
+		setPalette(pal);
+		setAutoFillBackground(true);
+	}
+	else
+	{
+		setAutoFillBackground(false);
+	}
 }
 
 } // namespace neurus

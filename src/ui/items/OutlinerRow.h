@@ -9,7 +9,8 @@
  *
  * Architecture:
  * - Constructor creates the layout and child widgets once.
- * - SetObject() reconfigures an existing row for a different scene object.
+ * - SetObject() binds object data (name, id, type icon); resets toggles.
+ * - SetStyle() applies visual state (selection highlight, alternating bg).
  * - Signal lambdas read from m_objectId at emission time, so recycling
  *   a row to a new objectId is transparent — no manual rewire needed.
  */
@@ -48,22 +49,38 @@ public:
 	OutlinerRow(const OutlinerRow&) = delete;
 	OutlinerRow& operator=(const OutlinerRow&) = delete;
 
+	// -------------------------------------------------------------------
+	// Two-phase row configuration: bind data, then apply style
+	// -------------------------------------------------------------------
+
 	/**
-	 * @brief Configures (or reconfigures) this row for a given scene object.
+	 * @brief Binds a scene object's identity data to this row.
 	 *
-	 * Updates the type icon, name, alternating background, and stored
-	 * objectId. Signal lambdas read m_objectId at emission time, so
-	 * no manual disconnect/reconnect is needed when recycling a row
-	 * to a different object.
+	 * Updates the type icon letter / color, name text, and stored objectId.
+	 * Resets visibility toggles to checked (signals blocked to avoid
+	 * cascading events during pool recycling).
 	 *
 	 * @param typeLetter Single character type icon ("C", "L", "M", etc.).
 	 * @param typeColor  CSS background color for the type icon.
 	 * @param name       Display name shown in the row.
 	 * @param objectId   Unique object identifier.
-	 * @param rowIndex   0-based row position for alternating background.
 	 */
 	void SetObject(const QString& typeLetter, const QString& typeColor,
-	               const QString& name, int objectId, int rowIndex);
+	               const QString& name, int objectId);
+
+	/**
+	 * @brief Applies visual styling: selection highlight and row background.
+	 *
+	 * Active  → white name text.
+	 * Selected (non-active) → blue name text.
+	 * Neither → dim gray name text.
+	 * Row background alternates on odd/even rowIndex for readability.
+	 *
+	 * @param isActive   True if this row is the primary (active) selection.
+	 * @param isSelected True if this row is in the selection set.
+	 * @param rowIndex   0-based row position for alternating background.
+	 */
+	void SetStyle(bool isActive, bool isSelected, int rowIndex);
 
 	/** @brief Returns the stored object identifier. */
 	int GetObjectId() const { return m_objectId; }

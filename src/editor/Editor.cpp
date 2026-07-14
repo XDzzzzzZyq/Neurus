@@ -169,11 +169,8 @@ neurus::project::Project& Editor::GetProject()
 UIContext Editor::GetUIContext() const
 {
 	UIContext ctx;
-	if (ed_project)
-	{
-		ctx.renderConfig = &ed_project->GetRenderConfig();
-		ctx.scene = &ed_project->GetScene();
-	}
+	ctx.renderConfig = &ed_project->GetRenderConfig();
+	ctx.scene = &ed_project->GetScene();
 	return ctx;
 }
 
@@ -250,20 +247,14 @@ void Editor::OnProjectOpen(const QString& path)
 
 void Editor::OnProjectSave()
 {
-	if (ed_project)
-	{
-		try { ed_project->Save(); }
-		catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
-	}
+	try { ed_project->Save(); }
+	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 }
 
 void Editor::OnProjectSaveAs(const QString& path)
 {
-	if (ed_project)
-	{
-		try { ed_project->Save(path.toStdString()); }
-		catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
-	}
+	try { ed_project->Save(path.toStdString()); }
+	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 }
 
 // --- Mesh, Camera, Light signal handlers ---
@@ -415,12 +406,50 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 }
 
 // =========================================================================
-// UploadSceneResources() – upload all meshes and shadow-casting lights to GPU
+// SelectObject – update scene.selections from outliner click
 // =========================================================================
+
+void Editor::SelectObject(int objectId, bool increment)
+{
+	auto& scene = ed_project->GetScene();
+
+	auto it = scene.obj_list.find(objectId);
+	if (it == scene.obj_list.end())
+	{
+		NEURUS_ERR("[Editor] SelectObject: object " << objectId << " not found in obj_list");
+		return;
+	}
+
+	auto* objPtr = it->second.get();
+	scene.selections.Select(objPtr, increment);
+
+	NEURUS_LOG("[Editor] SelectObject: id=" << objectId
+	           << " increment=" << increment
+	           << " count=" << scene.selections.GetSelectionCount());
+}
+
+// =========================================================================
+// ChangeObjectVisibility – propagate outliner toggle to scene object
+// =========================================================================
+
+void Editor::ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible)
+{
+	auto& scene = ed_project->GetScene();
+
+	auto it = scene.obj_list.find(objectId);
+	if (it == scene.obj_list.end())
+	{
+		NEURUS_ERR("[Editor] ChangeObjectVisibility: object " << objectId << " not found");
+		return;
+	}
+
+	it->second->SetVisible(viewportVisible, renderVisible);
+	ed_project->MarkDirty();
+}
 
 void Editor::UploadSceneResources()
 {
-	if (!ed_uploadManager || !ed_renderer || !ed_project) return;
+	if (!ed_uploadManager || !ed_renderer) return;
 
 	auto& scene = ed_project->GetScene();
 

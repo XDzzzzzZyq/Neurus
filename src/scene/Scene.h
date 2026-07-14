@@ -201,7 +201,9 @@ public:
 	ResPool<Environment> env_list;      ///< Environment objects (IBL)
 
 	/// Selection state for scene objects (runtime-only, not serialized).
-	Selections<ObjectID*> selections;
+	/// Stores const ObjectID* — compatible with both Editor (mutable objects via GetObjectID)
+	/// and Outliner (const ObjectID* from GetObjectIDs enumeration).
+	Selections<const ObjectID*> selections;
 
 	// -------------------------------------------------------------------
 	// Registration - store in both type-specific pool AND obj_list

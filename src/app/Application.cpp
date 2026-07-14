@@ -317,14 +317,19 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 {
 	(void)uiEvents;  // Unused in current panel signals; kept for symmetry
 
-	// --- Outliner object selection → EventBus ---
-	// UI layer emits Qt signal; Application translates to typed EventQueue event
+	// --- Outliner object selection → Editor (direct, follow RenderConfigPanel pattern) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
 		QObject::connect(outliner, &neurus::Outliner::objectSelected,
 			             [this](int objectId) {
-			                 app_eventBus.enqueue(neurus::ObjectSelected{objectId});
-			                });
+							 auto state = Input::GetInputState();
+			                 app_editor->SelectObject(objectId, Input::IsShiftHeld() || Input::IsCtrlHeld());
+			             });
+
+		QObject::connect(outliner, &neurus::Outliner::visibilityChanged,
+			             [this](int objectId, bool viewportVisible, bool renderVisible) {
+			                 app_editor->ChangeObjectVisibility(objectId, viewportVisible, renderVisible);
+			             });
 	}
 
 	// Handle Viewport resize - proactively recreate swapchain so the
@@ -343,8 +348,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	{
 		QObject::connect(cfgPanel, &neurus::RenderConfigPanel::configValueChanged,
 		                 [this](const neurus::RenderConfig& cfg) {
-		                     if (app_editor)
-		                         app_editor->SetRenderConfig(cfg);
+		                     app_editor->SetRenderConfig(cfg);
 		                 });
 	}
 }

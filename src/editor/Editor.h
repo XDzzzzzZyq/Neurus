@@ -133,6 +133,30 @@ public:
 	 */
 	void SetRenderConfig(const RenderConfig& cfg);
 
+	/**
+	 * @brief Selects a scene object by ID through scene.selections.
+	 *
+	 * Finds the ObjectID pointer in obj_list, then delegates to
+	 * selections.Select(). increment=true adds to the set (or makes
+	 * active if already selected); increment=false replaces entirely.
+	 *
+	 * @param objectId  Unique object identifier.
+	 * @param increment If true, add to selection; if false, single select.
+	 */
+	void SelectObject(int objectId, bool increment);
+
+	/**
+	 * @brief Changes viewport/render visibility of a scene object.
+	 *
+	 * Looks up the object by ID in obj_list and calls ObjectID::SetVisible().
+	 * Marks the project dirty so unsaved changes are tracked.
+	 *
+	 * @param objectId       Unique object identifier.
+	 * @param viewportVisible Viewport (editor) visibility.
+	 * @param renderVisible   Render (pipeline) visibility.
+	 */
+	void ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible);
+
 private:
 	// --- Signal handlers (implemented in later tasks) ---
 	void OnProjectNew();
