@@ -96,10 +96,11 @@ private:
 	 * @param typeColor  CSS background color for the type icon.
 	 * @param name       Display name shown in the row.
 	 * @param objectId   Unique object identifier (stored, not shown).
+	 * @param rowIndex   Row position in the list (0-based). Used for alternating background.
 	 * @return A QWidget row ready to be added to the vertical list layout.
 	 */
 	QWidget* CreateRow(const QString& typeLetter, const QString& typeColor,
-	                   const QString& name, int objectId);
+	                   const QString& name, int objectId, int rowIndex);
 
 	QScrollArea* m_scrollArea = nullptr;
 	QWidget*     m_container  = nullptr;

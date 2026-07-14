@@ -12,8 +12,10 @@
 
 #include "UIContext.h"
 
+#include <QColor>
 #include <QGroupBox>
 #include <QLabel>
+#include <QPalette>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
@@ -64,29 +66,29 @@ void Outliner::BuildUI()
 	// --- Cameras ---
 	sceneLayout->addWidget(CreateRow(
 		QString::fromUtf8("C"), kCamColor,
-		QString::fromUtf8("Main Camera"), 1001));
+		QString::fromUtf8("Main Camera"), 1001, 0));
 
 	sceneLayout->addWidget(CreateRow(
 		QString::fromUtf8("C"), kCamColor,
-		QString::fromUtf8("Side Camera"), 1002));
+		QString::fromUtf8("Side Camera"), 1002, 1));
 
 	// --- Lights ---
 	sceneLayout->addWidget(CreateRow(
 		QString::fromUtf8("L"), kLightColor,
-		QString::fromUtf8("Sun Light"), 2001));
+		QString::fromUtf8("Sun Light"), 2001, 2));
 
 	sceneLayout->addWidget(CreateRow(
 		QString::fromUtf8("L"), kLightColor,
-		QString::fromUtf8("Point Light"), 2002));
+		QString::fromUtf8("Point Light"), 2002, 3));
 
 	// --- Meshes ---
 	sceneLayout->addWidget(CreateRow(
 		QString::fromUtf8("M"), kMeshColor,
-		QString::fromUtf8("Sphere"), 3001));
+		QString::fromUtf8("Sphere"), 3001, 4));
 
 	sceneLayout->addWidget(CreateRow(
 		QString::fromUtf8("M"), kMeshColor,
-		QString::fromUtf8("Ground Plane"), 3002));
+		QString::fromUtf8("Ground Plane"), 3002, 5));
 
 	m_listLayout->addStretch();
 }
@@ -113,11 +115,20 @@ QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 // =========================================================================
 
 QWidget* Outliner::CreateRow(const QString& typeLetter, const QString& typeColor,
-                              const QString& name, int objectId)
+                              const QString& name, int objectId, int rowIndex)
 {
 	auto* row = new QWidget();
 	row->setFixedHeight(28);
 	row->setProperty("objectId", objectId);
+
+	// Alternating row backgrounds for readability
+	if (rowIndex % 2 == 1)
+	{
+		QPalette pal = row->palette();
+		pal.setColor(QPalette::Window, QColor(255, 255, 255, 8));
+		row->setPalette(pal);
+		row->setAutoFillBackground(true);
+	}
 
 	auto* rowLayout = new QHBoxLayout(row);
 	rowLayout->setContentsMargins(4, 1, 4, 1);
