@@ -125,7 +125,7 @@ QWidget* Outliner::CreateRow(const QString& typeLetter, const QString& typeColor
 	if (rowIndex % 2 == 1)
 	{
 		QPalette pal = row->palette();
-		pal.setColor(QPalette::Window, QColor(255, 255, 255, 8));
+		pal.setColor(QPalette::Window, QColor(255, 255, 255, 100));
 		row->setPalette(pal);
 		row->setAutoFillBackground(true);
 	}
