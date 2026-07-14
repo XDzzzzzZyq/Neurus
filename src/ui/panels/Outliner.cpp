@@ -164,6 +164,7 @@ QWidget* Outliner::CreateRow(const QString& typeLetter, const QString& typeColor
 		"QPushButton:hover {"
 		"  color: #000000;"
 		"  background: rgba(255, 255, 255, 0.5);"
+		"  border: 1px solid #FFD700;"
 		"}"
 		"QPushButton:pressed {"
 		"  color: #676767;"
