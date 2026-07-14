@@ -140,12 +140,12 @@ Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Appl
 - Tick marks enabled with interval = `max(1, sliderSteps/10)`
 
 ### ✅ UI MAY:
+- Own QVulkanInstance, VulkanWindow, QMainWindow
 - Emit EventBus signals
 - Handle Qt events (resize, close, menu actions)
 - Manage ADS dock layout
 
 ### ❌ UI MUST NOT:
-- Own QVulkanInstance, VulkanWindow, QMainWindow
 - Directly call Renderer methods (go through EventBus)
 - Create Vulkan objects beyond QVulkanInstance
 - Mutate scene state directly

@@ -13,7 +13,7 @@ with modern rendering algorithms.
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │ UI Layer (Qt6 Widgets + ADS)                                 │
-│  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
+│  owns: QWindow, UIEvents (QObject singleton)                 │
 └─────────────────────┬────────────────────────────────────────┘
                       │ Qt Signals/Slots
                       ▼
@@ -24,12 +24,12 @@ with modern rendering algorithms.
                       │
             ┌─────────┴──────────┐
             ▼                    ▼
-┌──────────────────┐  ┌────────────────────────────────────────┐
+┌───────────────────┐  ┌────────────────────────────────────────┐
 │ Data & Resource   │  │ Renderer Layer (Vulkan-HPP vk::raii)   │
 │  owns: allocators │  │  owns: VkInstance, VkDevice, VkQueue,  │
 │  descriptor pools │  │   VkSwapchainKHR, VkPipeline,          │
 │  pipeline cache   │  │   VkCommandBuffer, all GPU resources   │
-└──────────────────┘  └────────────────────────────────────────┘
+└───────────────────┘  └────────────────────────────────────────┘
 ```
 
 ## Prerequisites
