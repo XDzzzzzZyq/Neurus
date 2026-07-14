@@ -1,30 +1,76 @@
 /**
  * @file Outliner.cpp
- * @brief Outliner implementation — Blender-style vertical list with type icons,
- *        names, and visibility toggles.
+ * @brief Outliner implementation — pool-managed row list from UIContext scene data.
  *
- * Phase 1: Hard-coded demo layout following the RenderConfigPanel constructor
- * pattern (QVBoxLayout → QScrollArea → container → vertical row list).
- * Future phases will wire to real Scene data via UIContext.
+ * Architecture:
+ * - Constructor sets up the QScrollArea + container layout (empty).
+ * - Refresh() reads scene objects from UIContext and reconfigures rows
+ *   via OutlinerRow::SetObject() from a growing pool.
+ * - New rows are created when pool < scene objects, and connected to
+ *   Outliner signals once. Extra rows are hidden (not destroyed).
+ * - Signal lambdas on OutlinerRow read m_objectId at emission time,
+ *   so recycling a row to a different object is transparent.
  */
 
 #include "Outliner.h"
 
 #include "UIContext.h"
+#include "items/OutlinerRow.h"
 
-#include <QColor>
+#include "scene/UID.h"  // ObjectID, GOType
+
 #include <QGroupBox>
 #include <QLabel>
-#include <QPalette>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QVBoxLayout>
+
+#include <string>
 
 namespace neurus
 {
 
 // =========================================================================
-// Constructor — follows RenderConfigPanel pattern
+// Type-info helpers (mapped from GOType, stateless)
+// =========================================================================
+
+namespace
+{
+
+/**
+ * @brief Returns the display letter and CSS background color for a GOType.
+ */
+static std::pair<QString, QString> TypeInfo(ObjectID::GOType type)
+{
+	switch (type)
+	{
+	case ObjectID::GOType::GO_CAM:
+		return {QString::fromUtf8("C"),  QString::fromUtf8("#4A90D9")};  // blue
+	case ObjectID::GOType::GO_LIGHT:
+		return {QString::fromUtf8("L"),  QString::fromUtf8("#F5A623")};  // amber
+	case ObjectID::GOType::GO_POLYLIGHT:
+		return {QString::fromUtf8("P"),  QString::fromUtf8("#F5A623")};  // amber
+	case ObjectID::GOType::GO_MESH:
+		return {QString::fromUtf8("M"),  QString::fromUtf8("#7ED321")};  // green
+	case ObjectID::GOType::GO_ENVIR:
+		return {QString::fromUtf8("E"),  QString::fromUtf8("#9B59B6")};  // purple
+	case ObjectID::GOType::GO_SPRITE:
+		return {QString::fromUtf8("S"),  QString::fromUtf8("#1ABC9C")};  // cyan
+	case ObjectID::GOType::GO_DL:
+	case ObjectID::GOType::GO_DP:
+	case ObjectID::GOType::GO_DM:
+		return {QString::fromUtf8("D"),  QString::fromUtf8("#95A5A6")};  // gray
+	case ObjectID::GOType::GO_SDFFIELD:
+		return {QString::fromUtf8("F"),  QString::fromUtf8("#E67E22")};  // orange
+	default:
+		return {QString::fromUtf8("?"),  QString::fromUtf8("#95A5A6")};  // gray
+	}
+}
+
+} // anonymous namespace
+
+// =========================================================================
+// Constructor — scroll area + empty container (no hard-coded rows)
 // =========================================================================
 
 Outliner::Outliner(QWidget* parent)
@@ -45,52 +91,6 @@ Outliner::Outliner(QWidget* parent)
 	m_listLayout->setAlignment(Qt::AlignTop);
 
 	m_scrollArea->setWidget(m_container);
-
-	BuildUI();
-}
-
-// =========================================================================
-// BuildUI — hard-coded demo rows
-// =========================================================================
-
-void Outliner::BuildUI()
-{
-	// Type colors matching GOType categories (blender-esque palette)
-	const QString kCamColor   = QString::fromUtf8("#4A90D9");  // blue
-	const QString kLightColor = QString::fromUtf8("#F5A623");  // amber
-	const QString kMeshColor  = QString::fromUtf8("#7ED321");  // green
-
-	auto* sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
-	auto* sceneLayout = qobject_cast<QVBoxLayout*>(sceneGroup->layout());
-
-	// --- Cameras ---
-	sceneLayout->addWidget(CreateRow(
-		QString::fromUtf8("C"), kCamColor,
-		QString::fromUtf8("Main Camera"), 1001, 0));
-
-	sceneLayout->addWidget(CreateRow(
-		QString::fromUtf8("C"), kCamColor,
-		QString::fromUtf8("Side Camera"), 1002, 1));
-
-	// --- Lights ---
-	sceneLayout->addWidget(CreateRow(
-		QString::fromUtf8("L"), kLightColor,
-		QString::fromUtf8("Sun Light"), 2001, 2));
-
-	sceneLayout->addWidget(CreateRow(
-		QString::fromUtf8("L"), kLightColor,
-		QString::fromUtf8("Point Light"), 2002, 3));
-
-	// --- Meshes ---
-	sceneLayout->addWidget(CreateRow(
-		QString::fromUtf8("M"), kMeshColor,
-		QString::fromUtf8("Sphere"), 3001, 4));
-
-	sceneLayout->addWidget(CreateRow(
-		QString::fromUtf8("M"), kMeshColor,
-		QString::fromUtf8("Ground Plane"), 3002, 5));
-
-	m_listLayout->addStretch();
 }
 
 // =========================================================================
@@ -100,7 +100,6 @@ void Outliner::BuildUI()
 QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 {
 	auto* group = new QGroupBox(title);
-	//group->setFlat(true);
 
 	auto* groupLayout = new QVBoxLayout(group);
 	groupLayout->setContentsMargins(4, 4, 4, 4);
@@ -111,140 +110,78 @@ QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 }
 
 // =========================================================================
-// CreateRow — single row: [type icon] [name] [eye toggle] [monitor toggle]
+// EnsureRowPool — grow pool to meet needed capacity
 // =========================================================================
 
-QWidget* Outliner::CreateRow(const QString& typeLetter, const QString& typeColor,
-                              const QString& name, int objectId, int rowIndex)
+void Outliner::EnsureRowPool(std::size_t needed)
 {
-	auto* row = new QWidget();
-	row->setFixedHeight(28);
-	row->setProperty("objectId", objectId);
-
-	// Alternating row backgrounds for readability
-	if (rowIndex % 2 == 1)
+	while (m_rowPool.size() < needed)
 	{
-		QPalette pal = row->palette();
-		pal.setColor(QPalette::Window, QColor(255, 255, 255, 100));
-		row->setPalette(pal);
-		row->setAutoFillBackground(true);
+		auto* row = new OutlinerRow(m_sceneGroup);
+
+		// Connect row signals to Outliner signals once (permanent).
+		// Lambdas read m_objectId at emission time, so recycling
+		// a row to a new objectId works without reconnecting.
+		QObject::connect(row, &OutlinerRow::objectSelected,
+			this, &Outliner::objectSelected);
+		QObject::connect(row, &OutlinerRow::visibilityChanged,
+			this, &Outliner::visibilityChanged);
+
+		m_groupLayout->addWidget(row);
+		m_rowPool.push_back(row);
 	}
-
-	auto* rowLayout = new QHBoxLayout(row);
-	rowLayout->setContentsMargins(4, 1, 4, 1);
-	rowLayout->setSpacing(4);
-
-	// --- Type icon (colored QLabel, 22x22, centered) ---
-	auto* typeLabel = new QLabel(typeLetter);
-	typeLabel->setFixedSize(22, 22);
-	typeLabel->setAlignment(Qt::AlignCenter);
-	typeLabel->setStyleSheet(QString(
-		"QLabel {"
-		"  background-color: %1;"
-		"  color: white;"
-		"  border-radius: 3px;"
-		"  font-size: 11px;"
-		"  font-weight: bold;"
-		"}").arg(typeColor));
-	rowLayout->addWidget(typeLabel);
-
-	// --- Name (flat QPushButton styled as label, clickable for selection) ---
-	auto* nameBtn = new QPushButton(name);
-	nameBtn->setFlat(true);
-	nameBtn->setCursor(Qt::PointingHandCursor);
-	nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-	nameBtn->setStyleSheet(
-		"QPushButton {"
-		"  text-align: left;"
-		"  border: 1px solid transparent;"
-		"  border-radius: 10px;"
-		"  background: transparent;"
-		"  padding: 1px 4px;"
-		"  font-size: 11px;"
-		"}"
-		"QPushButton:hover {"
-		"  color: #000000;"
-		"  border-color: #313131;"
-		"}"
-		"QPushButton:pressed {"
-		"  color: #676767;"
-		"  background: rgba(0, 0, 0, 0.1);"
-		"}");
-	QObject::connect(nameBtn, &QPushButton::clicked, this, [this, objectId]() {
-		emit objectSelected(objectId);
-	});
-	rowLayout->addWidget(nameBtn);
-
-	// --- Visibility toggle buttons ---
-	//
-	// Flat QPushButton with checkable state — larger hit target than QToolButton.
-	// Both must exist before either connect lambda is created.
-	//
-	static const QString kToggleStyle = QString::fromUtf8(
-		"QPushButton {"
-		"  border: 1px solid transparent;"
-		"  border-radius: 3px;"
-		"  background: transparent;"
-		"  padding: 2px;"
-		"  font-size: 20px;"
-		"  font-weight: bold;"
-		"}"
-		"QPushButton:!checked {"
-		"  color: #d0d0d0;"
-		"}"
-		"QPushButton:checked {"
-		"  color: #444444;"
-		"}"
-		"QPushButton:hover {"
-		"  background: rgba(255, 255, 255, 0.10);"
-		"  border-color: rgba(255, 255, 255, 0.15);"
-		"}");
-
-	auto* eyeBtn    = new QPushButton(QString::fromUtf8("\u25C9"));  // ◉
-	auto* renderBtn = new QPushButton(QString::fromUtf8("\u25A3"));  // ▣
-
-	// Eye button
-	eyeBtn->setCheckable(true);
-	eyeBtn->setChecked(true);
-	eyeBtn->setFlat(true);
-	eyeBtn->setFixedSize(28, 26);
-	eyeBtn->setToolTip(QString::fromUtf8("Viewport visibility"));
-	eyeBtn->setCursor(Qt::PointingHandCursor);
-	eyeBtn->setStyleSheet(kToggleStyle);
-
-	// Render button
-	renderBtn->setCheckable(true);
-	renderBtn->setChecked(true);
-	renderBtn->setFlat(true);
-	renderBtn->setFixedSize(28, 26);
-	renderBtn->setToolTip(QString::fromUtf8("Render visibility"));
-	renderBtn->setCursor(Qt::PointingHandCursor);
-	renderBtn->setStyleSheet(kToggleStyle);
-
-	// Connect signals — capture the other button for combined state
-	QObject::connect(eyeBtn, &QPushButton::toggled, this,
-		[this, objectId, renderBtn](bool viewportChecked) {
-			emit visibilityChanged(objectId, viewportChecked, renderBtn->isChecked());
-		});
-	QObject::connect(renderBtn, &QPushButton::toggled, this,
-		[this, objectId, eyeBtn](bool renderChecked) {
-			emit visibilityChanged(objectId, eyeBtn->isChecked(), renderChecked);
-		});
-
-	rowLayout->addWidget(eyeBtn);
-	rowLayout->addWidget(renderBtn);
-
-	return row;
 }
 
 // =========================================================================
-// Refresh — no-op for hard-coded demo (future: rebuild from UIContext)
+// Refresh — bind pool rows to scene objects
 // =========================================================================
 
-void Outliner::Refresh(const UIContext& /*ctx*/)
+void Outliner::Refresh(const UIContext& ctx)
 {
-	// Hard-coded demo data — no per-frame refresh needed.
-	// Future: rebuild rows from UIContext scene data when scene changes.
+	auto ids = ctx.GetObjectIDs();
+
+	// Create the "Scene" category group once.
+	if (!m_sceneGroup)
+	{
+		m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
+		m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
+	}
+
+	// Count valid (non-null) objects.
+	std::size_t validCount = 0;
+	for (const auto* obj : ids)
+	{
+		if (obj) ++validCount;
+	}
+
+	// Ensure pool is large enough for valid objects.
+	EnsureRowPool(validCount);
+
+	// Configure visible rows.
+	std::size_t poolIndex = 0;
+	int rowIndex = 0;
+	for (const auto* obj : ids)
+	{
+		if (!obj) continue;
+
+		auto [letter, color] = TypeInfo(obj->o_type);
+		m_rowPool[poolIndex]->SetObject(
+			letter, color,
+			QString::fromStdString(obj->o_name),
+			obj->GetObjectID(), rowIndex);
+		m_rowPool[poolIndex]->setVisible(true);
+		++poolIndex;
+		++rowIndex;
+	}
+
+	// Hide surplus rows (pool larger than current scene).
+	for (std::size_t i = validCount; i < m_rowPool.size(); ++i)
+	{
+		m_rowPool[i]->setVisible(false);
+	}
+
+	// Show/hide the category group based on whether we have objects.
+	m_sceneGroup->setVisible(validCount > 0);
 }
 
 } // namespace neurus

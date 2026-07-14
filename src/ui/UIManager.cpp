@@ -81,10 +81,8 @@ void UIManager::Refresh(const UIContext& ctx)
 {
 	for (auto& [type, widget] : m_panels)
 	{
-		if (auto* panel = qobject_cast<UIPanel*>(widget))
-		{
-			panel->Refresh(ctx);
-		}
+		auto* panel = qobject_cast<UIPanel*>(widget);
+		panel->Refresh(ctx);
 	}
 }
 

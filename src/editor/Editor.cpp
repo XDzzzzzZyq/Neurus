@@ -172,6 +172,7 @@ UIContext Editor::GetUIContext() const
 	if (ed_project)
 	{
 		ctx.renderConfig = &ed_project->GetRenderConfig();
+		ctx.scene = &ed_project->GetScene();
 	}
 	return ctx;
 }

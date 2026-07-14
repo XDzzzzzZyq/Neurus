@@ -5,20 +5,23 @@
  * Displays scene objects as a scrollable vertical list. Each row shows the
  * object type icon, name, and two visibility toggles (viewport / render).
  *
- * Phase 1: Hard-coded demo layout following the RenderConfigPanel pattern.
- * Object IDs are stored via QWidget::setProperty but not displayed.
- *
  * Architecture:
  * - UIPanel subclass (matches RenderConfigPanel / PropertyEditor pattern)
  * - QVBoxLayout → QScrollArea → container widget with vertical row list
- * - Clicking a row's name emits objectSelected(int) via Qt signal
- * - Visibility toggles emit visibilityChanged(int, bool, bool)
- * - No Vulkan or Renderer includes — pure Qt6 Widgets
+ * - Rows are OutlinerRow widgets managed via a pool
+ * - Pool grows as needed; extra rows are hidden (not destroyed)
+ * - Each recycled row calls SetObject() — signal lambdas read the current
+ *   m_objectId at emission time, so no manual rewire needed
+ * - Row signals forwarded via Outliner::objectSelected / visibilityChanged
+ * - No Vulkan, Renderer, or scene-layer headers — pure Qt6 Widgets
  */
 
 #pragma once
 
 #include "UIPanel.h"
+
+#include <cstddef>
+#include <vector>
 
 class QGroupBox;
 class QScrollArea;
@@ -26,6 +29,8 @@ class QVBoxLayout;
 
 namespace neurus
 {
+
+class OutlinerRow;
 
 class Outliner : public UIPanel
 {
@@ -43,10 +48,10 @@ public:
 	/**
 	 * @brief Per-frame refresh from UIContext.
 	 *
-	 * Currently a no-op — hard-coded demo data does not change per-frame.
-	 * Future: rebuild rows from scene object pools carried by UIContext.
+	 * Uses a row pool: grows when scene objects exceed pool size, recycles
+	 * existing rows via SetObject() otherwise. Extra rows are hidden.
 	 *
-	 * @param ctx Read-only UI context (unused in Phase 1).
+	 * @param ctx Read-only UI context carrying Editor/Project state.
 	 */
 	void Refresh(const UIContext& ctx) override;
 
@@ -64,47 +69,29 @@ signals:
 
 private:
 	/**
-	 * @brief Builds the scrollable vertical list UI with hard-coded demo rows.
-	 *
-	 * Follows RenderConfigPanel constructor pattern:
-	 * QVBoxLayout → QScrollArea → container widget → QVBoxLayout → rows.
-	 */
-	void BuildUI();
-
-	/**
 	 * @brief Creates a collapsible QGroupBox for a category of objects.
 	 *
-	 * Matches the RenderConfigPanel Build*Section() pattern: creates a
-	 * QGroupBox, adds it to m_listLayout, and returns the group so the
-	 * caller can add rows to a new QVBoxLayout inside it.
-	 *
 	 * @param title Category header text (e.g. "Cameras").
-	 * @return The QGroupBox widget (caller uses group->layout() to add rows).
+	 * @return The QGroupBox widget.
 	 */
 	QGroupBox* AddCategoryGroup(const QString& title);
 
 	/**
-	 * @brief Creates a single row widget matching Blender's Outliner design.
-	 *
-	 * Row layout (all in QHBoxLayout, 28px height):
-	 *   [colored type label 22x22] [name QPushButton (stretching)] [eye toggle] [monitor toggle]
-	 *
-	 * The object ID is stored via QWidget::setProperty("objectId", id)
-	 * and is never displayed to the user.
-	 *
-	 * @param typeLetter Single character for the type icon ("C", "L", "M").
-	 * @param typeColor  CSS background color for the type icon.
-	 * @param name       Display name shown in the row.
-	 * @param objectId   Unique object identifier (stored, not shown).
-	 * @param rowIndex   Row position in the list (0-based). Used for alternating background.
-	 * @return A QWidget row ready to be added to the vertical list layout.
+	 * @brief Ensures the row pool has at least @p needed rows,
+	 *        creating new ones as necessary.
 	 */
-	QWidget* CreateRow(const QString& typeLetter, const QString& typeColor,
-	                   const QString& name, int objectId, int rowIndex);
+	void EnsureRowPool(std::size_t needed);
 
 	QScrollArea* m_scrollArea = nullptr;
 	QWidget*     m_container  = nullptr;
 	QVBoxLayout* m_listLayout = nullptr;
+
+	/// Persistent "Scene" category group (created once).
+	QGroupBox*     m_sceneGroup = nullptr;
+	QVBoxLayout*   m_groupLayout = nullptr;
+
+	/// Row pool — grows as needed, never shrinks.
+	std::vector<OutlinerRow*> m_rowPool;
 };
 
 } // namespace neurus
