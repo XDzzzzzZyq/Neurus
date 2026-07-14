@@ -93,6 +93,38 @@ const Camera* Scene::GetActiveCamera() const
 // Scene-wide operations
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Post-deserialization rebuild
+// ---------------------------------------------------------------------------
+
+void Scene::RebuildObjList()
+{
+	obj_list.clear();
+
+	// Lambda that inserts aliasing shared_ptr<ObjectID> for each entry in a pool.
+	auto rebuild = [this](auto& pool)
+	{
+		for (auto& [id, obj] : pool)
+		{
+			auto* basePtr = static_cast<ObjectID*>(obj.get());
+			int id_obj = basePtr->GetObjectID();
+			obj_list[id] = Resource<ObjectID>(obj, basePtr);
+		}
+	};
+
+	rebuild(cam_list);
+	rebuild(mesh_list);
+	rebuild(light_list);
+	rebuild(sprite_list);
+	rebuild(dLine_list);
+	rebuild(dPoints_list);
+	rebuild(env_list);
+}
+
+// ---------------------------------------------------------------------------
+// Scene-wide operations
+// ---------------------------------------------------------------------------
+
 void Scene::UpdateObjTransforms()
 {
 	for (auto& [id, obj] : obj_list)

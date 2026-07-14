@@ -146,7 +146,13 @@ public:
 	{
 		ar(CEREAL_NVP(cam_list), CEREAL_NVP(mesh_list), CEREAL_NVP(light_list),
 		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list),
-		   CEREAL_NVP(env_list), CEREAL_NVP(selections));
+		   CEREAL_NVP(env_list));
+
+		// Rebuild obj_list from typed pools after loading.
+		if constexpr (Archive::is_loading::value)
+		{
+			RebuildObjList();
+		}
 	}
 
 	// -------------------------------------------------------------------
@@ -194,8 +200,8 @@ public:
 	ResPool<DebugPoints> dPoints_list;  ///< Debug point primitives
 	ResPool<Environment> env_list;      ///< Environment objects (IBL)
 
-	/// Selection state for scene objects (serialized via cereal).
-	Selections<ObjectID> selections;
+	/// Selection state for scene objects (runtime-only, not serialized).
+	Selections<ObjectID*> selections;
 
 	// -------------------------------------------------------------------
 	// Registration - store in both type-specific pool AND obj_list
@@ -314,6 +320,15 @@ public:
 
 private:
 	SceneModifStatus sc_status = SceneModifStatus::SceneChanged; ///< Current scene modification state
+
+	/**
+	 * @brief Rebuilds obj_list from all typed pools after deserialization.
+	 *
+	 * Iterates each typed pool (cam_list, mesh_list, etc.) and inserts
+	 * aliasing shared_ptr<ObjectID> entries into obj_list, matching the
+	 * same pattern as RegisterObject().
+	 */
+	void RebuildObjList();
 
 	/**
 	 * @brief Registers an object in both its type-specific pool and the master obj_list.
