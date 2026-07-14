@@ -1,31 +1,31 @@
 /**
  * @file Outliner.h
- * @brief Outliner dock panel displaying scene object hierarchy in a QTreeView.
+ * @brief Outliner dock panel — Blender-style vertical list view.
  *
- * The Outliner reads from a const Scene reference and builds a flat tree
- * grouped by object type (Cameras, Meshes, Lights). Clicking an object emits
- * ObjectSelected via EventBus for Editor↔Renderer selection propagation.
+ * Displays scene objects as a scrollable vertical list. Each row shows the
+ * object type icon, name, and two visibility toggles (viewport / render).
+ *
+ * Phase 1: Hard-coded demo layout following the RenderConfigPanel pattern.
+ * Object IDs are stored via QWidget::setProperty but not displayed.
  *
  * Architecture:
- * - QTreeView + QStandardItemModel (simpler than QAbstractItemModel for MVP)
- * - Reads scene.cam_list, scene.mesh_list, scene.light_list
- * - Click → EventBus().enqueue(ObjectSelected{id})
- * - No DnD, no inline editing, no hierarchy (flat lists per category)
- *
- * @note UI Layer - communicates via EventBus (typed events, no Qt dependency).
+ * - UIPanel subclass (matches RenderConfigPanel / PropertyEditor pattern)
+ * - QVBoxLayout → QScrollArea → container widget with vertical row list
+ * - Clicking a row's name emits objectSelected(int) via Qt signal
+ * - Visibility toggles emit visibilityChanged(int, bool, bool)
+ * - No Vulkan or Renderer includes — pure Qt6 Widgets
  */
 
 #pragma once
 
 #include "UIPanel.h"
 
-class QTreeView;
-class QStandardItemModel;
+class QGroupBox;
+class QScrollArea;
+class QVBoxLayout;
 
 namespace neurus
 {
-
-class Scene;
 
 class Outliner : public UIPanel
 {
@@ -37,47 +37,73 @@ public:
 	explicit Outliner(QWidget* parent = nullptr);
 	~Outliner() override = default;
 
+	Outliner(const Outliner&) = delete;
+	Outliner& operator=(const Outliner&) = delete;
+
 	/**
-	 * @brief Refreshes the panel from a UIContext snapshot.
+	 * @brief Per-frame refresh from UIContext.
 	 *
-	 * Currently a no-op — the Outliner rebuilds via Refresh(const Scene&)
-	 * on project load/change events rather than per-frame.
+	 * Currently a no-op — hard-coded demo data does not change per-frame.
+	 * Future: rebuild rows from scene object pools carried by UIContext.
 	 *
-	 * @param ctx Read-only UI context (unused).
+	 * @param ctx Read-only UI context (unused in Phase 1).
 	 */
 	void Refresh(const UIContext& ctx) override;
 
-	/**
-	 * @brief Rebuilds the tree view from the given scene's object pools.
-	 *
-	 * Clears existing items and repopulates with current cameras, meshes,
-	 * and lights from the scene. Categories with no objects are hidden.
-	 *
-	 * @param scene Scene to read object pools from (const, read-only).
-	 */
-	void Refresh(const Scene& scene);
-
-private slots:
-	/**
-	 * @brief Handles tree view item click.
-	 *
-	 * Extracts the object ID from Qt::UserRole+1 and emits the
-	 * objectSelected signal, which Application wires to EventBus.
-	 *
-	 * @param index Model index of the clicked item.
-	 */
-	void OnItemClicked(const QModelIndex& index);
-
 signals:
-	/** @brief Emitted when a user clicks on a scene object in the outliner. */
+	/** @brief Emitted when a user clicks on a scene object row in the outliner. */
 	void objectSelected(int objectId);
 
-private:
-	QTreeView*         m_treeView = nullptr;
-	QStandardItemModel* m_model    = nullptr;
+	/**
+	 * @brief Emitted when visibility toggles change for an object.
+	 * @param objectId       Unique object identifier.
+	 * @param viewportVisible True if viewport visibility is enabled.
+	 * @param renderVisible   True if render visibility is enabled.
+	 */
+	void visibilityChanged(int objectId, bool viewportVisible, bool renderVisible);
 
-	static constexpr int ObjectIdRole   = Qt::UserRole + 1;
-	static constexpr int ObjectTypeRole = Qt::UserRole + 2;
+private:
+	/**
+	 * @brief Builds the scrollable vertical list UI with hard-coded demo rows.
+	 *
+	 * Follows RenderConfigPanel constructor pattern:
+	 * QVBoxLayout → QScrollArea → container widget → QVBoxLayout → rows.
+	 */
+	void BuildUI();
+
+	/**
+	 * @brief Creates a collapsible QGroupBox for a category of objects.
+	 *
+	 * Matches the RenderConfigPanel Build*Section() pattern: creates a
+	 * QGroupBox, adds it to m_listLayout, and returns the group so the
+	 * caller can add rows to a new QVBoxLayout inside it.
+	 *
+	 * @param title Category header text (e.g. "Cameras").
+	 * @return The QGroupBox widget (caller uses group->layout() to add rows).
+	 */
+	QGroupBox* AddCategoryGroup(const QString& title);
+
+	/**
+	 * @brief Creates a single row widget matching Blender's Outliner design.
+	 *
+	 * Row layout (all in QHBoxLayout, 28px height):
+	 *   [colored type label 22x22] [name QPushButton (stretching)] [eye toggle] [monitor toggle]
+	 *
+	 * The object ID is stored via QWidget::setProperty("objectId", id)
+	 * and is never displayed to the user.
+	 *
+	 * @param typeLetter Single character for the type icon ("C", "L", "M").
+	 * @param typeColor  CSS background color for the type icon.
+	 * @param name       Display name shown in the row.
+	 * @param objectId   Unique object identifier (stored, not shown).
+	 * @return A QWidget row ready to be added to the vertical list layout.
+	 */
+	QWidget* CreateRow(const QString& typeLetter, const QString& typeColor,
+	                   const QString& name, int objectId);
+
+	QScrollArea* m_scrollArea = nullptr;
+	QWidget*     m_container  = nullptr;
+	QVBoxLayout* m_listLayout = nullptr;
 };
 
 } // namespace neurus

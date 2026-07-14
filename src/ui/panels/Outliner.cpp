@@ -1,144 +1,238 @@
 /**
  * @file Outliner.cpp
- * @brief Outliner implementation - scene object tree view with EventBus selection.
+ * @brief Outliner implementation — Blender-style vertical list with type icons,
+ *        names, and visibility toggles.
+ *
+ * Phase 1: Hard-coded demo layout following the RenderConfigPanel constructor
+ * pattern (QVBoxLayout → QScrollArea → container → vertical row list).
+ * Future phases will wire to real Scene data via UIContext.
  */
 
 #include "Outliner.h"
 
 #include "UIContext.h"
-#include "scene/Light.h"
-#include "scene/Mesh.h"
-#include "scene/Scene.h"
 
-#include <QHeaderView>
-#include <QStandardItemModel>
-#include <QTreeView>
+#include <QGroupBox>
+#include <QLabel>
+#include <QPushButton>
+#include <QScrollArea>
 #include <QVBoxLayout>
 
 namespace neurus
 {
 
 // =========================================================================
-// Constructor
+// Constructor — follows RenderConfigPanel pattern
 // =========================================================================
 
 Outliner::Outliner(QWidget* parent)
 	: UIPanel(PanelType::Outliner, QString(), parent)
 {
-	auto* layout = new QVBoxLayout(this);
-	layout->setContentsMargins(0, 0, 0, 0);
+	auto* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(0, 0, 0, 0);
 
-	m_model = new QStandardItemModel(this);
-	m_model->setHorizontalHeaderLabels({"Outliner"});
+	m_scrollArea = new QScrollArea(this);
+	m_scrollArea->setWidgetResizable(true);
+	m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	mainLayout->addWidget(m_scrollArea);
 
-	m_treeView = new QTreeView(this);
-	m_treeView->setModel(m_model);
-	m_treeView->setHeaderHidden(true);
-	m_treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
-	m_treeView->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_treeView->setDragDropMode(QAbstractItemView::NoDragDrop);
-	m_treeView->setRootIsDecorated(true);
-	m_treeView->setAnimated(true);
+	m_container = new QWidget();
+	m_listLayout = new QVBoxLayout(m_container);
+	m_listLayout->setContentsMargins(4, 4, 4, 4);
+	m_listLayout->setSpacing(2);
+	m_listLayout->setAlignment(Qt::AlignTop);
 
-	layout->addWidget(m_treeView);
+	m_scrollArea->setWidget(m_container);
 
-	connect(m_treeView, &QTreeView::clicked,
-		this, &Outliner::OnItemClicked);
+	BuildUI();
 }
 
 // =========================================================================
-// Refresh(const UIContext&) - no-op per-frame refresh
+// BuildUI — hard-coded demo rows
+// =========================================================================
+
+void Outliner::BuildUI()
+{
+	// Type colors matching GOType categories (blender-esque palette)
+	const QString kCamColor   = QString::fromUtf8("#4A90D9");  // blue
+	const QString kLightColor = QString::fromUtf8("#F5A623");  // amber
+	const QString kMeshColor  = QString::fromUtf8("#7ED321");  // green
+
+	auto* sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
+	auto* sceneLayout = qobject_cast<QVBoxLayout*>(sceneGroup->layout());
+
+	// --- Cameras ---
+	sceneLayout->addWidget(CreateRow(
+		QString::fromUtf8("C"), kCamColor,
+		QString::fromUtf8("Main Camera"), 1001));
+
+	sceneLayout->addWidget(CreateRow(
+		QString::fromUtf8("C"), kCamColor,
+		QString::fromUtf8("Side Camera"), 1002));
+
+	// --- Lights ---
+	sceneLayout->addWidget(CreateRow(
+		QString::fromUtf8("L"), kLightColor,
+		QString::fromUtf8("Sun Light"), 2001));
+
+	sceneLayout->addWidget(CreateRow(
+		QString::fromUtf8("L"), kLightColor,
+		QString::fromUtf8("Point Light"), 2002));
+
+	// --- Meshes ---
+	sceneLayout->addWidget(CreateRow(
+		QString::fromUtf8("M"), kMeshColor,
+		QString::fromUtf8("Sphere"), 3001));
+
+	sceneLayout->addWidget(CreateRow(
+		QString::fromUtf8("M"), kMeshColor,
+		QString::fromUtf8("Ground Plane"), 3002));
+
+	m_listLayout->addStretch();
+}
+
+// =========================================================================
+// AddCategoryGroup — creates a QGroupBox with a QVBoxLayout for rows
+// =========================================================================
+
+QGroupBox* Outliner::AddCategoryGroup(const QString& title)
+{
+	auto* group = new QGroupBox(title);
+	//group->setFlat(true);
+
+	auto* groupLayout = new QVBoxLayout(group);
+	groupLayout->setContentsMargins(4, 4, 4, 4);
+	groupLayout->setSpacing(2);
+
+	m_listLayout->addWidget(group);
+	return group;
+}
+
+// =========================================================================
+// CreateRow — single row: [type icon] [name] [eye toggle] [monitor toggle]
+// =========================================================================
+
+QWidget* Outliner::CreateRow(const QString& typeLetter, const QString& typeColor,
+                              const QString& name, int objectId)
+{
+	auto* row = new QWidget();
+	row->setFixedHeight(28);
+	row->setProperty("objectId", objectId);
+
+	auto* rowLayout = new QHBoxLayout(row);
+	rowLayout->setContentsMargins(4, 1, 4, 1);
+	rowLayout->setSpacing(4);
+
+	// --- Type icon (colored QLabel, 22x22, centered) ---
+	auto* typeLabel = new QLabel(typeLetter);
+	typeLabel->setFixedSize(22, 22);
+	typeLabel->setAlignment(Qt::AlignCenter);
+	typeLabel->setStyleSheet(QString(
+		"QLabel {"
+		"  background-color: %1;"
+		"  color: white;"
+		"  border-radius: 3px;"
+		"  font-size: 11px;"
+		"  font-weight: bold;"
+		"}").arg(typeColor));
+	rowLayout->addWidget(typeLabel);
+
+	// --- Name (flat QPushButton styled as label, clickable for selection) ---
+	auto* nameBtn = new QPushButton(name);
+	nameBtn->setFlat(true);
+	nameBtn->setCursor(Qt::PointingHandCursor);
+	nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	nameBtn->setStyleSheet(
+		"QPushButton {"
+		"  text-align: left;"
+		"  border: none;"
+		"  background: transparent;"
+		"  padding: 1px 4px;"
+		"  font-size: 11px;"
+		"}"
+		"QPushButton:hover {"
+		"  color: #000000;"
+		"  background: rgba(255, 255, 255, 0.5);"
+		"}"
+		"QPushButton:pressed {"
+		"  color: #676767;"
+		"  background: rgba(0, 0, 0, 0.1);"
+		"}");
+	QObject::connect(nameBtn, &QPushButton::clicked, this, [this, objectId]() {
+		emit objectSelected(objectId);
+	});
+	rowLayout->addWidget(nameBtn);
+
+	// --- Visibility toggle buttons ---
+	//
+	// Flat QPushButton with checkable state — larger hit target than QToolButton.
+	// Both must exist before either connect lambda is created.
+	//
+	static const QString kToggleStyle = QString::fromUtf8(
+		"QPushButton {"
+		"  border: 1px solid transparent;"
+		"  border-radius: 3px;"
+		"  background: transparent;"
+		"  padding: 2px;"
+		"  font-size: 20px;"
+		"  font-weight: bold;"
+		"}"
+		"QPushButton:!checked {"
+		"  color: #d0d0d0;"
+		"}"
+		"QPushButton:checked {"
+		"  color: #444444;"
+		"}"
+		"QPushButton:hover {"
+		"  background: rgba(255, 255, 255, 0.10);"
+		"  border-color: rgba(255, 255, 255, 0.15);"
+		"}");
+
+	auto* eyeBtn    = new QPushButton(QString::fromUtf8("\u25C9"));  // ◉
+	auto* renderBtn = new QPushButton(QString::fromUtf8("\u25A3"));  // ▣
+
+	// Eye button
+	eyeBtn->setCheckable(true);
+	eyeBtn->setChecked(true);
+	eyeBtn->setFlat(true);
+	eyeBtn->setFixedSize(28, 26);
+	eyeBtn->setToolTip(QString::fromUtf8("Viewport visibility"));
+	eyeBtn->setCursor(Qt::PointingHandCursor);
+	eyeBtn->setStyleSheet(kToggleStyle);
+
+	// Render button
+	renderBtn->setCheckable(true);
+	renderBtn->setChecked(true);
+	renderBtn->setFlat(true);
+	renderBtn->setFixedSize(28, 26);
+	renderBtn->setToolTip(QString::fromUtf8("Render visibility"));
+	renderBtn->setCursor(Qt::PointingHandCursor);
+	renderBtn->setStyleSheet(kToggleStyle);
+
+	// Connect signals — capture the other button for combined state
+	QObject::connect(eyeBtn, &QPushButton::toggled, this,
+		[this, objectId, renderBtn](bool viewportChecked) {
+			emit visibilityChanged(objectId, viewportChecked, renderBtn->isChecked());
+		});
+	QObject::connect(renderBtn, &QPushButton::toggled, this,
+		[this, objectId, eyeBtn](bool renderChecked) {
+			emit visibilityChanged(objectId, eyeBtn->isChecked(), renderChecked);
+		});
+
+	rowLayout->addWidget(eyeBtn);
+	rowLayout->addWidget(renderBtn);
+
+	return row;
+}
+
+// =========================================================================
+// Refresh — no-op for hard-coded demo (future: rebuild from UIContext)
 // =========================================================================
 
 void Outliner::Refresh(const UIContext& /*ctx*/)
 {
-	// Outliner data is rebuilt on project load/change via Refresh(const Scene&),
-	// not on a per-frame basis.
-}
-
-// =========================================================================
-// Refresh - rebuild tree from Scene
-// =========================================================================
-
-void Outliner::Refresh(const Scene& scene)
-{
-	m_model->clear();
-
-	// Helper: add a non-selectable category header
-	auto addCategory = [this](const QString& name) -> QStandardItem*
-	{
-		auto* cat = new QStandardItem(name);
-		cat->setFlags(cat->flags() & ~Qt::ItemIsSelectable);
-		cat->setEditable(false);
-		m_model->invisibleRootItem()->appendRow(cat);
-		return cat;
-	};
-
-	// Helper: add a selectable leaf item under a category
-	auto addLeaf = [](QStandardItem* parent, const QString& label, int id)
-	{
-		auto* item = new QStandardItem(label);
-		item->setData(id, Qt::UserRole + 1);
-		item->setEditable(false);
-		parent->appendRow(item);
-	};
-
-	// --- Cameras ---
-	if (!scene.cam_list.empty())
-	{
-		auto* camCat = addCategory("Cameras");
-		for (const auto& [id, cam] : scene.cam_list)
-		{
-			QString label = cam->o_name.empty()
-				? QString("Camera #%1").arg(id)
-				: QString::fromStdString(cam->o_name);
-			addLeaf(camCat, label, id);
-		}
-	}
-
-	// --- Meshes ---
-	if (!scene.mesh_list.empty())
-	{
-		auto* meshCat = addCategory("Meshes");
-		for (const auto& [id, mesh] : scene.mesh_list)
-		{
-			QString label = mesh->o_name.empty()
-				? QString("Mesh #%1").arg(id)
-				: QString::fromStdString(mesh->o_name);
-			addLeaf(meshCat, label, id);
-		}
-	}
-
-	// --- Lights ---
-	if (!scene.light_list.empty())
-	{
-		auto* lightCat = addCategory("Lights");
-		for (const auto& [id, light] : scene.light_list)
-		{
-			QString label = light->o_name.empty()
-				? QString("Light #%1").arg(id)
-				: QString::fromStdString(light->o_name);
-			addLeaf(lightCat, label, id);
-		}
-	}
-
-	m_treeView->expandAll();
-}
-
-// =========================================================================
-// OnItemClicked - emit ObjectSelected via EventBus
-// =========================================================================
-
-void Outliner::OnItemClicked(const QModelIndex& index)
-{
-	if (!index.isValid())
-		return;
-
-	int objectId = index.data(Qt::UserRole + 1).toInt();
-	if (objectId > 0)
-	{
-		emit objectSelected(objectId);
-	}
+	// Hard-coded demo data — no per-frame refresh needed.
+	// Future: rebuild rows from UIContext scene data when scene changes.
 }
 
 } // namespace neurus
