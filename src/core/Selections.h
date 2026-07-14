@@ -1,30 +1,23 @@
 /**
  * @file Selections.h
- * @brief Generic selection state management for objects, with serialization support.
+ * @brief Generic selection state management for objects, using value semantics.
  *
  * Selections provides a type-safe container for tracking user selections.
  * It supports single and multi-selection modes with fast lookup via hash set.
- * Unlike the original SelectionManager, Selections stores object IDs (int)
- * instead of raw pointers, enabling cereal serialization.
+ * Stores T values directly — caller chooses the type (int, ObjectID*, etc.).
  *
  * Architecture:
- * - Template-based for use with any object type (ObjectID, Mesh, etc.)
- * - Scene owns Selections<ObjectID> for scene object selection (serializable)
- * - Editor delegates to Scene::selections via pointer, with a
- *   fallback instance for standalone (no-scene) usage
+ * - Template-based for use with any value type
+ * - Scene owns Selections<ObjectID*> for scene object selection
+ * - Editor delegates to Scene::selections via pointer
  * - UI queries selections to highlight/display selected objects
  * - Controllers mutate selections in response to user input
- *
- * Serialization:
- * - m_selectedIds (vector of int) is the serialized payload
- * - m_selectedPtrs and m_selectionCache are runtime caches rebuilt via
- *   ResolvePointers() after deserialization
  *
  * Selection Patterns:
  * - Single select: Replace current selection
  * - Multi-select (increment): Add to selection set
  * - Deselect: Remove from selection set
- * - Active object: Last selected object in list
+ * - Active object: Tracked via m_activePtr, separate from selection list
  *
  * @note Core Layer: Selections is part of the core type system
  * @note Thread-safety: Not thread-safe. Must be used from main thread only.
@@ -33,45 +26,37 @@
 #pragma once
 
 #include <algorithm>
-#include <memory>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 #include <cereal/cereal.hpp>
 #include <cereal/types/vector.hpp>
 
+namespace neurus
+{
+
 /**
  * @brief Generic selection state manager supporting single and multi-selection,
- *        with ID-based storage for cereal serialization.
+ *        storing T values directly.
  *
- * Selections maintains a list of selected object IDs with fast lookup.
- * It distinguishes between:
- * - Selected objects: All objects in the selection set
- * - Active object: The last selected object (primary selection)
+ * Selections maintains an ordered list of selected values with fast
+ * O(1) hash lookup. The active object is tracked explicitly via
+ * m_activePtr, separate from the selection list ordering.
  *
- * ID-based storage (int) enables cereal serialization. Runtime pointer
- * access is provided via a parallel pointer cache that can be rebuilt
- * after deserialization via ResolvePointers().
+ * T must be equality-comparable and hashable via std::hash<T>.
+ * T{} is used as the "null" sentinel (nullptr for pointers, 0 for ints).
  *
  * Usage Examples:
- * - Scene object selection in Outliner/Viewport
- * - Material selection in MaterialViewer
- * - Node selection in node editor
+ * - Selections<int>       for ID-based tests
+ * - Selections<ObjectID*> for scene object selection
+ * - Selections<Material*> for material selection
  *
  * Selection Modes:
  * - increment=false: Single selection (replace existing)
  * - increment=true: Multi-selection (add to set)
  *
- * Performance:
- * - Select: O(1) lookup + O(1) append
- * - IsSelected: O(1) hash lookup
- * - GetSelected: O(1) vector access
- *
- * @tparam T Base type of selectable objects (must provide GetObjectID() -> int)
- *
- * @note Active object is always the last selected object in the list
- * @note Duplicate selections are prevented via m_selectionCache
+ * @tparam T Value type to store. Must be default-constructible,
+ *           equality-comparable, and hashable.
  */
 template<class T>
 class Selections
@@ -96,181 +81,135 @@ public:
 	// -------------------------------------------------------------------
 
 	/**
-	 * @brief Selects an object.
+	 * @brief Selects a value.
 	 *
 	 * If increment=false (single selection):
 	 * - Clears existing selection
-	 * - Adds obj as the only selected object
+	 * - Adds obj as the only selected value
 	 *
 	 * If increment=true (multi-selection):
-	 * - If obj not in selection: adds to end (becomes active)
-	 * - If obj already selected: moves to end (becomes active)
-	 *
-	 * @param obj Pointer to object to select (nullptr ignored)
-	 * @param increment Whether to add to selection (true) or replace (false)
-	 *
-	 * @note Active object is always selected_objects.back()
+	 * - If obj not in selection: adds to end and becomes active
+	 * - If obj already selected: becomes active (moved to end of list)
 	 */
-	void Select(T* obj, bool increment)
+	void Select(const T& obj, bool increment)
 	{
-		if (obj == nullptr) return;
-
-		int id = obj->GetObjectID();
-
 		if (increment)
 		{
-			auto idx = std::find(m_selectedIds.begin(), m_selectedIds.end(), id);
-			if (idx == m_selectedIds.end())
+			auto it = m_selectionSet.find(obj);
+			if (it == m_selectionSet.end())
 			{
-				m_selectedIds.push_back(id);
-				m_selectedPtrs.push_back(obj);
-				m_selectionCache.insert(id);
+				m_selectedList.push_back(obj);
+				m_selectionSet.insert(obj);
 			}
 			else
 			{
-				// Move to end (becomes active) — swap both parallel vectors
-				auto dist = std::distance(m_selectedIds.begin(), idx);
-				auto lastIdx = m_selectedIds.size() - 1;
-				if (static_cast<size_t>(dist) != lastIdx)
+				// Move to end (becomes active) — swap with last element
+				auto itVec = std::find(m_selectedList.begin(), m_selectedList.end(), obj);
+				auto lastIdx = m_selectedList.size() - 1;
+				if (static_cast<size_t>(std::distance(m_selectedList.begin(), itVec)) != lastIdx)
 				{
-					std::swap(m_selectedIds[dist], m_selectedIds[lastIdx]);
-					std::swap(m_selectedPtrs[dist], m_selectedPtrs[lastIdx]);
+					std::swap(*itVec, m_selectedList.back());
 				}
 			}
+			m_activePtr = obj;
 		}
 		else
 		{
-			m_selectedIds.clear();
-			m_selectedIds.push_back(id);
-			m_selectedPtrs.clear();
-			m_selectedPtrs.push_back(obj);
-			m_selectionCache.clear();
-			m_selectionCache.insert(id);
+			m_selectedList.clear();
+			m_selectedList.push_back(obj);
+			m_selectionSet.clear();
+			m_selectionSet.insert(obj);
+			m_activePtr = obj;
 		}
 	}
 
 	/**
-	 * @brief Deselects an object.
+	 * @brief Deselects a value.
 	 *
-	 * Removes obj from selection set. If obj was active, the previous
-	 * object becomes active.
-	 *
-	 * @param obj Pointer to object to deselect (nullptr ignored)
-	 * @param increment Unused parameter (kept for API consistency)
+	 * Removes obj from selection set. If obj was the active object,
+	 * the last remaining value becomes active, or T{} if empty.
 	 *
 	 * @note No-op if obj is not selected
 	 */
-	void Deselect(T* obj, bool increment)
+	void Deselect(const T& obj, bool increment)
 	{
 		(void)increment;
-		if (obj == nullptr) return;
+		auto it = m_selectionSet.find(obj);
+		if (it == m_selectionSet.end()) return;
 
-		int id = obj->GetObjectID();
-		auto idx = std::find(m_selectedIds.begin(), m_selectedIds.end(), id);
-		if (idx == m_selectedIds.end()) return;
+		m_selectionSet.erase(it);
 
-		auto dist = std::distance(m_selectedIds.begin(), idx);
-		m_selectedIds.erase(idx);
-		m_selectedPtrs.erase(m_selectedPtrs.begin() + dist);
-		m_selectionCache.erase(id);
+		auto itVec = std::find(m_selectedList.begin(), m_selectedList.end(), obj);
+		if (itVec != m_selectedList.end())
+		{
+			m_selectedList.erase(itVec);
+		}
+
+		if (m_activePtr == obj)
+		{
+			m_activePtr = m_selectedList.empty() ? T{} : m_selectedList.back();
+		}
 	}
 
 	/**
-	 * @brief Returns the active (last selected) object.
+	 * @brief Returns the active (primary) selected value.
 	 *
-	 * The active object is the primary selection, typically used for
-	 * displaying properties or applying operations.
-	 *
-	 * @return Pointer to active object, or nullptr if no selection
+	 * @return Active value, or T{} if no selection
+	 *         (nullptr for pointer types, 0 for int types).
 	 */
-	T* GetActiveObject() const
+	T GetActiveObject() const
 	{
-		if (m_selectedPtrs.empty())
-			return nullptr;
-		return m_selectedPtrs.back();
+		if (m_selectedList.empty())
+			return T{};
+		return m_activePtr;
 	}
 
 	/**
-	 * @brief Returns the first selected object.
+	 * @brief Returns the first selected value.
 	 *
-	 * @return Pointer to first selected object, or nullptr if no selection
+	 * @return First selected value, or T{} if no selection.
 	 */
-	T* GetSelectedObjects() const
+	T GetSelectedObjects() const
 	{
-		if (m_selectedPtrs.empty())
-			return nullptr;
-		return m_selectedPtrs.front();
+		if (m_selectedList.empty())
+			return T{};
+		return m_selectedList.front();
 	}
 
 	/**
-	 * @brief Checks if an object is selected.
+	 * @brief Checks if a value is selected.
 	 *
-	 * Fast O(1) lookup using internal hash set of IDs.
-	 *
-	 * @param obj Pointer to object to check
-	 * @return true if obj is in the selection set
+	 * Fast O(1) lookup using internal hash set.
 	 */
-	bool IsSelected(T* obj) const
+	bool IsSelected(const T& obj) const
 	{
-		if (obj == nullptr) return false;
-		return m_selectionCache.find(obj->GetObjectID()) != m_selectionCache.end();
+		return m_selectionSet.find(obj) != m_selectionSet.end();
 	}
 
 	/**
-	 * @brief Returns the number of selected objects.
-	 * @return Count of selected objects.
+	 * @brief Returns the number of selected values.
 	 */
 	size_t GetSelectionCount() const
 	{
-		return m_selectedIds.size();
+		return m_selectedList.size();
 	}
 
 	/**
-	 * @brief Clears all selections.
+	 * @brief Returns the ordered list of selected values.
+	 */
+	const std::vector<T>& GetSelectedList() const
+	{
+		return m_selectedList;
+	}
+
+	/**
+	 * @brief Clears all selections and resets the active value to T{}.
 	 */
 	void ClearSelection()
 	{
-		m_selectedIds.clear();
-		m_selectedPtrs.clear();
-		m_selectionCache.clear();
-	}
-
-	// -------------------------------------------------------------------
-	// Post-deserialization resolution
-	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Rebuilds pointer cache and lookup set from deserialized IDs.
-	 *
-	 * After deserialization, m_selectedIds contains valid IDs but
-	 * m_selectedPtrs and m_selectionCache are empty. Call this method
-	 * with the scene's object pool (e.g. obj_list) to resolve IDs
-	 * to runtime pointers.
-	 *
-	 * @param pool Map of ID -> shared_ptr<T> containing all live objects.
-	 * @note Dangling IDs (pointing to objects no longer in the pool) are
-	 *       silently removed from m_selectedIds.
-	 */
-	void ResolvePointers(const std::unordered_map<int, std::shared_ptr<T>>& pool)
-	{
-		m_selectedPtrs.clear();
-		m_selectionCache.clear();
-
-		for (int id : m_selectedIds)
-		{
-			auto it = pool.find(id);
-			if (it != pool.end())
-			{
-				m_selectedPtrs.push_back(it->second.get());
-				m_selectionCache.insert(id);
-			}
-		}
-
-		// Remove dangling IDs that could not be resolved
-		m_selectedIds.erase(
-			std::remove_if(m_selectedIds.begin(), m_selectedIds.end(),
-				[this](int id) { return m_selectionCache.find(id) == m_selectionCache.end(); }),
-			m_selectedIds.end());
+		m_selectedList.clear();
+		m_selectionSet.clear();
+		m_activePtr = T{};
 	}
 
 	// -------------------------------------------------------------------
@@ -278,24 +217,39 @@ public:
 	// -------------------------------------------------------------------
 
 	/**
-	 * @brief Serializes the selection state (IDs only, not runtime pointer caches).
+	 * @brief Serializes the selection list (ordered list of values).
+	 *
+	 * For Selections<int> (test usage), this directly serializes int values.
+	 * For Selections<ObjectID*> (scene usage), serialization requires
+	 * a custom archive or pointer registration — not stored by default.
+	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
 	 */
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(cereal::make_nvp("selectedIds", m_selectedIds));
+		ar(cereal::make_nvp("selectedValues", m_selectedList));
+
+		// On deserialization, rebuild the hash set from the loaded list
+		// and set the active pointer to the last element.
+		if constexpr (Archive::is_loading::value)
+		{
+			m_selectionSet.clear();
+			m_selectionSet.insert(m_selectedList.begin(), m_selectedList.end());
+			m_activePtr = m_selectedList.empty() ? T{} : m_selectedList.back();
+		}
 	}
 
 private:
-	/// Ordered list of selected object IDs (last = active). This is the
-	/// serialized payload.
-	std::vector<int> m_selectedIds;
+	/// Ordered list of selected values (preserves selection order).
+	std::vector<T> m_selectedList;
 
-	/// Runtime pointer cache parallel to m_selectedIds. Not serialized.
-	std::vector<T*> m_selectedPtrs;
+	/// Fast hash lookup set for O(1) IsSelected() queries.
+	std::unordered_set<T> m_selectionSet;
 
-	/// Fast ID lookup set for O(1) IsSelected() queries.
-	std::unordered_set<int> m_selectionCache;
+	/// Active (primary) selected value, T{} if no selection.
+	T m_activePtr = T{};
 };
+
+} // namespace neurus

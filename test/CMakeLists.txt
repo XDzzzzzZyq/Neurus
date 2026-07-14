@@ -55,6 +55,7 @@ add_executable(neurus_test
 	asset/test_project_roundtrip.cpp
 	asset/test_default_project.cpp
 	core/test_graph.cpp
+	core/test_selections.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE
