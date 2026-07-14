@@ -20,6 +20,7 @@
 
 #include "passes/Pass.h"
 #include "RenderConfig.h"
+#include "RenderContext.h"
 #include "Swapchain.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -94,13 +95,16 @@ public:
 	/**
 	 * @brief Draws a single frame: acquire → record → submit → present.
 	 *
-	 * Reads camera and geometry from the scene. Handles swapchain recreation
-	 * on VK_ERROR_OUT_OF_DATE_KHR. Safe to call repeatedly (fence-guarded,
-	 * max kMaxFramesInFlight in flight).
+	 * Receives the editor-produced RenderContext (scene pointer, render
+	 * extent and frameIndex blank), fills in the render-specific fields
+	 * from the swapchain, and dispatches to all render passes.
 	 *
-	 * @param scene Scene providing active camera and mesh/light lists.
+	 * Handles swapchain recreation on VK_ERROR_OUT_OF_DATE_KHR. Safe to
+	 * call repeatedly (fence-guarded, max kMaxFramesInFlight in flight).
+	 *
+	 * @param editorCtx Editor-produced context with scene set.
 	 */
-	void DrawFrame(const Scene& scene);
+	void DrawFrame(const RenderContext& ctx);
 
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
@@ -147,6 +151,17 @@ public:
 	 */
 	void HandleResize(uint32_t width, uint32_t height);
 
+	/**
+	 * @brief Handles viewport recreation by rebuilding the swapchain with a new surface.
+	 *
+	 * Destroy the old swapchain and create a new one bound to the given surface.
+	 * Rebuilds all dependent resources (attachments, semaphores, command buffers).
+	 * Used when the Viewport widget is recreated with a new native HWND.
+	 *
+	 * @param newSurface New presentation surface (from the recreated Viewport).
+	 */
+	void HandleSurfaceChange(const vk::raii::SurfaceKHR& newSurface);
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
@@ -158,10 +173,10 @@ private:
 	 *   4. Blit HDRColor → swapchain image
 	 *   5. Transition swapchain image to present layout
 	 *
-	 * @param scene Scene providing active camera and mesh/light lists for iteration.
+	 * @param editorCtx Editor-produced context (scene set; width/height/frameIndex blank).
 	 */
 	void recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
-	                 const Scene& scene);
+	                 const RenderContext& editorCtx);
 
 	/** @brief Destroys and re-creates sync objects after swapchain resize. */
 	void recreateSwapchain();

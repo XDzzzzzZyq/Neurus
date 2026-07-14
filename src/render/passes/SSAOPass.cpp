@@ -323,13 +323,16 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 
 void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
+
+	// --- Cast scene UID to Scene* for access to Scene-specific members ---
+	const auto* scene = static_cast<const Scene*>(ctx.scene);
 
 	// --- 0. Update per-frame SSAO params UBO (camera matrices + kernel) ---
 	{
 		SSAOParamsGpu params{};
-		const Camera* cam = ctx.scene->GetActiveCamera();
+		const Camera* cam = scene->GetActiveCamera();
 		const glm::mat4 viewProj = cam->GetProjectionMatrix() * cam->GetViewMatrix();
 		const glm::mat4 view = cam->GetViewMatrix();
 		const glm::vec3 cameraPos = cam->GetPosition();

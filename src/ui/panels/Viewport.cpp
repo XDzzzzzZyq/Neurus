@@ -1,5 +1,6 @@
-#include "Viewport.h"
+#include "panels/Viewport.h"
 
+#include "UIContext.h"
 #include "core/Log.h"
 #include "editor/Input.h"
 #include "editor/events/UIEvents.h"
@@ -13,7 +14,7 @@
 namespace neurus {
 
 Viewport::Viewport(QWidget* parent)
-	: QWidget(parent)
+	: UIPanel(PanelType::Viewport, QString(), parent)
 {
 	// Ensure a dedicated native window handle exists for Vulkan surface creation
 	setAttribute(Qt::WA_NativeWindow);
@@ -31,6 +32,12 @@ Viewport::Viewport(QWidget* parent)
 }
 
 Viewport::~Viewport() = default;
+
+void Viewport::Refresh(const UIContext& /*ctx*/)
+{
+	// Viewport is event-driven — input forwarding and Vulkan rendering
+	// are handled outside the Qt widget refresh cycle.
+}
 
 void Viewport::paintEvent(QPaintEvent* /*event*/)
 {

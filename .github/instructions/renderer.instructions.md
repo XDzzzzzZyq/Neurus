@@ -11,6 +11,8 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Swapchain.h` - Swapchain creation, image acquisition, presentation, recreation
 - `src/render/Image.h/cpp` - GPU image with ImageState tracking (including Invalid) and mipmap generation
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
+- `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
+- `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer
 - `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 - `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
@@ -213,7 +215,19 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Shadow map resolution**: 2048×2048, `VK_FORMAT_D32_SFLOAT`
 - **PCF**: Percentage-closer filtering via `sampler2DShadow` with UV offset kernel, ortho depth comparison
 - **Shadow intensity**: Written to per-light layer in `ShadowIntensity` 2D array via `SunShadowIntensityEval` compute shader
+- **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.0005f) via `ctx.config`. No longer hardcoded in the pass.
 - **Shadow mode**: Supports `HARD`, `SOFT_PCF_16`, `SOFT_PCF_64` modes matching point light shadow pipeline
+
+### RenderConfig Convention
+
+`RenderConfig` (`src/render/RenderConfig.h`) is user-facing config owned by Editor/Project,
+passed to passes through `RenderContext::config` (opaque `void*`):
+
+- **Algorithm selection**: `r_pipeline` (Forward/Deferred), `r_aa`, `r_ao`, `r_shadow`, `r_ssr`
+- **Quality parameters**: `r_gamma`, `r_ao_ksize`, `r_ao_radius`, `r_shadow_bias` (0.0005f), `r_sample_pf`
+- **Serialized** via cereal for project save/load
+- **Live-update**: passes cast `static_cast<const RenderConfig*>(ctx.config)` each frame; scalar param changes take effect on next `DrawFrame()`
+- **Shadow bias flow**: `RenderConfigPanel` slider → `configValueChanged` → `Editor::SetRenderConfig` → `Project` → `RenderContext::config` → `ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
 
 ### Attachment Formats
 

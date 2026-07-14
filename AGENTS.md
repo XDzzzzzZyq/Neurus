@@ -77,6 +77,7 @@ UI Layer (Qt6) → UIEvents (Qt Signals) → Editor → EventQueue (typed events
   mutate application-level state.
 - **Editor**: application logic and scene mutation; owns Controllers;
   communicates via Context, UIEvents (Qt signals), and EventQueue (typed events).
+  Owns `RenderConfig` via `Project`; exposes `SetRenderConfig()` for UI→project sync.
 - **UI**: Qt6 Widgets presentation only; owns surface; emits signals.
 - **Asset** (`src/asset/`): Vulkan-free CPU-side asset loading (MeshData,
   ImageData, PixelFormat enum). No GPU resources.
@@ -120,7 +121,7 @@ Key rules:
 - Plan by tracing the closest existing feature
 - Break into 4 waves: Foundation → Core → Integration → Tests/Docs
 - Verify EVERY wave: build, ctest, VUID check, Python PIL for references
-- Never commit until user approves, unless user notified you in advanced.
+- Never commit until user approves, unless user notified you in advance.
 
 ## Development Guidelines
 
@@ -198,9 +199,16 @@ Neurus/
 │   │   │   ├── CameraController.h/cpp  # Event-driven camera controls
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
-│   │   ├── NeurusMainWindow.h/cpp # Main window with ADS dock manager
-│   │   ├── MainWindow.h/cpp       # (legacy QWindow subclass)
-│   │   ├── Viewport.h/cpp         # (legacy vk::raii widget)
+│   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
+│   │   ├── UIContext.h          # Per-frame UI data snapshot
+│   │   ├── items/               # Reusable composite widgets
+│   │   │   └── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
+│   │   ├── panels/               # Dock panel widgets
+│   │   │   ├── UIPanel.h         # Base class for all panels
+│   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
+│   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
+│   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
+│   │   │   └── RenderConfigPanel.h/cpp  # Live render setting controls
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
@@ -246,7 +254,7 @@ Neurus/
 - Keep classes lean. Prefer composition over inheritance. Avoid sprawling
   god classes that mix rendering, logic, and I/O. If a class has more
   than 8-10 public methods, question whether it's doing too much.
-- If a file or function feels "clumpsy", refactor it early. Technical debt
+- If a file or function feels "clumsy", refactor it early. Technical debt
   compounds fast in rendering code, where debugging GPU state is already
   complex enough.
 - Do not add global state unless a file already uses it and there is no
@@ -294,7 +302,7 @@ The entire codebase uses a **Z-up, +Y forward, right-hand** coordinate system
 ## Subagent Racing Prevention
 
 Multiple parallel subagents can race on `cmake --build` or launching
-`Neurus.exe` or the tests, causing file lock contention and false test failures. Moreover, subagent may use `git stash` to revet the changes, this will interrupt the editing of other subagents.
+`Neurus.exe` or the tests, causing file lock contention and false test failures. Moreover, subagent may use `git stash` to revert the changes, this will interrupt the editing of other subagents.
 
 **Rules:**
 1. **Only the master agent runs `cmake --build build/debug`** for the final

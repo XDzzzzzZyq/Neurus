@@ -184,9 +184,6 @@ private:
 	DescriptorPool      p_sunDescPool;                            ///< Descriptor pool for sun descriptor sets
 	std::vector<DescriptorSet> p_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)
 
-	// --- Push constant values ---
-	float p_bias = 0.0005f; ///< Depth bias for shadow acne prevention
-
 	/// Compute shaders loaded via ShaderLibrary.
 	std::shared_ptr<ComputeShader> p_pointLightShader;  ///< Point-light cubemap eval (shadow_eval.comp)
 	std::shared_ptr<ComputeShader> p_sunLightShader;    ///< Sun-light 2D eval (sun_shadow_eval.comp)

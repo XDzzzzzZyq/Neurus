@@ -179,7 +179,7 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::DrawFrame(const Scene& scene)
+void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 {
 	auto& fence = r_inFlightFences[r_currentFrame];
 	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
@@ -227,7 +227,7 @@ void DeferredRenderer::DrawFrame(const Scene& scene)
 	// --- Record and submit (reuse pre-allocated command buffer) ---
 	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
-	recordFrame(r_commandBuffers[imageIndex], imageIndex, scene);
+	recordFrame(r_commandBuffers[imageIndex], imageIndex, ctx);
 
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -275,6 +275,27 @@ void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
 	{
 		recreateSwapchain();
 	}
+}
+
+void DeferredRenderer::HandleSurfaceChange(const vk::raii::SurfaceKHR& newSurface)
+{
+	r_device.waitIdle();
+
+	// Preserve current extent to pass to the new swapchain
+	uint32_t width = r_swapchain ? r_swapchain->extent().width : 800;
+	uint32_t height = r_swapchain ? r_swapchain->extent().height : 600;
+
+	// Destroy old swapchain (which held a reference to the old surface)
+	r_swapchain.reset();
+
+	// Create new swapchain bound to the new surface
+	r_swapchain = std::make_unique<Swapchain>(r_physicalDevice, r_device, newSurface, width, height);
+
+	// Rebuild dependent resources for the new swapchain
+	recreateSwapchain();
+
+	NEURUS_LOG("[DeferredRenderer] Surface changed — swapchain rebuilt "
+	           << r_swapchain->extent().width << "x" << r_swapchain->extent().height);
 }
 
 // ---------------------------------------------------------------------------
@@ -334,7 +355,7 @@ void DeferredRenderer::recreateSwapchain()
 // ---------------------------------------------------------------------------
 
 void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
-                                   const Scene& scene)
+                                   const RenderContext& editorCtx)
 {
 	const vk::Extent2D extent = r_swapchain->extent();
 
@@ -343,11 +364,12 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
 	cmdBuf.begin(beginInfo);
 
-	// --- Build per-frame render context (constructed once, passed to all passes) ---
-	RenderContext ctx{};
-	ctx.renderExtent = extent;
+	// --- Build per-frame render context ---
+	// Copy the editor-produced context (scene) and fill in render-specific fields.
+	RenderContext ctx = editorCtx;
+	ctx.width = extent.width;
+	ctx.height = extent.height;
 	ctx.frameIndex = r_currentFrame;
-	ctx.scene = &scene;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---
 	r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);

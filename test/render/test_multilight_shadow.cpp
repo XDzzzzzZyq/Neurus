@@ -154,7 +154,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	// Step 2: Build RenderContext with both light UIDs
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
@@ -249,7 +249,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	// Build context
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -316,7 +316,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 	// Build context
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -447,7 +447,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	// Build context
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
@@ -639,7 +639,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	// Step 2: Build RenderContext
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();

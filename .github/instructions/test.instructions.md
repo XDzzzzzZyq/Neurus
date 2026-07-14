@@ -312,10 +312,10 @@ Each attachment format maps to RGBA8 PNG differently:
 rm test/render/reference/deferred/*.png
 
 # Run test — generates + skips
-cd build/debug && ctest -R DeferredShading
+make check FILTER="-R DeferredShading"
 
 # Run test again — compares against newly generated references
-cd build/debug && ctest -R DeferredShading
+make check FILTER="-R DeferredShading"
 ```
 
 **(IMPORTANT) Always verify references with Python** before committing:
@@ -351,16 +351,16 @@ Key things to check:
 cmake --build build/debug
 
 # Run all tests
-cd build/debug && ctest --output-on-failure
+make check
 
 # Run a specific test by name pattern
-cd build/debug && ctest -R DeferredShading
+make check FILTER="-R DeferredShading"
 
 # Run a specific test case
-cd build/debug && ctest -R "DeferredShadingTest.GbufferAttachments"
+make check FILTER="-R DeferredShadingTest.GbufferAttachments"
 
 # Run only non-GPU tests (CI-compatible)
-cd build/debug && ctest -E "DeferredShading|Lighting|Screenshot|ModelRender|Texture"
+make check FILTER="-E DeferredShading|Lighting|Screenshot|ModelRender|Texture"
 
 # Run the test executable directly with GTest filters
 build/debug/Debug/neurus_test --gtest_filter="DeferredShadingTest.*"
@@ -612,13 +612,13 @@ is NOT acceptable -- skip none of these steps.
 
 4. **Run tests related to the task**
    ```bash
-   cd build/debug && ctest -R <related_test_name> --output-on-failure
+   make check FILTER="-R <related_test_name>"
    ```
    Verify the test that is associated with the task FIRST. Otherwise, it will waste too much time on running the whole test suite.
 
 4. **Run tests → 100% all pass**
    ```bash
-   cd build/debug && ctest --output-on-failure
+   make check
    ```
    ALL tests must pass.  Do not ignore failures; fix them or update
    reference images if the change is intentional.

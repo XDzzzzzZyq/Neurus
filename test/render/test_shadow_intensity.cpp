@@ -172,7 +172,7 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	// Step 2: One shared RenderContext for all three passes
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
-	ctx.renderExtent = renderExtent;
+	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------

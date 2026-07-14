@@ -111,10 +111,11 @@ public:
 
 	// --- Quality parameters ---
 
-	float   r_gamma      = 1.0f;    ///< Gamma correction factor
-	int32_t r_ao_ksize   = 16;      ///< AO kernel size (number of samples)
-	float   r_ao_radius  = 0.5f;    ///< AO sample radius in world-space
-	int32_t r_sample_pf  = 128;     ///< Samples per frame for progressive rendering
+	float   r_gamma       = 1.0f;     ///< Gamma correction factor
+	float   r_shadow_bias = 0.0005f;  ///< Depth bias for shadow acne prevention
+	int32_t r_ao_ksize    = 16;       ///< AO kernel size (number of samples)
+	float   r_ao_radius   = 0.5f;     ///< AO sample radius in world-space
+	int32_t r_sample_pf   = 128;      ///< Samples per frame for progressive rendering
 
 public:
 	RenderConfig() = default;
@@ -126,8 +127,9 @@ public:
 	{
 		ar(CEREAL_NVP(r_pipeline), CEREAL_NVP(r_aa), CEREAL_NVP(r_ao),
 		   CEREAL_NVP(r_shadow), CEREAL_NVP(r_ssr),
-		   CEREAL_NVP(r_gamma), CEREAL_NVP(r_ao_ksize),
-		   CEREAL_NVP(r_ao_radius), CEREAL_NVP(r_sample_pf));
+		   CEREAL_NVP(r_gamma), CEREAL_NVP(r_shadow_bias),
+		   CEREAL_NVP(r_ao_ksize), CEREAL_NVP(r_ao_radius),
+		   CEREAL_NVP(r_sample_pf));
 	}
 
 	// --- Query helpers ---

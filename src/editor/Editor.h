@@ -5,7 +5,10 @@
 #include <QString>
 
 #include "controllers/Controllers.h"
-#include "editor/Input.h"   // InputState
+#include "editor/Input.h"        // InputState
+#include "render/RenderConfig.h"
+#include "render/RenderContext.h" // RenderContext (pure data, no Vulkan)
+#include "ui/UIContext.h"
 
 // Forward declarations (no render headers!)
 namespace neurus {
@@ -53,6 +56,28 @@ public:
 	neurus::project::Project& GetProject();
 
 	/**
+	 * @brief Builds a RenderContext from the current Editor state.
+	 *
+	 * Sets the scene pointer but leaves width, height, and frameIndex
+	 * at their default (0). The DeferredRenderer fills in the render-
+	 * specific fields from the swapchain before dispatching to passes.
+	 *
+	 * @return RenderContext with scene populated and render fields blank.
+	 */
+	RenderContext GetRenderContext() const;
+
+	/**
+	 * @brief Builds a UIContext snapshot from the current Editor/Project state.
+	 *
+	 * Called each frame from the newFrame loop to carry RenderConfig and
+	 * other editor state to the UI layer. The returned UIContext carries
+	 * opaque pointers that panels cast to their concrete types.
+	 *
+	 * @return UIContext populated with pointers into Project-owned data.
+	 */
+	UIContext GetUIContext() const;
+
+	/**
 	 * @brief Registers a controller of type T, calls Init(bus), and stores it.
 	 * @tparam T Controller type (must derive from Controllers).
 	 * @param bus EventQueue to pass to the controller's Init().
@@ -96,6 +121,17 @@ public:
 	 * and from OnProjectOpen() / OnProjectNew().
 	 */
 	void UploadSceneResources();
+
+	/**
+	 * @brief Updates the active RenderConfig and writes it into the project.
+	 *
+	 * Called from the UI layer when RenderConfigPanel emits a changed config.
+	 * The config is stored in the Project so it persists across saves and is
+	 * read by GetRenderContext() / GetUIContext() each frame.
+	 *
+	 * @param cfg New render configuration from the UI panel.
+	 */
+	void SetRenderConfig(const RenderConfig& cfg);
 
 private:
 	// --- Signal handlers (implemented in later tasks) ---

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include "UIPanel.h"
 
 class QKeyEvent;
 class QMouseEvent;
@@ -24,16 +24,28 @@ namespace neurus {
  * @note This class owns no Vulkan resources. It provides the HWND only;
  *       surface creation is the Renderer's responsibility.
  */
-class Viewport : public QWidget
+class Viewport : public UIPanel
 {
 	Q_OBJECT
 
 public:
+	static constexpr PanelType kType = PanelType::Viewport;
+
 	/**
 	 * @brief Constructs a Viewport with native window attributes.
 	 * @param parent Optional parent widget.
 	 */
 	explicit Viewport(QWidget* parent = nullptr);
+
+	/**
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Currently a no-op — the Viewport is event-driven (input forwarding)
+	 * and renders via Vulkan outside the Qt widget hierarchy.
+	 *
+	 * @param ctx Read-only UI context (unused).
+	 */
+	void Refresh(const UIContext& ctx) override;
 
 	/** @brief Default destructor. */
 	~Viewport() override;
@@ -51,7 +63,7 @@ public:
 	 */
 	HWND hwnd() const { return reinterpret_cast<HWND>(winId()); }
 
-Q_SIGNALS:
+signals:
 	/**
 	 * @brief Emitted when the widget is resized.
 	 * @param width New width in pixels.

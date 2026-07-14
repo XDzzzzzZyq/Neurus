@@ -1,10 +1,11 @@
 /**
- * @file OutlinerPanel.cpp
- * @brief OutlinerPanel implementation - scene object tree view with EventBus selection.
+ * @file Outliner.cpp
+ * @brief Outliner implementation - scene object tree view with EventBus selection.
  */
 
-#include "OutlinerPanel.h"
+#include "Outliner.h"
 
+#include "UIContext.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -21,8 +22,8 @@ namespace neurus
 // Constructor
 // =========================================================================
 
-OutlinerPanel::OutlinerPanel(QWidget* parent)
-	: QWidget(parent)
+Outliner::Outliner(QWidget* parent)
+	: UIPanel(PanelType::Outliner, QString(), parent)
 {
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -42,14 +43,24 @@ OutlinerPanel::OutlinerPanel(QWidget* parent)
 	layout->addWidget(m_treeView);
 
 	connect(m_treeView, &QTreeView::clicked,
-		this, &OutlinerPanel::OnItemClicked);
+		this, &Outliner::OnItemClicked);
+}
+
+// =========================================================================
+// Refresh(const UIContext&) - no-op per-frame refresh
+// =========================================================================
+
+void Outliner::Refresh(const UIContext& /*ctx*/)
+{
+	// Outliner data is rebuilt on project load/change via Refresh(const Scene&),
+	// not on a per-frame basis.
 }
 
 // =========================================================================
 // Refresh - rebuild tree from Scene
 // =========================================================================
 
-void OutlinerPanel::Refresh(const Scene& scene)
+void Outliner::Refresh(const Scene& scene)
 {
 	m_model->clear();
 
@@ -118,7 +129,7 @@ void OutlinerPanel::Refresh(const Scene& scene)
 // OnItemClicked - emit ObjectSelected via EventBus
 // =========================================================================
 
-void OutlinerPanel::OnItemClicked(const QModelIndex& index)
+void Outliner::OnItemClicked(const QModelIndex& index)
 {
 	if (!index.isValid())
 		return;

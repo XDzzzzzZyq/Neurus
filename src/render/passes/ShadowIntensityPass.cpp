@@ -5,6 +5,7 @@
 
 #include "RenderCache.h"
 #include "passes/ShadowIntensityPass.h"
+#include "render/RenderConfig.h"
 
 #include "ComputePipelineBuilder.h"
 #include "Image.h"
@@ -107,8 +108,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	}
 
 	NEURUS_LOG("[ShadowIntensityPass] numSets=" << numSets
-	           << " farPlane=" << Light::point_shadow_far
-	           << " bias=" << p_bias);
+	           << " farPlane=" << Light::point_shadow_far);
 
 	// --- Sun pipeline builder (owns the sun pipeline layout) ---
 	p_sunPipelineBuilder = std::make_unique<ComputePipelineBuilder>(device);
@@ -388,7 +388,7 @@ void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D ex
 
 void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Early out: no scene ---
@@ -398,9 +398,14 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		return;
 	}
 
+	// --- Cast scene UID to Scene* for access to Scene-specific members ---
+	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* config = static_cast<const RenderConfig*>(ctx.config);
+	const float shadowBias = config ? config->r_shadow_bias : 0.0005f;
+
 	{
 		int shadowCount = 0;
-		for (const auto& [uid, light] : ctx.scene->light_list)
+		for (const auto& [uid, light] : scene->light_list)
 		{
 			if (light && light->use_shadow)
 			{
@@ -431,7 +436,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	//     from light N-1.  Without this alternation, updating a bound descriptor
 	//     set invalidates the command buffer (VUID-00059 chain).
 	uint32_t lightIndex = 0;
-	for (const auto& [uid, light] : ctx.scene->light_list)
+	for (const auto& [uid, light] : scene->light_list)
 	{
 		// Skip non-shadow-casting lights and non-point lights (sun lights handled separately)
 		if (!light || !light->use_shadow) continue;
@@ -478,7 +483,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.lightPosY  = pos.y;
 			pc.lightPosZ  = pos.z;
 			pc.farPlane   = Light::point_shadow_far;
-			pc.bias       = p_bias;
+			pc.bias       = shadowBias;
 			pc.layerIndex = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
@@ -499,7 +504,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	// --- 4b. Dispatch sun (directional) shadow evaluation for each shadow-casting sun light ---
 	//        Uses a separate pipeline and descriptor sets for the 2D shadow path.
 	uint32_t sunLightIndex = 0;
-	for (const auto& [uid, light] : ctx.scene->light_list)
+	for (const auto& [uid, light] : scene->light_list)
 	{
 		// Only process sun lights that cast shadows
 		if (!light || !light->use_shadow) continue;
@@ -548,7 +553,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 				? kAltUp : kWorldUp;
 
 			// Use camera target as ortho centre (same as ShadowDepthPass)
-			const Camera* activeCam = ctx.scene->GetActiveCamera();
+			const Camera* activeCam = scene->GetActiveCamera();
 			const glm::vec3 center = activeCam->cam_tar;
 			const glm::vec3 lightEye = center - lightDir * farPlane;
 			const glm::mat4 lightView = glm::lookAt(lightEye, center, up);
@@ -558,7 +563,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 			SunShadowEvalPushConstants pc = {};
 			pc.lightViewProj = lightViewProj;
-			pc.bias          = p_bias;
+			pc.bias          = shadowBias;
 			pc.layerIndex    = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(

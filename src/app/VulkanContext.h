@@ -11,10 +11,11 @@ namespace neurus {
 /**
  * @brief Manages the Vulkan instance, physical device, and logical device.
  *
- * Two-phase construction to avoid moving the instance while the surface
+ * Three-phase construction to avoid moving the instance while the surface
  * holds a reference to its dispatcher:
  *   1. VulkanContext(std::move(instance)) - stores the instance (no move during surface lifetime)
- *   2. initDevice(surface) - creates physical device + logical device
+ *   2. InitDevice() - selects physical device, creates logical device with graphics queue
+ *   3. InitQueue(surface) - validates queue supports presentation, gets queue handle
  */
 class VulkanContext
 {
@@ -25,8 +26,11 @@ public:
 	/** @brief Takes ownership of the instance (from CreateInstance). */
 	explicit VulkanContext(vk::raii::Instance&& instance);
 
-	/** @brief Creates physical device + logical device using the given surface. */
-	void initDevice(const vk::raii::SurfaceKHR& surface);
+	/** @brief Selects physical device and creates logical device with a graphics queue family. */
+	void InitDevice();
+
+	/** @brief Validates queue supports presentation to the surface and gets the queue handle. */
+	void InitQueue(const vk::raii::SurfaceKHR& surface);
 
 	~VulkanContext();
 
@@ -45,7 +49,8 @@ public:
 private:
 	static vk::raii::Instance createInstanceInternal();
 	uint32_t selectPhysicalDeviceIndex();
-	uint32_t findGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface);
+	uint32_t findGraphicsQueueFamily();
+	uint32_t findGraphicsQueueFamilyWithPresent(const vk::raii::SurfaceKHR& surface);
 
 	std::unique_ptr<vk::raii::Instance> ctx_instance;
 	vk::raii::PhysicalDevices ctx_physicalDevices = nullptr;

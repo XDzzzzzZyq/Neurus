@@ -1,8 +1,8 @@
 /**
- * @file OutlinerPanel.h
+ * @file Outliner.h
  * @brief Outliner dock panel displaying scene object hierarchy in a QTreeView.
  *
- * The OutlinerPanel reads from a const Scene reference and builds a flat tree
+ * The Outliner reads from a const Scene reference and builds a flat tree
  * grouped by object type (Cameras, Meshes, Lights). Clicking an object emits
  * ObjectSelected via EventBus for Editor↔Renderer selection propagation.
  *
@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include <QWidget>
+#include "UIPanel.h"
 
 class QTreeView;
 class QStandardItemModel;
@@ -27,13 +27,25 @@ namespace neurus
 
 class Scene;
 
-class OutlinerPanel : public QWidget
+class Outliner : public UIPanel
 {
 	Q_OBJECT
 
 public:
-	explicit OutlinerPanel(QWidget* parent = nullptr);
-	~OutlinerPanel() override = default;
+	static constexpr PanelType kType = PanelType::Outliner;
+
+	explicit Outliner(QWidget* parent = nullptr);
+	~Outliner() override = default;
+
+	/**
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Currently a no-op — the Outliner rebuilds via Refresh(const Scene&)
+	 * on project load/change events rather than per-frame.
+	 *
+	 * @param ctx Read-only UI context (unused).
+	 */
+	void Refresh(const UIContext& ctx) override;
 
 	/**
 	 * @brief Rebuilds the tree view from the given scene's object pools.

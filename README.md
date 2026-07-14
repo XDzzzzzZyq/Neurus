@@ -12,24 +12,24 @@ with modern rendering algorithms.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ UI Layer (Qt6 QML)                                          │
-│  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
+│ UI Layer (Qt6 Widgets + ADS)                                 │
+│  owns: QWindow, UIEvents (QObject singleton)                 │
 └─────────────────────┬────────────────────────────────────────┘
                       │ Qt Signals/Slots
                       ▼
 ┌──────────────────────────────────────────────────────────────┐
-│ Editor Layer                                                │
+│ Editor Layer                                                 │
 │  owns: Project, UploadManager, Controllers                   │
 └─────────────────────┬────────────────────────────────────────┘
                       │
             ┌─────────┴──────────┐
             ▼                    ▼
-┌──────────────────┐  ┌────────────────────────────────────────┐
+┌───────────────────┐  ┌────────────────────────────────────────┐
 │ Data & Resource   │  │ Renderer Layer (Vulkan-HPP vk::raii)   │
 │  owns: allocators │  │  owns: VkInstance, VkDevice, VkQueue,  │
 │  descriptor pools │  │   VkSwapchainKHR, VkPipeline,          │
 │  pipeline cache   │  │   VkCommandBuffer, all GPU resources   │
-└──────────────────┘  └────────────────────────────────────────┘
+└───────────────────┘  └────────────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -65,9 +65,7 @@ make nobuild
 # Opens: ../Neurus_VS2022/Neurus.sln
 
 # Run tests
-make test
-# Or manually:
-cd build/debug && ctest --output-on-failure
+make check
 ```
 
 ## Project Structure

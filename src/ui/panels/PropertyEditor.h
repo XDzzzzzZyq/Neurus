@@ -1,6 +1,6 @@
 #pragma once
 
-#include <QWidget>
+#include "UIPanel.h"
 #include <QFormLayout>
 #include <QDoubleSpinBox>
 #include <QLabel>
@@ -25,13 +25,15 @@ namespace neurus {
  * Supports Transform (all objects), Camera, and Light properties for MVP.
  *
  * @note Properties are read-only for MVP. Editing will be added via Controllers.
- * @note Owned by NeurusMainWindow as a right dock widget.
+ * @note Owned by UIManager as a right dock widget.
  */
-class PropertyEditor : public QWidget
+class PropertyEditor : public UIPanel
 {
 	Q_OBJECT
 
 public:
+	static constexpr PanelType kType = PanelType::PropertyEditor;
+
 	/**
 	 * @brief Constructs the Property Editor.
 	 * @param scene Non-owning pointer to the active Scene (nullable - set later via SetScene).
@@ -43,6 +45,16 @@ public:
 
 	PropertyEditor(const PropertyEditor&) = delete;
 	PropertyEditor& operator=(const PropertyEditor&) = delete;
+
+	/**
+	 * @brief Refreshes the panel from a UIContext snapshot.
+	 *
+	 * Currently a no-op — the PropertyEditor updates on ObjectSelected events
+	 * rather than per-frame refresh.
+	 *
+	 * @param ctx Read-only UI context (unused).
+	 */
+	void Refresh(const UIContext& ctx) override;
 
 	/**
 	 * @brief Sets the active scene for object lookups.

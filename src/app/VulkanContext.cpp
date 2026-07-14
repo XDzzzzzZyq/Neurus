@@ -78,14 +78,16 @@ VulkanContext::VulkanContext(vk::raii::Instance&& instance)
 	ctx_instance = std::make_unique<vk::raii::Instance>(std::move(instance));
 }
 
-void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
+void VulkanContext::InitDevice()
 {
 	ctx_physicalDevices = vk::raii::PhysicalDevices(*ctx_instance);
 	ctx_selectedDeviceIndex = selectPhysicalDeviceIndex();
 	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
 	auto props = pd.getProperties();
 	ctx_gpuName = props.deviceName.data();
-	ctx_graphicsQueueFamily = findGraphicsQueueFamily(surface);
+
+	// Find any graphics-capable queue family (surface validation deferred to InitQueue)
+	ctx_graphicsQueueFamily = findGraphicsQueueFamily();
 
 	float prio = 1.0f;
 	vk::DeviceQueueCreateInfo qCI({}, ctx_graphicsQueueFamily, 1, &prio);
@@ -121,6 +123,12 @@ void VulkanContext::initDevice(const vk::raii::SurfaceKHR& surface)
 	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &descriptorIndexing);
 
 	ctx_device = std::make_unique<vk::raii::Device>(pd, devCI);
+}
+
+void VulkanContext::InitQueue(const vk::raii::SurfaceKHR& surface)
+{
+	// Re-evaluate queue family that supports presentation to this surface
+	ctx_graphicsQueueFamily = findGraphicsQueueFamilyWithPresent(surface);
 	ctx_graphicsQueue = ctx_device->getQueue(ctx_graphicsQueueFamily, 0);
 }
 
@@ -136,7 +144,19 @@ uint32_t VulkanContext::selectPhysicalDeviceIndex()
 	return 0;
 }
 
-uint32_t VulkanContext::findGraphicsQueueFamily(const vk::raii::SurfaceKHR& surface)
+uint32_t VulkanContext::findGraphicsQueueFamily()
+{
+	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
+	auto qf = pd.getQueueFamilyProperties();
+	for (uint32_t i = 0; i < (uint32_t)qf.size(); ++i)
+	{
+		if (qf[i].queueFlags & vk::QueueFlagBits::eGraphics)
+			return i;
+	}
+	throw std::runtime_error("No graphics-capable queue family found.");
+}
+
+uint32_t VulkanContext::findGraphicsQueueFamilyWithPresent(const vk::raii::SurfaceKHR& surface)
 {
 	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
 	auto qf = pd.getQueueFamilyProperties();

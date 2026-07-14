@@ -285,13 +285,16 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	// Guard: skip if no scene
 	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return; }
 
+	// --- Cast scene UID to Scene* for access to Scene-specific members ---
+	const auto* scene = static_cast<const Scene*>(ctx.scene);
+
 	const vk::Viewport viewport(0.f, 0.f,
 	                            static_cast<float>(p_resolution),
 	                            static_cast<float>(p_resolution),
 	                            0.f, 1.f);
 	const vk::Rect2D scissor({0, 0}, {p_resolution, p_resolution});
 
-	for (const auto& [uid, lightPtr] : ctx.scene->light_list)
+	for (const auto& [uid, lightPtr] : scene->light_list)
 	{
 		// Skip lights that don't cast shadows
 		if (!lightPtr || !lightPtr->use_shadow) continue;
@@ -375,9 +378,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		cmdBuf.beginRendering(renderInfo);
 		}
 
-		if (ctx.scene)
+		if (scene)
 		{
-			for (const auto& [id, mesh] : ctx.scene->mesh_list)
+			for (const auto& [id, mesh] : scene->mesh_list)
 			{
 				if (!mesh || !mesh->o_mesh) continue;
 
@@ -428,7 +431,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		const vk::Rect2D sunScissor({0, 0}, {kSunResolution, kSunResolution});
 
 		// Get camera target for shadow ortho center
-		const Camera* activeCam = ctx.scene->GetActiveCamera();
+		const Camera* activeCam = scene->GetActiveCamera();
 		const glm::vec3 center = activeCam->cam_tar;
 
 		const float field = Light::sun_shadow_field;
@@ -440,7 +443,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		constexpr glm::vec3 kWorldUp(0.0f, 0.0f, 1.0f);
 		constexpr glm::vec3 kAltUp(1.0f, 0.0f, 0.0f);
 
-		for (const auto& [uid, lightPtr] : ctx.scene->light_list)
+		for (const auto& [uid, lightPtr] : scene->light_list)
 		{
 			if (!lightPtr) continue;
 			if (lightPtr->light_type != LightType::SUNLIGHT) continue;
@@ -490,9 +493,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 			cmdBuf.beginRendering(renderInfo);
 
-			if (ctx.scene)
+			if (scene)
 			{
-				for (const auto& [id, mesh] : ctx.scene->mesh_list)
+				for (const auto& [id, mesh] : scene->mesh_list)
 				{
 					if (!mesh || !mesh->o_mesh) continue;
 

@@ -24,7 +24,7 @@ make nobuild
 # Opens: ../Neurus_VS2022/Neurus.sln
 
 # Build and run tests
-make test
+make check
 ```
 
 ## CI
@@ -37,8 +37,9 @@ make test
 - Framework: Google Test
 - Non-GPU tests run in CI (UIEvents, EventQueue, EditorContext)
 - GPU tests require a Vulkan 1.4-capable device
-- Run all tests: `cd build/debug && ctest --output-on-failure`
-- Run a single test: `cd build/debug && ctest -R DeferredShading`
+- Run all tests: `make check` (or `cd build/debug && ctest --output-on-failure`)
+- Run specific tests: `make check FILTER="-R DeferredShading"`
+- Build only the test binary: `make build test` (or `make test`)
 - On local machine, launch `Neurus.exe` to check terminal output and runtime errors.
 - See `.github/instructions/test.instructions.md` for full testing standards and patterns.
 

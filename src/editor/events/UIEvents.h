@@ -69,6 +69,10 @@ signals:
 	 *  @param height New viewport height in pixels. */
 	void viewportResized(int width, int height);
 
+	/** @brief Emitted when the viewport widget is recreated with a new native HWND.
+	 *  @param newHwnd The new native window handle for Vulkan surface creation. */
+	void viewportRecreated(quintptr newHwnd);
+
 	// --- Screenshot signals ---
 
 	/** @brief Emitted when a screenshot is requested (F12 or menu).
@@ -136,6 +140,8 @@ public:
 	void requestCameraAdd() { emit cameraAddRequested(); }
 	void requestLightAdd() { emit lightAddRequested(); }
 	void requestSunLightAdd() { emit sunLightAddRequested(); }
+
+	void requestViewportRecreation(quintptr newHwnd) { emit viewportRecreated(newHwnd); }
 
 private:
 	UIEvents() = default;

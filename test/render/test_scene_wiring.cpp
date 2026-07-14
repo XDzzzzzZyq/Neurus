@@ -260,7 +260,7 @@ TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 	scene.UseCamera(cam);
 
 	// DrawFrame must not throw or cause a fatal failure
-	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
 
 	// Ensure GPU is idle before teardown
 	m_renderer->WaitIdle();
@@ -289,7 +289,7 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithOnlyCamera_NoCrash)
 	// Verify active camera is set
 	ASSERT_NE(scene.GetActiveCamera(), nullptr);
 
-	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
 
 	m_renderer->WaitIdle();
 }
@@ -327,10 +327,10 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 	scene.UseLight(light);
 
 	// Draw a frame
-	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
 
 	// Draw a second frame to exercise fence-guarded in-flight cycling
-	EXPECT_NO_THROW(m_renderer->DrawFrame(scene));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
 
 	m_renderer->WaitIdle();
 }

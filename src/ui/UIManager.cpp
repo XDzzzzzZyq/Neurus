@@ -1,7 +1,9 @@
-#include "NeurusMainWindow.h"
-#include "OutlinerPanel.h"
-#include "PropertyEditor.h"
-#include "Viewport.h"
+#include "UIManager.h"
+#include "panels/Outliner.h"
+#include "panels/PropertyEditor.h"
+#include "panels/RenderConfigPanel.h"
+#include "panels/Viewport.h"
+#include "UIContext.h"
 
 #include "editor/events/UIEvents.h"
 
@@ -17,13 +19,15 @@
 #include <DockWidget.h>
 #include <DockAreaWidget.h>
 
+#include <memory>
+
 namespace neurus {
 
 // =========================================================================
 // Constructor / Destructor
 // =========================================================================
 
-NeurusMainWindow::NeurusMainWindow(QWidget* parent)
+UIManager::UIManager(QWidget* parent)
 	: QMainWindow(parent)
 {
 	setWindowTitle("Neurus");
@@ -40,37 +44,55 @@ NeurusMainWindow::NeurusMainWindow(QWidget* parent)
 	CreateMenus();
 }
 
-NeurusMainWindow::~NeurusMainWindow() = default;
+UIManager::~UIManager()
+{
+	// Release panel/dock pointers before Qt parent-child cleanup destroys them.
+	m_panels.clear();
+	m_docks.clear();
+}
 
 // =========================================================================
 // Viewport accessors
 // =========================================================================
 
-HWND NeurusMainWindow::getViewportHwnd() const
+HWND UIManager::getViewportHwnd() const
 {
-	return win_viewportWidget ? win_viewportWidget->hwnd() : nullptr;
+	auto* vp = GetPanel<Viewport>();
+	return vp ? vp->hwnd() : nullptr;
 }
 
-int NeurusMainWindow::getViewportWidth() const
+int UIManager::getViewportWidth() const
 {
-	return win_viewportWidget ? win_viewportWidget->width() : 0;
+	auto* vp = GetPanel<Viewport>();
+	return vp ? vp->width() : 0;
 }
 
-int NeurusMainWindow::getViewportHeight() const
+int UIManager::getViewportHeight() const
 {
-	return win_viewportWidget ? win_viewportWidget->height() : 0;
+	auto* vp = GetPanel<Viewport>();
+	return vp ? vp->height() : 0;
 }
 
-Viewport* NeurusMainWindow::getViewport() const
+// =========================================================================
+// Refresh – push UIContext to all registered panels
+// =========================================================================
+
+void UIManager::Refresh(const UIContext& ctx)
 {
-	return win_viewportWidget;
+	for (auto& [type, widget] : m_panels)
+	{
+		if (auto* panel = qobject_cast<UIPanel*>(widget))
+		{
+			panel->Refresh(ctx);
+		}
+	}
 }
 
 // =========================================================================
 // Menus
 // =========================================================================
 
-void NeurusMainWindow::CreateMenus()
+void UIManager::CreateMenus()
 {
 	auto* fileMenu = menuBar()->addMenu("&File");
 
@@ -114,10 +136,10 @@ void NeurusMainWindow::CreateMenus()
 
 	auto* saveLayoutAction = viewMenu->addAction("&Save Layout");
 	saveLayoutAction->setShortcut(QKeySequence("Ctrl+Shift+L"));
-	connect(saveLayoutAction, &QAction::triggered, this, &NeurusMainWindow::SaveLayout);
+	connect(saveLayoutAction, &QAction::triggered, this, &UIManager::SaveLayout);
 
 	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
-	connect(resetLayoutAction, &QAction::triggered, this, &NeurusMainWindow::RestoreDefaultLayout);
+	connect(resetLayoutAction, &QAction::triggered, this, &UIManager::RestoreDefaultLayout);
 
 	auto* editMenu = menuBar()->addMenu("&Edit");
 
@@ -191,23 +213,28 @@ static QWidget* makePlaceholder(const QString& text)
 	return widget;
 }
 
-void NeurusMainWindow::CreateDocks()
+void UIManager::CreateDocks()
 {
-	if (!win_viewportWidget){
-		// Create Viewport after docks — CreateDocks() places it as viewport content
-		win_viewportWidget = new Viewport();
-		win_viewportWidget->resize(800, 600);
-		win_viewportWidget->winId();  // Force native window handle creation
+	// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
+	auto viewport = std::make_unique<Viewport>();
+	viewport->resize(800, 600);
+	viewport->winId();  // Force native window handle creation
+	HWND newHwnd = viewport->hwnd();
 
-		// --- Viewport (MUST be created FIRST - ADS central widget requirement) ---
-		win_viewportDock = new ads::CDockWidget(win_dockManager, "Viewport");
-		win_viewportDock->setWidget(win_viewportWidget, ads::CDockWidget::ForceNoScrollArea);
-		win_viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
-		// Use CenterDockWidgetArea instead of setCentralWidget so it stays dockable
-		win_dockManager->addDockWidget(ads::LeftDockWidgetArea, win_viewportDock);
-	}
+	auto* viewportDock = new ads::CDockWidget(win_dockManager, viewport->PanelName());
+	viewportDock->setWidget(viewport.get(), ads::CDockWidget::ForceNoScrollArea);
+	viewportDock->setFeature(ads::CDockWidget::DockWidgetClosable, false);
+	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, viewportDock);
 
-	// --- Left: Shader Editor ---
+	// Transfer panel ownership to CDockWidget (Qt parent-child).
+	// After setWidget(), the dock owns the panel; release unique_ptr to avoid double-delete.
+	m_panels[PanelType::Viewport] = viewport.release();
+	m_docks[PanelType::Viewport] = viewportDock;
+
+	// Notify Application of the new native HWND for surface recreation
+	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
+
+	// --- Left: Shader Editor (placeholder, not a UIPanel) ---
 	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
 	shaderDock->setWidget(makePlaceholder("Shader Editor"));
 	shaderDock->resize(280, 300);
@@ -215,31 +242,36 @@ void NeurusMainWindow::CreateDocks()
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
 
 	// --- Left: Outliner ---
-	auto* outlinerDock = new ads::CDockWidget(win_dockManager, "Outliner");
-	auto* outlinerPanel = new OutlinerPanel();
-	win_outlinerPanel = outlinerPanel;
-	outlinerDock->setWidget(outlinerPanel);
+	auto outliner = std::make_unique<Outliner>();
+	auto* outlinerDock = new ads::CDockWidget(win_dockManager, outliner->PanelName());
+	outlinerDock->setWidget(outliner.get());
 	outlinerDock->resize(280, 300);
 	outlinerDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, outlinerDock);
+	m_panels[PanelType::Outliner] = outliner.release();
+	m_docks[PanelType::Outliner] = outlinerDock;
 
 	// --- Right: Property Editor ---
-	auto* propertyEditor = new PropertyEditor(nullptr);
-	win_propertyEditor = propertyEditor;
-	auto* propDock = new ads::CDockWidget(win_dockManager, "Property Editor");
-	propDock->setWidget(propertyEditor);
+	auto propertyEditor = std::make_unique<PropertyEditor>(nullptr);
+	auto* propDock = new ads::CDockWidget(win_dockManager, propertyEditor->PanelName());
+	propDock->setWidget(propertyEditor.get());
 	propDock->resize(280, 300);
 	propDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
+	m_panels[PanelType::PropertyEditor] = propertyEditor.release();
+	m_docks[PanelType::PropertyEditor] = propDock;
 
 	// --- Right: Render Config ---
-	auto* configDock = new ads::CDockWidget(win_dockManager, "Render Config");
-	configDock->setWidget(makePlaceholder("Render Config"));
-	configDock->resize(280, 300);
-	configDock->setMinimumSize(200, 200);
+	auto renderConfigPanel = std::make_unique<RenderConfigPanel>();
+	auto* configDock = new ads::CDockWidget(win_dockManager, renderConfigPanel->PanelName());
+	configDock->setWidget(renderConfigPanel.get(), ads::CDockWidget::ForceNoScrollArea);
+	configDock->resize(280, 400);
+	configDock->setMinimumSize(220, 300);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
+	m_panels[PanelType::RenderConfig] = renderConfigPanel.release();
+	m_docks[PanelType::RenderConfig] = configDock;
 
-	// --- Bottom: Texture Viewer ---
+	// --- Bottom: Texture Viewer (placeholder, not a UIPanel) ---
 	auto* textureDock = new ads::CDockWidget(win_dockManager, "Texture Viewer");
 	textureDock->setWidget(makePlaceholder("Texture Viewer"));
 	textureDock->resize(300, 200);
@@ -251,7 +283,7 @@ void NeurusMainWindow::CreateDocks()
 // Layout persistence
 // =========================================================================
 
-void NeurusMainWindow::SaveLayout()
+void UIManager::SaveLayout()
 {
 	QString path = QApplication::applicationDirPath() + "/layout.ads";
 	QFile file(path);
@@ -263,7 +295,7 @@ void NeurusMainWindow::SaveLayout()
 	}
 }
 
-void NeurusMainWindow::LoadLayout()
+void UIManager::LoadLayout()
 {
 	QString path = QApplication::applicationDirPath() + "/layout.ads";
 	QFile file(path);
@@ -275,19 +307,21 @@ void NeurusMainWindow::LoadLayout()
 	}
 }
 
-void NeurusMainWindow::RestoreDefaultLayout()
+void UIManager::RestoreDefaultLayout()
 {
-	// Delete all non-viewport docks
+	// Clear panel/dock maps before dock manager destroys its children.
+	// Dock widgets and their contained panels are owned by CDockManager
+	// via Qt parent-child; clearing the maps just drops our non-owning pointers.
+	m_panels.clear();
+	m_docks.clear();
+
 	auto docks = win_dockManager->dockWidgetsMap();
 	for (auto it = docks.begin(); it != docks.end(); ++it)
 	{
-		if (it.value() != win_viewportDock)
-		{
-			it.value()->deleteDockWidget();
-		}
+		it.value()->deleteDockWidget();
 	}
 
-	// Re-create the default dock arrangement
+	// Re-create the default dock arrangement (emits viewportRecreated)
 	CreateDocks();
 }
 

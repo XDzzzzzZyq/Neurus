@@ -1,5 +1,6 @@
-#include "ui/PropertyEditor.h"
+#include "panels/PropertyEditor.h"
 
+#include "UIContext.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Scene.h"
@@ -16,7 +17,7 @@ namespace neurus {
 // =========================================================================
 
 PropertyEditor::PropertyEditor(Scene* scene, QWidget* parent)
-	: QWidget(parent)
+	: UIPanel(PanelType::PropertyEditor, QString(), parent)
 	, m_scene(scene)
 {
 	// --- Main layout ---
@@ -34,6 +35,15 @@ PropertyEditor::PropertyEditor(Scene* scene, QWidget* parent)
 
 	// Note: EventBus subscriptions (ObjectSelected / ObjectDeselected) are
 	// wired by Application::WireSignals() to keep the UI layer EventBus-free.
+}
+
+// =========================================================================
+// Refresh(const UIContext&) - no-op per-frame refresh
+// =========================================================================
+
+void PropertyEditor::Refresh(const UIContext& /*ctx*/)
+{
+	// PropertyEditor updates on ObjectSelected events, not per-frame.
 }
 
 // =========================================================================

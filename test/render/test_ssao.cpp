@@ -114,7 +114,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 	cb.scene->UseCamera(cb.camera);
 
 	RenderContext ctx{
-		.renderExtent = {kRenderWidth, kRenderHeight},
+			.width = kRenderWidth, .height = kRenderHeight,
 		.scene = cb.scene.get(),
 	};
 

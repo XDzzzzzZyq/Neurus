@@ -187,6 +187,7 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
+            "r_shadow_bias": 0.002,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128

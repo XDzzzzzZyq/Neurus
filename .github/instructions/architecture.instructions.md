@@ -69,11 +69,13 @@ are shared across layers.
 - Event-driven controller communication: `Editor::Edit(input)` translates InputState → typed events → EventQueue.Process() → controllers handle events
 
 **UI Layer** (`src/ui/`)
-- Qt6 Widgets presentation layer (MainWindow, dock panels via Qt-Advanced-Docking-System)
-- Owns VkSurfaceKHR (created from QWindow + QVulkanInstance, or via VulkanWidget)
-- Hosts QVulkanWindow for GPU rendering viewport
+- Qt6 Widgets presentation layer with Qt-Advanced-Docking-System (ADS)
+- **UIManager**: QMainWindow subclass with dock manager, menus, and per-frame Refresh pipeline
+- **Panel system**: all dock widgets inherit `UIPanel` (`PanelType` enum for registry): Viewport, Outliner, PropertyEditor, RenderConfigPanel
+- `src/ui/items/`: Definion of UI elements, 
+    - **ScalarSlider**: reusable slider+spinbox composite widget with auto-derived step/decimals
 - Displays data and captures user input
-- Emits Qt signals for state changes
+- Emits Qt signals via UIEvents for state changes
 - Must NOT directly access Renderer internals
 - Must NOT mutate scene state directly
 
@@ -96,8 +98,9 @@ are shared across layers.
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals
 - UI↔Editor layer dispatch
-- Main signals: `newFrame()`, `windowResized(int, int)`
-- Decoupled: emitters don't know subscribers
+- Main signals: `newFrame()`, `windowResized(int, int)`, `viewportRecreated(quintptr)`, `screenshotRequested()`, `screenshotAllRequested()`
+- `newFrame` decoupled: emitters don't know subscribers
+- Panels emit their own signals (e.g. `Outliner::objectSelected`, `RenderConfigPanel::configValueChanged`) — Application wires them to Editor
 
 **EventQueue System** (Typed Event Dispatcher)
 - Header-only template-based event dispatcher (no Qt dependency)
@@ -108,8 +111,11 @@ are shared across layers.
 
 **Context System** (Data)
 - `EditorContext` - Scene + editor state
+- `UIContext` - Per-frame UI snapshot carrying `RenderConfig` pointer
 - Read-only access to scene data for Renderer
 - Data flows: Editor mutates, Renderer consumes
+- `RenderConfig` owned by Project; per-frame snapshots via `RenderContext::config` (`void*`)
+- `Editor::SetRenderConfig()` writes UI config changes → Project → RenderContext
 
 ### Vulkan Ownership Graph (Critical)
 

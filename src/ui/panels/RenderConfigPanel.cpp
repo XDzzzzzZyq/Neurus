@@ -1,0 +1,390 @@
+/**
+ * @file RenderConfigPanel.cpp
+ * @brief RenderConfigPanel implementation — hard-coded UI layout for render settings.
+ */
+
+#include "panels/RenderConfigPanel.h"
+
+#include "items/ScalarSlider.h"
+#include "render/RenderConfig.h"
+#include "UIContext.h"
+
+#include <QCheckBox>
+#include <QComboBox>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QLabel>
+#include <QScrollArea>
+#include <QSpinBox>
+#include <QVBoxLayout>
+
+namespace neurus
+{
+
+// =========================================================================
+// Constructor / Destructor
+// =========================================================================
+
+RenderConfigPanel::RenderConfigPanel(QWidget* parent)
+	: UIPanel(PanelType::RenderConfig, QString(), parent)
+{
+	// --- Main layout ---
+	auto* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(0, 0, 0, 0);
+
+	// --- Scroll area ---
+	auto* scrollArea = new QScrollArea(this);
+	scrollArea->setWidgetResizable(true);
+	scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	mainLayout->addWidget(scrollArea);
+
+	// --- Form container ---
+	auto* formContainer = new QWidget();
+	auto* formLayout = new QVBoxLayout(formContainer);
+	formLayout->setContentsMargins(6, 6, 6, 6);
+	formLayout->setSpacing(6);
+
+	// --- Build sections ---
+	BuildShadowsSection();
+	formLayout->addWidget(m_shadowsGroup);
+
+	BuildAmbientOcclusionSection();
+	formLayout->addWidget(m_aoGroup);
+
+	BuildLightingSection();
+	formLayout->addWidget(m_lightingGroup);
+
+	BuildPostProcessingSection();
+	formLayout->addWidget(m_postGroup);
+
+	BuildPipelineSection();
+	formLayout->addWidget(m_pipelineGroup);
+
+	// --- Bottom stretch ---
+	formLayout->addStretch();
+
+	scrollArea->setWidget(formContainer);
+
+	// --- Wire all signals ---
+	ConnectAllSignals();
+}
+
+// =========================================================================
+// Section builders
+// =========================================================================
+
+// --- Helper: create a labelled combo box row in a form layout ---
+static QComboBox* addComboRow(QFormLayout* form, const QString& label, const QStringList& items)
+{
+	auto* combo = new QComboBox();
+	combo->addItems(items);
+	form->addRow(label, combo);
+	return combo;
+}
+
+// --- Helper: create a QSpinBox row ---
+static QSpinBox* addSpinRow(QFormLayout* form, const QString& label, int min, int max, int initial)
+{
+	auto* spin = new QSpinBox();
+	spin->setRange(min, max);
+	spin->setValue(initial);
+	form->addRow(label, spin);
+	return spin;
+}
+
+// =========================================================================
+// Shadows
+// =========================================================================
+
+void RenderConfigPanel::BuildShadowsSection()
+{
+	m_shadowsGroup = new QGroupBox("Shadows");
+	m_shadowsGroup->setCheckable(true);
+	m_shadowsGroup->setChecked(true);
+
+	auto* form = new QFormLayout(m_shadowsGroup);
+	form->setContentsMargins(8, 12, 8, 8);
+	form->setSpacing(4);
+
+	m_shadowAlgCombo = addComboRow(form, "Algorithm",
+		{"None", "Shadow Mapping", "SDF Soft Shadow", "VSSM"});
+
+	m_shadowPCFCombo = addComboRow(form, "PCF Filter",
+		{"Hard", "Soft PCF 16", "Soft PCF 64"});
+
+	m_shadowBiasSlider = new ScalarSlider(0.0, 0.01, 1000, 0.0005, this);
+	form->addRow("Bias", m_shadowBiasSlider);
+}
+
+// =========================================================================
+// Ambient Occlusion
+// =========================================================================
+
+void RenderConfigPanel::BuildAmbientOcclusionSection()
+{
+	m_aoGroup = new QGroupBox("Ambient Occlusion");
+	m_aoGroup->setCheckable(true);
+	m_aoGroup->setChecked(true);
+
+	auto* form = new QFormLayout(m_aoGroup);
+	form->setContentsMargins(8, 12, 8, 8);
+	form->setSpacing(4);
+
+	m_aoAlgCombo = addComboRow(form, "Algorithm", {"None", "SSAO"});
+	m_aoAlgCombo->setCurrentIndex(1);  // Default: SSAO
+
+	m_aoKernelSpin = addSpinRow(form, "Kernel Size", 1, 64, 16);
+
+	m_aoRadiusSlider = new ScalarSlider(0.0, 5.0, 500, 0.5, this);
+	form->addRow("Radius", m_aoRadiusSlider);
+}
+
+// =========================================================================
+// Lighting
+// =========================================================================
+
+void RenderConfigPanel::BuildLightingSection()
+{
+	m_lightingGroup = new QGroupBox("Lighting");
+	m_lightingGroup->setCheckable(false);  // Always enabled
+
+	auto* form = new QFormLayout(m_lightingGroup);
+	form->setContentsMargins(8, 12, 8, 8);
+	form->setSpacing(4);
+
+	m_iblCheckBox = new QCheckBox("Enable IBL");
+	m_iblCheckBox->setChecked(true);
+	form->addRow(m_iblCheckBox);
+
+	m_exposureSlider = new ScalarSlider(0.0, 5.0, 100, 1.0, this);
+	form->addRow("Exposure", m_exposureSlider);
+}
+
+// =========================================================================
+// Post-Processing
+// =========================================================================
+
+void RenderConfigPanel::BuildPostProcessingSection()
+{
+	m_postGroup = new QGroupBox("Post-Processing");
+	m_postGroup->setCheckable(false);
+
+	auto* form = new QFormLayout(m_postGroup);
+	form->setContentsMargins(8, 12, 8, 8);
+	form->setSpacing(4);
+
+	m_aaCombo = addComboRow(form, "Anti-Aliasing", {"None", "MSAA", "FXAA"});
+
+	m_gammaSlider = new ScalarSlider(1.0, 3.0, 200, 1.0, this);
+	form->addRow("Gamma", m_gammaSlider);
+}
+
+// =========================================================================
+// Pipeline
+// =========================================================================
+
+void RenderConfigPanel::BuildPipelineSection()
+{
+	m_pipelineGroup = new QGroupBox("Pipeline");
+	m_pipelineGroup->setCheckable(false);
+
+	auto* form = new QFormLayout(m_pipelineGroup);
+	form->setContentsMargins(8, 12, 8, 8);
+	form->setSpacing(4);
+
+	m_pipelineCombo = addComboRow(form, "Pipeline",
+		{"Forward", "Deferred"});
+	m_pipelineCombo->setCurrentIndex(1);  // Default: Deferred
+
+	m_ssrCombo = addComboRow(form, "SSR",
+		{"None", "Ray Marching", "SDF Ray Marching", "SDF Resolved"});
+
+	m_samplesPerFrameSpin = addSpinRow(form, "Samples / Frame", 1, 1024, 128);
+}
+
+// =========================================================================
+// Signal wiring
+// =========================================================================
+
+void RenderConfigPanel::ConnectAllSignals()
+{
+	auto emitCfg = [this]() { 
+		emit configValueChanged(Save()); 
+		};
+
+	// --- Shadows ---
+	connect(m_shadowsGroup, &QGroupBox::toggled, this, emitCfg);
+	connect(m_shadowAlgCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
+	connect(m_shadowPCFCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
+	connect(m_shadowBiasSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
+
+	// --- Ambient Occlusion ---
+	connect(m_aoGroup, &QGroupBox::toggled, this, emitCfg);
+	connect(m_aoAlgCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
+	connect(m_aoKernelSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+		this, emitCfg);
+	connect(m_aoRadiusSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
+
+	// --- Lighting ---
+	connect(m_iblCheckBox, &QCheckBox::toggled, this, emitCfg);
+	connect(m_exposureSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
+
+	// --- Post-Processing ---
+	connect(m_aaCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
+	connect(m_gammaSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
+
+	// --- Pipeline ---
+	connect(m_pipelineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
+	connect(m_ssrCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
+	connect(m_samplesPerFrameSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+		this, emitCfg);
+}
+
+// =========================================================================
+// RenderConfig ↔ UI sync
+// =========================================================================
+
+void RenderConfigPanel::Refresh(const UIContext& ctx)
+{
+	const auto* config = static_cast<const RenderConfig*>(ctx.renderConfig);
+	if (!config) return;
+
+	// --- Shadows ---
+	{
+		QSignalBlocker b1(m_shadowAlgCombo);
+		QSignalBlocker b2(m_shadowsGroup);
+		switch (config->r_shadow)
+		{
+		case ShadowAlg::None:           m_shadowAlgCombo->setCurrentIndex(0); break;
+		case ShadowAlg::ShadowMapping:  m_shadowAlgCombo->setCurrentIndex(1); break;
+		case ShadowAlg::SDFSoftShadow:  m_shadowAlgCombo->setCurrentIndex(2); break;
+		case ShadowAlg::VSSM:           m_shadowAlgCombo->setCurrentIndex(3); break;
+		}
+		m_shadowsGroup->setChecked(config->r_shadow != ShadowAlg::None);
+
+		m_shadowBiasSlider->setValue(config->r_shadow_bias);
+	}
+
+	// --- Ambient Occlusion ---
+	{
+		QSignalBlocker b1(m_aoAlgCombo);
+		QSignalBlocker b2(m_aoGroup);
+		switch (config->r_ao)
+		{
+		case AOAlg::None: m_aoAlgCombo->setCurrentIndex(0); break;
+		case AOAlg::SSAO: m_aoAlgCombo->setCurrentIndex(1); break;
+		}
+		m_aoGroup->setChecked(config->r_ao != AOAlg::None);
+
+		QSignalBlocker b3(m_aoKernelSpin);
+		m_aoKernelSpin->setValue(config->r_ao_ksize);
+
+		m_aoRadiusSlider->setValue(config->r_ao_radius);
+	}
+
+	// --- Post-Processing ---
+	{
+		QSignalBlocker b1(m_aaCombo);
+		switch (config->r_aa)
+		{
+		case AAAlg::None: m_aaCombo->setCurrentIndex(0); break;
+		case AAAlg::MSAA: m_aaCombo->setCurrentIndex(1); break;
+		case AAAlg::FXAA: m_aaCombo->setCurrentIndex(2); break;
+		}
+
+		QSignalBlocker b2(m_gammaSlider);
+		m_gammaSlider->setValue(config->r_gamma);
+	}
+
+	// --- Pipeline ---
+	{
+		QSignalBlocker b1(m_pipelineCombo);
+		switch (config->r_pipeline)
+		{
+		case RenderPipeLine::Forward:  m_pipelineCombo->setCurrentIndex(0); break;
+		case RenderPipeLine::Deferred: m_pipelineCombo->setCurrentIndex(1); break;
+		case RenderPipeLine::Custom0:  m_pipelineCombo->setCurrentIndex(0); break;  // fallback
+		}
+
+		QSignalBlocker b2(m_ssrCombo);
+		switch (config->r_ssr)
+		{
+		case SSRAlg::None:                    m_ssrCombo->setCurrentIndex(0); break;
+		case SSRAlg::RayMarching:             m_ssrCombo->setCurrentIndex(1); break;
+		case SSRAlg::SDFRayMarching:          m_ssrCombo->setCurrentIndex(2); break;
+		case SSRAlg::SDFResolvedRayMarching:  m_ssrCombo->setCurrentIndex(3); break;
+		}
+
+		QSignalBlocker b3(m_samplesPerFrameSpin);
+		m_samplesPerFrameSpin->setValue(config->r_sample_pf);
+	}
+}
+
+RenderConfig RenderConfigPanel::Save() const
+{
+	RenderConfig config{};
+
+	// --- Shadows ---
+	switch (m_shadowAlgCombo->currentIndex())
+	{
+	case 0: config.r_shadow = ShadowAlg::None;          break;
+	case 1: config.r_shadow = ShadowAlg::ShadowMapping; break;
+	case 2: config.r_shadow = ShadowAlg::SDFSoftShadow; break;
+	case 3: config.r_shadow = ShadowAlg::VSSM;          break;
+	}
+	if (!m_shadowsGroup->isChecked())
+		config.r_shadow = ShadowAlg::None;
+
+	config.r_shadow_bias = static_cast<float>(m_shadowBiasSlider->value());
+
+	// --- Ambient Occlusion ---
+	switch (m_aoAlgCombo->currentIndex())
+	{
+	case 0: config.r_ao = AOAlg::None; break;
+	case 1: config.r_ao = AOAlg::SSAO; break;
+	}
+	if (!m_aoGroup->isChecked())
+		config.r_ao = AOAlg::None;
+
+	config.r_ao_ksize  = m_aoKernelSpin->value();
+	config.r_ao_radius = static_cast<float>(m_aoRadiusSlider->value());
+
+	// --- Post-Processing ---
+	switch (m_aaCombo->currentIndex())
+	{
+	case 0: config.r_aa = AAAlg::None; break;
+	case 1: config.r_aa = AAAlg::MSAA; break;
+	case 2: config.r_aa = AAAlg::FXAA; break;
+	}
+	config.r_gamma = static_cast<float>(m_gammaSlider->value());
+
+	// --- Pipeline ---
+	switch (m_pipelineCombo->currentIndex())
+	{
+	case 0: config.r_pipeline = RenderPipeLine::Forward;  break;
+	case 1: config.r_pipeline = RenderPipeLine::Deferred; break;
+	}
+
+	switch (m_ssrCombo->currentIndex())
+	{
+	case 0: config.r_ssr = SSRAlg::None;                    break;
+	case 1: config.r_ssr = SSRAlg::RayMarching;             break;
+	case 2: config.r_ssr = SSRAlg::SDFRayMarching;          break;
+	case 3: config.r_ssr = SSRAlg::SDFResolvedRayMarching;  break;
+	}
+	config.r_sample_pf = m_samplesPerFrameSpin->value();
+
+	return config;
+}
+
+} // namespace neurus

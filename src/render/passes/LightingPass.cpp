@@ -266,11 +266,14 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 
 void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
-	const Camera* cam = ctx.scene->GetActiveCamera();
+	// --- Cast scene UID to Scene* for access to Scene-specific members ---
+	const auto* scene = static_cast<const Scene*>(ctx.scene);
+
+	const Camera* cam = scene->GetActiveCamera();
 	const glm::vec3 cameraPos = cam->GetPosition();
 	const glm::mat4 viewMatrix = cam->GetViewMatrix();
 	const glm::mat4 invProjView = glm::inverse(cam->GetProjectionMatrix() * cam->GetViewMatrix());
-	const vk::Extent2D renderExtent = ctx.renderExtent;
+	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t frameIndex = ctx.frameIndex;
 
 	// --- 1. Write descriptor set for this frame slot ---
@@ -279,11 +282,11 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 1b. Write IBL cubemap descriptors (bindings 8-9) from RenderCache EnvironmentGPU ---
 	{
 		DescriptorSet& dstSet = p_descriptorSets[frameIndex];
-		const bool hasEnv = (ctx.scene != nullptr && !ctx.scene->env_list.empty());
+		const bool hasEnv = !scene->env_list.empty();
 
 		if (hasEnv)
 		{
-			auto& env = ctx.scene->env_list.begin()->second;
+			auto& env = scene->env_list.begin()->second;
 			const EnvironmentGPU* envGPU = cache.GetEnvironmentGPU(env->GetObjectID());
 
 			if (envGPU && envGPU->diffuseTexture && envGPU->diffuseTexture->GetImage())
@@ -413,7 +416,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 
 		// Enable IBL when scene has an environment
-		pc.iblEnabled = (ctx.scene && !ctx.scene->env_list.empty()) ? 1 : 0;
+		pc.iblEnabled = !scene->env_list.empty() ? 1 : 0;
 
 		// Copy inverse(proj * view) matrix for skybox background ray
 		const float* ipv = &invProjView[0][0];

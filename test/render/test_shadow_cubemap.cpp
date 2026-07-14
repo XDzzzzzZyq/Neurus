@@ -292,7 +292,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 		auto& cmd = BeginCmd();
 
 		RenderContext ctx{};
-		ctx.renderExtent = vk::Extent2D(kRes, kRes);
+		ctx.width = kRes; ctx.height = kRes;
 		ctx.scene        = shadowRes.scene.get();
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 

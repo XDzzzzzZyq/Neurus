@@ -6,7 +6,7 @@
  *   1. QApplication - Qt event loop (Widgets)
  *   2. EventBus - singleton cross-layer communication
  *   3. VulkanContext (Phase 1) - VkInstance creation
- *   4. NeurusMainWindow + Viewport - Qt window with dockable Viewport
+ *   4. UIManager + Viewport - Qt window with dockable Viewport
  *   5. Show main window - apply layout so widget has final size
  *   6. VkSurfaceKHR - created from Viewport's native HWND
  *   7. VulkanContext (Phase 2) - logical device + queue selection
@@ -36,10 +36,12 @@
 #include "render/shaders/ShaderLibrary.h"
 #include "asset/Project.h"
 #include "scene/Scene.h"
-#include "ui/NeurusMainWindow.h"
-#include "ui/OutlinerPanel.h"
-#include "ui/PropertyEditor.h"
-#include "ui/Viewport.h"
+#include "ui/UIManager.h"
+#include "ui/UIContext.h"
+#include "ui/panels/Outliner.h"
+#include "ui/panels/PropertyEditor.h"
+#include "ui/panels/RenderConfigPanel.h"
+#include "ui/panels/Viewport.h"
 
 #include <QApplication>
 #include <QCoreApplication>
@@ -147,8 +149,8 @@ bool Application::InitVulkan()
 		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
 		// Step 2: Create Qt window with Viewport
-		app_mainWindow = std::make_unique<neurus::NeurusMainWindow>();
-		// Viewport is created internally by NeurusMainWindow constructor
+		app_mainWindow = std::make_unique<neurus::UIManager>();
+		// Viewport is created internally by UIManager constructor
 
 		// Step 3: Create VkSurfaceKHR from Viewport's native HWND
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
@@ -156,13 +158,24 @@ bool Application::InitVulkan()
 		app_surface = std::make_unique<vk::raii::SurfaceKHR>(app_vkContext->instance(), surfaceCreateInfo);
 
 		// Step 4: Create logical device
-		app_vkContext->initDevice(*app_surface);
+		app_vkContext->InitDevice();
 
 		uiEvents.setGpuName(QString::fromStdString(app_vkContext->gpuName()));
 	}
 	catch (const std::exception& e)
 	{
 		NEURUS_ERR("Vulkan initialization failed: " << e.what());
+		return false;
+	}
+
+	try
+	{
+		// Step 5: Validate queue family supports presentation, get queue handle
+		app_vkContext->InitQueue(*app_surface);
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("Queue initialization failed: " << e.what());
 		return false;
 	}
 
@@ -264,9 +277,20 @@ void Application::InitEditor(std::unique_ptr<project::Project> project)
 void Application::WireSignals()
 {
 	auto& uiEvents = neurus::UIEvents::instance();
+	NewFrameSignals(uiEvents);
+	PanelSignals(uiEvents);
+	RecreateSignals(uiEvents);
+	ScreenShotSignals(uiEvents);
+}
 
+// =========================================================================
+// NewFrameSignals – render request + timer-driven loop
+// =========================================================================
+
+void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
+{
 	// --- Render request (manual frame trigger) ---
-	// 3-line newFrame pattern: update input → translate to events → draw
+	// 3-line newFrame pattern: update input → translate to events → draw → refresh UI
 	QObject::connect(&uiEvents, &neurus::UIEvents::newFrame,
 	                 [this]() {
 	                     if (app_renderer && app_editor)
@@ -274,49 +298,95 @@ void Application::WireSignals()
 	                         Input::UpdateState();
 	                         app_editor->Edit(Input::GetInputState());
 	                         app_eventBus.Process();  // Dispatch all enqueued events before drawing
-	                         app_renderer->DrawFrame(app_editor->GetScene());
+	                         app_renderer->DrawFrame(app_editor->GetRenderContext());
+	                         app_mainWindow->Refresh(app_editor->GetUIContext());
 	                     }
 	                 });
 
-	// --- OutlinerPanel object selection → EventBus ---
-	// UI layer emits Qt signal; Application translates to typed EventQueue event
-	{
-		auto* outliner = app_mainWindow->getOutlinerPanel();
-		if (outliner)
-		{
-			QObject::connect(outliner, &neurus::OutlinerPanel::objectSelected,
-			                 [this](int objectId) {
-			                     app_eventBus.enqueue(neurus::ObjectSelected{objectId});
-			                 });
-		}
-	}
+	// StartRenderLoop – timer-driven ~60 FPS render loop
+	QObject::connect(app_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
+		emit uiEvents.newFrame();
+	});
+}
 
-	// --- PropertyEditor selection → EventBus subscriptions ---
-	// Subscribe to ObjectSelected / ObjectDeselected on behalf of PropertyEditor
-	// so that the UI layer remains EventBus-free.
+// =========================================================================
+// PanelSignals – Outliner selection + Viewport resize
+// =========================================================================
+
+void Application::PanelSignals(neurus::UIEvents& uiEvents)
+{
+	(void)uiEvents;  // Unused in current panel signals; kept for symmetry
+
+	// --- Outliner object selection → EventBus ---
+	// UI layer emits Qt signal; Application translates to typed EventQueue event
+	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
-		auto* propEditor = app_mainWindow->getPropertyEditor();
-		if (propEditor)
-		{
-			app_eventBus.subscribe<neurus::ObjectSelected>(
-				[propEditor](const neurus::ObjectSelected& e) {
-					propEditor->LoadObject(e.objectId);
-				});
-			app_eventBus.subscribe<neurus::ObjectDeselected>(
-				[propEditor](const neurus::ObjectDeselected& /*e*/) {
-					propEditor->Clear();
-				});
-		}
+		QObject::connect(outliner, &neurus::Outliner::objectSelected,
+			             [this](int objectId) {
+			                 app_eventBus.enqueue(neurus::ObjectSelected{objectId});
+			                });
 	}
 
 	// Handle Viewport resize - proactively recreate swapchain so the
 	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
 	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
-	QObject::connect(app_mainWindow->getViewport(), &neurus::Viewport::resized,
-	                 [this](int width, int height) {
-	                     ResizeViewport(width, height);
-	                 });
+	if (auto* viewport = app_mainWindow->GetPanel<neurus::Viewport>())
+	{
+		QObject::connect(viewport, &neurus::Viewport::resized,
+		                 [this](int width, int height) {
+		                     ResizeViewport(width, height);
+		                 });
+	}
 
+	// Handle RenderConfig changes — update Editor/Project config in real time
+	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
+	{
+		QObject::connect(cfgPanel, &neurus::RenderConfigPanel::configValueChanged,
+		                 [this](const neurus::RenderConfig& cfg) {
+		                     if (app_editor)
+		                         app_editor->SetRenderConfig(cfg);
+		                 });
+	}
+}
+
+// =========================================================================
+// RecreateSignals – Viewport recreation (new HWND → new surface → new swapchain)
+// =========================================================================
+
+void Application::RecreateSignals(neurus::UIEvents& uiEvents)
+{
+	// Handle Viewport recreation (new native HWND → new surface → new swapchain)
+	QObject::connect(&uiEvents, &neurus::UIEvents::viewportRecreated,
+	                 [this](quintptr newHwnd) {
+	                     // Reconnect panel signals (Viewport resize) to the new widget
+	                     PanelSignals(neurus::UIEvents::instance());
+
+	                     if (!app_vkContext || !app_renderer)
+	                         return;
+	                     try
+	                     {
+	                         HINSTANCE hinstance = GetModuleHandle(nullptr);
+	                         vk::Win32SurfaceCreateInfoKHR surfaceCI({}, hinstance,
+	                             reinterpret_cast<HWND>(newHwnd));
+	                         auto new_surface = std::make_unique<vk::raii::SurfaceKHR>(
+	                             app_vkContext->instance(), surfaceCI);
+	                         app_renderer->HandleSurfaceChange(*new_surface);
+	                         app_surface = std::move(new_surface);  // Old surface destroyed AFTER swapchain drops its ref
+	                         NEURUS_LOG("[Application] Viewport recreated — new surface + swapchain");
+	                     }
+	                     catch (const std::exception& e)
+	                     {
+	                         NEURUS_ERR("Viewport recreation failed: " << e.what());
+	                     }
+	                 });
+}
+
+// =========================================================================
+// ScreenShotSignals – screenshot + attachment dump requests
+// =========================================================================
+
+void Application::ScreenShotSignals(neurus::UIEvents& uiEvents)
+{
 	// Handle screenshot requests (F12 / menu action) via UIEvents signal
 	QObject::connect(&uiEvents, &neurus::UIEvents::screenshotRequested,
 	                 [this]() {
@@ -339,10 +409,5 @@ void Application::WireSignals()
 	                             app_renderer->GetExtent(), 1024);
 	                     }
 	                 });
-
-	// StartRenderLoop – timer-driven ~60 FPS render loop
-	QObject::connect(app_renderTimer.get(), &QTimer::timeout, [&uiEvents]() {
-		emit uiEvents.newFrame();
-	});
 }
 } // namespace neurus

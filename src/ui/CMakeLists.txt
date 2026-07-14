@@ -1,14 +1,19 @@
 # src/ui/CMakeLists.txt - UI Layer (Qt6 QML)
 
 add_library(neurus_ui STATIC
-	NeurusMainWindow.h
-	NeurusMainWindow.cpp
-	OutlinerPanel.h
-	OutlinerPanel.cpp
-	PropertyEditor.h
-	PropertyEditor.cpp
-	Viewport.h
-	Viewport.cpp
+	UIManager.h
+	UIManager.cpp
+	items/ScalarSlider.h
+	items/ScalarSlider.cpp
+	panels/UIPanel.h
+	panels/Outliner.h
+	panels/Outliner.cpp
+	panels/PropertyEditor.h
+	panels/PropertyEditor.cpp
+	panels/RenderConfigPanel.h
+	panels/RenderConfigPanel.cpp
+	panels/Viewport.h
+	panels/Viewport.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC
