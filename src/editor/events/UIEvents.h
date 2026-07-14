@@ -61,14 +61,6 @@ signals:
 
 	// --- UI-driven editor signals ---
 
-	/** @brief Emitted when the render configuration is changed (toggled, slider, etc.). */
-	void renderConfigChanged();
-
-	/** @brief Emitted when the viewport widget is resized.
-	 *  @param width New viewport width in pixels.
-	 *  @param height New viewport height in pixels. */
-	void viewportResized(int width, int height);
-
 	/** @brief Emitted when the viewport widget is recreated with a new native HWND.
 	 *  @param newHwnd The new native window handle for Vulkan surface creation. */
 	void viewportRecreated(quintptr newHwnd);
