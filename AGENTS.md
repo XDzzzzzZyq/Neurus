@@ -19,6 +19,7 @@ isolation. Use this file as the high-level reference; detailed rules live in
 | Renderer Layer | [renderer.instructions.md](.github/instructions/renderer.instructions.md) |
 | Editor Layer | [editor.instructions.md](.github/instructions/editor.instructions.md) |
 | UI System | [ui-system.instructions.md](.github/instructions/ui-system.instructions.md) |
+| Event System | [events.instructions.md](.github/instructions/events.instructions.md) |
 | Asset Layer | [data-resource.instructions.md](.github/instructions/data-resource.instructions.md) |
 
 ---

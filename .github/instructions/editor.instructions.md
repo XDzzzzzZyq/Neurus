@@ -9,9 +9,6 @@ changes through the event system.
 ## Location
 
 - `src/editor/Input.h` - InputState struct + GetInputState() / UpdateState()
-- `src/editor/events/UIEvents.h` - QObject singleton for UI↔Editor signals
-- `src/editor/events/EventQueue.h` - Typed EventQueue for Editor↔Renderer event dispatch
-- `src/editor/events/CameraEvents.h` - Camera event structs (rotate, zoom, push, slide)
 - `src/editor/Editor.h` - Editor orchestrator (owns Project, Context, Controllers)
 - `src/editor/EditorContext.h` - Editor + scene state container
 - `src/editor/controllers/Controllers.h` - Base class for all controllers
@@ -19,11 +16,9 @@ changes through the event system.
 
 ## Core Responsibilities
 
-1. **Event Management**
-   - **UIEvents**: QObject singleton with Qt signals for UI↔Editor communication
-     (newFrame, windowResized, deviceLost, validationMessage, etc.)
-   - **EventQueue**: Typed event dispatcher for Editor↔Renderer event dispatch (no Qt
-     dependency). Events are enqueued on `enqueue()` and dispatched on `Process()`.
+1. **Event Management** — See `.github/instructions/events.instructions.md` for the
+   complete event system: UIEvents singleton, EventQueue typed dispatcher, event
+   structs, and the `ConnectUIEvent`/`OnUIEvent` template forwarding pattern.
 
 2. **Context Provisioning**
    - `EditorContext` aggregates scene state and editor state
@@ -42,54 +37,6 @@ changes through the event system.
    - Manage scene hierarchy
 
 ## Key Components
-
-### UIEvents (Qt Signal Bus)
-
-```cpp
-class UIEvents : public QObject {
-    Q_OBJECT
-public:
-    static UIEvents& instance();
-
-signals:
-    void newFrame();
-    void windowResized(int width, int height);
-    void deviceLost();
-    void validationMessage(QString severity, QString message);
-
-private:
-    UIEvents() = default;
-};
-```
-
-**Design:**
-- Singleton pattern via `instance()` static method
-- Qt's signal/slot mechanism provides type-safe dispatch
-- Signals are implicitly thread-safe (Qt handles queued connections)
-- Multiple slots can connect to the same signal
-- QML exposure via `rootContext()->setContextProperty("UIEvents", &ui)`
-
-### EventQueue (Typed Event Dispatcher)
-
-```cpp
-// Subscribe to typed events
-EventQueue().subscribe<ObjectSelected>([](const ObjectSelected& e) {
-    inspector.showEntity(e.objectId);
-});
-
-// Enqueue events (deferred dispatch)
-EventQueue().enqueue(ObjectSelected{42});
-
-// Process all queued events (call once per frame)
-EventQueue().Process();
-```
-
-**Design:**
-- Header-only template-based dispatcher (zero Qt dependency)
-- Deferred FIFO queue: `enqueue()` stores, `Process()` dispatches
-- Re-entrant safe: events emitted from handlers are appended to queue
-- Max events cap (default 1000) prevents infinite loops
-- Not thread-safe - all calls on main thread
 
 ### EditorContext
 
