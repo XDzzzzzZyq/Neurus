@@ -1,10 +1,15 @@
 /**
  * @file OutlinerRow.cpp
  * @brief OutlinerRow implementation — two-phase config: SetObject (data) then SetStyle (visual).
+ *
+ * Type icons are loaded from the Icons cache as QPixmaps.
+ * Visibility toggle buttons swap between visible/invisible icons
+ * sourced from the Icons cache on each toggle.
  */
 
 #include "items/OutlinerRow.h"
 
+#include <QGraphicsColorizeEffect>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPalette>
@@ -12,6 +17,7 @@
 
 #include <QGuiApplication>
 
+#include "Icons.h"
 #include "editor/Input.h"
 
 namespace neurus
@@ -40,6 +46,22 @@ static const QString kNameBtnColorStyle = QString::fromUtf8(
 	"}");
 
 // =========================================================================
+// Shared visibility-toggle stylesheet (no text properties — icon-driven)
+// =========================================================================
+
+static const QString kToggleStyle = QString::fromUtf8(
+	"QPushButton {"
+	"  border: 1px solid transparent;"
+	"  border-radius: 3px;"
+	"  background: transparent;"
+	"  padding: 2px;"
+	"}"
+	"QPushButton:hover {"
+	"  background: rgba(255, 255, 255, 0.10);"
+	"  border-color: rgba(255, 255, 255, 0.15);"
+	"}");
+
+// =========================================================================
 // Constructor — create layout + child widgets once
 // =========================================================================
 
@@ -52,7 +74,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	rowLayout->setContentsMargins(4, 1, 4, 1);
 	rowLayout->setSpacing(4);
 
-	// --- Type icon (colored QLabel, 22x22, centered) ---
+	// --- Type icon (QLabel with QPixmap, 22x22, centered) ---
 	m_typeLabel = new QLabel();
 	m_typeLabel->setFixedSize(22, 22);
 	m_typeLabel->setAlignment(Qt::AlignCenter);
@@ -70,55 +92,60 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	});
 	rowLayout->addWidget(m_nameBtn);
 
-	// --- Visibility toggle buttons ---
-	static const QString kToggleStyle = QString::fromUtf8(
-		"QPushButton {"
-		"  border: 1px solid transparent;"
-		"  border-radius: 3px;"
-		"  background: transparent;"
-		"  padding: 2px;"
-		"  font-size: 20px;"
-		"  font-weight: bold;"
-		"}"
-		"QPushButton:!checked {"
-		"  color: #d0d0d0;"
-		"}"
-		"QPushButton:checked {"
-		"  color: #444444;"
-		"}"
-		"QPushButton:hover {"
-		"  background: rgba(255, 255, 255, 0.10);"
-		"  border-color: rgba(255, 255, 255, 0.15);"
-		"}");
+	// --- Visibility toggle buttons (icon-driven, checkable) ---
+	m_eyeBtn    = new QPushButton();
+	m_renderBtn = new QPushButton();
 
-	m_eyeBtn    = new QPushButton(QString::fromUtf8("\u25C9"));  // ◉
-	m_renderBtn = new QPushButton(QString::fromUtf8("\u25A3"));  // ▣
+	const QSize kToggleBtnSize(26, 26);
+	const QSize kToggleIconSize(20, 20);
 
 	// Eye button
 	m_eyeBtn->setCheckable(true);
 	m_eyeBtn->setChecked(true);
 	m_eyeBtn->setFlat(true);
-	m_eyeBtn->setFixedSize(28, 26);
+	m_eyeBtn->setFixedSize(kToggleBtnSize);
+	m_eyeBtn->setIconSize(kToggleIconSize);
+	m_eyeBtn->setIcon(Icons::GetIcon("editor:preivew_visible"));
 	m_eyeBtn->setToolTip(QString::fromUtf8("Viewport visibility"));
 	m_eyeBtn->setCursor(Qt::PointingHandCursor);
 	m_eyeBtn->setStyleSheet(kToggleStyle);
+	auto* eyeFx = new QGraphicsColorizeEffect(m_eyeBtn);
+	eyeFx->setColor(QColor("#444444"));  // checked = visible = dark
+	eyeFx->setEnabled(true);
+	m_eyeBtn->setGraphicsEffect(eyeFx);
 
 	// Render button
 	m_renderBtn->setCheckable(true);
 	m_renderBtn->setChecked(true);
 	m_renderBtn->setFlat(true);
-	m_renderBtn->setFixedSize(28, 26);
+	m_renderBtn->setFixedSize(kToggleBtnSize);
+	m_renderBtn->setIconSize(kToggleIconSize);
+	m_renderBtn->setIcon(Icons::GetIcon("editor:render_visible"));
 	m_renderBtn->setToolTip(QString::fromUtf8("Render visibility"));
 	m_renderBtn->setCursor(Qt::PointingHandCursor);
 	m_renderBtn->setStyleSheet(kToggleStyle);
+	auto* renderFx = new QGraphicsColorizeEffect(m_renderBtn);
+	renderFx->setColor(QColor("#444444"));  // checked = visible = dark
+	renderFx->setEnabled(true);
+	m_renderBtn->setGraphicsEffect(renderFx);
 
-	// Connect signals — lambdas read m_objectId at emission time
+	// Connect signals — lambdas read m_objectId at emission time.
+	// Each toggle swaps its icon between visible/invisible variants
+	// and applies a colorize tint (dark when checked, light when unchecked).
 	QObject::connect(m_eyeBtn, &QPushButton::toggled, this,
 		[this](bool viewportChecked) {
+			m_eyeBtn->setIcon(Icons::GetIcon(
+				viewportChecked ? "editor:preivew_visible" : "editor:preview_invisible"));
+			auto* fx = qobject_cast<QGraphicsColorizeEffect*>(m_eyeBtn->graphicsEffect());
+			if (fx) fx->setColor(viewportChecked ? QColor("#444444") : QColor("#d0d0d0"));
 			emit visibilityChanged(VisibilityChanged{m_objectId, viewportChecked, m_renderBtn->isChecked()});
 		});
 	QObject::connect(m_renderBtn, &QPushButton::toggled, this,
 		[this](bool renderChecked) {
+			m_renderBtn->setIcon(Icons::GetIcon(
+				renderChecked ? "editor:render_visible" : "editor:render_invisible"));
+			auto* fx = qobject_cast<QGraphicsColorizeEffect*>(m_renderBtn->graphicsEffect());
+			if (fx) fx->setColor(renderChecked ? QColor("#444444") : QColor("#d0d0d0"));
 			emit visibilityChanged(VisibilityChanged{m_objectId, m_eyeBtn->isChecked(), renderChecked});
 		});
 
@@ -127,25 +154,36 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 }
 
 // =========================================================================
+// UpdateToggleIcons — refresh both toggle icons from current checked state
+// =========================================================================
+
+void OutlinerRow::UpdateToggleIcons()
+{
+	m_eyeBtn->setIcon(Icons::GetIcon(
+		m_eyeBtn->isChecked() ? "editor:preivew_visible" : "editor:preview_invisible"));
+	auto* eyeFx = qobject_cast<QGraphicsColorizeEffect*>(m_eyeBtn->graphicsEffect());
+	if (eyeFx) eyeFx->setColor(m_eyeBtn->isChecked() ? QColor("#444444") : QColor("#d0d0d0"));
+
+	m_renderBtn->setIcon(Icons::GetIcon(
+		m_renderBtn->isChecked() ? "editor:render_visible" : "editor:render_invisible"));
+	auto* renderFx = qobject_cast<QGraphicsColorizeEffect*>(m_renderBtn->graphicsEffect());
+	if (renderFx) renderFx->setColor(m_renderBtn->isChecked() ? QColor("#444444") : QColor("#d0d0d0"));
+}
+
+// =========================================================================
 // SetObject — bind object identity data, reset toggles
 // =========================================================================
 
-void OutlinerRow::SetObject(const QString& typeLetter, const QString& typeColor,
+void OutlinerRow::SetObject(const std::string& iconName,
                             const QString& name, int objectId)
 {
 	m_objectId = objectId;
 	setProperty("objectId", objectId);
 
-	// Update type icon
-	m_typeLabel->setText(typeLetter);
-	m_typeLabel->setStyleSheet(QString(
-		"QLabel {"
-		"  background-color: %1;"
-		"  color: white;"
-		"  border-radius: 3px;"
-		"  font-size: 11px;"
-		"  font-weight: bold;"
-		"}").arg(typeColor));
+	// Update type icon from the Icons cache
+	const QIcon& icon = Icons::GetIcon(iconName);
+	m_typeLabel->setPixmap(icon.pixmap(22, 22));
+	m_typeLabel->setStyleSheet(QString());  // clear old colored-background CSS
 
 	// Update name text
 	m_nameBtn->setText(name);
@@ -158,6 +196,9 @@ void OutlinerRow::SetObject(const QString& typeLetter, const QString& typeColor,
 	m_renderBtn->blockSignals(true);
 	m_renderBtn->setChecked(true);
 	m_renderBtn->blockSignals(false);
+
+	// Manually set initial toggle icons (signals were blocked above).
+	UpdateToggleIcons();
 }
 
 // =========================================================================
@@ -172,6 +213,8 @@ void OutlinerRow::SetVisibilities(bool viewportVisible, bool renderVisible)
 	m_renderBtn->blockSignals(true);
 	m_renderBtn->setChecked(renderVisible);
 	m_renderBtn->blockSignals(false);
+
+	UpdateToggleIcons();
 }
 
 // =========================================================================

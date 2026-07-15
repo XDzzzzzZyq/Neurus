@@ -1,4 +1,5 @@
 #include "UIManager.h"
+#include "Icons.h"
 #include "panels/Outliner.h"
 #include "panels/PropertyEditor.h"
 #include "panels/RenderConfigPanel.h"
@@ -30,6 +31,8 @@ namespace neurus {
 UIManager::UIManager(QWidget* parent)
 	: QMainWindow(parent)
 {
+	Icons::Initialize();
+
 	setWindowTitle("Neurus");
 	resize(1600, 900);
 

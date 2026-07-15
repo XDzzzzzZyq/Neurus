@@ -10,6 +10,8 @@
  *   Outliner signals once. Extra rows are hidden (not destroyed).
  * - Signal lambdas on OutlinerRow read m_objectId at emission time,
  *   so recycling a row to a different object is transparent.
+ * - Type icons are resolved from GOType via the Outliner-owned Icons cache
+ *   and passed as icon names ("scene:camera", "scene:light", etc.).
  */
 
 #include "Outliner.h"
@@ -32,39 +34,30 @@ namespace neurus
 {
 
 // =========================================================================
-// Type-info helpers (mapped from GOType, stateless)
+// Type-icon helpers (mapped from GOType → Icons key name)
 // =========================================================================
 
 namespace
 {
 
 /**
- * @brief Returns the display letter and CSS background color for a GOType.
+ * @brief Returns the icon name in "folder:name" format for a GOType.
  */
-static std::pair<QString, QString> TypeInfo(ObjectID::GOType type)
+static std::string TypeIconName(ObjectID::GOType type)
 {
 	switch (type)
 	{
 	case ObjectID::GOType::GO_CAM:
-		return {QString::fromUtf8("C"),  QString::fromUtf8("#4A90D9")};  // blue
+		return "scene:camera";
 	case ObjectID::GOType::GO_LIGHT:
-		return {QString::fromUtf8("L"),  QString::fromUtf8("#F5A623")};  // amber
 	case ObjectID::GOType::GO_POLYLIGHT:
-		return {QString::fromUtf8("P"),  QString::fromUtf8("#F5A623")};  // amber
+		return "scene:light";
 	case ObjectID::GOType::GO_MESH:
-		return {QString::fromUtf8("M"),  QString::fromUtf8("#7ED321")};  // green
+		return "scene:mesh";
 	case ObjectID::GOType::GO_ENVIR:
-		return {QString::fromUtf8("E"),  QString::fromUtf8("#9B59B6")};  // purple
-	case ObjectID::GOType::GO_SPRITE:
-		return {QString::fromUtf8("S"),  QString::fromUtf8("#1ABC9C")};  // cyan
-	case ObjectID::GOType::GO_DL:
-	case ObjectID::GOType::GO_DP:
-	case ObjectID::GOType::GO_DM:
-		return {QString::fromUtf8("D"),  QString::fromUtf8("#95A5A6")};  // gray
-	case ObjectID::GOType::GO_SDFFIELD:
-		return {QString::fromUtf8("F"),  QString::fromUtf8("#E67E22")};  // orange
+		return "scene:environment";
 	default:
-		return {QString::fromUtf8("?"),  QString::fromUtf8("#95A5A6")};  // gray
+		return "scene:mesh";  // fallback
 	}
 }
 
@@ -173,11 +166,11 @@ void Outliner::Refresh(const UIContext& ctx)
 	{
 		if (!obj) continue;
 
-		auto [letter, color] = TypeInfo(obj->o_type);
+		auto iconName = TypeIconName(obj->o_type);
 
-		// Phase 1 — bind object identity data (name, id, icon).
+		// Phase 1 — bind object identity data (icon name, name, id).
 		m_rowPool[poolIndex]->SetObject(
-			letter, color,
+			iconName,
 			QString::fromStdString(obj->o_name),
 			obj->GetObjectID());
 

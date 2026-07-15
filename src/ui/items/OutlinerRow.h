@@ -9,10 +9,12 @@
  *
  * Architecture:
  * - Constructor creates the layout and child widgets once.
- * - SetObject() binds object data (name, id, type icon); resets toggles.
+ * - SetObject() binds object data (icon name, name, id); resets toggles.
  * - SetStyle() applies visual state (selection highlight, alternating bg).
  * - Signal lambdas read from m_objectId at emission time, so recycling
  *   a row to a new objectId is transparent — no manual rewire needed.
+ * - Visibility toggle buttons swap between visible/invisible icons
+ *   loaded via Icons::GetIcon().
  */
 
 #pragma once
@@ -20,6 +22,8 @@
 #include <QWidget>
 
 #include "editor/events/EditorEvents.h"
+
+#include <string>
 
 class QLabel;
 class QPushButton;
@@ -31,7 +35,7 @@ namespace neurus
  * @brief A single row in the Outliner list view (pool-compatible).
  *
  * Layout (all in QHBoxLayout, 28px height):
- *   [colored type label 22x22] [name QPushButton (stretching)] [eye toggle] [monitor toggle]
+ *   [type icon 22x22] [name QPushButton (stretching)] [eye toggle] [monitor toggle]
  */
 class OutlinerRow : public QWidget
 {
@@ -58,23 +62,22 @@ public:
 	/**
 	 * @brief Binds a scene object's identity data to this row.
 	 *
-	 * Updates the type icon letter / color, name text, and stored objectId.
+	 * Updates the type icon pixmap, name text, and stored objectId.
 	 * Resets visibility toggles to checked (signals blocked to avoid
-	 * cascading events during pool recycling).
+	 * cascading events during pool recycling) and sets their icons.
 	 *
-	 * @param typeLetter Single character type icon ("C", "L", "M", etc.).
-	 * @param typeColor  CSS background color for the type icon.
-	 * @param name       Display name shown in the row.
-	 * @param objectId   Unique object identifier.
+	 * @param iconName Icon name in "folder:name" format (e.g. "scene:camera").
+	 * @param name     Display name shown in the row.
+	 * @param objectId Unique object identifier.
 	 */
-	void SetObject(const QString& typeLetter, const QString& typeColor,
-	               const QString& name, int objectId);
+	void SetObject(const std::string& iconName, const QString& name, int objectId);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
 	 *
 	 * Updates both the viewport (eye) and render (monitor) toggle buttons
 	 * using blockSignals so no false visibilityChanged emissions occur.
+	 * Also swaps the button icons to reflect the new state.
 	 *
 	 * @param viewportVisible True to enable viewport visibility.
 	 * @param renderVisible   True to enable render visibility.
@@ -106,11 +109,14 @@ signals:
 	void visibilityChanged(const VisibilityChanged& e);
 
 private:
+	/** @brief Updates both visibility toggle icons from the Icons cache. */
+	void UpdateToggleIcons();
+
 	QLabel*      m_typeLabel  = nullptr;
 	QPushButton* m_nameBtn    = nullptr;
 	QPushButton* m_eyeBtn     = nullptr;
 	QPushButton* m_renderBtn  = nullptr;
-	int m_objectId = 0;
+	int          m_objectId   = 0;
 };
 
 } // namespace neurus
