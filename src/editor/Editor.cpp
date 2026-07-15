@@ -451,6 +451,20 @@ void Editor::ChangeObjectVisibility(int objectId, bool viewportVisible, bool ren
 
 	it->second->SetVisible(viewportVisible, renderVisible);
 	ed_project->MarkDirty();
+
+	// Light visibility change → re-upload lighting SSBO to reflect new state.
+	// Shader variants (point/sun) are filtered by UploadLighting based on
+	// is_viewport/is_rendered, so re-uploading the full light_list propagates
+	// the toggle to GPU-side light arrays.
+	if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
+	    it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
+	{
+		if (ed_uploadManager && ed_renderer)
+		{
+			auto lightDict = ed_uploadManager->UploadLighting(scene.light_list);
+			ed_renderer->GetRenderCache().UpdateLighting(lightDict);
+		}
+	}
 }
 
 void Editor::UploadSceneResources()

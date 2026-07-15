@@ -298,6 +298,8 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	{
 		// Skip lights that don't cast shadows
 		if (!lightPtr || !lightPtr->use_shadow) continue;
+		// Skip invisible lights
+		if (!lightPtr->is_viewport || !lightPtr->is_rendered) continue;
 
 		const glm::vec3 lightPos = lightPtr->GetPosition();
 		const float farPlane = (lightPtr->light_type == LightType::POINTLIGHT)
@@ -383,6 +385,8 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			for (const auto& [id, mesh] : scene->mesh_list)
 			{
 				if (!mesh || !mesh->o_mesh) continue;
+				if (!mesh->is_viewport || !mesh->is_rendered) continue;
+
 
 				MeshGPU* gpuPtr = cache.GetMeshGPU(mesh->GetObjectID());
 				if (!gpuPtr)
@@ -448,6 +452,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			if (!lightPtr) continue;
 			if (lightPtr->light_type != LightType::SUNLIGHT) continue;
 			if (!lightPtr->use_shadow) continue;
+			if (!lightPtr->is_viewport || !lightPtr->is_rendered) continue;
 
 			// --- Compute sun direction (local forward vector) ---
 			const glm::vec3 sunDir = glm::normalize(lightPtr->GetDirection());

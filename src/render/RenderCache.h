@@ -361,7 +361,6 @@ private:
 	std::unordered_map<AttachmentName, Image> rc_attachments;
 
 	std::unique_ptr<Image> rc_shadowIntensityArray;
-	std::unordered_map<int, uint32_t> rc_shadowIntensityLayerIndex;
 
 	// --- Per-mesh lazy GPU resources (key = object UID as int) ---
 	std::unordered_map<int, MeshGPU> rc_meshGPUs;
@@ -376,8 +375,6 @@ private:
 	std::unique_ptr<LightingGPU> rc_lightingGPU;
 
 	// --- Light UID → SSBO index / shadow index maps (populated by variant UpdateLighting) ---
-	std::unordered_map<int, uint32_t> rc_uidToPointLightIndex;
-	std::unordered_map<int, uint32_t> rc_uidToSunLightIndex;
 	std::unordered_map<int, uint32_t> rc_uidToShadowIndex;
 };
 

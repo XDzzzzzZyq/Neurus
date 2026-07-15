@@ -110,13 +110,17 @@ Image& RenderCache::GetShadowIntensityArray(const vk::Extent2D extent)
 
 uint32_t RenderCache::GetShadowIntensityLayer(const int lightUID, const vk::Extent2D /*extent*/)
 {
-	auto it = rc_shadowIntensityLayerIndex.find(lightUID);
-	if (it != rc_shadowIntensityLayerIndex.end())
+	// Fast path: check the shadow index built by UpdateLighting (always in sync
+	// with the SSBO shadowMapIndex field and current visibility state).
+	auto it = rc_uidToShadowIndex.find(lightUID);
+	if (it != rc_uidToShadowIndex.end())
 	{
 		return it->second;
 	}
 
-	const uint32_t layer = static_cast<uint32_t>(rc_shadowIntensityLayerIndex.size());
+	// Slow path: light not yet registered (e.g. test context or first frame).
+	// Lazily allocate the next available index.
+	const uint32_t layer = static_cast<uint32_t>(rc_uidToShadowIndex.size());
 	if (layer >= MAX_SHADOW_LAYERS)
 	{
 		NEURUS_ERR("[RenderCache] Shadow intensity layer overflow: lightUID="
@@ -125,7 +129,7 @@ uint32_t RenderCache::GetShadowIntensityLayer(const int lightUID, const vk::Exte
 		return 0;
 	}
 
-	rc_shadowIntensityLayerIndex[lightUID] = layer;
+	rc_uidToShadowIndex[lightUID] = layer;
 	NEURUS_LOG("[RenderCache] Allocated shadow intensity layer " << layer
 	           << " for lightUID=" << lightUID);
 	return layer;
@@ -138,8 +142,8 @@ Image* RenderCache::GetShadowIntensityArray() const
 
 uint32_t RenderCache::GetShadowIntensityLayerIndex(const int lightUID) const
 {
-	const auto it = rc_shadowIntensityLayerIndex.find(lightUID);
-	return (it != rc_shadowIntensityLayerIndex.end()) ? it->second : 0;
+	const auto it = rc_uidToShadowIndex.find(lightUID);
+	return (it != rc_uidToShadowIndex.end()) ? it->second : 0;
 }
 
 std::vector<int> RenderCache::GetShadowMapUIDs() const
@@ -165,7 +169,7 @@ void RenderCache::RemoveLight(const int lightUID)
 		it->second.shadowDepthMap.reset();
 		it->second.shadowColorMap.reset();
 	}
-	rc_shadowIntensityLayerIndex.erase(lightUID);
+	rc_uidToShadowIndex.erase(lightUID);
 }
 
 bool RenderCache::HasAttachment(const AttachmentName name) const
@@ -208,12 +212,9 @@ void RenderCache::Clean()
 {
 	rc_attachments.clear();
 	rc_shadowIntensityArray.reset();
-	rc_shadowIntensityLayerIndex.clear();
 	rc_meshGPUs.clear();
 	rc_environmentGPUs.clear();
 	rc_lightGPUs.clear();
-	rc_uidToPointLightIndex.clear();
-	rc_uidToSunLightIndex.clear();
 	rc_uidToShadowIndex.clear();
 	rc_lightingGPU.reset();
 }
@@ -222,7 +223,6 @@ void RenderCache::CleanScreenSpace()
 {
 	rc_attachments.clear();
 	rc_shadowIntensityArray.reset();
-	rc_shadowIntensityLayerIndex.clear();
 	// rc_uidTo*Index maps preserved — shadow indexing survives resize
 	// rc_meshGPUs preserved — mesh GPU buffers survive resize
 	// rc_environmentGPUs preserved — IBL cubemaps survive resize
@@ -301,8 +301,6 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 	assert(rc_lightingGPU && "InitLightingGPU must be called before UpdateLighting");
 
 	// --- Clear index maps ---
-	rc_uidToPointLightIndex.clear();
-	rc_uidToSunLightIndex.clear();
 	rc_uidToShadowIndex.clear();
 
 	// --- Separate point and sun lights, sorted by UID for determinism ---
@@ -333,12 +331,10 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 
 	for (size_t i = 0; i < pointEntries.size(); ++i)
 	{
-		rc_uidToPointLightIndex[pointEntries[i].first] = static_cast<uint32_t>(i);
 		pointVec.push_back(pointEntries[i].second);
 	}
 	for (size_t i = 0; i < sunEntries.size(); ++i)
 	{
-		rc_uidToSunLightIndex[sunEntries[i].first] = static_cast<uint32_t>(i);
 		sunVec.push_back(sunEntries[i].second);
 	}
 
