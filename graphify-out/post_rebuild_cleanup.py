@@ -82,7 +82,7 @@ _GLM_LABELS = {'vec3', 'vec2', 'vec4', 'mat4', 'mat3', 'mat2', 'quat'}
 _QT_LABELS = {
     'QString', 'QWidget', 'QObject', 'QWindow', 'QVulkanInstance',
     'QComboBox', 'QFormLayout', 'QCheckBox', 'QSlider', 'QSpinBox',
-    'QStringList',
+    'QStringList', 'QGroupBox', 'QPointF', 'QRectF', 'QSizeF', 'QVector3D', 'QMatrix4x4',
     'QModelIndex', 'QDoubleSpinBox', 'QKeyEvent', 'QMouseEvent',
     'QPaintEvent', 'QResizeEvent', 'QWheelEvent', 'HWND',
 }
