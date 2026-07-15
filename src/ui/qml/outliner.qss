@@ -1,0 +1,26 @@
+QPushButton#outlinerNameBtn {
+	text-align: left;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	background: transparent;
+	padding: 1px 4px;
+	font-size: 11px;
+}
+QPushButton#outlinerNameBtn:hover {
+	border-color: #313131;
+}
+QPushButton#outlinerNameBtn:pressed {
+	color: #676767;
+	background: rgba(0, 0, 0, 0.1);
+}
+
+QPushButton#outlinerToggleBtn {
+	border: 1px solid transparent;
+	border-radius: 3px;
+	background: transparent;
+	padding: 2px;
+}
+QPushButton#outlinerToggleBtn:hover {
+	background: rgba(255, 255, 255, 0.10);
+	border-color: rgba(255, 255, 255, 0.15);
+}

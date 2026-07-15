@@ -6,19 +6,21 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 
 ## Location
 
-- `src/ui/UIManager.h/cpp` - QMainWindow subclass with ADS dock manager + menus
-- `src/ui/panels/UIPanel.h` - Base class for all dock panels with PanelType enum
-- `src/ui/panels/Viewport.h/cpp` - Native HWND Vulkan surface widget (Viewport dock)
-- `src/ui/panels/Outliner.h/cpp` - Scene object hierarchy tree (Outliner dock)
-- `src/ui/panels/PropertyEditor.h/cpp` - Object property inspector (Property Editor dock)
-- `src/ui/panels/RenderConfigPanel.h/cpp` - Live render config controls (Render Config dock)
-- `src/ui/items/ScalarSlider.h/cpp` - Reusable slider+spinbox composite widget with auto-derived step/decimals
-- `src/ui/UIContext.h` - Per-frame UI data snapshot (carries RenderConfig pointer)
-- `src/ui/VulkanWindow.h/cpp` - QVulkanWindow subclass hosting the triangle renderer
-- `src/ui/MainWindow.h/cpp` - (legacy) QWindow subclass
-- `src/ui/VulkanWidget.h/cpp` - (legacy) QWidget subclass with native HWND for vk::raii surface
-- `src/ui/qml/main.qml` - (legacy) QML source
-- `src/render/QVulkanRenderer.h/cpp` - QVulkanWindowRenderer implementation (triangle pipeline)
+| File | Purpose |
+|------|---------|
+| `src/ui/UIManager.h/cpp` | QMainWindow subclass with ADS dock manager + menus |
+| `src/ui/UIManager.h/cpp` | Per-frame `Refresh()` pipeline, panel registry (`GetPanel<T>`) |
+| `src/ui/UIContext.h/cpp` | Per-frame UI data snapshot (carries RenderConfig pointer) |
+| `src/ui/panels/UIPanel.h` | Base class for all dock panels with `PanelType` enum |
+| `src/ui/panels/Viewport.h/cpp` | Native HWND Vulkan surface widget (Viewport dock) |
+| `src/ui/panels/Outliner.h/cpp` | Scene object hierarchy tree (Outliner dock) |
+| `src/ui/panels/PropertyEditor.h/cpp` | Object property inspector (Property Editor dock) |
+| `src/ui/panels/RenderConfigPanel.h/cpp` | Live render config controls (Render Config dock) |
+| `src/ui/Icons.h/cpp` | Static SVG icon library with lazy-loaded QIcon cache |
+| `src/ui/items/ScalarSlider.h/cpp` | Reusable slider+spinbox composite widget |
+| `src/ui/items/OutlinerRow.h/cpp` | Pool-recyclable outliner row with type icon, name, toggles |
+| `src/ui/qml/` | Qt resource files: QML layouts, QSS stylesheets (embedded at build time) |
+| `src/ui/VulkanWindow.h/cpp` | QVulkanWindow subclass hosting the triangle renderer |
 
 ## Rendering Architecture
 
@@ -130,6 +132,25 @@ All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 
 Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Application` to `Editor::SetRenderConfig(cfg)`.
 
+## Reusable Items
+
+Items in `src/ui/items/` are self-contained composite widgets used across panels.
+They do NOT belong to any specific panel and should be reused rather than
+redefined.
+
+### Icons
+
+`Icons` (`src/ui/Icons.h`) is a fully static class providing lazy-loaded QIcon objects:
+
+- **`Icons::Initialize()`** — called once by `UIManager` during construction. Populates the hardcoded path registry (icon name → Qt resource path). Safe to call multiple times (idempotent).
+- **`Icons::GetIcon(name)`** — returns `const QIcon&` from an internal cache. On first access, loads the SVG from the Qt resource system; subsequent calls return the cached instance.
+- **Naming convention**: `"folder:name"` (e.g. `"scene:mesh"` → `:/icons/scene/mesh.svg`). 10 icons registered across `scene:` and `editor:` namespaces.
+- **Path registry**: hardcoded in `Initialize()`, mapping icon names to `:/icons/...` Qt resource paths.
+- **Cache**: `std::unordered_map<std::string, QIcon>`, populated lazily per icon name.
+- **No instantiation needed** — all members are static. Any code in `src/ui/` can call `Icons::GetIcon(name)` directly.
+
+Icons are embedded in the binary via `qt_add_resources(neurus_ui "icons" PREFIX "/icons" ...)` in `src/ui/CMakeLists.txt`. SVGs live under `res/ui/icons/`.
+
 ### ScalarSlider
 
 `ScalarSlider` (`src/ui/items/ScalarSlider.h`) is a reusable composite `QWidget`:
@@ -138,6 +159,36 @@ Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Appl
 - Emits a single `valueChanged()` signal regardless of which control moved
 - Step and decimals auto-derived: `step = (max-min)/sliderSteps`, `decimals = ceil(-log10(step))`
 - Tick marks enabled with interval = `max(1, sliderSteps/10)`
+
+## Patterns
+
+### Loading QSS Stylesheets from Qt Resources
+
+Stylesheets should be stored as `.qss` files in `src/ui/qml/` and embedded via
+`qt_add_resources`, same as QML. Use `setObjectName()` + QSS ID selectors
+instead of per-widget `setStyleSheet()` calls:
+
+```
+// 1. Embed in CMakeLists.txt
+qt_add_resources(neurus_ui "resources" PREFIX "/" FILES qml/outliner.qss)
+
+// 2. Load once (static, one-shot)
+QFile file(":/qml/outliner.qss");
+file.open(QIODevice::ReadOnly | QIODevice::Text);
+QString stylesheet = QTextStream(&file).readAll();
+
+// 3. Apply to parent widget — ID selectors cascade to children
+parentWidget->setStyleSheet(stylesheet);
+
+// 4. In C++, set object names matching QSS ID selectors
+childBtn->setObjectName("myButton");  // matches QPushButton#myButton
+
+// 5. Per-instance overrides via setStyleSheet() on the specific child
+childBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
+```
+
+See `src/ui/qml/outliner.qss` for the canonical example using
+`QPushButton#outlinerNameBtn` and `QPushButton#outlinerToggleBtn` selectors.
 
 ### ✅ UI MAY:
 - Own QVulkanInstance, VulkanWindow, QMainWindow

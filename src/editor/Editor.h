@@ -1,13 +1,13 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
-#include <QString>
 
 #include "controllers/Controllers.h"
-#include "editor/Input.h"        // InputState
+#include "editor/events/EventBus.h"
 #include "render/RenderConfig.h"
-#include "render/RenderContext.h" // RenderContext (pure data, no Vulkan)
+#include "render/RenderContext.h"
 #include "ui/UIContext.h"
 
 // Forward declarations (no render headers!)
@@ -17,7 +17,6 @@ class DeferredRenderer;
 class Scene;
 class Environment;
 class UploadManager;
-class EventQueue;
 }
 
 namespace neurus::project {
@@ -37,7 +36,7 @@ namespace neurus {
 class Editor
 {
 public:
-	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer, EventQueue& eventBus);
+	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer);
 	~Editor();
 
 	Editor(const Editor&) = delete;
@@ -80,26 +79,28 @@ public:
 	/**
 	 * @brief Registers a controller of type T, calls Init(bus), and stores it.
 	 * @tparam T Controller type (must derive from Controllers).
-	 * @param bus EventQueue to pass to the controller's Init().
 	 */
 	template<typename T>
-	void RegisterController(EventQueue& bus)
+	void RegisterController()
 	{
 		auto ctrl = std::make_unique<T>();
-		ctrl->Init(bus);
+		ctrl->Init(ed_eventBus);
 		ed_controllers.push_back(std::move(ctrl));
 	}
 
 	/**
-	 * @brief Translates raw InputState into CameraEvents and dispatches them.
+	 * @brief Processes all enqueued events (called once per frame from newFrame).
 	 *
-	 * Reads modifier keys and mouse deltas from InputState, enqueues the
-	 * appropriate CameraEvent (rotate, push, slide, zoom), then calls
-	 * EventQueue().Process() to dispatch to CameraController handlers.
-	 *
-	 * @param input Raw input state from Input::GetInputState().
+	 * Dispatches events enqueued by Viewport signal handlers
+	 * (OnMouseMoved, OnMouseScrolled) and other sources through
+	 * EventQueue::Process().
 	 */
-	void Edit(const InputState& input);
+	void Edit();
+
+	template<typename Event>
+	void OnUIEvent(const Event& e){
+		ed_eventBus.enqueue<Event>(e);
+	}
 
 	/**
 	 * @brief Handles viewport resize by dispatching a CameraResizeEvent.
@@ -123,32 +124,46 @@ public:
 	void UploadSceneResources();
 
 	/**
-	 * @brief Updates the active RenderConfig and writes it into the project.
+	 * @brief Selects a scene object by ID through scene.selections.
 	 *
-	 * Called from the UI layer when RenderConfigPanel emits a changed config.
-	 * The config is stored in the Project so it persists across saves and is
-	 * read by GetRenderContext() / GetUIContext() each frame.
+	 * Finds the ObjectID pointer in obj_list, then delegates to
+	 * selections.Select(). increment=true adds to the set (or makes
+	 * active if already selected); increment=false replaces entirely.
 	 *
-	 * @param cfg New render configuration from the UI panel.
+	 * @param objectId  Unique object identifier.
+	 * @param increment If true, add to selection; if false, single select.
 	 */
-	void SetRenderConfig(const RenderConfig& cfg);
+	void SelectObject(int objectId, bool increment);
+
+	/**
+	 * @brief Changes viewport/render visibility of a scene object.
+	 *
+	 * Looks up the object by ID in obj_list and calls ObjectID::SetVisible().
+	 * Marks the project dirty so unsaved changes are tracked.
+	 *
+	 * @param objectId       Unique object identifier.
+	 * @param viewportVisible Viewport (editor) visibility.
+	 * @param renderVisible   Render (pipeline) visibility.
+	 */
+	void ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible);
 
 private:
-	// --- Signal handlers (implemented in later tasks) ---
+	// --- Handlers called by EventQueue subscribers in Initialize() ---
 	void OnProjectNew();
-	void OnProjectOpen(const QString& path);
+	void OnProjectOpen(const std::string& path);
 	void OnProjectSave();
-	void OnProjectSaveAs(const QString& path);
-	void OnMeshImport(const QString& path);
+	void OnProjectSaveAs(const std::string& path);
+	void OnMeshImport(const std::string& path);
 	void OnCameraAdd();
 	void OnLightAdd();
 	void OnSunLightAdd();
 	void OnScreenshotRequested();
 	void OnScreenshotAllRequested();
 	void OnIBLLoad();
-	void GenerateIBL(const std::shared_ptr<Environment>& env);  ///< Shared IBL generation: loads HDR/fallback, generates cubemaps via IBLPass
+	void GenerateIBL(const std::shared_ptr<Environment>& env);
 
 	// --- Owned ---
+	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
 	std::unique_ptr<neurus::project::Project> ed_project;
 	std::unique_ptr<UploadManager> ed_uploadManager;
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
@@ -156,7 +171,6 @@ private:
 	// --- Non-owning references ---
 	VulkanContext* ed_vkContext = nullptr;
 	DeferredRenderer* ed_renderer = nullptr;
-	EventQueue& ed_eventBus;                     ///< Application-owned EventBus (non-owning reference)
 	Scene* ed_ownerScene = nullptr;  ///< Scene passed to Initialize()
 };
 

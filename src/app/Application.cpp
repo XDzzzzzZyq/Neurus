@@ -26,9 +26,10 @@
 #include "VulkanContext.h"
 #include "core/Log.h"
 #include "editor/Editor.h"
-#include "editor/Input.h"
 #include "editor/events/EditorEvents.h"
 #include "editor/events/UIEvents.h"
+#include "editor/events/ConfigEvents.h"
+#include "editor/events/InputEvents.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
 #include "render/Screenshot.h"
@@ -45,8 +46,10 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QTimer>
 
+#include <cmath>
 #include <windows.h>
 
 #include <iostream>
@@ -264,7 +267,7 @@ void Application::ResizeViewport(int width, int height)
 void Application::InitEditor(std::unique_ptr<project::Project> project)
 {
 	auto& scene = project->GetScene();  // Grab reference before ownership transfer
-	app_editor = std::make_unique<neurus::Editor>(app_vkContext.get(), app_renderer.get(), app_eventBus);
+	app_editor = std::make_unique<neurus::Editor>(app_vkContext.get(), app_renderer.get());
 	app_editor->SetProject(std::move(project));
 	app_editor->Initialize(scene);
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
@@ -290,14 +293,12 @@ void Application::WireSignals()
 void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 {
 	// --- Render request (manual frame trigger) ---
-	// 3-line newFrame pattern: update input → translate to events → draw → refresh UI
+	// newFrame pattern: process enqueued camera events → draw → refresh UI
 	QObject::connect(&uiEvents, &neurus::UIEvents::newFrame,
 	                 [this]() {
 	                     if (app_renderer && app_editor)
 	                     {
-	                         Input::UpdateState();
-	                         app_editor->Edit(Input::GetInputState());
-	                         app_eventBus.Process();  // Dispatch all enqueued events before drawing
+	                         app_editor->Edit();  // Process all enqueued events (camera, etc.)
 	                         app_renderer->DrawFrame(app_editor->GetRenderContext());
 	                         app_mainWindow->Refresh(app_editor->GetUIContext());
 	                     }
@@ -315,37 +316,43 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 
 void Application::PanelSignals(neurus::UIEvents& uiEvents)
 {
-	(void)uiEvents;  // Unused in current panel signals; kept for symmetry
+	// --- UIEvents → Editor (via ConnectUIEvent → OnUIEvent → EventQueue) ---
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectNewRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectOpenRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectSaveRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectSaveAsRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::meshImportRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::cameraAddRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 
-	// --- Outliner object selection → EventBus ---
-	// UI layer emits Qt signal; Application translates to typed EventQueue event
+	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
-		QObject::connect(outliner, &neurus::Outliner::objectSelected,
-			             [this](int objectId) {
-			                 app_eventBus.enqueue(neurus::ObjectSelected{objectId});
-			                });
+		ConnectUIEvent(outliner, &neurus::Outliner::objectSelected);
+		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
 	}
 
-	// Handle Viewport resize - proactively recreate swapchain so the
-	// next DrawFrame uses the correct dimensions. The existing OutOfDateKHR
-	// fallback in DrawFrame/AcquireNextImage remains as a safety net.
+	// --- Viewport signals: resize + camera control ---
 	if (auto* viewport = app_mainWindow->GetPanel<neurus::Viewport>())
 	{
+		// Handle Viewport resize
 		QObject::connect(viewport, &neurus::Viewport::resized,
 		                 [this](int width, int height) {
 		                     ResizeViewport(width, height);
 		                 });
+
+		// Forward mouse movement to Editor for camera orbit/pan/dolly
+		ConnectUIEvent(viewport, &neurus::Viewport::mouseMoved);
+
+		// Forward mouse scroll to Editor for camera zoom
+		ConnectUIEvent(viewport, &neurus::Viewport::mouseScrolled);
 	}
 
-	// Handle RenderConfig changes — update Editor/Project config in real time
+	// Handle RenderConfig changes → Editor (via ConnectUIEvent → OnUIEvent → EventQueue)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
-		QObject::connect(cfgPanel, &neurus::RenderConfigPanel::configValueChanged,
-		                 [this](const neurus::RenderConfig& cfg) {
-		                     if (app_editor)
-		                         app_editor->SetRenderConfig(cfg);
-		                 });
+		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
 	}
 }
 
@@ -355,8 +362,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 
 void Application::RecreateSignals(neurus::UIEvents& uiEvents)
 {
-	// Handle Viewport recreation (new native HWND → new surface → new swapchain)
-	QObject::connect(&uiEvents, &neurus::UIEvents::viewportRecreated,
+	// Handle UI recreation (new native HWND → new surface → new swapchain, rebind the signals)
+	QObject::connect(&uiEvents, &neurus::UIEvents::uiRecreated,
 	                 [this](quintptr newHwnd) {
 	                     // Reconnect panel signals (Viewport resize) to the new widget
 	                     PanelSignals(neurus::UIEvents::instance());

@@ -407,7 +407,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		int shadowCount = 0;
 		for (const auto& [uid, light] : scene->light_list)
 		{
-			if (light && light->use_shadow)
+			if (light && light->use_shadow && light->is_viewport && light->is_rendered)
 			{
 				auto pos = light->GetPosition();
 				shadowCount++;
@@ -438,8 +438,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	uint32_t lightIndex = 0;
 	for (const auto& [uid, light] : scene->light_list)
 	{
-		// Skip non-shadow-casting lights and non-point lights (sun lights handled separately)
+		// Skip non-shadow-casting, invisible, and non-point lights (sun lights handled separately)
 		if (!light || !light->use_shadow) continue;
+		if (!light->is_viewport || !light->is_rendered) continue;
 		if (light->light_type != LightType::POINTLIGHT) continue;
 
 		p_currentLightUID = uid;
@@ -506,8 +507,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	uint32_t sunLightIndex = 0;
 	for (const auto& [uid, light] : scene->light_list)
 	{
-		// Only process sun lights that cast shadows
+		// Only process visible sun lights that cast shadows
 		if (!light || !light->use_shadow) continue;
+		if (!light->is_viewport || !light->is_rendered) continue;
 		if (light->light_type != LightType::SUNLIGHT) continue;
 
 		p_currentLightUID = uid;

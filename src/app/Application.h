@@ -9,7 +9,6 @@
 
 #include "app/VulkanContext.h"
 #include "editor/Editor.h"
-#include "editor/events/EventBus.h"
 #include "asset/Project.h"
 #include "render/DeferredRenderer.h"
 #include "render/Screenshot.h"
@@ -69,12 +68,24 @@ private:
 	void RecreateSignals(UIEvents& uiEvents);
 	void ScreenShotSignals(UIEvents& uiEvents);
 
+	template<typename Panel, typename Event>
+	void ConnectUIEvent(
+		QObject* sender,
+		void (Panel::*signal)(const Event&))
+	{
+		QObject::connect(
+			static_cast<Panel*>(sender),
+			signal,
+			[editor = app_editor.get()](const Event& e)
+			{
+				editor->OnUIEvent(e);
+			}
+		);
+	}
+
 	// --- Qt infrastructure (destroyed after GPU stack) ---
 	std::unique_ptr<QApplication>         app_qtApp;
 	std::unique_ptr<QTimer>               app_renderTimer;
-
-	// --- Application-owned EventBus (shared references to Editor, Outliner, etc.) ---
-	EventQueue app_eventBus;
 
 	// --- GPU / UI stack (destroyed in REVERSE order: renderer first, vkContext last) ---
 	// Screenshot holds refs to RenderCache (owned by DeferredRenderer) — must be destroyed BEFORE renderer.

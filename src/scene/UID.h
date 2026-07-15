@@ -87,6 +87,27 @@ public:
 	{
 		return s_count;
 	}
+
+	/**
+	 * @brief Cereal serialization for the unique ID.
+	 *
+	 * Serializes o_id to preserve identity across save/load cycles.
+	 * On deserialization, bumps s_count to stay ahead of the loaded ID
+	 * so newly created objects do not collide with restored ones.
+	 *
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(CEREAL_NVP(o_id));
+		if constexpr (Archive::is_loading::value)
+		{
+			if (o_id >= s_count)
+				s_count = o_id + 1;
+		}
+	}
 };
 
 /**
@@ -191,7 +212,7 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(CEREAL_NVP(o_name), CEREAL_NVP(o_type),
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(o_name), CEREAL_NVP(o_type),
 		   CEREAL_NVP(is_viewport), CEREAL_NVP(is_rendered));
 	}
 };

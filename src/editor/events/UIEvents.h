@@ -3,6 +3,9 @@
 #include <QObject>
 #include <QString>
 
+#include "editor/events/ProjectEvents.h"
+#include "editor/events/AssetEvents.h"
+
 namespace neurus {
 
 /**
@@ -61,17 +64,9 @@ signals:
 
 	// --- UI-driven editor signals ---
 
-	/** @brief Emitted when the render configuration is changed (toggled, slider, etc.). */
-	void renderConfigChanged();
-
-	/** @brief Emitted when the viewport widget is resized.
-	 *  @param width New viewport width in pixels.
-	 *  @param height New viewport height in pixels. */
-	void viewportResized(int width, int height);
-
 	/** @brief Emitted when the viewport widget is recreated with a new native HWND.
 	 *  @param newHwnd The new native window handle for Vulkan surface creation. */
-	void viewportRecreated(quintptr newHwnd);
+	void uiRecreated(quintptr newHwnd);
 
 	// --- Screenshot signals ---
 
@@ -86,33 +81,30 @@ signals:
 	// --- Project file signals ---
 
 	/** @brief Emitted when a new project is requested (Ctrl+N). */
-	void projectNewRequested();
+	void projectNewRequested(const ProjectNewEvent& e);
 
-	/** @brief Emitted when an existing project file should be opened (Ctrl+O).
-	 *  @param path Absolute path to the .neurus.json file. */
-	void projectOpenRequested(const QString& path);
+	/** @brief Emitted when an existing project file should be opened (Ctrl+O). */
+	void projectOpenRequested(const ProjectOpenEvent& e);
 
 	/** @brief Emitted when the current project should be saved (Ctrl+S). */
-	void projectSaveRequested();
+	void projectSaveRequested(const ProjectSaveEvent& e);
 
-	/** @brief Emitted when the current project should be saved to a new path (Ctrl+Shift+S).
-	 *  @param path Absolute path for the .neurus.json output file. */
-	void projectSaveAsRequested(const QString& path);
+	/** @brief Emitted when the current project should be saved to a new path (Ctrl+Shift+S). */
+	void projectSaveAsRequested(const ProjectSaveAsEvent& e);
 
 	// --- Mesh import signals ---
 
-	/** @brief Emitted when a mesh file is selected for import (Edit → Add → Mesh...).
-	 *  @param path Absolute path to the OBJ file. */
-	void meshImportRequested(const QString& path);
+	/** @brief Emitted when a mesh file is selected for import (Edit → Add → Mesh...). */
+	void meshImportRequested(const MeshImportEvent& e);
 
 	/** @brief Emitted when a new camera should be added to the scene (Edit → Add → Camera). */
-	void cameraAddRequested();
+	void cameraAddRequested(const CameraAddEvent& e);
 
 	/** @brief Emitted when a new light should be added to the scene (Edit → Add → Light). */
-	void lightAddRequested();
+	void lightAddRequested(const LightAddEvent& e);
 
 	/** @brief Emitted when a new sun light should be added to the scene (Edit → Add → Sun Light). */
-	void sunLightAddRequested();
+	void sunLightAddRequested(const SunLightAddEvent& e);
 
 public:
 	/**
@@ -128,20 +120,20 @@ public:
 
 	// --- Project file convenience methods ---
 
-	void requestProjectNew() { emit projectNewRequested(); }
-	void requestProjectOpen(const QString& path) { emit projectOpenRequested(path); }
-	void requestProjectSave() { emit projectSaveRequested(); }
-	void requestProjectSaveAs(const QString& path) { emit projectSaveAsRequested(path); }
+	void requestProjectNew() { emit projectNewRequested(ProjectNewEvent{}); }
+	void requestProjectOpen(const QString& path) { emit projectOpenRequested(ProjectOpenEvent{path.toStdString()}); }
+	void requestProjectSave() { emit projectSaveRequested(ProjectSaveEvent{}); }
+	void requestProjectSaveAs(const QString& path) { emit projectSaveAsRequested(ProjectSaveAsEvent{path.toStdString()}); }
 
 	// --- Mesh import convenience method ---
 
-	void requestMeshImport(const QString& path) { emit meshImportRequested(path); }
+	void requestMeshImport(const QString& path) { emit meshImportRequested(MeshImportEvent{path.toStdString()}); }
 
-	void requestCameraAdd() { emit cameraAddRequested(); }
-	void requestLightAdd() { emit lightAddRequested(); }
-	void requestSunLightAdd() { emit sunLightAddRequested(); }
+	void requestCameraAdd() { emit cameraAddRequested(CameraAddEvent{}); }
+	void requestLightAdd() { emit lightAddRequested(LightAddEvent{}); }
+	void requestSunLightAdd() { emit sunLightAddRequested(SunLightAddEvent{}); }
 
-	void requestViewportRecreation(quintptr newHwnd) { emit viewportRecreated(newHwnd); }
+	void requestUIRecreation(quintptr newHwnd) { emit uiRecreated(newHwnd); }
 
 private:
 	UIEvents() = default;

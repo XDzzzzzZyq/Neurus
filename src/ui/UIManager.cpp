@@ -1,4 +1,5 @@
 #include "UIManager.h"
+#include "Icons.h"
 #include "panels/Outliner.h"
 #include "panels/PropertyEditor.h"
 #include "panels/RenderConfigPanel.h"
@@ -30,6 +31,8 @@ namespace neurus {
 UIManager::UIManager(QWidget* parent)
 	: QMainWindow(parent)
 {
+	Icons::Initialize();
+
 	setWindowTitle("Neurus");
 	resize(1600, 900);
 
@@ -81,10 +84,8 @@ void UIManager::Refresh(const UIContext& ctx)
 {
 	for (auto& [type, widget] : m_panels)
 	{
-		if (auto* panel = qobject_cast<UIPanel*>(widget))
-		{
-			panel->Refresh(ctx);
-		}
+		auto* panel = qobject_cast<UIPanel*>(widget);
+		panel->Refresh(ctx);
 	}
 }
 
@@ -231,9 +232,6 @@ void UIManager::CreateDocks()
 	m_panels[PanelType::Viewport] = viewport.release();
 	m_docks[PanelType::Viewport] = viewportDock;
 
-	// Notify Application of the new native HWND for surface recreation
-	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
-
 	// --- Left: Shader Editor (placeholder, not a UIPanel) ---
 	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
 	shaderDock->setWidget(makePlaceholder("Shader Editor"));
@@ -277,6 +275,9 @@ void UIManager::CreateDocks()
 	textureDock->resize(300, 200);
 	textureDock->setMinimumSize(200, 150);
 	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
+
+	// Notify Application of the new native HWND for surface recreation
+	UIEvents::instance().requestUIRecreation(reinterpret_cast<quintptr>(newHwnd));
 }
 
 // =========================================================================
@@ -321,7 +322,7 @@ void UIManager::RestoreDefaultLayout()
 		it.value()->deleteDockWidget();
 	}
 
-	// Re-create the default dock arrangement (emits viewportRecreated)
+	// Re-create the default dock arrangement (emits uiRecreated)
 	CreateDocks();
 }
 

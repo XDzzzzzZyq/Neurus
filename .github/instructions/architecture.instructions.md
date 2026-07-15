@@ -95,19 +95,18 @@ are shared across layers.
 
 ### Communication Protocols
 
+See `.github/instructions/events.instructions.md` for the complete event system
+(UIEvents, EventQueue, event structs, and the `ConnectUIEvent`/`OnUIEvent`
+template forwarding pattern).
+
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals
-- UI↔Editor layer dispatch
-- Main signals: `newFrame()`, `windowResized(int, int)`, `viewportRecreated(quintptr)`, `screenshotRequested()`, `screenshotAllRequested()`
-- `newFrame` decoupled: emitters don't know subscribers
-- Panels emit their own signals (e.g. `Outliner::objectSelected`, `RenderConfigPanel::configValueChanged`) — Application wires them to Editor
+- UI panels emit their own signals (e.g. `Outliner::objectSelected`, `RenderConfigPanel::configValueChanged`)
+- `Application::ConnectUIEvent<T>` template bridges panel signals → `Editor::OnUIEvent<T>` → `EventQueue::enqueue<T>`
 
 **EventQueue System** (Typed Event Dispatcher)
 - Header-only template-based event dispatcher (no Qt dependency)
-- Editor↔Renderer event dispatch with deferred Process()
-- Subscribe: `EventQueue().subscribe<T>(handler)`
-- Enqueue: `EventQueue().enqueue(event)`
-- Dispatch: `EventQueue().Process()` (call once per frame)
+- Editor↔Renderer event dispatch with deferred `Process()`
 
 **Context System** (Data)
 - `EditorContext` - Scene + editor state

@@ -1,144 +1,200 @@
 /**
  * @file Outliner.cpp
- * @brief Outliner implementation - scene object tree view with EventBus selection.
+ * @brief Outliner implementation — pool-managed row list from UIContext scene data.
+ *
+ * Architecture:
+ * - Constructor sets up the QScrollArea + container layout (empty).
+ * - Refresh() reads scene objects from UIContext and reconfigures rows
+ *   via OutlinerRow::SetObject() from a growing pool.
+ * - New rows are created when pool < scene objects, and connected to
+ *   Outliner signals once. Extra rows are hidden (not destroyed).
+ * - Signal lambdas on OutlinerRow read m_objectId at emission time,
+ *   so recycling a row to a different object is transparent.
+ * - Type icons are resolved from GOType via the Outliner-owned Icons cache
+ *   and passed as icon names ("scene:camera", "scene:light", etc.).
  */
 
 #include "Outliner.h"
 
 #include "UIContext.h"
-#include "scene/Light.h"
-#include "scene/Mesh.h"
-#include "scene/Scene.h"
+#include "items/OutlinerRow.h"
 
-#include <QHeaderView>
-#include <QStandardItemModel>
-#include <QTreeView>
+#include "scene/Scene.h"
+#include "scene/UID.h"  // ObjectID, GOType
+
+#include <QGroupBox>
+#include <QLabel>
+#include <QPushButton>
+#include <QScrollArea>
 #include <QVBoxLayout>
+
+#include <string>
 
 namespace neurus
 {
 
 // =========================================================================
-// Constructor
+// Type-icon helpers (mapped from GOType → Icons key name)
+// =========================================================================
+
+namespace
+{
+
+/**
+ * @brief Returns the icon name in "folder:name" format for a GOType.
+ */
+static std::string TypeIconName(ObjectID::GOType type)
+{
+	switch (type)
+	{
+	case ObjectID::GOType::GO_CAM:
+		return "scene:camera";
+	case ObjectID::GOType::GO_LIGHT:
+	case ObjectID::GOType::GO_POLYLIGHT:
+		return "scene:light";
+	case ObjectID::GOType::GO_MESH:
+		return "scene:mesh";
+	case ObjectID::GOType::GO_ENVIR:
+		return "scene:environment";
+	default:
+		return "scene:mesh";  // fallback
+	}
+}
+
+} // anonymous namespace
+
+// =========================================================================
+// Constructor — scroll area + empty container (no hard-coded rows)
 // =========================================================================
 
 Outliner::Outliner(QWidget* parent)
 	: UIPanel(PanelType::Outliner, QString(), parent)
 {
-	auto* layout = new QVBoxLayout(this);
-	layout->setContentsMargins(0, 0, 0, 0);
+	auto* mainLayout = new QVBoxLayout(this);
+	mainLayout->setContentsMargins(0, 0, 0, 0);
 
-	m_model = new QStandardItemModel(this);
-	m_model->setHorizontalHeaderLabels({"Outliner"});
+	m_scrollArea = new QScrollArea(this);
+	m_scrollArea->setWidgetResizable(true);
+	m_scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	mainLayout->addWidget(m_scrollArea);
 
-	m_treeView = new QTreeView(this);
-	m_treeView->setModel(m_model);
-	m_treeView->setHeaderHidden(true);
-	m_treeView->setEditTriggers(QAbstractItemView::NoEditTriggers);
-	m_treeView->setSelectionMode(QAbstractItemView::SingleSelection);
-	m_treeView->setDragDropMode(QAbstractItemView::NoDragDrop);
-	m_treeView->setRootIsDecorated(true);
-	m_treeView->setAnimated(true);
+	m_container = new QWidget();
+	m_listLayout = new QVBoxLayout(m_container);
+	m_listLayout->setContentsMargins(4, 4, 4, 4);
+	m_listLayout->setSpacing(2);
+	m_listLayout->setAlignment(Qt::AlignTop);
 
-	layout->addWidget(m_treeView);
-
-	connect(m_treeView, &QTreeView::clicked,
-		this, &Outliner::OnItemClicked);
+	m_scrollArea->setWidget(m_container);
 }
 
 // =========================================================================
-// Refresh(const UIContext&) - no-op per-frame refresh
+// AddCategoryGroup — creates a QGroupBox with a QVBoxLayout for rows
 // =========================================================================
 
-void Outliner::Refresh(const UIContext& /*ctx*/)
+QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 {
-	// Outliner data is rebuilt on project load/change via Refresh(const Scene&),
-	// not on a per-frame basis.
+	auto* group = new QGroupBox(title);
+
+	auto* groupLayout = new QVBoxLayout(group);
+	groupLayout->setContentsMargins(4, 4, 4, 4);
+	groupLayout->setSpacing(2);
+
+	m_listLayout->addWidget(group);
+	return group;
 }
 
 // =========================================================================
-// Refresh - rebuild tree from Scene
+// EnsureRowPool — grow pool to meet needed capacity
 // =========================================================================
 
-void Outliner::Refresh(const Scene& scene)
+void Outliner::EnsureRowPool(std::size_t needed)
 {
-	m_model->clear();
-
-	// Helper: add a non-selectable category header
-	auto addCategory = [this](const QString& name) -> QStandardItem*
+	while (m_rowPool.size() < needed)
 	{
-		auto* cat = new QStandardItem(name);
-		cat->setFlags(cat->flags() & ~Qt::ItemIsSelectable);
-		cat->setEditable(false);
-		m_model->invisibleRootItem()->appendRow(cat);
-		return cat;
-	};
+		auto* row = new OutlinerRow(m_sceneGroup);
 
-	// Helper: add a selectable leaf item under a category
-	auto addLeaf = [](QStandardItem* parent, const QString& label, int id)
-	{
-		auto* item = new QStandardItem(label);
-		item->setData(id, Qt::UserRole + 1);
-		item->setEditable(false);
-		parent->appendRow(item);
-	};
+		// Connect row signals to Outliner signals once (permanent).
+		// Lambdas read m_objectId at emission time, so recycling
+		// a row to a new objectId works without reconnecting.
+		QObject::connect(row, &OutlinerRow::objectSelected,
+			this, &Outliner::objectSelected);
+		QObject::connect(row, &OutlinerRow::visibilityChanged,
+			this, &Outliner::visibilityChanged);
 
-	// --- Cameras ---
-	if (!scene.cam_list.empty())
-	{
-		auto* camCat = addCategory("Cameras");
-		for (const auto& [id, cam] : scene.cam_list)
-		{
-			QString label = cam->o_name.empty()
-				? QString("Camera #%1").arg(id)
-				: QString::fromStdString(cam->o_name);
-			addLeaf(camCat, label, id);
-		}
+		m_groupLayout->addWidget(row);
+		m_rowPool.push_back(row);
 	}
-
-	// --- Meshes ---
-	if (!scene.mesh_list.empty())
-	{
-		auto* meshCat = addCategory("Meshes");
-		for (const auto& [id, mesh] : scene.mesh_list)
-		{
-			QString label = mesh->o_name.empty()
-				? QString("Mesh #%1").arg(id)
-				: QString::fromStdString(mesh->o_name);
-			addLeaf(meshCat, label, id);
-		}
-	}
-
-	// --- Lights ---
-	if (!scene.light_list.empty())
-	{
-		auto* lightCat = addCategory("Lights");
-		for (const auto& [id, light] : scene.light_list)
-		{
-			QString label = light->o_name.empty()
-				? QString("Light #%1").arg(id)
-				: QString::fromStdString(light->o_name);
-			addLeaf(lightCat, label, id);
-		}
-	}
-
-	m_treeView->expandAll();
 }
 
 // =========================================================================
-// OnItemClicked - emit ObjectSelected via EventBus
+// Refresh — bind pool rows to scene objects
 // =========================================================================
 
-void Outliner::OnItemClicked(const QModelIndex& index)
+void Outliner::Refresh(const UIContext& ctx)
 {
-	if (!index.isValid())
-		return;
+	auto ids = ctx.GetObjectIDs();
 
-	int objectId = index.data(Qt::UserRole + 1).toInt();
-	if (objectId > 0)
+	// Create the "Scene" category group once.
+	if (!m_sceneGroup)
 	{
-		emit objectSelected(objectId);
+		m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
+		m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
 	}
+
+	// --- Query selection state from the scene's Selections<const ObjectID*> ---
+	const Scene* scene = static_cast<const Scene*>(ctx.scene);
+	const ObjectID* activeObj = nullptr;
+	if (scene)
+	{
+		activeObj = scene->selections.GetActiveObject();
+	}
+
+	// Count valid (non-null) objects.
+	std::size_t validCount = 0;
+	for (const auto* obj : ids)
+	{
+		if (obj) ++validCount;
+	}
+
+	// Ensure pool is large enough for valid objects.
+	EnsureRowPool(validCount);
+
+	// Configure visible rows.
+	std::size_t poolIndex = 0;
+	int rowIndex = 0;
+	for (const auto* obj : ids)
+	{
+		if (!obj) continue;
+
+		auto iconName = TypeIconName(obj->o_type);
+
+		// Phase 1 — bind object identity data (icon name, name, id).
+		m_rowPool[poolIndex]->SetObject(
+			iconName,
+			QString::fromStdString(obj->o_name),
+			obj->GetObjectID());
+
+		// Sync visibility toggles to the object's actual flags.
+		m_rowPool[poolIndex]->SetVisibilities(obj->is_viewport, obj->is_rendered);
+
+		// Phase 2 — apply visual styling (selection highlight + row bg).
+		bool isActive   = (activeObj == obj);
+		bool isSelected = scene && scene->selections.IsSelected(obj);
+		m_rowPool[poolIndex]->SetStyle(isActive, isSelected && !isActive, rowIndex);
+
+		m_rowPool[poolIndex]->setVisible(true);
+		++poolIndex;
+		++rowIndex;
+	}
+
+	// Hide surplus rows (pool larger than current scene).
+	for (std::size_t i = validCount; i < m_rowPool.size(); ++i)
+	{
+		m_rowPool[i]->setVisible(false);
+	}
+
+	// Show/hide the category group based on whether we have objects.
+	m_sceneGroup->setVisible(validCount > 0);
 }
 
 } // namespace neurus

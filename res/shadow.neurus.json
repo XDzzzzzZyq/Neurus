@@ -10,16 +10,19 @@
                             "id": 2147483649,
                             "data": {
                                 "value0": {
-                                    "o_name": "",
+                                    "value0": {
+                                        "o_id": 2
+                                    },
+                                    "o_name": "Camera",
                                     "o_type": 0,
                                     "is_viewport": true,
                                     "is_rendered": true
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": 0.0,
-                                        "y": -6.0,
-                                        "z": 6.0
+                                        "x": -4.642979145050049,
+                                        "y": 5.96278715133667,
+                                        "z": 3.858483076095581
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -57,7 +60,10 @@
                             "id": 2147483650,
                             "data": {
                                 "value0": {
-                                    "o_name": "Mesh",
+                                    "value0": {
+                                        "o_id": 8
+                                    },
+                                    "o_name": "Grid 1",
                                     "o_type": 1,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -96,7 +102,10 @@
                             "id": 2147483651,
                             "data": {
                                 "value0": {
-                                    "o_name": "Mesh",
+                                    "value0": {
+                                        "o_id": 9
+                                    },
+                                    "o_name": "Grid 2",
                                     "o_type": 1,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -135,7 +144,10 @@
                             "id": 2147483652,
                             "data": {
                                 "value0": {
-                                    "o_name": "Mesh",
+                                    "value0": {
+                                        "o_id": 10
+                                    },
+                                    "o_name": "Ground",
                                     "o_type": 1,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -176,7 +188,10 @@
                             "id": 2147483653,
                             "data": {
                                 "value0": {
-                                    "o_name": "",
+                                    "value0": {
+                                        "o_id": 4
+                                    },
+                                    "o_name": "Point Light 1",
                                     "o_type": 2,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -215,14 +230,17 @@
                     }
                 },
                 {
-                    "key": 7,
+                    "key": 5,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483654,
                             "data": {
                                 "value0": {
-                                    "o_name": "",
+                                    "value0": {
+                                        "o_id": 5
+                                    },
+                                    "o_name": "Point Light 2",
                                     "o_type": 2,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -261,14 +279,17 @@
                     }
                 },
                 {
-                    "key": 8,
+                    "key": 6,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483655,
                             "data": {
                                 "value0": {
-                                    "o_name": "",
+                                    "value0": {
+                                        "o_id": 6
+                                    },
+                                    "o_name": "Sun Light",
                                     "o_type": 2,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -310,10 +331,7 @@
             "sprite_list": [],
             "dLine_list": [],
             "dPoints_list": [],
-            "env_list": [],
-            "selections": {
-                "selectedIds": []
-            }
+            "env_list": []
         },
         "proj_config": {
             "r_pipeline": 1,
@@ -322,7 +340,7 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.002,
+            "r_shadow_bias": 0.0020000000949949028,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128

@@ -10,6 +10,9 @@
                             "id": 2147483649,
                             "data": {
                                 "value0": {
+                                    "value0": {
+                                        "o_id": 7
+                                    },
                                     "o_name": "",
                                     "o_type": 0,
                                     "is_viewport": true,
@@ -57,6 +60,9 @@
                             "id": 2147483650,
                             "data": {
                                 "value0": {
+                                    "value0": {
+                                        "o_id": 8
+                                    },
                                     "o_name": "Mesh",
                                     "o_type": 1,
                                     "is_viewport": true,
@@ -98,6 +104,9 @@
                             "id": 2147483651,
                             "data": {
                                 "value0": {
+                                    "value0": {
+                                        "o_id": 9
+                                    },
                                     "o_name": "",
                                     "o_type": 2,
                                     "is_viewport": true,
@@ -149,6 +158,9 @@
                             "id": 2147483652,
                             "data": {
                                 "value0": {
+                                    "value0": {
+                                        "o_id": 10
+                                    },
                                     "o_name": "Environment",
                                     "o_type": 4,
                                     "is_viewport": true,

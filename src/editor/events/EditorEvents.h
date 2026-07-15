@@ -12,6 +12,7 @@ namespace neurus {
 struct ObjectSelected
 {
 	int objectId;
+	int modifiers;  ///< Modifier key bitmask (Input::Modifiers flags).
 };
 
 /** @brief Emitted when a scene object is deselected. */
@@ -76,6 +77,14 @@ struct EnvironmentChanged
 {
 	int sceneId = -1; ///< ID of the Scene containing the Environment
 	int envId   = -1; ///< ID of the Environment object (from UID::GetObjectID())
+};
+
+/** @brief Emitted when object visibility toggles change in the outliner. */
+struct VisibilityChanged
+{
+	int  objectId;        ///< Unique object identifier.
+	bool viewportVisible; ///< Viewport (editor) visibility.
+	bool renderVisible;   ///< Render (pipeline) visibility.
 };
 
 } // namespace neurus

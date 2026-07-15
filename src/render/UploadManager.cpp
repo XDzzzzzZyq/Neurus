@@ -302,7 +302,7 @@ UploadManager::UploadLighting(const std::unordered_map<int, std::shared_ptr<Ligh
 
 	for (const auto& [uid, light] : lights)
 	{
-		if (!light) continue;
+		if (!light || !light->is_viewport || !light->is_rendered) continue;
 		result[uid] = UploadLighting(*light);
 	}
 

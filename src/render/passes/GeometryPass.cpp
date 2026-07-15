@@ -240,6 +240,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		for (const auto& [id, mesh] : scene->mesh_list)
 		{
 			if (!mesh || !mesh->o_mesh) continue;
+			if (!mesh->is_viewport || !mesh->is_rendered) continue;
 
 			MeshGPU* gpuPtr = cache.GetMeshGPU(mesh->GetObjectID());
 			if (!gpuPtr)

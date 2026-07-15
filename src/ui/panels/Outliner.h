@@ -1,31 +1,38 @@
 /**
  * @file Outliner.h
- * @brief Outliner dock panel displaying scene object hierarchy in a QTreeView.
+ * @brief Outliner dock panel — Blender-style vertical list view.
  *
- * The Outliner reads from a const Scene reference and builds a flat tree
- * grouped by object type (Cameras, Meshes, Lights). Clicking an object emits
- * ObjectSelected via EventBus for Editor↔Renderer selection propagation.
+ * Displays scene objects as a scrollable vertical list. Each row shows the
+ * object type icon, name, and two visibility toggles (viewport / render).
  *
  * Architecture:
- * - QTreeView + QStandardItemModel (simpler than QAbstractItemModel for MVP)
- * - Reads scene.cam_list, scene.mesh_list, scene.light_list
- * - Click → EventBus().enqueue(ObjectSelected{id})
- * - No DnD, no inline editing, no hierarchy (flat lists per category)
- *
- * @note UI Layer - communicates via EventBus (typed events, no Qt dependency).
+ * - UIPanel subclass (matches RenderConfigPanel / PropertyEditor pattern)
+ * - QVBoxLayout → QScrollArea → container widget with vertical row list
+ * - Rows are OutlinerRow widgets managed via a pool
+ * - Pool grows as needed; extra rows are hidden (not destroyed)
+ * - Each recycled row calls SetObject() — signal lambdas read the current
+ *   m_objectId at emission time, so no manual rewire needed
+ * - Row signals forwarded via Outliner::objectSelected / visibilityChanged
+ * - Reads scene data via UIContext — no Renderer or Vulkan headers
  */
 
 #pragma once
 
 #include "UIPanel.h"
 
-class QTreeView;
-class QStandardItemModel;
+#include "editor/events/EditorEvents.h"
+
+#include <cstddef>
+#include <vector>
+
+class QGroupBox;
+class QScrollArea;
+class QVBoxLayout;
 
 namespace neurus
 {
 
-class Scene;
+class OutlinerRow;
 
 class Outliner : public UIPanel
 {
@@ -37,47 +44,51 @@ public:
 	explicit Outliner(QWidget* parent = nullptr);
 	~Outliner() override = default;
 
+	Outliner(const Outliner&) = delete;
+	Outliner& operator=(const Outliner&) = delete;
+
 	/**
-	 * @brief Refreshes the panel from a UIContext snapshot.
+	 * @brief Per-frame refresh from UIContext.
 	 *
-	 * Currently a no-op — the Outliner rebuilds via Refresh(const Scene&)
-	 * on project load/change events rather than per-frame.
+	 * Uses a row pool: grows when scene objects exceed pool size, recycles
+	 * existing rows via SetObject() otherwise. Extra rows are hidden.
 	 *
-	 * @param ctx Read-only UI context (unused).
+	 * @param ctx Read-only UI context carrying Editor/Project state.
 	 */
 	void Refresh(const UIContext& ctx) override;
 
-	/**
-	 * @brief Rebuilds the tree view from the given scene's object pools.
-	 *
-	 * Clears existing items and repopulates with current cameras, meshes,
-	 * and lights from the scene. Categories with no objects are hidden.
-	 *
-	 * @param scene Scene to read object pools from (const, read-only).
-	 */
-	void Refresh(const Scene& scene);
-
-private slots:
-	/**
-	 * @brief Handles tree view item click.
-	 *
-	 * Extracts the object ID from Qt::UserRole+1 and emits the
-	 * objectSelected signal, which Application wires to EventBus.
-	 *
-	 * @param index Model index of the clicked item.
-	 */
-	void OnItemClicked(const QModelIndex& index);
-
 signals:
-	/** @brief Emitted when a user clicks on a scene object in the outliner. */
-	void objectSelected(int objectId);
+	/** @brief Emitted when a user clicks on a scene object row in the outliner. */
+	void objectSelected(const ObjectSelected& e);
+
+	/** @brief Emitted when visibility toggles change for an object. */
+	void visibilityChanged(const VisibilityChanged& e);
 
 private:
-	QTreeView*         m_treeView = nullptr;
-	QStandardItemModel* m_model    = nullptr;
+	/**
+	 * @brief Creates a collapsible QGroupBox for a category of objects.
+	 *
+	 * @param title Category header text (e.g. "Cameras").
+	 * @return The QGroupBox widget.
+	 */
+	QGroupBox* AddCategoryGroup(const QString& title);
 
-	static constexpr int ObjectIdRole   = Qt::UserRole + 1;
-	static constexpr int ObjectTypeRole = Qt::UserRole + 2;
+	/**
+	 * @brief Ensures the row pool has at least @p needed rows,
+	 *        creating new ones as necessary.
+	 */
+	void EnsureRowPool(std::size_t needed);
+
+	QScrollArea* m_scrollArea = nullptr;
+	QWidget*     m_container  = nullptr;
+	QVBoxLayout* m_listLayout = nullptr;
+
+	/// Persistent "Scene" category group (created once).
+	QGroupBox*     m_sceneGroup = nullptr;
+	QVBoxLayout*   m_groupLayout = nullptr;
+
+	/// Row pool — grows as needed, never shrinks.
+	std::vector<OutlinerRow*> m_rowPool;
 };
 
 } // namespace neurus
