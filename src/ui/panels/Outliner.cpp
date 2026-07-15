@@ -181,6 +181,9 @@ void Outliner::Refresh(const UIContext& ctx)
 			QString::fromStdString(obj->o_name),
 			obj->GetObjectID());
 
+		// Sync visibility toggles to the object's actual flags.
+		m_rowPool[poolIndex]->SetVisibilities(obj->is_viewport, obj->is_rendered);
+
 		// Phase 2 — apply visual styling (selection highlight + row bg).
 		bool isActive   = (activeObj == obj);
 		bool isSelected = scene && scene->selections.IsSelected(obj);

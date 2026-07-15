@@ -156,6 +156,20 @@ void OutlinerRow::SetObject(const QString& typeLetter, const QString& typeColor,
 }
 
 // =========================================================================
+// SetVisibilities — set toggle states without emitting signals
+// =========================================================================
+
+void OutlinerRow::SetVisibilities(bool viewportVisible, bool renderVisible)
+{
+	m_eyeBtn->blockSignals(true);
+	m_eyeBtn->setChecked(viewportVisible);
+	m_eyeBtn->blockSignals(false);
+	m_renderBtn->blockSignals(true);
+	m_renderBtn->setChecked(renderVisible);
+	m_renderBtn->blockSignals(false);
+}
+
+// =========================================================================
 // SetStyle — apply selection text color + alternating row background
 // =========================================================================
 

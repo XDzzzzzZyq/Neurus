@@ -69,6 +69,17 @@ public:
 	               const QString& name, int objectId);
 
 	/**
+	 * @brief Sets visibility toggle states without emitting signals.
+	 *
+	 * Updates both the viewport (eye) and render (monitor) toggle buttons
+	 * using blockSignals so no false visibilityChanged emissions occur.
+	 *
+	 * @param viewportVisible True to enable viewport visibility.
+	 * @param renderVisible   True to enable render visibility.
+	 */
+	void SetVisibilities(bool viewportVisible, bool renderVisible);
+
+	/**
 	 * @brief Applies visual styling: selection highlight and row background.
 	 *
 	 * Active  → white name text.
