@@ -87,4 +87,25 @@ struct VisibilityChanged
 	bool renderVisible;   ///< Render (pipeline) visibility.
 };
 
+/**
+ * @brief Emitted when the transform of a selected object is edited from the Property Panel.
+ *
+ * Carries the full position/rotation/scale state after an edit. The Editor
+ * layer applies these values to the scene object's Transform3D directly.
+ * Rotation values are in degrees (Euler: pitch=X, yaw=Z, roll=Y).
+ */
+struct TransformChanged
+{
+	int   objectId;            ///< Target scene object identifier.
+	float posX = 0.0f;         ///< World-space X position.
+	float posY = 0.0f;         ///< World-space Y position (forward).
+	float posZ = 0.0f;         ///< World-space Z position (up).
+	float rotX = 0.0f;         ///< Pitch rotation in degrees.
+	float rotY = 0.0f;         ///< Roll rotation in degrees.
+	float rotZ = 0.0f;         ///< Yaw rotation in degrees.
+	float sclX = 1.0f;         ///< X-axis scale.
+	float sclY = 1.0f;         ///< Y-axis scale.
+	float sclZ = 1.0f;         ///< Z-axis scale.
+};
+
 } // namespace neurus

@@ -3,7 +3,7 @@
  * @brief Base class for all dock panel widgets in the UI layer.
  *
  * UIPanel provides the common QWidget base for dockable panels (Outliner,
- * PropertyEditor, RenderConfigPanel). All panels inherit UIPanel so the
+ * PropertyPanel, RenderConfigPanel). All panels inherit UIPanel so the
  * dock system can treat them uniformly.
  *
  * Architecture:
@@ -31,7 +31,7 @@ enum class PanelType : uint8_t
 {
 	Viewport,
 	Outliner,
-	PropertyEditor,
+	PropertyPanel,
 	RenderConfig,
 	Count
 };
@@ -81,7 +81,7 @@ private:
 		{
 		case PanelType::Viewport:       return "Viewport";
 		case PanelType::Outliner:       return "Outliner";
-		case PanelType::PropertyEditor: return "Property Editor";
+		case PanelType::PropertyPanel: return "Property Panel";
 		case PanelType::RenderConfig:   return "Render Config";
 		default:                        return "Unknown";
 		}

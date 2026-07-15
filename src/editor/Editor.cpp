@@ -105,6 +105,21 @@ void Editor::Initialize(Scene& scene)
 		ed_project->GetRenderConfig() = e.config;
 	});
 
+	ed_eventBus.subscribe<TransformChanged>([this](const TransformChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.obj_list.find(e.objectId);
+		if (it == scene.obj_list.end()) return;
+
+		void* transformPtr = it->second->GetTransform();
+		if (!transformPtr) return;
+
+		auto* xform = static_cast<Transform3D*>(transformPtr);
+		xform->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
+		xform->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
+		xform->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
+		ed_project->MarkDirty();
+	});
+
 	ed_eventBus.subscribe<ObjectSelected>([this](const ObjectSelected& e) {
 		bool shiftOrCtrl = (e.modifiers & (Input::Mod_Shift | Input::Mod_Ctrl)) != 0;
 		SelectObject(e.objectId, shiftOrCtrl);

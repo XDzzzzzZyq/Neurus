@@ -40,7 +40,7 @@
 #include "ui/UIManager.h"
 #include "ui/UIContext.h"
 #include "ui/panels/Outliner.h"
-#include "ui/panels/PropertyEditor.h"
+#include "ui/panels/PropertyPanel.h"
 #include "ui/panels/RenderConfigPanel.h"
 #include "ui/panels/Viewport.h"
 
@@ -353,6 +353,12 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
 		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
+	}
+
+	// Handle Transform changes from Property Panel → Editor
+	if (auto* propPanel = app_mainWindow->GetPanel<neurus::PropertyPanel>())
+	{
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::transformChanged);
 	}
 }
 
