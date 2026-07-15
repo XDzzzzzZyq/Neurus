@@ -42,6 +42,7 @@ qt_add_resources(neurus_ui "resources"
 	PREFIX "/"
 	FILES
 		qml/main.qml
+		qml/outliner.qss
 )
 
 # Qt resource file (SVG icons)

@@ -9,11 +9,13 @@
 
 #include "items/OutlinerRow.h"
 
+#include <QFile>
 #include <QGraphicsColorizeEffect>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPalette>
 #include <QPushButton>
+#include <QTextStream>
 
 #include <QGuiApplication>
 
@@ -24,42 +26,22 @@ namespace neurus
 {
 
 // =========================================================================
-// Shared name-button stylesheet template (color injected by SetStyle)
+// Outliner stylesheet (loaded once from outliner.qss Qt resource)
 // =========================================================================
 
-static const QString kNameBtnColorStyle = QString::fromUtf8(
-	"QPushButton {"
-	"  text-align: left;"
-	"  border: 1px solid transparent;"
-	"  border-radius: 10px;"
-	"  background: transparent;"
-	"  padding: 1px 4px;"
-	"  font-size: 11px;"
-	"  color: %1;"
-	"}"
-	"QPushButton:hover {"
-	"  border-color: #313131;"
-	"}"
-	"QPushButton:pressed {"
-	"  color: #676767;"
-	"  background: rgba(0, 0, 0, 0.1);"
-	"}");
+static QString s_outlinerStyle;
 
-// =========================================================================
-// Shared visibility-toggle stylesheet (no text properties — icon-driven)
-// =========================================================================
+static void LoadOutlinerStyle()
+{
+	static bool loaded = false;
+	if (loaded) return;
+	loaded = true;
 
-static const QString kToggleStyle = QString::fromUtf8(
-	"QPushButton {"
-	"  border: 1px solid transparent;"
-	"  border-radius: 3px;"
-	"  background: transparent;"
-	"  padding: 2px;"
-	"}"
-	"QPushButton:hover {"
-	"  background: rgba(255, 255, 255, 0.10);"
-	"  border-color: rgba(255, 255, 255, 0.15);"
-	"}");
+	QFile file(":/qml/outliner.qss");
+	if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
+	s_outlinerStyle = QTextStream(&file).readAll();
+	file.close();
+}
 
 // =========================================================================
 // Constructor — create layout + child widgets once
@@ -68,6 +50,9 @@ static const QString kToggleStyle = QString::fromUtf8(
 OutlinerRow::OutlinerRow(QWidget* parent)
 	: QWidget(parent)
 {
+	LoadOutlinerStyle();
+	setStyleSheet(s_outlinerStyle);
+
 	setFixedHeight(28);
 
 	auto* rowLayout = new QHBoxLayout(this);
@@ -82,6 +67,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 
 	// --- Name (flat QPushButton styled as label, clickable for selection) ---
 	m_nameBtn = new QPushButton();
+	m_nameBtn->setObjectName("outlinerNameBtn");
 	m_nameBtn->setFlat(true);
 	m_nameBtn->setCursor(Qt::PointingHandCursor);
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -100,6 +86,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	const QSize kToggleIconSize(20, 20);
 
 	// Eye button
+	m_eyeBtn->setObjectName("outlinerToggleBtn");
 	m_eyeBtn->setCheckable(true);
 	m_eyeBtn->setChecked(true);
 	m_eyeBtn->setFlat(true);
@@ -108,13 +95,13 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_eyeBtn->setIcon(Icons::GetIcon("editor:preivew_visible"));
 	m_eyeBtn->setToolTip(QString::fromUtf8("Viewport visibility"));
 	m_eyeBtn->setCursor(Qt::PointingHandCursor);
-	m_eyeBtn->setStyleSheet(kToggleStyle);
 	auto* eyeFx = new QGraphicsColorizeEffect(m_eyeBtn);
 	eyeFx->setColor(QColor("#444444"));  // checked = visible = dark
 	eyeFx->setEnabled(true);
 	m_eyeBtn->setGraphicsEffect(eyeFx);
 
 	// Render button
+	m_renderBtn->setObjectName("outlinerToggleBtn");
 	m_renderBtn->setCheckable(true);
 	m_renderBtn->setChecked(true);
 	m_renderBtn->setFlat(true);
@@ -123,7 +110,6 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_renderBtn->setIcon(Icons::GetIcon("editor:render_visible"));
 	m_renderBtn->setToolTip(QString::fromUtf8("Render visibility"));
 	m_renderBtn->setCursor(Qt::PointingHandCursor);
-	m_renderBtn->setStyleSheet(kToggleStyle);
 	auto* renderFx = new QGraphicsColorizeEffect(m_renderBtn);
 	renderFx->setColor(QColor("#444444"));  // checked = visible = dark
 	renderFx->setEnabled(true);
@@ -231,7 +217,8 @@ void OutlinerRow::SetStyle(bool isActive, bool isSelected, int rowIndex)
 		color = QString::fromUtf8("#4A90D9");    // blue — selected, not active
 	else
 		color = QString::fromUtf8("#000000");    // dim gray — deselected
-	m_nameBtn->setStyleSheet(kNameBtnColorStyle.arg(color));
+	m_nameBtn->setStyleSheet(
+		QString::fromUtf8("QPushButton { color: %1; }").arg(color));
 
 	// --- Alternating row background ---
 	if (rowIndex % 2 == 1)
