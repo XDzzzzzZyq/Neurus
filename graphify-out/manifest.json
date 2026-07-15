@@ -1,7 +1,7 @@
 {
   "src/app/Application.cpp": {
-    "mtime": 1784097753.6498451,
-    "ast_hash": "12e1bbae068e4142ce432044fbbaed21",
+    "mtime": 1784098487.7148287,
+    "ast_hash": "6d1ed1a67312059e9694d705b9d7e820",
     "semantic_hash": ""
   },
   "src/app/Application.h": {
@@ -65,8 +65,8 @@
     "semantic_hash": ""
   },
   "src/editor/events/EditorEvents.h": {
-    "mtime": 1784097201.9033742,
-    "ast_hash": "85fd9d18d64ebb00658057fe404ae1b2",
+    "mtime": 1784098481.9147215,
+    "ast_hash": "609b948baf4aefad934cfae6459b0fb7",
     "semantic_hash": ""
   },
   "src/editor/events/EventBus.h": {
@@ -80,8 +80,8 @@
     "semantic_hash": ""
   },
   "src/editor/events/UIEvents.h": {
-    "mtime": 1784097174.4545946,
-    "ast_hash": "808548da5b667729351aadfa8a1efcd9",
+    "mtime": 1784098339.723084,
+    "ast_hash": "e88aa769f1eb7427aa917e823c5a40ab",
     "semantic_hash": ""
   },
   "src/main.cpp": {
@@ -285,8 +285,8 @@
     "semantic_hash": ""
   },
   "src/scene/Mesh.h": {
-    "mtime": 1784084071.5675023,
-    "ast_hash": "e37f04db1e22ba5a8f51f05235f38789",
+    "mtime": 1784111911.8228207,
+    "ast_hash": "ae9ce218e6841f6c20bf86368ac83945",
     "semantic_hash": ""
   },
   "src/scene/Scene.cpp": {
@@ -365,8 +365,8 @@
     "semantic_hash": "5652a251657a9652e36d046135c9e72d"
   },
   "src/editor/Editor.cpp": {
-    "mtime": 1784097315.0367024,
-    "ast_hash": "fc58e77afdd86164ddd19519f27748cc",
+    "mtime": 1784104103.7744687,
+    "ast_hash": "f90c321f9ed8e85d9479e650d08ee441",
     "semantic_hash": ""
   },
   "src/editor/Editor.h": {
@@ -400,8 +400,8 @@
     "semantic_hash": ""
   },
   "src/render/passes/GeometryPass.cpp": {
-    "mtime": 1784084071.4609675,
-    "ast_hash": "2983fcbcac55520ab2d3fa7fbc6b5518",
+    "mtime": 1784104353.8004055,
+    "ast_hash": "ff5a4aaead1c448831a80f1203447a35",
     "semantic_hash": ""
   },
   "src/render/passes/GeometryPass.h": {
@@ -445,8 +445,8 @@
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.cpp": {
-    "mtime": 1784084071.4752245,
-    "ast_hash": "f3b424e75fa9690ee98ec8681deb7d0d",
+    "mtime": 1784103375.8636477,
+    "ast_hash": "ca77cfe487e2f0d2b513ab7ef48d721f",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowDepthPass.h": {
@@ -535,13 +535,13 @@
     "semantic_hash": ""
   },
   "src/render/RenderCache.cpp": {
-    "mtime": 1784084071.379611,
-    "ast_hash": "b50bd3cb75672675d1dbe88f644f0f3b",
+    "mtime": 1784105824.3240829,
+    "ast_hash": "cd2e87689ec4b1fdaf5dc1438ff63460",
     "semantic_hash": ""
   },
   "src/render/RenderCache.h": {
-    "mtime": 1784084071.3806117,
-    "ast_hash": "3c23a6a55fe76f711c339e76de2b490f",
+    "mtime": 1784105789.264226,
+    "ast_hash": "eb4ab0186ecef1d660088bddb880790d",
     "semantic_hash": ""
   },
   "src/render/RenderContext.h": {
@@ -565,8 +565,8 @@
     "semantic_hash": ""
   },
   "src/render/passes/ShadowIntensityPass.cpp": {
-    "mtime": 1784084071.4772243,
-    "ast_hash": "645b8a8de173e47ce6b8c72651223c49",
+    "mtime": 1784103401.5281487,
+    "ast_hash": "2fb056c97dc35efbcc96449206983364",
     "semantic_hash": ""
   },
   "src/render/passes/ShadowIntensityPass.h": {
@@ -660,8 +660,8 @@
     "semantic_hash": ""
   },
   "src/render/UploadManager.cpp": {
-    "mtime": 1784084071.4040017,
-    "ast_hash": "055189865888993a982a5f1426279a74",
+    "mtime": 1784103358.4809444,
+    "ast_hash": "7c99a8b230444c7fdc95e792942d00f9",
     "semantic_hash": ""
   },
   "src/render/UploadManager.h": {
@@ -715,8 +715,8 @@
     "semantic_hash": ""
   },
   "src/ui/UIManager.cpp": {
-    "mtime": 1784097790.6946898,
-    "ast_hash": "93f21314e511d6aa5fea0107f0f76235",
+    "mtime": 1784102208.8200698,
+    "ast_hash": "d9d77812ea795a5d7ba50a66486351f8",
     "semantic_hash": ""
   },
   "src/ui/UIManager.h": {
@@ -725,12 +725,12 @@
     "semantic_hash": ""
   },
   "src/ui/panels/Outliner.cpp": {
-    "mtime": 1784084540.6978889,
-    "ast_hash": "c8d71945201c85595d8840308a9ab216",
+    "mtime": 1784102190.802173,
+    "ast_hash": "65294b9ea0312d8055ae92a61a47c964",
     "semantic_hash": ""
   },
   "src/ui/panels/Outliner.h": {
-    "mtime": 1784097246.747167,
+    "mtime": 1784102184.4535694,
     "ast_hash": "f1b0d73e4b670d3e71440eec56256e37",
     "semantic_hash": ""
   },
@@ -810,13 +810,23 @@
     "semantic_hash": ""
   },
   "src/ui/items/OutlinerRow.cpp": {
-    "mtime": 1784097277.1709979,
-    "ast_hash": "8a6eeb6c98eff50c1a27f07879302d1b",
+    "mtime": 1784107200.1079025,
+    "ast_hash": "90d6695eab9595b41463cc9d32005680",
     "semantic_hash": ""
   },
   "src/ui/items/OutlinerRow.h": {
-    "mtime": 1784097234.736156,
-    "ast_hash": "fe058d62ce342544cf7bb080b6e9b9be",
+    "mtime": 1784102147.5786686,
+    "ast_hash": "2d6c8c752490bcfabad40b6e2f79cc40",
+    "semantic_hash": ""
+  },
+  "src/ui/Icons.cpp": {
+    "mtime": 1784102108.681311,
+    "ast_hash": "f94ce7d11b363ab06b92444af1714e0e",
+    "semantic_hash": ""
+  },
+  "src/ui/Icons.h": {
+    "mtime": 1784102070.7094643,
+    "ast_hash": "8ff434eda0d4e0e415c6564eb408737c",
     "semantic_hash": ""
   }
 }
