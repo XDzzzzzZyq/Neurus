@@ -19,7 +19,7 @@
 #pragma once
 
 #include "UIPanel.h"
-#include "render/RenderConfig.h"
+#include "editor/events/ConfigEvents.h"
 
 // Forward declarations
 class QCheckBox;
@@ -63,7 +63,7 @@ public:
 
 signals:
 	/** @brief Emitted whenever any control value changes, carrying the new config. */
-	void configValueChanged(RenderConfig cfg);
+	void configValueChanged(const RenderConfigChangedEvent& e);
 
 private:
 	// --- Section builders ---

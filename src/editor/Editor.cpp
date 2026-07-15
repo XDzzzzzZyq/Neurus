@@ -1,10 +1,14 @@
 #include "Editor.h"
 
-#include "editor/controllers/CameraController.h"
+#include "editor/events/InputEvents.h"
+#include "editor/events/ProjectEvents.h"
+#include "editor/events/AssetEvents.h"
+#include "editor/events/ConfigEvents.h"
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"
+
+#include "editor/controllers/CameraController.h"
 #include "editor/events/EventBus.h"
-#include "editor/events/UIEvents.h"
 #include "asset/Project.h"
 
 #include "app/VulkanContext.h"
@@ -85,41 +89,25 @@ void Editor::Initialize(Scene& scene)
 	// and from OnProjectOpen() / OnProjectNew().
 
 	// --- Wire project file signal handlers ---
-	auto& uiEvents = neurus::UIEvents::instance();
+	// (events are enqueued by Editor::OnUIEvent from UIEvents Qt signals)
 
-	// Handle New Project (Ctrl+N)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectNewRequested,
-		[this]() { OnProjectNew(); });
+	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) { OnProjectNew(); });
+	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) { OnProjectOpen(e.path); });
+	ed_eventBus.subscribe<ProjectSaveEvent>([this](const ProjectSaveEvent&) { OnProjectSave(); });
+	ed_eventBus.subscribe<ProjectSaveAsEvent>([this](const ProjectSaveAsEvent& e) { OnProjectSaveAs(e.path); });
 
-	// Handle Open Project (Ctrl+O)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectOpenRequested,
-		[this](const QString& path) { OnProjectOpen(path); });
+	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) { OnMeshImport(e.path); });
+	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) { OnCameraAdd(); });
+	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) { OnLightAdd(); });
+	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) { OnSunLightAdd(); });
 
-	// Handle Save (Ctrl+S)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveRequested,
-		[this]() { OnProjectSave(); });
+	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
+		ed_project->GetRenderConfig() = e.config;
+	});
 
-	// Handle Save As (Ctrl+Shift+S)
-	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveAsRequested,
-		[this](const QString& path) { OnProjectSaveAs(path); });
-
-	// --- Mesh/camera/light signal handlers ---
-
-	// Handle mesh import (Edit -> Add -> Mesh...)
-	QObject::connect(&uiEvents, &neurus::UIEvents::meshImportRequested,
-		[this](const QString& path) { OnMeshImport(path); });
-
-	// Handle camera add (Edit -> Add -> Camera)
-	QObject::connect(&uiEvents, &neurus::UIEvents::cameraAddRequested,
-		[this]() { OnCameraAdd(); });
-
-	// Handle light add (Edit -> Add -> Light)
-	QObject::connect(&uiEvents, &neurus::UIEvents::lightAddRequested,
-		[this]() { OnLightAdd(); });
-
-	// Handle sun light add (Edit -> Add -> Sun Light)
-	QObject::connect(&uiEvents, &neurus::UIEvents::sunLightAddRequested,
-		[this]() { OnSunLightAdd(); });
+	ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
+		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
+	});
 
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
@@ -138,6 +126,29 @@ void Editor::Initialize(Scene& scene)
 		{
 			NEURUS_ERR("[Editor] EnvironmentChanged: env ID " << e.envId << " not found");
 		}
+	});
+
+	ed_eventBus.subscribe<MouseMoveEvent>([this](const MouseMoveEvent& e) {
+		auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
+		if (!cam) return;
+
+		if (e.middleHeld)
+		{
+			if (e.modifiers & Input::Mod_Ctrl)
+				ed_eventBus.enqueue(CameraPushEvent{cam, e.delta.x, e.delta.y});
+			else if (e.modifiers & Input::Mod_Shift)
+				ed_eventBus.enqueue(CameraSlideEvent{cam, e.delta.x, e.delta.y});
+			else
+				ed_eventBus.enqueue(CameraRotateEvent{cam, e.delta.x, e.delta.y});
+		}
+	});
+
+	ed_eventBus.subscribe<MouseScrollEvent>([this](const MouseScrollEvent& e) {
+		auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
+		if (!cam) return;
+
+		if (std::abs(e.delta) > 0.001f)
+			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
 	});
 
 	NEURUS_LOG("[Editor] Initialized");
@@ -173,15 +184,6 @@ UIContext Editor::GetUIContext() const
 	return ctx;
 }
 
-// =========================================================================
-// SetRenderConfig – update project config from UI panel
-// =========================================================================
-
-void Editor::SetRenderConfig(const RenderConfig& cfg)
-{
-	ed_project->GetRenderConfig() = cfg;
-}
-
 // --- Project signal handlers ---
 
 void Editor::OnProjectNew()
@@ -213,7 +215,7 @@ void Editor::OnProjectNew()
 	}
 }
 
-void Editor::OnProjectOpen(const QString& path)
+void Editor::OnProjectOpen(const std::string& path)
 {
 	try
 	{
@@ -224,9 +226,9 @@ void Editor::OnProjectOpen(const QString& path)
 		}
 
 		ed_project = std::make_unique<neurus::project::Project>(
-			neurus::project::Project::Open(path.toStdString(),
+			neurus::project::Project::Open(path,
 			                               resolveResourcePath("").toStdString()));
-		NEURUS_LOG("[Editor] Opened project: " << path.toStdString());
+		NEURUS_LOG("[Editor] Opened project: " << path);
 
 		// Update owner scene pointer to the new project's scene
 		auto& projectScene = ed_project->GetScene();
@@ -250,18 +252,18 @@ void Editor::OnProjectSave()
 	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 }
 
-void Editor::OnProjectSaveAs(const QString& path)
+void Editor::OnProjectSaveAs(const std::string& path)
 {
-	try { ed_project->Save(path.toStdString()); }
+	try { ed_project->Save(path); }
 	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 }
 
 // --- Mesh, Camera, Light signal handlers ---
 
-void Editor::OnMeshImport(const QString& path)
+void Editor::OnMeshImport(const std::string& path)
 {
 	try {
-		auto mesh = std::make_shared<neurus::Mesh>(path.toStdString());
+		auto mesh = std::make_shared<neurus::Mesh>(path);
 		ed_project->GetScene().UseMesh(mesh);
 
 		// Upload to GPU immediately via UploadManager
@@ -272,7 +274,7 @@ void Editor::OnMeshImport(const QString& path)
 		}
 
 		ed_project->MarkDirty();
-		NEURUS_LOG("[Editor] Imported mesh: " << path.toStdString());
+		NEURUS_LOG("[Editor] Imported mesh: " << path);
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to import mesh: " << e.what());
@@ -500,39 +502,6 @@ void Editor::HandleResize(uint32_t width, uint32_t height)
 void Editor::Edit()
 {
 	ed_eventBus.Process();
-}
-
-// =========================================================================
-// OnMouseMoved() — Viewport mouseMoved → CameraEvents
-// =========================================================================
-
-void Editor::OnMouseMoved(const MouseMoveEvent& e)
-{
-	auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
-	if (!cam) return;
-
-	if (e.middleHeld)
-	{
-		if (e.modifiers & Input::Mod_Ctrl)
-			ed_eventBus.enqueue(CameraPushEvent{cam, e.delta.x, e.delta.y});
-		else if (e.modifiers & Input::Mod_Shift)
-			ed_eventBus.enqueue(CameraSlideEvent{cam, e.delta.x, e.delta.y});
-		else
-			ed_eventBus.enqueue(CameraRotateEvent{cam, e.delta.x, e.delta.y});
-	}
-}
-
-// =========================================================================
-// OnMouseScrolled() — Viewport mouseScrolled → CameraZoomEvent
-// =========================================================================
-
-void Editor::OnMouseScrolled(const MouseScrollEvent& e)
-{
-	auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
-	if (!cam) return;
-
-	if (std::abs(e.delta) > 0.001f)
-		ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
 }
 
 } // namespace neurus

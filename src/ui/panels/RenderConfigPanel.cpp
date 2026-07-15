@@ -209,7 +209,7 @@ void RenderConfigPanel::BuildPipelineSection()
 void RenderConfigPanel::ConnectAllSignals()
 {
 	auto emitCfg = [this]() { 
-		emit configValueChanged(Save()); 
+		emit configValueChanged(RenderConfigChangedEvent{Save()}); 
 		};
 
 	// --- Shadows ---

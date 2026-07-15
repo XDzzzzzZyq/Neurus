@@ -4,7 +4,7 @@
 
 #include <glm/glm.hpp>
 
-#include "editor/Input.h"  // for Input::MouseButton
+#include "editor/events/InputEvents.h"
 
 class QKeyEvent;
 class QMouseEvent;

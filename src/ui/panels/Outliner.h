@@ -20,6 +20,8 @@
 
 #include "UIPanel.h"
 
+#include "editor/events/EditorEvents.h"
+
 #include <cstddef>
 #include <vector>
 
@@ -57,15 +59,10 @@ public:
 
 signals:
 	/** @brief Emitted when a user clicks on a scene object row in the outliner. */
-	void objectSelected(int objectId);
+	void objectSelected(const ObjectSelected& e);
 
-	/**
-	 * @brief Emitted when visibility toggles change for an object.
-	 * @param objectId       Unique object identifier.
-	 * @param viewportVisible True if viewport visibility is enabled.
-	 * @param renderVisible   True if render visibility is enabled.
-	 */
-	void visibilityChanged(int objectId, bool viewportVisible, bool renderVisible);
+	/** @brief Emitted when visibility toggles change for an object. */
+	void visibilityChanged(const VisibilityChanged& e);
 
 private:
 	/**

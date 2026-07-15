@@ -19,6 +19,8 @@
 
 #include <QWidget>
 
+#include "editor/events/EditorEvents.h"
+
 class QLabel;
 class QPushButton;
 
@@ -98,15 +100,10 @@ public:
 
 signals:
 	/** @brief Emitted when the name button is clicked. */
-	void objectSelected(int objectId);
+	void objectSelected(const ObjectSelected& e);
 
-	/**
-	 * @brief Emitted when either visibility toggle changes.
-	 * @param objectId       Unique object identifier.
-	 * @param viewportVisible True if viewport visibility is enabled.
-	 * @param renderVisible   True if render visibility is enabled.
-	 */
-	void visibilityChanged(int objectId, bool viewportVisible, bool renderVisible);
+	/** @brief Emitted when either visibility toggle changes. */
+	void visibilityChanged(const VisibilityChanged& e);
 
 private:
 	QLabel*      m_typeLabel  = nullptr;

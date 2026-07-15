@@ -68,6 +68,21 @@ private:
 	void RecreateSignals(UIEvents& uiEvents);
 	void ScreenShotSignals(UIEvents& uiEvents);
 
+	template<typename Panel, typename Event>
+	void ConnectUIEvent(
+		QObject* sender,
+		void (Panel::*signal)(const Event&))
+	{
+		QObject::connect(
+			static_cast<Panel*>(sender),
+			signal,
+			[editor = app_editor.get()](const Event& e)
+			{
+				editor->OnUIEvent(e);
+			}
+		);
+	}
+
 	// --- Qt infrastructure (destroyed after GPU stack) ---
 	std::unique_ptr<QApplication>         app_qtApp;
 	std::unique_ptr<QTimer>               app_renderTimer;

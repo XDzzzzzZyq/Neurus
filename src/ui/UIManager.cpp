@@ -229,9 +229,6 @@ void UIManager::CreateDocks()
 	m_panels[PanelType::Viewport] = viewport.release();
 	m_docks[PanelType::Viewport] = viewportDock;
 
-	// Notify Application of the new native HWND for surface recreation
-	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
-
 	// --- Left: Shader Editor (placeholder, not a UIPanel) ---
 	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
 	shaderDock->setWidget(makePlaceholder("Shader Editor"));
@@ -275,6 +272,9 @@ void UIManager::CreateDocks()
 	textureDock->resize(300, 200);
 	textureDock->setMinimumSize(200, 150);
 	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
+
+	// Notify Application of the new native HWND for surface recreation
+	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
 }
 
 // =========================================================================

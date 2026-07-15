@@ -1,11 +1,10 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
-#include <QString>
 
 #include "controllers/Controllers.h"
-#include "editor/Input.h"
 #include "editor/events/EventBus.h"
 #include "render/RenderConfig.h"
 #include "render/RenderContext.h"
@@ -98,21 +97,10 @@ public:
 	 */
 	void Edit();
 
-	/**
-	 * @brief Handles mouse movement from the Viewport and enqueues camera events.
-	 *
-	 * Translates MMB drag + modifiers into CameraRotateEvent / CameraPushEvent /
-	 * CameraSlideEvent and enqueues to the internal EventQueue.
-	 *
-	 * @param e Mouse move event from Viewport::mouseMoved signal.
-	 */
-	void OnMouseMoved(const MouseMoveEvent& e);
-
-	/**
-	 * @brief Handles mouse scroll from the Viewport and enqueues a camera zoom event.
-	 * @param e Mouse scroll event from Viewport::mouseScrolled signal.
-	 */
-	void OnMouseScrolled(const MouseScrollEvent& e);
+	template<typename Event>
+	void OnUIEvent(const Event& e){
+		ed_eventBus.enqueue<Event>(e);
+	}
 
 	/**
 	 * @brief Handles viewport resize by dispatching a CameraResizeEvent.
@@ -134,17 +122,6 @@ public:
 	 * and from OnProjectOpen() / OnProjectNew().
 	 */
 	void UploadSceneResources();
-
-	/**
-	 * @brief Updates the active RenderConfig and writes it into the project.
-	 *
-	 * Called from the UI layer when RenderConfigPanel emits a changed config.
-	 * The config is stored in the Project so it persists across saves and is
-	 * read by GetRenderContext() / GetUIContext() each frame.
-	 *
-	 * @param cfg New render configuration from the UI panel.
-	 */
-	void SetRenderConfig(const RenderConfig& cfg);
 
 	/**
 	 * @brief Selects a scene object by ID through scene.selections.
@@ -171,19 +148,19 @@ public:
 	void ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible);
 
 private:
-	// --- Signal handlers (implemented in later tasks) ---
+	// --- Handlers called by EventQueue subscribers in Initialize() ---
 	void OnProjectNew();
-	void OnProjectOpen(const QString& path);
+	void OnProjectOpen(const std::string& path);
 	void OnProjectSave();
-	void OnProjectSaveAs(const QString& path);
-	void OnMeshImport(const QString& path);
+	void OnProjectSaveAs(const std::string& path);
+	void OnMeshImport(const std::string& path);
 	void OnCameraAdd();
 	void OnLightAdd();
 	void OnSunLightAdd();
 	void OnScreenshotRequested();
 	void OnScreenshotAllRequested();
 	void OnIBLLoad();
-	void GenerateIBL(const std::shared_ptr<Environment>& env);  ///< Shared IBL generation: loads HDR/fallback, generates cubemaps via IBLPass
+	void GenerateIBL(const std::shared_ptr<Environment>& env);
 
 	// --- Owned ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.

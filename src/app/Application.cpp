@@ -28,6 +28,8 @@
 #include "editor/Editor.h"
 #include "editor/events/EditorEvents.h"
 #include "editor/events/UIEvents.h"
+#include "editor/events/ConfigEvents.h"
+#include "editor/events/InputEvents.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
 #include "render/Screenshot.h"
@@ -314,23 +316,30 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 
 void Application::PanelSignals(neurus::UIEvents& uiEvents)
 {
-	(void)uiEvents;  // Unused in current panel signals; kept for symmetry
+	// --- UIEvents → Editor (via ConnectUIEvent → OnUIEvent → EventQueue) ---
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectNewRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectOpenRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectSaveRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectSaveAsRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::meshImportRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::cameraAddRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 
-	// --- Outliner object selection → Editor (direct, follow RenderConfigPanel pattern) ---
+	// --- Outliner selection → Editor ---
+	// objectSelected needs modifier check at signal time, so uses a lambda.
+	// visibilityChanged uses ConnectUIEvent for direct event forwarding.
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
 		QObject::connect(outliner, &neurus::Outliner::objectSelected,
-			             [this](int objectId) {
+			             [this](const ObjectSelected& e) {
 			                 auto mods = QGuiApplication::queryKeyboardModifiers();
 			                 bool shiftOrCtrl = mods.testFlag(Qt::ShiftModifier)
 			                                    || mods.testFlag(Qt::ControlModifier);
-			                 app_editor->SelectObject(objectId, shiftOrCtrl);
+			                 app_editor->SelectObject(e.objectId, shiftOrCtrl);
 			             });
 
-		QObject::connect(outliner, &neurus::Outliner::visibilityChanged,
-			             [this](int objectId, bool viewportVisible, bool renderVisible) {
-			                 app_editor->ChangeObjectVisibility(objectId, viewportVisible, renderVisible);
-			             });
+		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
 	}
 
 	// --- Viewport signals: resize + camera control ---
@@ -343,25 +352,16 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		                 });
 
 		// Forward mouse movement to Editor for camera orbit/pan/dolly
-		QObject::connect(viewport, &neurus::Viewport::mouseMoved,
-		                 [this](const neurus::MouseMoveEvent& e) {
-		                     app_editor->OnMouseMoved(e);
-		                 });
+		ConnectUIEvent(viewport, &neurus::Viewport::mouseMoved);
 
 		// Forward mouse scroll to Editor for camera zoom
-		QObject::connect(viewport, &neurus::Viewport::mouseScrolled,
-		                 [this](const neurus::MouseScrollEvent& e) {
-		                     app_editor->OnMouseScrolled(e);
-		                 });
+		ConnectUIEvent(viewport, &neurus::Viewport::mouseScrolled);
 	}
 
-	// Handle RenderConfig changes — update Editor/Project config in real time
+	// Handle RenderConfig changes → Editor (via ConnectUIEvent → OnUIEvent → EventQueue)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
-		QObject::connect(cfgPanel, &neurus::RenderConfigPanel::configValueChanged,
-		                 [this](const neurus::RenderConfig& cfg) {
-		                     app_editor->SetRenderConfig(cfg);
-		                 });
+		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
 	}
 }
 

@@ -61,7 +61,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	// Lambda reads m_objectId at emission time — works after SetObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
-		emit objectSelected(m_objectId);
+		emit objectSelected(ObjectSelected{m_objectId});
 	});
 	rowLayout->addWidget(m_nameBtn);
 
@@ -110,11 +110,11 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	// Connect signals — lambdas read m_objectId at emission time
 	QObject::connect(m_eyeBtn, &QPushButton::toggled, this,
 		[this](bool viewportChecked) {
-			emit visibilityChanged(m_objectId, viewportChecked, m_renderBtn->isChecked());
+			emit visibilityChanged(VisibilityChanged{m_objectId, viewportChecked, m_renderBtn->isChecked()});
 		});
 	QObject::connect(m_renderBtn, &QPushButton::toggled, this,
 		[this](bool renderChecked) {
-			emit visibilityChanged(m_objectId, m_eyeBtn->isChecked(), renderChecked);
+			emit visibilityChanged(VisibilityChanged{m_objectId, m_eyeBtn->isChecked(), renderChecked});
 		});
 
 	rowLayout->addWidget(m_eyeBtn);
