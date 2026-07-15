@@ -12,6 +12,7 @@ namespace neurus {
 struct ObjectSelected
 {
 	int objectId;
+	int modifiers;  ///< Modifier key bitmask (Input::Modifiers flags).
 };
 
 /** @brief Emitted when a scene object is deselected. */

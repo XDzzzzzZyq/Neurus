@@ -66,7 +66,7 @@ signals:
 
 	/** @brief Emitted when the viewport widget is recreated with a new native HWND.
 	 *  @param newHwnd The new native window handle for Vulkan surface creation. */
-	void viewportRecreated(quintptr newHwnd);
+	void uiRecreated(quintptr newHwnd);
 
 	// --- Screenshot signals ---
 
@@ -133,7 +133,7 @@ public:
 	void requestLightAdd() { emit lightAddRequested(LightAddEvent{}); }
 	void requestSunLightAdd() { emit sunLightAddRequested(SunLightAddEvent{}); }
 
-	void requestViewportRecreation(quintptr newHwnd) { emit viewportRecreated(newHwnd); }
+	void requestUIRecreation(quintptr newHwnd) { emit uiRecreated(newHwnd); }
 
 private:
 	UIEvents() = default;

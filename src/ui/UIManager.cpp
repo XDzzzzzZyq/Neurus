@@ -274,7 +274,7 @@ void UIManager::CreateDocks()
 	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
 
 	// Notify Application of the new native HWND for surface recreation
-	UIEvents::instance().requestViewportRecreation(reinterpret_cast<quintptr>(newHwnd));
+	UIEvents::instance().requestUIRecreation(reinterpret_cast<quintptr>(newHwnd));
 }
 
 // =========================================================================
@@ -319,7 +319,7 @@ void UIManager::RestoreDefaultLayout()
 		it.value()->deleteDockWidget();
 	}
 
-	// Re-create the default dock arrangement (emits viewportRecreated)
+	// Re-create the default dock arrangement (emits uiRecreated)
 	CreateDocks();
 }
 

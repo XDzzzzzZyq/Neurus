@@ -105,6 +105,11 @@ void Editor::Initialize(Scene& scene)
 		ed_project->GetRenderConfig() = e.config;
 	});
 
+	ed_eventBus.subscribe<ObjectSelected>([this](const ObjectSelected& e) {
+		bool shiftOrCtrl = (e.modifiers & (Input::Mod_Shift | Input::Mod_Ctrl)) != 0;
+		SelectObject(e.objectId, shiftOrCtrl);
+	});
+
 	ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
 		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
 	});

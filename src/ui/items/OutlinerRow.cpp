@@ -10,6 +10,10 @@
 #include <QPalette>
 #include <QPushButton>
 
+#include <QGuiApplication>
+
+#include "editor/Input.h"
+
 namespace neurus
 {
 
@@ -61,7 +65,8 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	// Lambda reads m_objectId at emission time — works after SetObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
-		emit objectSelected(ObjectSelected{m_objectId});
+		const auto mods = Input::GetModifiers(QGuiApplication::queryKeyboardModifiers());
+		emit objectSelected(ObjectSelected{m_objectId, mods});
 	});
 	rowLayout->addWidget(m_nameBtn);
 

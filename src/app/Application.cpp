@@ -326,19 +326,10 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 
-	// --- Outliner selection → Editor ---
-	// objectSelected needs modifier check at signal time, so uses a lambda.
-	// visibilityChanged uses ConnectUIEvent for direct event forwarding.
+	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
-		QObject::connect(outliner, &neurus::Outliner::objectSelected,
-			             [this](const ObjectSelected& e) {
-			                 auto mods = QGuiApplication::queryKeyboardModifiers();
-			                 bool shiftOrCtrl = mods.testFlag(Qt::ShiftModifier)
-			                                    || mods.testFlag(Qt::ControlModifier);
-			                 app_editor->SelectObject(e.objectId, shiftOrCtrl);
-			             });
-
+		ConnectUIEvent(outliner, &neurus::Outliner::objectSelected);
 		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
 	}
 
@@ -371,8 +362,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 
 void Application::RecreateSignals(neurus::UIEvents& uiEvents)
 {
-	// Handle Viewport recreation (new native HWND → new surface → new swapchain)
-	QObject::connect(&uiEvents, &neurus::UIEvents::viewportRecreated,
+	// Handle UI recreation (new native HWND → new surface → new swapchain, rebind the signals)
+	QObject::connect(&uiEvents, &neurus::UIEvents::uiRecreated,
 	                 [this](quintptr newHwnd) {
 	                     // Reconnect panel signals (Viewport resize) to the new widget
 	                     PanelSignals(neurus::UIEvents::instance());
