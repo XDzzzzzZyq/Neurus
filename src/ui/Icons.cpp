@@ -26,7 +26,7 @@ void Icons::Initialize()
 	RegisterIcon("editor:movie",             ":/icons/editor/movie.svg");
 	RegisterIcon("editor:movie_off",         ":/icons/editor/movie_off.svg");
 	RegisterIcon("editor:preview_invisible", ":/icons/editor/preview_invisible.svg");
-	RegisterIcon("editor:preivew_visible",   ":/icons/editor/preivew_visible.svg");
+	RegisterIcon("editor:preview_visible",   ":/icons/editor/preview_visible.svg");
 	RegisterIcon("editor:render_invisible",  ":/icons/editor/render_invisible.svg");
 	RegisterIcon("editor:render_visible",    ":/icons/editor/render_visible.svg");
 }
@@ -53,9 +53,8 @@ const QIcon& Icons::GetIcon(const std::string& name)
 	auto pathIt = s_paths.find(name);
 	if (pathIt == s_paths.end())
 	{
-		// Unknown icon name — return a default-constructed (empty) QIcon
+		// Unknown icon name — return empty icon, do not cache
 		static const QIcon s_emptyIcon;
-		s_cache[name] = s_emptyIcon;
 		return s_emptyIcon;
 	}
 

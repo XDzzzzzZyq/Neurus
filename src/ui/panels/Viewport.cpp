@@ -87,9 +87,9 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
 	const QPointF pos = event->position();
 	const MouseMoveEvent evt{
-		.position = Input::GetMousePos(pos),
-		.delta = Input::GetMousePos(pos - m_lastPos),
-		.modifiers = Input::GetModifiers(event->modifiers()),
+		.position = Input::GetMousePos(static_cast<float>(pos.x()), static_cast<float>(pos.y())),
+		.delta = Input::GetMousePos(static_cast<float>(pos.x() - m_lastPos.x()), static_cast<float>(pos.y() - m_lastPos.y())),
+		.modifiers = Input::GetModifiers(static_cast<uint32_t>(event->modifiers().toInt())),
 		.leftHeld = m_leftHeld,
 		.middleHeld = m_middleHeld,
 		.rightHeld = m_rightHeld
@@ -102,7 +102,7 @@ void Viewport::mouseMoveEvent(QMouseEvent* event)
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
 	m_lastPos = event->position();  // Reset delta on press
-	const auto btn = Input::GetMouseButton(event->button());
+	const auto btn = Input::GetMouseButton(static_cast<uint32_t>(event->button()));
 	switch (btn)
 	{
 		case Input::MouseButton::Left:   m_leftHeld = true; break;
@@ -111,8 +111,8 @@ void Viewport::mousePressEvent(QMouseEvent* event)
 	}
 	const MousePressEvent evt{
 		.button = btn,
-		.position = Input::GetMousePos(event->position()),
-		.modifiers = Input::GetModifiers(event->modifiers())
+		.position = Input::GetMousePos(static_cast<float>(event->position().x()), static_cast<float>(event->position().y())),
+		.modifiers = Input::GetModifiers(static_cast<uint32_t>(event->modifiers().toInt()))
 	};
 	emit mousePressed(evt);
 	QWidget::mousePressEvent(event);
@@ -120,7 +120,7 @@ void Viewport::mousePressEvent(QMouseEvent* event)
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
-	const auto btn = Input::GetMouseButton(event->button());
+	const auto btn = Input::GetMouseButton(static_cast<uint32_t>(event->button()));
 	switch (btn)
 	{
 		case Input::MouseButton::Left:   m_leftHeld = false; break;
@@ -129,8 +129,8 @@ void Viewport::mouseReleaseEvent(QMouseEvent* event)
 	}
 	const MouseReleaseEvent evt{
 		.button = btn,
-		.position = Input::GetMousePos(event->position()),
-		.modifiers = Input::GetModifiers(event->modifiers())
+		.position = Input::GetMousePos(static_cast<float>(event->position().x()), static_cast<float>(event->position().y())),
+		.modifiers = Input::GetModifiers(static_cast<uint32_t>(event->modifiers().toInt()))
 	};
 	emit mouseReleased(evt);
 	QWidget::mouseReleaseEvent(event);
@@ -141,8 +141,8 @@ void Viewport::wheelEvent(QWheelEvent* event)
 	const float notches = event->angleDelta().y() / 120.0f;
 	const MouseScrollEvent evt{
 		.delta = notches,
-		.position = Input::GetMousePos(event->position()),
-		.modifiers = Input::GetModifiers(event->modifiers()),
+		.position = Input::GetMousePos(static_cast<float>(event->position().x()), static_cast<float>(event->position().y())),
+		.modifiers = Input::GetModifiers(static_cast<uint32_t>(event->modifiers().toInt())),
 		.leftHeld = m_leftHeld,
 		.middleHeld = m_middleHeld,
 		.rightHeld = m_rightHeld

@@ -1,38 +1,54 @@
 /**
  * @file Input.cpp
  * @brief Implementation of Input static translation helpers.
+ *
+ * Qt types are unwrapped by callers — Input.cpp only deals with raw C++ types.
+ * The internal conversions match Qt::KeyboardModifier / Qt::MouseButton values,
+ * but no Qt headers are exposed through Input.h.
  */
 
 #include "editor/Input.h"
 
+#include <QObject>   // Qt::KeyboardModifier, Qt::MouseButton
+
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Translation helpers
+// GetMousePos — float pair → glm::vec2
 // ---------------------------------------------------------------------------
 
-glm::vec2 Input::GetMousePos(const QPointF& pos)
+glm::vec2 Input::GetMousePos(float x, float y)
 {
-	return glm::vec2(static_cast<float>(pos.x()), static_cast<float>(pos.y()));
+	return glm::vec2(x, y);
 }
 
-Input::Modifiers Input::GetModifiers(const Qt::KeyboardModifiers mods)
+// ---------------------------------------------------------------------------
+// GetModifiers — uint32_t → Modifiers bitmask
+// ---------------------------------------------------------------------------
+
+Input::Modifiers Input::GetModifiers(uint32_t qtMods)
 {
-	int mask = 0;
-	if (mods & Qt::ShiftModifier)   mask |= Mod_Shift;
-	if (mods & Qt::ControlModifier) mask |= Mod_Ctrl;
-	if (mods & Qt::AltModifier)     mask |= Mod_Alt;
-	return static_cast<Modifiers>(mask);
+	auto mods = static_cast<Qt::KeyboardModifiers>(qtMods);
+
+	int result = Mod_None;
+	if (mods & Qt::ShiftModifier)   result |= Mod_Shift;
+	if (mods & Qt::ControlModifier) result |= Mod_Ctrl;
+	if (mods & Qt::AltModifier)     result |= Mod_Alt;
+	return static_cast<Modifiers>(result);
 }
 
-Input::MouseButton Input::GetMouseButton(const Qt::MouseButton btn)
+// ---------------------------------------------------------------------------
+// GetMouseButton — uint32_t → MouseButton
+// ---------------------------------------------------------------------------
+
+Input::MouseButton Input::GetMouseButton(uint32_t qtBtn)
 {
-	switch (btn)
+	switch (static_cast<Qt::MouseButton>(qtBtn))
 	{
 	case Qt::LeftButton:   return MouseButton::Left;
 	case Qt::RightButton:  return MouseButton::Right;
 	case Qt::MiddleButton: return MouseButton::Middle;
-	default:               return MouseButton::Left;
+	default:               return MouseButton::Left;  // fallback
 	}
 }
 

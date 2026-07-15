@@ -57,7 +57,7 @@ qt_add_resources(neurus_ui "icons"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/movie.svg"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/movie_off.svg"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/preview_invisible.svg"
-		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/preivew_visible.svg"
+		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/preview_visible.svg"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/render_invisible.svg"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/render_visible.svg"
 )

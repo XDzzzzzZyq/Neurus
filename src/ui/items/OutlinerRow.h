@@ -87,9 +87,9 @@ public:
 	/**
 	 * @brief Applies visual styling: selection highlight and row background.
 	 *
-	 * Active  → white name text.
-	 * Selected (non-active) → blue name text.
-	 * Neither → dim gray name text.
+	 * Active  → orange name text (#ff6f00).
+	 * Selected (non-active) → blue name text (#4A90D9).
+	 * Neither → black name text (#000000).
 	 * Row background alternates on odd/even rowIndex for readability.
 	 *
 	 * @param isActive   True if this row is the primary (active) selection.

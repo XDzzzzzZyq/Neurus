@@ -1,33 +1,26 @@
 /**
  * @file Input.h
- * @brief Pure static translation helpers for converting Qt input types to engine types.
+ * @brief Pure static translation helpers for converting raw input values to engine types.
  *
  * Architecture:
- * - Stateless static utility — no member variables, no QObject, no state machine.
- * - Three translation methods: Qt mouse position → glm::vec2, Qt modifiers → bitmask,
- *   Qt mouse button → Input::MouseButton.
+ * - Stateless static utility — no member variables, no state machine.
+ * - Three translation methods: raw position → glm::vec2, raw modifier int → bitmask,
+ *   raw button int → Input::MouseButton.
+ * - No Qt dependency — callers unwrap Qt types before calling.
  * - No more polling loop, no triple-buffer, no key state queries.
  *
  * @note Editor Layer: Input is part of the Editor system, not UI or Renderer.
- * @note Not thread-safe — must be used from the main (Qt) thread only.
  */
+
 #pragma once
 
+#include <cstdint>
 #include <glm/glm.hpp>
-#include <QObject>
-#include <QPoint>
 
 namespace neurus {
 
 /**
- * @brief Stateless static helper for translating Qt input primitives.
- *
- * The old Input class was a global-state polling system (triple-buffer key/mouse
- * arrays, per-frame UpdateState(), InputState struct). It has been stripped down
- * to three pure translation methods that convert Qt event data into engine types.
- *
- * The Viewport class emits Qt signals for input events; controllers and Editor
- * react directly to those signals. Input no longer owns any state.
+ * @brief Stateless static helper for translating raw input primitives.
  */
 class Input
 {
@@ -36,7 +29,7 @@ public:
 	// Mouse button identifiers
 	// -----------------------------------------------------------------------
 
-	/** @brief Mouse button index for use with Qt mouse events. */
+	/** @brief Mouse button index. */
 	enum MouseButton
 	{
 		Left = 0,   ///< Left mouse button
@@ -49,11 +42,9 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Converts a Qt QPointF mouse position to a glm::vec2.
-	 * @param pos Widget-local cursor position from a Qt mouse event.
-	 * @return glm::vec2 with x = pos.x(), y = pos.y().
+	 * @brief Builds a glm::vec2 from raw coordinates.
 	 */
-	static glm::vec2 GetMousePos(const QPointF& pos);
+	static glm::vec2 GetMousePos(float x, float y);
 
 	// -----------------------------------------------------------------------
 	// Modifier key flags (combinable bitmask)
@@ -69,19 +60,17 @@ public:
 	};
 
 	/**
-	 * @brief Translates Qt keyboard modifiers into a Modifiers bitmask.
-	 * @param mods Qt::KeyboardModifiers from a mouse or key event.
-	 * @return Bitmask of active modifier keys.
+	 * @brief Translates a raw modifier integer into a Modifiers bitmask.
+	 * @param qtMods Raw modifier value (e.g. static_cast<uint32_t>(Qt::KeyboardModifiers)).
 	 */
-	static Modifiers GetModifiers(Qt::KeyboardModifiers mods);
+	static Modifiers GetModifiers(uint32_t qtMods);
 
 	/**
-	 * @brief Maps a Qt::MouseButton enum to Input::MouseButton.
-	 * @param btn Qt mouse button identifier from a mouse event.
-	 * @return Corresponding Input::MouseButton. Falls back to Left for
-	 *         unrecognised buttons.
+	 * @brief Maps a raw button integer to Input::MouseButton.
+	 * @param qtBtn Raw button value (e.g. static_cast<uint32_t>(Qt::MouseButton)).
+	 * @return Corresponding Input::MouseButton. Falls back to Left for unrecognised values.
 	 */
-	static MouseButton GetMouseButton(Qt::MouseButton btn);
+	static MouseButton GetMouseButton(uint32_t qtBtn);
 };
 
 } // namespace neurus

@@ -73,7 +73,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	// Lambda reads m_objectId at emission time — works after SetObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
-		const auto mods = Input::GetModifiers(QGuiApplication::queryKeyboardModifiers());
+		const auto mods = Input::GetModifiers(static_cast<uint32_t>(QGuiApplication::queryKeyboardModifiers().toInt()));
 		emit objectSelected(ObjectSelected{m_objectId, mods});
 	});
 	rowLayout->addWidget(m_nameBtn);
@@ -92,7 +92,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_eyeBtn->setFlat(true);
 	m_eyeBtn->setFixedSize(kToggleBtnSize);
 	m_eyeBtn->setIconSize(kToggleIconSize);
-	m_eyeBtn->setIcon(Icons::GetIcon("editor:preivew_visible"));
+	m_eyeBtn->setIcon(Icons::GetIcon("editor:preview_visible"));
 	m_eyeBtn->setToolTip(QString::fromUtf8("Viewport visibility"));
 	m_eyeBtn->setCursor(Qt::PointingHandCursor);
 	auto* eyeFx = new QGraphicsColorizeEffect(m_eyeBtn);
@@ -121,7 +121,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	QObject::connect(m_eyeBtn, &QPushButton::toggled, this,
 		[this](bool viewportChecked) {
 			m_eyeBtn->setIcon(Icons::GetIcon(
-				viewportChecked ? "editor:preivew_visible" : "editor:preview_invisible"));
+				viewportChecked ? "editor:preview_visible" : "editor:preview_invisible"));
 			auto* fx = qobject_cast<QGraphicsColorizeEffect*>(m_eyeBtn->graphicsEffect());
 			if (fx) fx->setColor(viewportChecked ? QColor("#444444") : QColor("#d0d0d0"));
 			emit visibilityChanged(VisibilityChanged{m_objectId, viewportChecked, m_renderBtn->isChecked()});
@@ -146,7 +146,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 void OutlinerRow::UpdateToggleIcons()
 {
 	m_eyeBtn->setIcon(Icons::GetIcon(
-		m_eyeBtn->isChecked() ? "editor:preivew_visible" : "editor:preview_invisible"));
+		m_eyeBtn->isChecked() ? "editor:preview_visible" : "editor:preview_invisible"));
 	auto* eyeFx = qobject_cast<QGraphicsColorizeEffect*>(m_eyeBtn->graphicsEffect());
 	if (eyeFx) eyeFx->setColor(m_eyeBtn->isChecked() ? QColor("#444444") : QColor("#d0d0d0"));
 
@@ -212,11 +212,11 @@ void OutlinerRow::SetStyle(bool isActive, bool isSelected, int rowIndex)
 	// --- Selection text color ---
 	QString color;
 	if (isActive)
-		color = QString::fromUtf8("#ff6f00");    // bright white — active
+		color = QString::fromUtf8("#ff6f00");    // orange — active
 	else if (isSelected)
 		color = QString::fromUtf8("#4A90D9");    // blue — selected, not active
 	else
-		color = QString::fromUtf8("#000000");    // dim gray — deselected
+		color = QString::fromUtf8("#000000");    // black — deselected
 	m_nameBtn->setStyleSheet(
 		QString::fromUtf8("QPushButton { color: %1; }").arg(color));
 

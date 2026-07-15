@@ -13,7 +13,7 @@
  * - Each recycled row calls SetObject() — signal lambdas read the current
  *   m_objectId at emission time, so no manual rewire needed
  * - Row signals forwarded via Outliner::objectSelected / visibilityChanged
- * - No Vulkan, Renderer, or scene-layer headers — pure Qt6 Widgets
+ * - Reads scene data via UIContext — no Renderer or Vulkan headers
  */
 
 #pragma once

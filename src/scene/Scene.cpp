@@ -108,7 +108,7 @@ void Scene::RebuildObjList()
 		{
 			auto* basePtr = static_cast<ObjectID*>(obj.get());
 			int id_obj = basePtr->GetObjectID();
-			obj_list[id] = Resource<ObjectID>(obj, basePtr);
+			obj_list[id_obj] = Resource<ObjectID>(obj, basePtr);
 		}
 	};
 
