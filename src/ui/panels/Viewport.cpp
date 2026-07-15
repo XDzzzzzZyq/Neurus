@@ -2,7 +2,6 @@
 
 #include "UIContext.h"
 #include "core/Log.h"
-#include "editor/Input.h"
 #include "editor/events/UIEvents.h"
 
 #include <QKeyEvent>
@@ -57,9 +56,6 @@ void Viewport::resizeEvent(QResizeEvent* event)
 
 void Viewport::keyPressEvent(QKeyEvent* event)
 {
-	// Forward all key presses to the Input system for per-frame querying
-	Input::RecordKeyPress(event->key());
-
 	if (event->key() == Qt::Key_F12)
 	{
 		if (event->modifiers() == Qt::NoModifier)
@@ -84,49 +80,74 @@ void Viewport::keyPressEvent(QKeyEvent* event)
 
 void Viewport::keyReleaseEvent(QKeyEvent* event)
 {
-	Input::RecordKeyRelease(event->key());
 	QWidget::keyReleaseEvent(event);
 }
 
 void Viewport::mouseMoveEvent(QMouseEvent* event)
 {
 	const QPointF pos = event->position();
-	Input::RecordMouseMove(static_cast<float>(pos.x()), static_cast<float>(pos.y()));
+	const MouseMoveEvent evt{
+		.position = Input::GetMousePos(pos),
+		.delta = Input::GetMousePos(pos - m_lastPos),
+		.modifiers = Input::GetModifiers(event->modifiers()),
+		.leftHeld = m_leftHeld,
+		.middleHeld = m_middleHeld,
+		.rightHeld = m_rightHeld
+	};
+	m_lastPos = pos;
+	emit mouseMoved(evt);
 	QWidget::mouseMoveEvent(event);
 }
 
 void Viewport::mousePressEvent(QMouseEvent* event)
 {
-	const auto button = event->button();
-	if (button == Qt::LeftButton)
-		Input::RecordMousePress(Input::MouseButton::Left);
-	else if (button == Qt::RightButton)
-		Input::RecordMousePress(Input::MouseButton::Right);
-	else if (button == Qt::MiddleButton)
-		Input::RecordMousePress(Input::MouseButton::Middle);
-
+	m_lastPos = event->position();  // Reset delta on press
+	const auto btn = Input::GetMouseButton(event->button());
+	switch (btn)
+	{
+		case Input::MouseButton::Left:   m_leftHeld = true; break;
+		case Input::MouseButton::Right:  m_rightHeld = true; break;
+		case Input::MouseButton::Middle: m_middleHeld = true; break;
+	}
+	const MousePressEvent evt{
+		.button = btn,
+		.position = Input::GetMousePos(event->position()),
+		.modifiers = Input::GetModifiers(event->modifiers())
+	};
+	emit mousePressed(evt);
 	QWidget::mousePressEvent(event);
 }
 
 void Viewport::mouseReleaseEvent(QMouseEvent* event)
 {
-	const auto button = event->button();
-	if (button == Qt::LeftButton)
-		Input::RecordMouseRelease(Input::MouseButton::Left);
-	else if (button == Qt::RightButton)
-		Input::RecordMouseRelease(Input::MouseButton::Right);
-	else if (button == Qt::MiddleButton)
-		Input::RecordMouseRelease(Input::MouseButton::Middle);
-
+	const auto btn = Input::GetMouseButton(event->button());
+	switch (btn)
+	{
+		case Input::MouseButton::Left:   m_leftHeld = false; break;
+		case Input::MouseButton::Right:  m_rightHeld = false; break;
+		case Input::MouseButton::Middle: m_middleHeld = false; break;
+	}
+	const MouseReleaseEvent evt{
+		.button = btn,
+		.position = Input::GetMousePos(event->position()),
+		.modifiers = Input::GetModifiers(event->modifiers())
+	};
+	emit mouseReleased(evt);
 	QWidget::mouseReleaseEvent(event);
 }
 
 void Viewport::wheelEvent(QWheelEvent* event)
 {
-	// angleDelta().y() is typically ±120 per notch → divide by 120 for
-	// notches, then by 8 for the common "lines per notch" factor ≈ ±1.
 	const float notches = event->angleDelta().y() / 120.0f;
-	Input::RecordScroll(notches);
+	const MouseScrollEvent evt{
+		.delta = notches,
+		.position = Input::GetMousePos(event->position()),
+		.modifiers = Input::GetModifiers(event->modifiers()),
+		.leftHeld = m_leftHeld,
+		.middleHeld = m_middleHeld,
+		.rightHeld = m_rightHeld
+	};
+	emit mouseScrolled(evt);
 	QWidget::wheelEvent(event);
 }
 

@@ -5,9 +5,10 @@
 #include <QString>
 
 #include "controllers/Controllers.h"
-#include "editor/Input.h"        // InputState
+#include "editor/Input.h"
+#include "editor/events/EventBus.h"
 #include "render/RenderConfig.h"
-#include "render/RenderContext.h" // RenderContext (pure data, no Vulkan)
+#include "render/RenderContext.h"
 #include "ui/UIContext.h"
 
 // Forward declarations (no render headers!)
@@ -17,7 +18,6 @@ class DeferredRenderer;
 class Scene;
 class Environment;
 class UploadManager;
-class EventQueue;
 }
 
 namespace neurus::project {
@@ -37,7 +37,7 @@ namespace neurus {
 class Editor
 {
 public:
-	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer, EventQueue& eventBus);
+	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer);
 	~Editor();
 
 	Editor(const Editor&) = delete;
@@ -80,26 +80,39 @@ public:
 	/**
 	 * @brief Registers a controller of type T, calls Init(bus), and stores it.
 	 * @tparam T Controller type (must derive from Controllers).
-	 * @param bus EventQueue to pass to the controller's Init().
 	 */
 	template<typename T>
-	void RegisterController(EventQueue& bus)
+	void RegisterController()
 	{
 		auto ctrl = std::make_unique<T>();
-		ctrl->Init(bus);
+		ctrl->Init(ed_eventBus);
 		ed_controllers.push_back(std::move(ctrl));
 	}
 
 	/**
-	 * @brief Translates raw InputState into CameraEvents and dispatches them.
+	 * @brief Processes all enqueued events (called once per frame from newFrame).
 	 *
-	 * Reads modifier keys and mouse deltas from InputState, enqueues the
-	 * appropriate CameraEvent (rotate, push, slide, zoom), then calls
-	 * EventQueue().Process() to dispatch to CameraController handlers.
-	 *
-	 * @param input Raw input state from Input::GetInputState().
+	 * Dispatches events enqueued by Viewport signal handlers
+	 * (OnMouseMoved, OnMouseScrolled) and other sources through
+	 * EventQueue::Process().
 	 */
-	void Edit(const InputState& input);
+	void Edit();
+
+	/**
+	 * @brief Handles mouse movement from the Viewport and enqueues camera events.
+	 *
+	 * Translates MMB drag + modifiers into CameraRotateEvent / CameraPushEvent /
+	 * CameraSlideEvent and enqueues to the internal EventQueue.
+	 *
+	 * @param e Mouse move event from Viewport::mouseMoved signal.
+	 */
+	void OnMouseMoved(const MouseMoveEvent& e);
+
+	/**
+	 * @brief Handles mouse scroll from the Viewport and enqueues a camera zoom event.
+	 * @param e Mouse scroll event from Viewport::mouseScrolled signal.
+	 */
+	void OnMouseScrolled(const MouseScrollEvent& e);
 
 	/**
 	 * @brief Handles viewport resize by dispatching a CameraResizeEvent.
@@ -173,6 +186,7 @@ private:
 	void GenerateIBL(const std::shared_ptr<Environment>& env);  ///< Shared IBL generation: loads HDR/fallback, generates cubemaps via IBLPass
 
 	// --- Owned ---
+	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
 	std::unique_ptr<neurus::project::Project> ed_project;
 	std::unique_ptr<UploadManager> ed_uploadManager;
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
@@ -180,7 +194,6 @@ private:
 	// --- Non-owning references ---
 	VulkanContext* ed_vkContext = nullptr;
 	DeferredRenderer* ed_renderer = nullptr;
-	EventQueue& ed_eventBus;                     ///< Application-owned EventBus (non-owning reference)
 	Scene* ed_ownerScene = nullptr;  ///< Scene passed to Initialize()
 };
 

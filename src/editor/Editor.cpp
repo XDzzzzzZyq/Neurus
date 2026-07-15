@@ -52,10 +52,9 @@ static QString resolveResourcePath(const char* relativePath)
 
 namespace neurus {
 
-Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer, EventQueue& eventBus)
+Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer)
 	: ed_vkContext(vkCtx)
 	, ed_renderer(renderer)
-	, ed_eventBus(eventBus)
 {
 	if (ed_vkContext && ed_renderer)
 	{
@@ -126,7 +125,7 @@ void Editor::Initialize(Scene& scene)
 	OnIBLLoad();
 
 	// --- Register controllers ---
-	RegisterController<CameraController>(ed_eventBus);
+	RegisterController<CameraController>();
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
@@ -495,29 +494,45 @@ void Editor::HandleResize(uint32_t width, uint32_t height)
 }
 
 // =========================================================================
-// Edit() – translate InputState → CameraEvents, following OpenGL Viewport.cpp pattern
+// Edit() — process all enqueued events (called from newFrame)
 // =========================================================================
 
-void Editor::Edit(const InputState& input)
+void Editor::Edit()
 {
-	auto& scene = GetScene();
-	auto* cam = const_cast<Camera*>(scene.GetActiveCamera());
+	ed_eventBus.Process();
+}
+
+// =========================================================================
+// OnMouseMoved() — Viewport mouseMoved → CameraEvents
+// =========================================================================
+
+void Editor::OnMouseMoved(const MouseMoveEvent& e)
+{
+	auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
 	if (!cam) return;
 
-	// Translate InputState → CameraEvents (matching OpenGL Viewport.cpp:178-198)
-	if (input.middleMouseHeld)
+	if (e.middleHeld)
 	{
-		if (input.ctrlHeld)
-			ed_eventBus.enqueue(CameraPushEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
-		else if (input.shiftHeld)
-			ed_eventBus.enqueue(CameraSlideEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+		if (e.modifiers & Input::Mod_Ctrl)
+			ed_eventBus.enqueue(CameraPushEvent{cam, e.delta.x, e.delta.y});
+		else if (e.modifiers & Input::Mod_Shift)
+			ed_eventBus.enqueue(CameraSlideEvent{cam, e.delta.x, e.delta.y});
 		else
-			ed_eventBus.enqueue(CameraRotateEvent{cam, input.mouseDeltaX, input.mouseDeltaY});
+			ed_eventBus.enqueue(CameraRotateEvent{cam, e.delta.x, e.delta.y});
 	}
-	if (std::abs(input.scrollDelta) > 0.001f)
-		ed_eventBus.enqueue(CameraZoomEvent{cam, input.scrollDelta});
+}
 
-	// Process() is called once at the end of newFrame, not here.
+// =========================================================================
+// OnMouseScrolled() — Viewport mouseScrolled → CameraZoomEvent
+// =========================================================================
+
+void Editor::OnMouseScrolled(const MouseScrollEvent& e)
+{
+	auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
+	if (!cam) return;
+
+	if (std::abs(e.delta) > 0.001f)
+		ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
 }
 
 } // namespace neurus
