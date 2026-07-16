@@ -2,8 +2,16 @@
 
 #include "Icons.h"
 #include "UIContext.h"
+#include "items/CameraProperties.h"
+#include "items/EnvironmentProperties.h"
+#include "items/LightProperties.h"
+#include "items/MeshProperties.h"
 #include "items/Vec3Spin.h"
 
+#include "scene/Camera.h"
+#include "scene/Environment.h"
+#include "scene/Light.h"
+#include "scene/Mesh.h"
 #include "scene/Scene.h"
 #include "scene/Transform.h"
 #include "scene/UID.h"
@@ -27,6 +35,12 @@ PropertyPanel::PropertyPanel(QWidget* parent)
 
 	BuildTransformEditor();
 	mainLayout->addWidget(m_transformGroup);
+
+	BuildTypeSubpanels();
+	mainLayout->addWidget(m_cameraProps);
+	mainLayout->addWidget(m_meshProps);
+	mainLayout->addWidget(m_lightProps);
+	mainLayout->addWidget(m_envProps);
 
 	m_emptyLabel = new QLabel("No selected object");
 	m_emptyLabel->setAlignment(Qt::AlignCenter);
@@ -107,7 +121,6 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 		const glm::vec3& rot = xform->GetRotation();
 		const glm::vec3& scl = xform->GetScale();
 
-
 		// Vec3Spin::setValue handles dirty-check internally
 		m_posSpin->setValue(pos.x, pos.y, pos.z);
 		m_rotSpin->setValue(rot.x, rot.y, rot.z);
@@ -118,6 +131,67 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 	else
 	{
 		SetEnabled(false);
+	}
+
+	// --- Type-specific subpanel ---
+	ShowTypeSubpanel(static_cast<int>(activeObj->o_type));
+	switch (activeObj->o_type)
+	{
+	case ObjectID::GOType::GO_CAM:
+	{
+		auto it = scene->cam_list.find(objectId);
+		if (it != scene->cam_list.end())
+		{
+			auto* cam = it->second.get();
+			m_cameraProps->setObjectId(objectId);
+			m_cameraProps->setTarget(cam->cam_tar);
+			m_cameraProps->setFov(cam->cam_pers);
+		}
+		break;
+	}
+	case ObjectID::GOType::GO_MESH:
+	{
+		auto it = scene->mesh_list.find(objectId);
+		if (it != scene->mesh_list.end())
+		{
+			auto* mesh = it->second.get();
+			m_meshProps->setObjectId(objectId);
+			m_meshProps->setMeshPath(mesh->o_meshPath);
+			m_meshProps->setShadowEnabled(mesh->using_shadow);
+			m_meshProps->setMaterialEnabled(mesh->using_material);
+		}
+		break;
+	}
+	case ObjectID::GOType::GO_LIGHT:
+	case ObjectID::GOType::GO_POLYLIGHT:
+	{
+		auto it = scene->light_list.find(objectId);
+		if (it != scene->light_list.end())
+		{
+			auto* light = it->second.get();
+			m_lightProps->setObjectId(objectId);
+			m_lightProps->setLightType(Light::ParseLightName(light->light_type).second);
+			m_lightProps->setPower(light->light_power);
+			m_lightProps->setRadius(light->light_radius);
+			m_lightProps->setShadowEnabled(light->use_shadow);
+		}
+		break;
+	}
+	case ObjectID::GOType::GO_ENVIR:
+	{
+		auto it = scene->env_list.find(objectId);
+		if (it != scene->env_list.end())
+		{
+			auto* env = it->second.get();
+			m_envProps->setObjectId(objectId);
+			m_envProps->setIntensity(env->GetIntensity());
+			m_envProps->setRotation(env->GetRotation());
+			m_envProps->setEquirectPath(env->GetEquirectPath());
+		}
+		break;
+	}
+	default:
+		break;
 	}
 }
 
@@ -217,6 +291,85 @@ void PropertyPanel::SetEnabled(bool enabled)
 	m_transformGroup->setVisible(enabled);
 	m_transformGroup->setEnabled(enabled);
 	m_emptyLabel->setVisible(!enabled);
+
+	if (!enabled)
+	{
+		ShowTypeSubpanel(static_cast<int>(ObjectID::GOType::NONE_GO));
+	}
+}
+
+// =========================================================================
+// BuildTypeSubpanels — create type-specific editors (each owns its QGroupBox)
+// =========================================================================
+
+void PropertyPanel::BuildTypeSubpanels()
+{
+	m_cameraProps = new CameraProperties(this);
+	m_meshProps   = new MeshProperties(this);
+	m_lightProps  = new LightProperties(this);
+	m_envProps    = new EnvironmentProperties(this);
+
+	// --- Forward signals from subpanels to PropertyPanel signals ---
+
+	// Camera
+	QObject::connect(m_cameraProps, &CameraProperties::targetChanged, this,
+		[this](int objectId, float x, float y, float z) {
+			emit cameraTargetChanged({objectId, x, y, z});
+		});
+	QObject::connect(m_cameraProps, &CameraProperties::fovChanged, this,
+		[this](int objectId, float fov) {
+			emit cameraFovChanged({objectId, fov});
+		});
+
+	// Mesh
+	QObject::connect(m_meshProps, &MeshProperties::shadowChanged, this,
+		[this](int objectId, bool enabled) {
+			emit meshShadowChanged({objectId, enabled});
+		});
+	QObject::connect(m_meshProps, &MeshProperties::materialChanged, this,
+		[this](int objectId, bool enabled) {
+			emit meshMaterialChanged({objectId, enabled});
+		});
+
+	// Light
+	QObject::connect(m_lightProps, &LightProperties::powerChanged, this,
+		[this](int objectId, float power) {
+			emit lightPowerChanged({objectId, power});
+		});
+	QObject::connect(m_lightProps, &LightProperties::radiusChanged, this,
+		[this](int objectId, float radius) {
+			emit lightRadiusChanged({objectId, radius});
+		});
+	QObject::connect(m_lightProps, &LightProperties::shadowChanged, this,
+		[this](int objectId, bool enabled) {
+			emit lightShadowChanged({objectId, enabled});
+		});
+
+	// Environment
+	QObject::connect(m_envProps, &EnvironmentProperties::intensityChanged, this,
+		[this](int objectId, float intensity) {
+			emit envIntensityChanged({objectId, intensity});
+		});
+	QObject::connect(m_envProps, &EnvironmentProperties::rotationChanged, this,
+		[this](int objectId, float rotation) {
+			emit envRotationChanged({objectId, rotation});
+		});
+
+	// Start with all hidden
+	ShowTypeSubpanel(static_cast<int>(ObjectID::GOType::NONE_GO));
+}
+
+// =========================================================================
+// ShowTypeSubpanel — show only the subpanel matching the given GOType
+// =========================================================================
+
+void PropertyPanel::ShowTypeSubpanel(int goType)
+{
+	m_cameraProps->setVisible(goType == static_cast<int>(ObjectID::GOType::GO_CAM));
+	m_meshProps->setVisible(goType == static_cast<int>(ObjectID::GOType::GO_MESH));
+	m_lightProps->setVisible(goType == static_cast<int>(ObjectID::GOType::GO_LIGHT) ||
+	                         goType == static_cast<int>(ObjectID::GOType::GO_POLYLIGHT));
+	m_envProps->setVisible(goType == static_cast<int>(ObjectID::GOType::GO_ENVIR));
 }
 
 } // namespace neurus

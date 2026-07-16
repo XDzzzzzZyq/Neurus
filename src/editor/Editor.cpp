@@ -162,6 +162,89 @@ void Editor::Initialize(Scene& scene)
 		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
 	});
 
+	// --- Camera property events ---
+
+	ed_eventBus.subscribe<CameraTargetChanged>([this](const CameraTargetChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.cam_list.find(e.objectId);
+		if (it == scene.cam_list.end()) return;
+		it->second->SetTarPos(glm::vec3(e.targetX, e.targetY, e.targetZ));
+		ed_project->MarkDirty();
+	});
+
+	ed_eventBus.subscribe<CameraFovChanged>([this](const CameraFovChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.cam_list.find(e.objectId);
+		if (it == scene.cam_list.end()) return;
+		it->second->ChangeCamPersp(e.fov);
+		ed_project->MarkDirty();
+	});
+
+	// --- Mesh property events ---
+
+	ed_eventBus.subscribe<MeshShadowChanged>([this](const MeshShadowChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.mesh_list.find(e.objectId);
+		if (it == scene.mesh_list.end()) return;
+		it->second->EnableShadow(e.enabled);
+		ed_project->MarkDirty();
+	});
+
+	ed_eventBus.subscribe<MeshMaterialChanged>([this](const MeshMaterialChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.mesh_list.find(e.objectId);
+		if (it == scene.mesh_list.end()) return;
+		it->second->EnableMaterial(e.enabled);
+		ed_project->MarkDirty();
+	});
+
+	// --- Light property events ---
+
+	ed_eventBus.subscribe<LightPowerChanged>([this](const LightPowerChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.light_list.find(e.objectId);
+		if (it == scene.light_list.end()) return;
+		it->second->SetPower(e.power);
+		ed_project->MarkDirty();
+		UploadLighting();
+	});
+
+	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.light_list.find(e.objectId);
+		if (it == scene.light_list.end()) return;
+		it->second->SetRadius(e.radius);
+		ed_project->MarkDirty();
+		UploadLighting();
+	});
+
+	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.light_list.find(e.objectId);
+		if (it == scene.light_list.end()) return;
+		it->second->SetShadow(e.enabled);
+		ed_project->MarkDirty();
+		UploadLighting();
+	});
+
+	// --- Environment property events ---
+
+	ed_eventBus.subscribe<EnvironmentIntensityChanged>([this](const EnvironmentIntensityChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.env_list.find(e.objectId);
+		if (it == scene.env_list.end()) return;
+		it->second->SetIntensity(e.intensity);
+		ed_project->MarkDirty();
+	});
+
+	ed_eventBus.subscribe<EnvironmentRotationChanged>([this](const EnvironmentRotationChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.env_list.find(e.objectId);
+		if (it == scene.env_list.end()) return;
+		it->second->SetRotation(e.rotation);
+		ed_project->MarkDirty();
+	});
+
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
 

@@ -361,6 +361,23 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::positionChanged);
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::rotationChanged);
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::scaleChanged);
+
+		// Camera properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::cameraTargetChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::cameraFovChanged);
+
+		// Mesh properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::meshShadowChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::meshMaterialChanged);
+
+		// Light properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightPowerChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightRadiusChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightShadowChanged);
+
+		// Environment properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::envIntensityChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::envRotationChanged);
 	}
 }
 
