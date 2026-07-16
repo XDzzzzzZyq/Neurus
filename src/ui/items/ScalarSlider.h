@@ -77,6 +77,7 @@ private:
 	double          m_min         = 0.0;
 	double          m_max         = 1.0;
 	int             m_sliderSteps = 100;
+	double			m_v			  = 0.0;
 };
 
 } // namespace neurus
