@@ -135,9 +135,10 @@ void Outliner::Refresh(const UIContext& ctx)
 		// Sync visibility toggles to the object's actual flags.
 		m_rowPool[poolIndex]->SetVisibilities(obj->is_viewport, obj->is_rendered);
 
-		// Phase 2 — apply visual styling (selection highlight + row bg).
+		// Phase 2 — apply selection highlight (QSS property) + row background.
 		neurus::SelectionMode mode = scene->selections.GetMode(obj);
-		m_rowPool[poolIndex]->SetStyle(int(mode), poolIndex);
+		m_rowPool[poolIndex]->SetSelectionMode(mode);
+		m_rowPool[poolIndex]->SetRowIndex(static_cast<int>(poolIndex));
 
 		m_rowPool[poolIndex]->setVisible(true);
 		++poolIndex;

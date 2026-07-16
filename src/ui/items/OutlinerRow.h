@@ -10,7 +10,7 @@
  * Architecture:
  * - Constructor creates the layout and child widgets once.
  * - SetObject() binds object data (icon name, name, id); resets toggles.
- * - SetStyle() applies visual state (selection highlight, alternating bg).
+ * - SetSelectionMode() / SetRowIndex() apply visual state (QSS property + alternating bg).
  * - Signal lambdas read from m_objectId at emission time, so recycling
  *   a row to a new objectId is transparent — no manual rewire needed.
  * - Visibility toggle buttons swap between visible/invisible icons
@@ -24,6 +24,8 @@
 
 #include "editor/events/EditorEvents.h"
 
+#include <cstdint>
+
 #include <string>
 
 class QLabel;
@@ -31,6 +33,9 @@ class QPushButton;
 
 namespace neurus
 {
+
+/** @brief Forward declaration (defined in core/Selections.h). */
+enum class SelectionMode : uint32_t;
 
 /**
  * @brief A single row in the Outliner list view (pool-compatible).
@@ -86,17 +91,26 @@ public:
 	void SetVisibilities(bool viewportVisible, bool renderVisible);
 
 	/**
-	 * @brief Applies visual styling: selection highlight and row background.
+	 * @brief Sets selection visual state via QSS dynamic property.
 	 *
-	 * Active  → orange name text (#ff6f00).
-	 * Selected (non-active) → blue name text (#4A90D9).
-	 * Neither → black name text (#000000).
-	 * Row background alternates on odd/even rowIndex for readability.
+	 * Maps SelectionMode to "selectionState" property on m_nameBtn:
+	 *   Active   → "active"   (#ff6f00 via QSS)
+	 *   Selected → "selected" (#4A90D9 via QSS)
+	 *   Neither  → "normal"   (#000000 via QSS)
 	 *
-	 * @param mode      Bitmask representing selection state (Active, Selected).
-	 * @param rowIndex  0-based row position for alternating background.
+	 * @param mode   Selection mode bitmask (Active / Selected).
 	 */
-	void SetStyle(int mode, int rowIndex);
+	void SetSelectionMode(SelectionMode mode);
+
+	/**
+	 * @brief Sets row index for alternating background.
+	 *
+	 * Odd rows get a translucent white background, even rows are transparent.
+	 * No-op if rowIndex hasn't changed (dirty check).
+	 *
+	 * @param rowIndex  0-based row position.
+	 */
+	void SetRowIndex(int rowIndex);
 
 	/** @brief Returns the stored object identifier. */
 	int GetObjectId() const { return m_objectId; }
@@ -109,16 +123,21 @@ signals:
 	void visibilityChanged(const VisibilityChanged& e);
 
 private:
-	/** @brief Updates both visibility toggle icons from the Icons cache. */
-	void UpdateToggleIcons();
+	/** @brief Sets the eye button colorize effect from current checked state. */
+	void SetEyeBtnColor();
 
-	QLabel*      m_typeLabel  = nullptr;
-	QPushButton* m_nameBtn    = nullptr;
-	QPushButton* m_eyeBtn     = nullptr;
-	QPushButton* m_renderBtn  = nullptr;
-	int          m_objectId   = -1;
-	int 		 m_mode       = -1;
-	int 		 m_idx		  = -1;
+	/** @brief Sets the render button colorize effect from current checked state. */
+	void SetRenderBtnColor();
+
+	QLabel*      m_typeLabel     = nullptr;
+	QPushButton* m_nameBtn       = nullptr;
+	QPushButton* m_eyeBtn        = nullptr;
+	QPushButton* m_renderBtn     = nullptr;
+	int          m_objectId      = -1;
+	int 		 m_mode          = -1;
+	int 		 m_idx           = -1;
+	bool         m_eyeVisible    = true;
+	bool         m_renderVisible = true;
 };
 
 } // namespace neurus

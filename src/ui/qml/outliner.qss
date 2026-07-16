@@ -13,6 +13,15 @@ QPushButton#outlinerNameBtn:pressed {
 	color: #676767;
 	background: rgba(0, 0, 0, 0.1);
 }
+QPushButton#outlinerNameBtn[selectionState="active"] {
+	color: #ff6f00;
+}
+QPushButton#outlinerNameBtn[selectionState="selected"] {
+	color: #4A90D9;
+}
+QPushButton#outlinerNameBtn[selectionState="normal"] {
+	color: #000000;
+}
 
 QPushButton#outlinerToggleBtn {
 	border: 1px solid transparent;
