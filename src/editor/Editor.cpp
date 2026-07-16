@@ -320,7 +320,7 @@ void Editor::OnCameraAdd()
 {
 	try {
 		auto camera = std::make_shared<neurus::Camera>();
-		camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 		ed_project->GetScene().UseCamera(camera);
 		ed_project->MarkDirty();

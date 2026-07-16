@@ -222,7 +222,7 @@ protected:
 	std::shared_ptr<Camera> CreateDefaultCamera()
 	{
 		auto cam = std::make_shared<Camera>();
-		cam->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+		cam->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		cam->ChangeCamRatio(static_cast<float>(kRenderWidth), static_cast<float>(kRenderHeight));
 		return cam;

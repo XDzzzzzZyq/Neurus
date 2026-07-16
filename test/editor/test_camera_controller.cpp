@@ -78,7 +78,7 @@ class CameraControllerTest : public ::testing::Test
  */
 TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
 {
-	m_camera->SetCamPos(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
@@ -101,7 +101,7 @@ TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
  */
 TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
 {
-	m_camera->SetCamPos(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialZ = m_camera->GetPosition().z;
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -125,7 +125,7 @@ TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
  */
 TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 0.0f, 5.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	CameraRotateEvent e{m_camera.get(), 0.0f, 1000.0f};
@@ -164,7 +164,7 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
  */
 TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -186,7 +186,7 @@ TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
  */
 TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -208,7 +208,7 @@ TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
  */
 TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.01f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 0.01f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	CameraZoomEvent e{m_camera.get(), 1.0f}; // Try to zoom in more
@@ -236,7 +236,7 @@ TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
  */
 TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialX = m_camera->GetPosition().x;
 	const float initialY = m_camera->GetPosition().y;
@@ -261,7 +261,7 @@ TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
  */
 TEST_F(CameraControllerTest, Dolly_WithoutMMB_NoMovement)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -286,7 +286,7 @@ TEST_F(CameraControllerTest, Dolly_WithoutMMB_NoMovement)
  */
 TEST_F(CameraControllerTest, Pan_ShiftMMB_Right_MovesCameraAndTarget)
 {
-	m_camera->SetCamPos(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -316,7 +316,7 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Right_MovesCameraAndTarget)
  */
 TEST_F(CameraControllerTest, Pan_ShiftMMB_Up_MovesUp)
 {
-	m_camera->SetCamPos(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const float initialZ = m_camera->GetPosition().z;
 	const float initialTarZ = m_camera->cam_tar.z;
@@ -342,7 +342,7 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Up_MovesUp)
  */
 TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 0.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -365,7 +365,7 @@ TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
  */
 TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
 {
-	m_camera->SetCamPos(glm::vec3(3.0f, 5.0f, 4.0f));
+	m_camera->SetPosition(glm::vec3(3.0f, 5.0f, 4.0f));
 	m_camera->SetTarPos(glm::vec3(1.0f, 3.0f, 2.0f));
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
@@ -386,7 +386,7 @@ TEST_F(CameraControllerTest, Edge_NoInput_NoChange)
  */
 TEST_F(CameraControllerTest, Edge_ModifierConflict_CtrlWins)
 {
-	m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialTar = m_camera->cam_tar;
 

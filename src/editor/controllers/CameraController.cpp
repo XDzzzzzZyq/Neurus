@@ -76,7 +76,7 @@ void OnCameraZoom(const neurus::CameraZoomEvent& e)
 	const float clampedRadius = std::clamp(newRadius, kMinRadius, kMaxRadius);
 
 	const glm::vec3 newDir = glm::normalize(dir) * clampedRadius;
-	camera.SetCamPos(target + newDir);
+	camera.SetPosition(target + newDir);
 
 	NotifyCameraChanged(camera);
 }
@@ -118,7 +118,7 @@ void OnCameraRotate(const neurus::CameraRotateEvent& e)
 		std::sin(newElevation)
 	);
 
-	camera.SetCamPos(target + newDir * radius);
+	camera.SetPosition(target + newDir * radius);
 
 	NotifyCameraChanged(camera);
 }
@@ -143,7 +143,7 @@ void OnCameraPush(const neurus::CameraPushEvent& e)
 	const float dollyAmount = e.mouse_delta_y * kDollySensitivity;
 	const glm::vec3 offset = dir * dollyAmount;
 
-	camera.SetCamPos(pos + offset);
+	camera.SetPosition(pos + offset);
 
 	NotifyCameraChanged(camera);
 }
@@ -181,7 +181,7 @@ void OnCameraSlide(const neurus::CameraSlideEvent& e)
 	const glm::vec3 delta = e.mouse_delta_x * kPanSensitivity * right
 	                        + e.mouse_delta_y * kPanSensitivity * up;
 
-	camera.SetCamPos(pos + delta);
+	camera.SetPosition(pos + delta);
 	camera.SetTarPos(target + delta);
 
 	NotifyCameraChanged(camera);

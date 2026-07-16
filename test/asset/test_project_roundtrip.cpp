@@ -81,7 +81,7 @@ TEST(ProjectRoundtrip, CameraOnly)
 	camera->cam_near = 0.1f;
 	camera->cam_far = 100.0f;
 	camera->cam_tar = glm::vec3(0.0f, 0.0f, 1.0f);
-	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	scene.UseCamera(camera);
 
 	project.Save(tmp.path);
@@ -190,7 +190,7 @@ TEST(ProjectRoundtrip, FullScene)
 
 	// Camera
 	auto camera = std::make_shared<Camera>();
-	camera->SetCamPos(glm::vec3(0.0f, 10.0f, 3.0f));
+	camera->SetPosition(glm::vec3(0.0f, 10.0f, 3.0f));
 	camera->cam_tar = glm::vec3(0.0f, 0.0f, 1.0f);
 	camera->cam_pers = 45.0f;
 	scene.UseCamera(camera);

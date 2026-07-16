@@ -202,7 +202,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		0.1f,             // near
 		100.0f);          // far
 
-	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	// -----------------------------------------------------------------------

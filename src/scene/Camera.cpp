@@ -74,9 +74,9 @@ void Camera::ChangeCamPersp(float persp)
 	RecomputeMatrices();
 }
 
-void Camera::SetCamPos(const glm::vec3& pos)
+void Camera::SetPosition(const glm::vec3& pos)
 {
-	SetPosition(pos);
+	Transform3D::SetPosition(pos);
 	// View matrix depends on position, so recompute eagerly
 	// (SetPosition already recomputed the model matrix)
 	RecomputeMatrices();
