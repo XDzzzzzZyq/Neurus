@@ -78,4 +78,38 @@ const QIcon& Icons::GetIcon(const std::string& name)
 	return insertedIt->second;
 }
 
+const QIcon &Icons::GetIconPair(const std::string &name_on, const std::string &name_off)
+{
+    	// Return cached icon if already loaded
+	auto cacheIt = s_cache.find(name_on + name_off);
+	if (cacheIt != s_cache.end())
+	{
+		return cacheIt->second;
+	}
+
+	// Look up the resource path
+	auto path_on = s_paths.find(name_on);
+	auto path_off = s_paths.find(name_off);
+
+
+	QIcon icon;
+
+	icon.addFile(
+		path_on->second,
+		QSize(),
+		QIcon::Normal,
+		QIcon::On
+	);
+
+	icon.addFile(
+		path_off->second,
+		QSize(),
+		QIcon::Normal,
+		QIcon::Off
+	);
+
+	auto [insertedIt, _] = s_cache.emplace(name_on + name_off, std::move(icon));
+	return insertedIt->second;
+}
+
 } // namespace neurus

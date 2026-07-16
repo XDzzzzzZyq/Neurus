@@ -37,6 +37,7 @@ public:
 	 * @brief Returns the QIcon for the given name ("folder:name" format).
 	 */
 	static const QIcon& GetIcon(const std::string& name);
+	static const QIcon& GetIconPair(const std::string& name_on, const std::string& name_off);
 
 	/**
 	 * @brief Returns the type icon for a scene object GOType.

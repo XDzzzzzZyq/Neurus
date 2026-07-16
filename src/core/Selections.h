@@ -17,7 +17,7 @@
  * - Single select: Replace current selection
  * - Multi-select (increment): Add to selection set
  * - Deselect: Remove from selection set
- * - Active object: Tracked via m_activePtr, separate from selection list
+ * - Active object: Tracked via m_active, separate from selection list
  *
  * @note Core Layer: Selections is part of the core type system
  * @note Thread-safety: Not thread-safe. Must be used from main thread only.
@@ -41,7 +41,7 @@ namespace neurus
  *
  * Selections maintains an ordered list of selected values with fast
  * O(1) hash lookup. The active object is tracked explicitly via
- * m_activePtr, separate from the selection list ordering.
+ * m_active, separate from the selection list ordering.
  *
  * T must be equality-comparable and hashable via std::hash<T>.
  * T{} is used as the "null" sentinel (nullptr for pointers, 0 for ints).
@@ -58,10 +58,19 @@ namespace neurus
  * @tparam T Value type to store. Must be default-constructible,
  *           equality-comparable, and hashable.
  */
+
+enum class SelectionMode : uint32_t 
+{
+	None = 0,
+	Selected = 1 << 0,
+	Active = 1 << 1,
+};
+
 template<class T>
 class Selections
 {
 public:
+
 	/** @brief Default constructor. */
 	Selections() = default;
 
@@ -111,7 +120,7 @@ public:
 					std::swap(*itVec, m_selectedList.back());
 				}
 			}
-			m_activePtr = obj;
+			m_active = obj;
 		}
 		else
 		{
@@ -119,7 +128,7 @@ public:
 			m_selectedList.push_back(obj);
 			m_selectionSet.clear();
 			m_selectionSet.insert(obj);
-			m_activePtr = obj;
+			m_active = obj;
 		}
 	}
 
@@ -128,8 +137,8 @@ public:
 	 *
 	 * Removes obj from selection set. If obj was the active object,
 	 * the last remaining value becomes active, or T{} if empty.
-	 *
-	 * @note No-op if obj is not selected
+		SelectionMode mode = scene->selections.GetMode(obj);
+		m_rowPool[poolIndex]->SetStyle(mode, poolIndex);
 	 */
 	void Deselect(const T& obj, bool increment)
 	{
@@ -145,9 +154,9 @@ public:
 			m_selectedList.erase(itVec);
 		}
 
-		if (m_activePtr == obj)
+		if (m_active == obj)
 		{
-			m_activePtr = m_selectedList.empty() ? T{} : m_selectedList.back();
+			m_active = m_selectedList.empty() ? T{} : m_selectedList.back();
 		}
 	}
 
@@ -161,7 +170,7 @@ public:
 	{
 		if (m_selectedList.empty())
 			return T{};
-		return m_activePtr;
+		return m_active;
 	}
 
 	/**
@@ -184,6 +193,21 @@ public:
 	bool IsSelected(const T& obj) const
 	{
 		return m_selectionSet.find(obj) != m_selectionSet.end();
+	}
+
+	bool IsActive(const T& obj) const
+	{
+		return m_active == obj;
+	}
+
+	SelectionMode GetMode(const T& obj) const
+	{
+		uint32_t mode = 0;
+		if (IsSelected(obj))
+			mode |= uint32_t(SelectionMode::Selected);
+		if (IsActive(obj))
+			mode |= uint32_t(SelectionMode::Active);
+		return SelectionMode(mode);
 	}
 
 	/**
@@ -209,7 +233,7 @@ public:
 	{
 		m_selectedList.clear();
 		m_selectionSet.clear();
-		m_activePtr = T{};
+		m_active = T{};
 	}
 
 	// -------------------------------------------------------------------
@@ -237,7 +261,7 @@ public:
 		{
 			m_selectionSet.clear();
 			m_selectionSet.insert(m_selectedList.begin(), m_selectedList.end());
-			m_activePtr = m_selectedList.empty() ? T{} : m_selectedList.back();
+			m_active = m_selectedList.empty() ? T{} : m_selectedList.back();
 		}
 	}
 
@@ -249,7 +273,7 @@ private:
 	std::unordered_set<T> m_selectionSet;
 
 	/// Active (primary) selected value, T{} if no selection.
-	T m_activePtr = T{};
+	T m_active = T{};
 };
 
 } // namespace neurus

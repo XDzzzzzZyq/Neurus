@@ -56,6 +56,9 @@ Outliner::Outliner(QWidget* parent)
 	m_listLayout->setAlignment(Qt::AlignTop);
 
 	m_scrollArea->setWidget(m_container);
+
+	m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
+	m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
 }
 
 // =========================================================================
@@ -95,6 +98,14 @@ void Outliner::EnsureRowPool(std::size_t needed)
 		m_groupLayout->addWidget(row);
 		m_rowPool.push_back(row);
 	}
+
+	// m_rowPool.size() >= needed
+
+	// Hide surplus rows (pool larger than current scene).
+	for (std::size_t i = needed; i < m_rowPool.size(); ++i)
+	{
+		m_rowPool[i]->setVisible(false);
+	}
 }
 
 // =========================================================================
@@ -105,38 +116,16 @@ void Outliner::Refresh(const UIContext& ctx)
 {
 	auto ids = ctx.GetObjectIDs();
 
-	// Create the "Scene" category group once.
-	if (!m_sceneGroup)
-	{
-		m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
-		m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
-	}
-
 	// --- Query selection state from the scene's Selections<const ObjectID*> ---
 	const Scene* scene = static_cast<const Scene*>(ctx.scene);
-	const ObjectID* activeObj = nullptr;
-	if (scene)
-	{
-		activeObj = scene->selections.GetActiveObject();
-	}
-
-	// Count valid (non-null) objects.
-	std::size_t validCount = 0;
-	for (const auto* obj : ids)
-	{
-		if (obj) ++validCount;
-	}
 
 	// Ensure pool is large enough for valid objects.
-	EnsureRowPool(validCount);
+	EnsureRowPool(ids.size());
 
 	// Configure visible rows.
 	std::size_t poolIndex = 0;
-	int rowIndex = 0;
 	for (const auto* obj : ids)
 	{
-		if (!obj) continue;
-
 		// Phase 1 — bind object identity data (icon, name, id).
 		m_rowPool[poolIndex]->SetObject(
 			Icons::ObjectIcon(static_cast<int>(obj->o_type)),
@@ -147,23 +136,15 @@ void Outliner::Refresh(const UIContext& ctx)
 		m_rowPool[poolIndex]->SetVisibilities(obj->is_viewport, obj->is_rendered);
 
 		// Phase 2 — apply visual styling (selection highlight + row bg).
-		bool isActive   = (activeObj == obj);
-		bool isSelected = scene && scene->selections.IsSelected(obj);
-		m_rowPool[poolIndex]->SetStyle(isActive, isSelected && !isActive, rowIndex);
+		neurus::SelectionMode mode = scene->selections.GetMode(obj);
+		m_rowPool[poolIndex]->SetStyle(int(mode), poolIndex);
 
 		m_rowPool[poolIndex]->setVisible(true);
 		++poolIndex;
-		++rowIndex;
-	}
-
-	// Hide surplus rows (pool larger than current scene).
-	for (std::size_t i = validCount; i < m_rowPool.size(); ++i)
-	{
-		m_rowPool[i]->setVisible(false);
 	}
 
 	// Show/hide the category group based on whether we have objects.
-	m_sceneGroup->setVisible(validCount > 0);
+	m_sceneGroup->setVisible(!ids.empty());
 }
 
 } // namespace neurus

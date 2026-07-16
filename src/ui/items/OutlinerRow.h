@@ -93,11 +93,10 @@ public:
 	 * Neither → black name text (#000000).
 	 * Row background alternates on odd/even rowIndex for readability.
 	 *
-	 * @param isActive   True if this row is the primary (active) selection.
-	 * @param isSelected True if this row is in the selection set.
-	 * @param rowIndex   0-based row position for alternating background.
+	 * @param mode      Bitmask representing selection state (Active, Selected).
+	 * @param rowIndex  0-based row position for alternating background.
 	 */
-	void SetStyle(bool isActive, bool isSelected, int rowIndex);
+	void SetStyle(int mode, int rowIndex);
 
 	/** @brief Returns the stored object identifier. */
 	int GetObjectId() const { return m_objectId; }
@@ -117,7 +116,9 @@ private:
 	QPushButton* m_nameBtn    = nullptr;
 	QPushButton* m_eyeBtn     = nullptr;
 	QPushButton* m_renderBtn  = nullptr;
-	int          m_objectId   = 0;
+	int          m_objectId   = -1;
+	int 		 m_mode       = -1;
+	int 		 m_idx		  = -1;
 };
 
 } // namespace neurus
