@@ -108,13 +108,10 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 		const glm::vec3& scl = xform->GetScale();
 
 
-		// Vec3Spin::SetValue handles dirty-check internally
-		m_posSpin->SetValue(
-			static_cast<float>(pos.x), static_cast<float>(pos.y), static_cast<float>(pos.z));
-		m_rotSpin->SetValue(
-			static_cast<float>(rot.x), static_cast<float>(rot.y), static_cast<float>(rot.z));
-		m_sclSpin->SetValue(
-			static_cast<float>(scl.x), static_cast<float>(scl.y), static_cast<float>(scl.z));
+		// Vec3Spin::setValue handles dirty-check internally
+		m_posSpin->setValue(pos.x, pos.y, pos.z);
+		m_rotSpin->setValue(rot.x, rot.y, rot.z);
+		m_sclSpin->setValue(scl.x, scl.y, scl.z);
 
 		SetEnabled(true);
 	}
@@ -164,7 +161,7 @@ void PropertyPanel::BuildTransformEditor()
 	// Row 3: Scale — Vec3Spin spans columns 1–3
 	grid->addWidget(new QLabel("Scale"), 3, 0);
 	m_sclSpin = new Vec3Spin(0.001, 1000.0, 0.1, 3, QString());
-	m_sclSpin->SetValue(1.0f, 1.0f, 1.0f);  // initial identity
+	m_sclSpin->setValue(1.0, 1.0, 1.0);  // initial identity
 	grid->addWidget(m_sclSpin, 3, 1, 1, 3);
 
 	// Row 4: Reset button — spans all 4 columns
@@ -194,9 +191,9 @@ void PropertyPanel::BuildTransformEditor()
 
 	// --- Reset button ---
 	QObject::connect(resetBtn, &QPushButton::clicked, this, [this]() {
-		m_posSpin->SetValue(0.0f, 0.0f, 0.0f);
-		m_rotSpin->SetValue(0.0f, 0.0f, 0.0f);
-		m_sclSpin->SetValue(1.0f, 1.0f, 1.0f);
+		m_posSpin->setValue(0.0, 0.0, 0.0);
+		m_rotSpin->setValue(0.0, 0.0, 0.0);
+		m_sclSpin->setValue(1.0, 1.0, 1.0);
 
 		if (m_currentObjectId >= 0)
 		{

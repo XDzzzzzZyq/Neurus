@@ -8,7 +8,7 @@
  * Architecture:
  * - QWidget subclass with internal QHBoxLayout
  * - Owns the three QDoubleSpinBox child widgets
- * - SetValue() with dirty-check: skips spinbox update if values unchanged
+ * - setValue() with dirty-check: skips spinbox update if values unchanged
  * - No Vulkan or Renderer dependencies — pure Qt UI layer
  * - Lives in src/ui/items/ alongside ScalarSlider and OutlinerRow
  */
@@ -51,11 +51,11 @@ public:
 	 * Uses QSignalBlocker on all three spinboxes to suppress valueChanged
 	 * during programmatic updates.
 	 */
-	void SetValue(float x, float y, float z);
+	void setValue(double x, double y, double z);
 
 signals:
 	/** @brief Emitted when any spinbox changes, carrying the current (x,y,z). */
-	void valueChanged(float x, float y, float z);
+	void valueChanged(double x, double y, double z);
 
 private:
 	QDoubleSpinBox* m_spinX = nullptr;
@@ -63,9 +63,9 @@ private:
 	QDoubleSpinBox* m_spinZ = nullptr;
 
 	// --- Cached values for dirty-check ---
-	float m_valX = 0;
-	float m_valY = 0;
-	float m_valZ = 0;
+	double m_valX = 0;
+	double m_valY = 0;
+	double m_valZ = 0;
 };
 
 } // namespace neurus

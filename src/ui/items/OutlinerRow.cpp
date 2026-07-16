@@ -1,6 +1,6 @@
 /**
  * @file OutlinerRow.cpp
- * @brief OutlinerRow implementation — two-phase config: SetObject (data) then SetSelectionMode + SetRowIndex (visual).
+ * @brief OutlinerRow implementation — two-phase config: setObject (data) then setSelectionMode + setRowIndex (visual).
  *
  * Type icons are loaded from the Icons cache as QPixmaps.
  * Visibility toggle buttons swap between visible/invisible icons
@@ -74,7 +74,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_nameBtn->setFlat(true);
 	m_nameBtn->setCursor(Qt::PointingHandCursor);
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-	// Lambda reads m_objectId at emission time — works after SetObject
+	// Lambda reads m_objectId at emission time — works after setObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
 		const auto mods = Input::GetModifiers(static_cast<uint32_t>(QGuiApplication::queryKeyboardModifiers().toInt()));
 		emit objectSelected(ObjectSelected{m_objectId, mods});
@@ -123,13 +123,13 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	QObject::connect(m_eyeBtn, &QPushButton::toggled, this,
 		[this](bool) {
 			m_eyeVisible = m_eyeBtn->isChecked();
-			SetEyeBtnColor();
+			setEyeBtnColor();
 			emit visibilityChanged(VisibilityChanged{m_objectId, m_eyeVisible, m_renderVisible});
 		});
 	QObject::connect(m_renderBtn, &QPushButton::toggled, this,
 		[this](bool) {
 			m_renderVisible = m_renderBtn->isChecked();
-			SetRenderBtnColor();
+			setRenderBtnColor();
 			emit visibilityChanged(VisibilityChanged{m_objectId, m_eyeVisible, m_renderVisible});
 		});
 
@@ -141,7 +141,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 // SetEyeBtnColor — update eye button colorize effect from checked state
 // =========================================================================
 
-void OutlinerRow::SetEyeBtnColor()
+void OutlinerRow::setEyeBtnColor()
 {
 	auto* fx = qobject_cast<QGraphicsColorizeEffect*>(m_eyeBtn->graphicsEffect());
 	if (fx) fx->setColor(m_eyeBtn->isChecked() ? QColor("#444444") : QColor("#d0d0d0"));
@@ -151,17 +151,17 @@ void OutlinerRow::SetEyeBtnColor()
 // SetRenderBtnColor — update render button colorize effect from checked state
 // =========================================================================
 
-void OutlinerRow::SetRenderBtnColor()
+void OutlinerRow::setRenderBtnColor()
 {
 	auto* fx = qobject_cast<QGraphicsColorizeEffect*>(m_renderBtn->graphicsEffect());
 	if (fx) fx->setColor(m_renderBtn->isChecked() ? QColor("#444444") : QColor("#d0d0d0"));
 }
 
 // =========================================================================
-// SetObject — bind object identity data, reset toggles
+// setObject — bind object identity data, reset toggles
 // =========================================================================
 
-void OutlinerRow::SetObject(const QIcon& icon,
+void OutlinerRow::setObject(const QIcon& icon,
                             const QString& name, int objectId)
 {
 	// Update name text
@@ -177,10 +177,10 @@ void OutlinerRow::SetObject(const QIcon& icon,
 }
 
 // =========================================================================
-// SetVisibilities — set toggle states without emitting signals
+// setVisibilities — set toggle states without emitting signals
 // =========================================================================
 
-void OutlinerRow::SetVisibilities(bool viewportVisible, bool renderVisible)
+void OutlinerRow::setVisibilities(bool viewportVisible, bool renderVisible)
 {
 	if (m_eyeVisible != viewportVisible)
 	{
@@ -188,7 +188,7 @@ void OutlinerRow::SetVisibilities(bool viewportVisible, bool renderVisible)
 		m_eyeBtn->setChecked(viewportVisible);
 		m_eyeBtn->blockSignals(false);
 		m_eyeVisible = viewportVisible;
-		SetEyeBtnColor();
+		setEyeBtnColor();
 	}
 
 	if (m_renderVisible != renderVisible)
@@ -197,15 +197,15 @@ void OutlinerRow::SetVisibilities(bool viewportVisible, bool renderVisible)
 		m_renderBtn->setChecked(renderVisible);
 		m_renderBtn->blockSignals(false);
 		m_renderVisible = renderVisible;
-		SetRenderBtnColor();
+		setRenderBtnColor();
 	}
 }
 
 // =========================================================================
-// SetSelectionMode — set name button color via QSS dynamic property
+// setSelectionMode — set name button color via QSS dynamic property
 // =========================================================================
 
-void OutlinerRow::SetSelectionMode(SelectionMode mode)
+void OutlinerRow::setSelectionMode(SelectionMode mode)
 {
 	if (m_mode == static_cast<int>(mode))
 		return;
@@ -227,10 +227,10 @@ void OutlinerRow::SetSelectionMode(SelectionMode mode)
 }
 
 // =========================================================================
-// SetRowIndex — alternating row background
+// setRowIndex — alternating row background
 // =========================================================================
 
-void OutlinerRow::SetRowIndex(int rowIndex)
+void OutlinerRow::setRowIndex(int rowIndex)
 {
 	if (m_idx == rowIndex)
 		return;

@@ -5,7 +5,7 @@
  * Architecture:
  * - Constructor sets up the QScrollArea + container layout (empty).
  * - Refresh() reads scene objects from UIContext and reconfigures rows
- *   via OutlinerRow::SetObject() from a growing pool.
+ *   via OutlinerRow::setObject() from a growing pool.
  * - New rows are created when pool < scene objects, and connected to
  *   Outliner signals once. Extra rows are hidden (not destroyed).
  * - Signal lambdas on OutlinerRow read m_objectId at emission time,
@@ -127,18 +127,18 @@ void Outliner::Refresh(const UIContext& ctx)
 	for (const auto* obj : ids)
 	{
 		// Phase 1 — bind object identity data (icon, name, id).
-		m_rowPool[poolIndex]->SetObject(
+		m_rowPool[poolIndex]->setObject(
 			Icons::ObjectIcon(static_cast<int>(obj->o_type)),
 			QString::fromStdString(obj->o_name),
 			obj->GetObjectID());
 
 		// Sync visibility toggles to the object's actual flags.
-		m_rowPool[poolIndex]->SetVisibilities(obj->is_viewport, obj->is_rendered);
+		m_rowPool[poolIndex]->setVisibilities(obj->is_viewport, obj->is_rendered);
 
 		// Phase 2 — apply selection highlight (QSS property) + row background.
 		neurus::SelectionMode mode = scene->selections.GetMode(obj);
-		m_rowPool[poolIndex]->SetSelectionMode(mode);
-		m_rowPool[poolIndex]->SetRowIndex(static_cast<int>(poolIndex));
+		m_rowPool[poolIndex]->setSelectionMode(mode);
+		m_rowPool[poolIndex]->setRowIndex(static_cast<int>(poolIndex));
 
 		m_rowPool[poolIndex]->setVisible(true);
 		++poolIndex;

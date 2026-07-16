@@ -46,9 +46,9 @@ Vec3Spin::Vec3Spin(double min, double max, double step, int decimals,
 	// --- Wire valueChanged signals, each carrying the current triplet ---
 	auto emitChanged = [this]() {
 		emit valueChanged(
-			static_cast<float>(m_spinX->value()),
-			static_cast<float>(m_spinY->value()),
-			static_cast<float>(m_spinZ->value()));
+			m_spinX->value(),
+			m_spinY->value(),
+			m_spinZ->value());
 	};
 	QObject::connect(m_spinX, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
 	                 this, emitChanged);
@@ -59,10 +59,10 @@ Vec3Spin::Vec3Spin(double min, double max, double step, int decimals,
 }
 
 // =========================================================================
-// SetValue — dirty-checked batch update
+// setValue — dirty-checked batch update
 // =========================================================================
 
-void Vec3Spin::SetValue(float x, float y, float z)
+void Vec3Spin::setValue(double x, double y, double z)
 {
 	QSignalBlocker bx(m_spinX);
 	QSignalBlocker by(m_spinY);
@@ -70,17 +70,17 @@ void Vec3Spin::SetValue(float x, float y, float z)
 
 	if (m_valX != x)
 	{
-		m_spinX->setValue(static_cast<double>(x));
+		m_spinX->setValue(x);
 		m_valX = x;
 	}
 	if (m_valY != y)
 	{
-		m_spinY->setValue(static_cast<double>(y));
+		m_spinY->setValue(y);
 		m_valY = y;
 	}
 	if (m_valZ != z)
 	{
-		m_spinZ->setValue(static_cast<double>(z));
+		m_spinZ->setValue(z);
 		m_valZ = z;
 	}
 }

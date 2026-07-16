@@ -205,12 +205,12 @@ if (m_eyeVisible != viewportVisible)
     m_eyeBtn->setChecked(viewportVisible);
     m_eyeBtn->blockSignals(false);
     m_eyeVisible = viewportVisible;
-    SetEyeBtnColor();
+    setEyeBtnColor();
 }
 
 // DON'T: always apply, even when identical
 m_eyeBtn->setChecked(viewportVisible);
-SetEyeBtnColor();
+setEyeBtnColor();
 ```
 
 This applies to any `Refresh()`-based panel — cache the previous value of each
@@ -236,6 +236,17 @@ m_nameBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
 The same principle applies to `setIcon()` on toggle buttons — use
 `GetIconPair()` to pre-bake On/Off states into a single `QIcon` instead of
 string-building icon names and calling `GetIcon()` on every toggle.
+
+### Naming Convention: `set*` for Refresh-Path Methods
+
+Widget methods called from `Refresh()` or other per-frame update paths must
+use Qt-style lowercase naming (e.g. `setObject()`, `setValue()`, `setRowIndex()`)
+rather than PascalCase. This aligns with Qt's own convention for setter methods
+(`QSpinBox::setValue()`, `QWidget::setVisible()`) and distinguishes them from
+application-level PascalCase methods (`BuildTransformEditor()`, `PopulateTransform()`).
+
+New reusable items in `src/ui/items/` should follow this convention for all
+public setters that participate in the Refresh pipeline.
 
 ### ✅ UI MAY:
 - Own QVulkanInstance, VulkanWindow, QMainWindow

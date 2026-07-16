@@ -10,7 +10,7 @@
  * - QVBoxLayout → QScrollArea → container widget with vertical row list
  * - Rows are OutlinerRow widgets managed via a pool
  * - Pool grows as needed; extra rows are hidden (not destroyed)
- * - Each recycled row calls SetObject() — signal lambdas read the current
+ * - Each recycled row calls setObject() — signal lambdas read the current
  *   m_objectId at emission time, so no manual rewire needed
  * - Row signals forwarded via Outliner::objectSelected / visibilityChanged
  * - Reads scene data via UIContext — no Renderer or Vulkan headers

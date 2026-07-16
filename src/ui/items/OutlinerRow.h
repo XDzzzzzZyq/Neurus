@@ -9,8 +9,8 @@
  *
  * Architecture:
  * - Constructor creates the layout and child widgets once.
- * - SetObject() binds object data (icon name, name, id); resets toggles.
- * - SetSelectionMode() / SetRowIndex() apply visual state (QSS property + alternating bg).
+ * - setObject() binds object data (icon name, name, id); resets toggles.
+ * - setSelectionMode() / setRowIndex() apply visual state (QSS property + alternating bg).
  * - Signal lambdas read from m_objectId at emission time, so recycling
  *   a row to a new objectId is transparent — no manual rewire needed.
  * - Visibility toggle buttons swap between visible/invisible icons
@@ -52,7 +52,7 @@ public:
 	 * @brief Constructs an empty outliner row (no object bound yet).
 	 * @param parent Parent widget.
 	 *
-	 * Creates the layout and child widgets once. Call SetObject() to
+	 * Creates the layout and child widgets once. Call setObject() to
 	 * bind a scene object to this row.
 	 */
 	explicit OutlinerRow(QWidget* parent = nullptr);
@@ -76,7 +76,7 @@ public:
 	 * @param name     Display name shown in the row.
 	 * @param objectId Unique object identifier.
 	 */
-	void SetObject(const QIcon& icon, const QString& name, int objectId);
+	void setObject(const QIcon& icon, const QString& name, int objectId);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
@@ -88,7 +88,7 @@ public:
 	 * @param viewportVisible True to enable viewport visibility.
 	 * @param renderVisible   True to enable render visibility.
 	 */
-	void SetVisibilities(bool viewportVisible, bool renderVisible);
+	void setVisibilities(bool viewportVisible, bool renderVisible);
 
 	/**
 	 * @brief Sets selection visual state via QSS dynamic property.
@@ -100,7 +100,7 @@ public:
 	 *
 	 * @param mode   Selection mode bitmask (Active / Selected).
 	 */
-	void SetSelectionMode(SelectionMode mode);
+	void setSelectionMode(SelectionMode mode);
 
 	/**
 	 * @brief Sets row index for alternating background.
@@ -110,10 +110,10 @@ public:
 	 *
 	 * @param rowIndex  0-based row position.
 	 */
-	void SetRowIndex(int rowIndex);
+	void setRowIndex(int rowIndex);
 
 	/** @brief Returns the stored object identifier. */
-	int GetObjectId() const { return m_objectId; }
+	int getObjectId() const { return m_objectId; }
 
 signals:
 	/** @brief Emitted when the name button is clicked. */
@@ -124,10 +124,10 @@ signals:
 
 private:
 	/** @brief Sets the eye button colorize effect from current checked state. */
-	void SetEyeBtnColor();
+	void setEyeBtnColor();
 
 	/** @brief Sets the render button colorize effect from current checked state. */
-	void SetRenderBtnColor();
+	void setRenderBtnColor();
 
 	QLabel*      m_typeLabel     = nullptr;
 	QPushButton* m_nameBtn       = nullptr;
