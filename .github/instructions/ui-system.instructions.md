@@ -190,6 +190,53 @@ childBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
 See `src/ui/qml/outliner.qss` for the canonical example using
 `QPushButton#outlinerNameBtn` and `QPushButton#outlinerToggleBtn` selectors.
 
+## Performance Optimization
+
+### Lazy Updates via Logical State Tracking
+
+Avoid redundant widget operations by storing the last-known state and skipping
+updates when nothing changed:
+
+```cpp
+// DO: dirty-check before applying
+if (m_eyeVisible != viewportVisible)
+{
+    m_eyeBtn->blockSignals(true);
+    m_eyeBtn->setChecked(viewportVisible);
+    m_eyeBtn->blockSignals(false);
+    m_eyeVisible = viewportVisible;
+    SetEyeBtnColor();
+}
+
+// DON'T: always apply, even when identical
+m_eyeBtn->setChecked(viewportVisible);
+SetEyeBtnColor();
+```
+
+This applies to any `Refresh()`-based panel — cache the previous value of each
+widget-modifying input and gate the write behind an equality check.
+
+### Prefer QSS Over Inline Stylesheets
+
+Setting `setStyleSheet()` on individual widgets forces Qt to re-parse the CSS
+text and re-resolve all selectors, which is measurably slower than QSS class
+selectors with dynamic properties:
+
+```cpp
+// DO: QSS with dynamic property (fast, declarative)
+//  .qss: QPushButton#outlinerNameBtn[selectionState="active"] { color: #ff6f00; }
+m_nameBtn->setProperty("selectionState", "active");
+m_nameBtn->style()->unpolish(m_nameBtn);
+m_nameBtn->style()->polish(m_nameBtn);
+
+// DON'T: inline stylesheet (slow, re-parses CSS text each time)
+m_nameBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
+```
+
+The same principle applies to `setIcon()` on toggle buttons — use
+`GetIconPair()` to pre-bake On/Off states into a single `QIcon` instead of
+string-building icon names and calling `GetIcon()` on every toggle.
+
 ### ✅ UI MAY:
 - Own QVulkanInstance, VulkanWindow, QMainWindow
 - Emit EventBus signals
