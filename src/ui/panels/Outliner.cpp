@@ -16,6 +16,7 @@
 
 #include "Outliner.h"
 
+#include "Icons.h"
 #include "UIContext.h"
 #include "items/OutlinerRow.h"
 
@@ -32,36 +33,6 @@
 
 namespace neurus
 {
-
-// =========================================================================
-// Type-icon helpers (mapped from GOType → Icons key name)
-// =========================================================================
-
-namespace
-{
-
-/**
- * @brief Returns the icon name in "folder:name" format for a GOType.
- */
-static std::string TypeIconName(ObjectID::GOType type)
-{
-	switch (type)
-	{
-	case ObjectID::GOType::GO_CAM:
-		return "scene:camera";
-	case ObjectID::GOType::GO_LIGHT:
-	case ObjectID::GOType::GO_POLYLIGHT:
-		return "scene:light";
-	case ObjectID::GOType::GO_MESH:
-		return "scene:mesh";
-	case ObjectID::GOType::GO_ENVIR:
-		return "scene:environment";
-	default:
-		return "scene:mesh";  // fallback
-	}
-}
-
-} // anonymous namespace
 
 // =========================================================================
 // Constructor — scroll area + empty container (no hard-coded rows)
@@ -166,11 +137,9 @@ void Outliner::Refresh(const UIContext& ctx)
 	{
 		if (!obj) continue;
 
-		auto iconName = TypeIconName(obj->o_type);
-
-		// Phase 1 — bind object identity data (icon name, name, id).
+		// Phase 1 — bind object identity data (icon, name, id).
 		m_rowPool[poolIndex]->SetObject(
-			iconName,
+			Icons::ObjectIcon(static_cast<int>(obj->o_type)),
 			QString::fromStdString(obj->o_name),
 			obj->GetObjectID());
 

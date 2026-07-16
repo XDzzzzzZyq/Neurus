@@ -105,18 +105,33 @@ void Editor::Initialize(Scene& scene)
 		ed_project->GetRenderConfig() = e.config;
 	});
 
-	ed_eventBus.subscribe<TransformChanged>([this](const TransformChanged& e) {
+	ed_eventBus.subscribe<PositionChanged>([this](const PositionChanged& e) {
 		auto& scene = ed_project->GetScene();
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
-
 		void* transformPtr = it->second->GetTransform();
 		if (!transformPtr) return;
+		static_cast<Transform3D*>(transformPtr)->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
+		ed_project->MarkDirty();
+	});
 
-		auto* xform = static_cast<Transform3D*>(transformPtr);
-		xform->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
-		xform->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
-		xform->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
+	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.obj_list.find(e.objectId);
+		if (it == scene.obj_list.end()) return;
+		void* transformPtr = it->second->GetTransform();
+		if (!transformPtr) return;
+		static_cast<Transform3D*>(transformPtr)->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
+		ed_project->MarkDirty();
+	});
+
+	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
+		auto& scene = ed_project->GetScene();
+		auto it = scene.obj_list.find(e.objectId);
+		if (it == scene.obj_list.end()) return;
+		void* transformPtr = it->second->GetTransform();
+		if (!transformPtr) return;
+		static_cast<Transform3D*>(transformPtr)->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
 		ed_project->MarkDirty();
 	});
 

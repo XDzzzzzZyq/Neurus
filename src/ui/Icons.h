@@ -31,27 +31,19 @@ class Icons
 public:
 	Icons() = delete;
 
-	/**
-	 * @brief Populates the hardcoded icon name→resource path registry.
-	 *
-	 * Must be called once before any GetIcon() calls. Safe to call
-	 * multiple times (idempotent). Typically invoked by UIManager
-	 * during construction.
-	 */
 	static void Initialize();
 
 	/**
-	 * @brief Returns the QIcon for the given name, loading it on first access.
-	 *
-	 * Looks up @p name in the path registry populated by Initialize().
-	 * On first call, loads the SVG from the Qt resource system and caches
-	 * the resulting QIcon. Subsequent calls return the cached instance.
-	 *
-	 * @param name Icon name in "folder:name" format (e.g. "scene:mesh").
-	 * @return Const reference to the cached QIcon. If @p name is not
-	 *         registered, returns a default-constructed (empty) QIcon.
+	 * @brief Returns the QIcon for the given name ("folder:name" format).
 	 */
 	static const QIcon& GetIcon(const std::string& name);
+
+	/**
+	 * @brief Returns the type icon for a scene object GOType.
+	 *
+	 * GOType int values: 1=MESH, 3=LIGHT, 4=CAMERA, others=MESH fallback.
+	 */
+	static QIcon ObjectIcon(int goType);
 
 private:
 	static void RegisterIcon(const std::string& name, const QString& resourcePath);

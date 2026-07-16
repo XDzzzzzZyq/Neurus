@@ -160,14 +160,12 @@ void OutlinerRow::UpdateToggleIcons()
 // SetObject — bind object identity data, reset toggles
 // =========================================================================
 
-void OutlinerRow::SetObject(const std::string& iconName,
+void OutlinerRow::SetObject(const QIcon& icon,
                             const QString& name, int objectId)
 {
 	m_objectId = objectId;
 	setProperty("objectId", objectId);
 
-	// Update type icon from the Icons cache
-	const QIcon& icon = Icons::GetIcon(iconName);
 	m_typeLabel->setPixmap(icon.pixmap(22, 22));
 	m_typeLabel->setStyleSheet(QString());  // clear old colored-background CSS
 

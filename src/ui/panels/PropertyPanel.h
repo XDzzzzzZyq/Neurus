@@ -11,15 +11,15 @@
 namespace neurus {
 
 /**
- * @brief Transform-only property panel for editing position/rotation/scale of a selected object.
+ * @brief Property Panel displaying type/name header and editable transform for the active
+ *        scene object.
  *
- * Displays an editable QGroupBox with color-coded XYZ spinboxes for position,
- * rotation (Euler degrees), and scale. Emits transformChanged() on every edit.
- * Call LoadTransform() to populate from external state; ClearTransform() to
- * disable when nothing is selected.
+ * Refresh() reads the active object from UIContext::scene→selections each frame,
+ * displaying its o_name with type icon and populating the Position / Rotation / Scale
+ * QDoubleSpinBox grid from its Transform3D. Editing any field emits a granular signal
+ * (positionChanged / rotationChanged / scaleChanged).
  *
- * @note Pure UI layer — no Scene, Camera, or Light dependencies.
- * @note Owned by UIManager as a right dock widget.
+ * @note Pure UI layer — no scene mutation. Signals flow through ConnectUIEvent to Editor.
  */
 class PropertyPanel : public UIPanel
 {
@@ -34,39 +34,36 @@ public:
 	PropertyPanel(const PropertyPanel&) = delete;
 	PropertyPanel& operator=(const PropertyPanel&) = delete;
 
+	/** @brief Reads active object from UIContext, updates header + transform editor. */
 	void Refresh(const UIContext& ctx) override;
 
-	/**
-	 * @brief Populates the transform editor from raw float values and enables editing.
-	 * @param objectId Currently selected object ID (carried back in transformChanged events).
-	 * @param posX/Y/Z  World-space position.
-	 * @param rotX/Y/Z  Euler rotation in degrees (pitch=X, roll=Y, yaw=Z).
-	 * @param sclX/Y/Z  Per-axis scale.
-	 */
-	void LoadTransform(int objectId,
-	                   float posX, float posY, float posZ,
-	                   float rotX, float rotY, float rotZ,
-	                   float sclX, float sclY, float sclZ);
-
-	/** @brief Disables the transform editor and clears the tracked object ID. */
-	void ClearTransform();
-
 signals:
-	/** @brief Emitted when any transform field is edited by the user. */
-	void transformChanged(const TransformChanged& e);
+	void positionChanged(const PositionChanged& e);
+	void rotationChanged(const RotationChanged& e);
+	void scaleChanged(const ScaleChanged& e);
 
 private:
+	void BuildHeader();
 	void BuildTransformEditor();
 
-	/** @brief Enables or disables the entire transform editor group box. */
+	/** @brief Populates transform spinboxes from raw float values. */
+	void PopulateTransform(float px, float py, float pz,
+	                       float rx, float ry, float rz,
+	                       float sx, float sy, float sz);
+
+	/** @brief Enables or disables header + transform group. */
 	void SetEnabled(bool enabled);
 
-	/** @brief Reads current transform editor values into a TransformChanged event. */
-	TransformChanged CollectTransform() const;
-
+	// --- State ---
 	int    m_currentObjectId = -1;
 
-	QVBoxLayout*    m_mainLayout = nullptr;
+	// --- Header ---
+	QWidget* m_headerWidget = nullptr;
+	QLabel*  m_iconLabel = nullptr;
+	QLabel*  m_nameLabel = nullptr;
+	QLabel*  m_emptyLabel = nullptr;
+
+	// --- Transform editor ---
 	QGroupBox*      m_transformGroup = nullptr;
 	QDoubleSpinBox* m_posX = nullptr;
 	QDoubleSpinBox* m_posY = nullptr;
@@ -77,7 +74,6 @@ private:
 	QDoubleSpinBox* m_sclX = nullptr;
 	QDoubleSpinBox* m_sclY = nullptr;
 	QDoubleSpinBox* m_sclZ = nullptr;
-	QPushButton*    m_resetBtn = nullptr;
 };
 
 } // namespace neurus

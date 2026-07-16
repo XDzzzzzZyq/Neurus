@@ -358,7 +358,9 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	// Handle Transform changes from Property Panel → Editor
 	if (auto* propPanel = app_mainWindow->GetPanel<neurus::PropertyPanel>())
 	{
-		ConnectUIEvent(propPanel, &neurus::PropertyPanel::transformChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::positionChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::rotationChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::scaleChanged);
 	}
 }
 

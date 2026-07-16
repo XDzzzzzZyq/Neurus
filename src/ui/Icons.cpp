@@ -1,4 +1,5 @@
 #include "Icons.h"
+#include "scene/UID.h"
 
 namespace neurus
 {
@@ -29,6 +30,19 @@ void Icons::Initialize()
 	RegisterIcon("editor:preview_visible",   ":/icons/editor/preview_visible.svg");
 	RegisterIcon("editor:render_invisible",  ":/icons/editor/render_invisible.svg");
 	RegisterIcon("editor:render_visible",    ":/icons/editor/render_visible.svg");
+}
+
+// --- ObjectIcon — GOType → QIcon ------------------------------------------
+
+QIcon Icons::ObjectIcon(int goType)
+{
+	switch (ObjectID::GOType(goType))
+	{
+	case ObjectID::GOType::GO_CAM:    return GetIcon("scene:camera");       // GO_CAM
+	case ObjectID::GOType::GO_LIGHT:  return GetIcon("scene:light");        // GO_LIGHT
+	case ObjectID::GOType::GO_MESH:   return GetIcon("scene:mesh");         // GO_MESH
+	default: return GetIcon("scene:mesh");
+	}
 }
 
 // --- RegisterIcon ----------------------------------------------------------

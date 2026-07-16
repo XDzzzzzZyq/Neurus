@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <QIcon>
 #include <QWidget>
 
 #include "editor/events/EditorEvents.h"
@@ -66,11 +67,11 @@ public:
 	 * Resets visibility toggles to checked (signals blocked to avoid
 	 * cascading events during pool recycling) and sets their icons.
 	 *
-	 * @param iconName Icon name in "folder:name" format (e.g. "scene:camera").
+	 * @param icon     Type icon for this object.
 	 * @param name     Display name shown in the row.
 	 * @param objectId Unique object identifier.
 	 */
-	void SetObject(const std::string& iconName, const QString& name, int objectId);
+	void SetObject(const QIcon& icon, const QString& name, int objectId);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
