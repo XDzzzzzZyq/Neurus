@@ -113,6 +113,12 @@ void Editor::Initialize(Scene& scene)
 		if (!transformPtr) return;
 		static_cast<Transform3D*>(transformPtr)->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
 		ed_project->MarkDirty();
+
+		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
+			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
+		{
+			UploadLighting();
+		}
 	});
 
 	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
@@ -123,6 +129,12 @@ void Editor::Initialize(Scene& scene)
 		if (!transformPtr) return;
 		static_cast<Transform3D*>(transformPtr)->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
 		ed_project->MarkDirty();
+
+		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
+			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
+		{
+			UploadLighting();
+		}
 	});
 
 	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
@@ -133,6 +145,12 @@ void Editor::Initialize(Scene& scene)
 		if (!transformPtr) return;
 		static_cast<Transform3D*>(transformPtr)->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
 		ed_project->MarkDirty();
+
+		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
+			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
+		{
+			UploadLighting();
+		}
 	});
 
 	ed_eventBus.subscribe<ObjectSelected>([this](const ObjectSelected& e) {
@@ -340,11 +358,7 @@ void Editor::OnLightAdd()
 		light->SetRadius(0.05f);
 		ed_project->GetScene().UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
-		if (ed_uploadManager && ed_renderer)
-		{
-			auto lightDict = ed_uploadManager->UploadLighting(ed_project->GetScene().light_list);
-			ed_renderer->GetRenderCache().UpdateLighting(lightDict);
-		}
+		UploadLighting();
 		// Upload shadow map for this light
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
 		{
@@ -369,11 +383,7 @@ void Editor::OnSunLightAdd()
 		light->use_shadow = true;
 		ed_project->GetScene().UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
-		if (ed_uploadManager && ed_renderer)
-		{
-			auto lightDict = ed_uploadManager->UploadLighting(ed_project->GetScene().light_list);
-			ed_renderer->GetRenderCache().UpdateLighting(lightDict);
-		}
+		UploadLighting();
 		// Upload shadow map for this sun light
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
 		{
@@ -489,11 +499,7 @@ void Editor::ChangeObjectVisibility(int objectId, bool viewportVisible, bool ren
 	if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
 	    it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
 	{
-		if (ed_uploadManager && ed_renderer)
-		{
-			auto lightDict = ed_uploadManager->UploadLighting(scene.light_list);
-			ed_renderer->GetRenderCache().UpdateLighting(lightDict);
-		}
+		UploadLighting();
 	}
 }
 
@@ -522,12 +528,19 @@ void Editor::UploadSceneResources()
 	}
 
 	// Upload lighting SSBO (point/sun light structs) via variant API
+	UploadLighting();
+
+	NEURUS_LOG("[Editor] Uploaded scene resources to GPU");
+}
+
+void Editor::UploadLighting()
+{
+	if (ed_uploadManager && ed_renderer)
 	{
+		auto& scene = ed_project->GetScene();
 		auto lightDict = ed_uploadManager->UploadLighting(scene.light_list);
 		ed_renderer->GetRenderCache().UpdateLighting(lightDict);
 	}
-
-	NEURUS_LOG("[Editor] Uploaded scene resources to GPU");
 }
 
 // =========================================================================
