@@ -2,10 +2,10 @@
 
 #include "Icons.h"
 #include "UIContext.h"
-#include "items/CameraProperties.h"
-#include "items/EnvironmentProperties.h"
-#include "items/LightProperties.h"
-#include "items/MeshProperties.h"
+#include "presets/CameraProperties.h"
+#include "presets/EnvironmentProperties.h"
+#include "presets/LightProperties.h"
+#include "presets/MeshProperties.h"
 #include "items/Vec3Spin.h"
 
 #include "scene/Camera.h"

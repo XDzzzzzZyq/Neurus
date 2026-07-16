@@ -1,4 +1,4 @@
-#include "items/EnvironmentProperties.h"
+#include "presets/EnvironmentProperties.h"
 #include "items/ScalarSlider.h"
 
 #include <QGroupBox>

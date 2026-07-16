@@ -13,14 +13,14 @@ add_library(neurus_ui STATIC
 	items/OutlinerRow.cpp
 	items/Vec3Spin.h
 	items/Vec3Spin.cpp
-	items/CameraProperties.h
-	items/CameraProperties.cpp
-	items/MeshProperties.h
-	items/MeshProperties.cpp
-	items/LightProperties.h
-	items/LightProperties.cpp
-	items/EnvironmentProperties.h
-	items/EnvironmentProperties.cpp
+	presets/CameraProperties.h
+	presets/CameraProperties.cpp
+	presets/MeshProperties.h
+	presets/MeshProperties.cpp
+	presets/LightProperties.h
+	presets/LightProperties.cpp
+	presets/EnvironmentProperties.h
+	presets/EnvironmentProperties.cpp
 	panels/UIPanel.h
 	panels/Outliner.h
 	panels/Outliner.cpp

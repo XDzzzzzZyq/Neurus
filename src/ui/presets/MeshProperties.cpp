@@ -1,4 +1,4 @@
-#include "items/MeshProperties.h"
+#include "presets/MeshProperties.h"
 
 #include <QCheckBox>
 #include <QGroupBox>

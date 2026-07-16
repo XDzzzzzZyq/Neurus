@@ -1,4 +1,4 @@
-#include "items/LightProperties.h"
+#include "presets/LightProperties.h"
 #include "items/ScalarSlider.h"
 
 #include <QCheckBox>
