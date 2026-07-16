@@ -11,6 +11,8 @@ add_library(neurus_ui STATIC
 	items/ScalarSlider.cpp
 	items/OutlinerRow.h
 	items/OutlinerRow.cpp
+	items/Vec3Spin.h
+	items/Vec3Spin.cpp
 	panels/UIPanel.h
 	panels/Outliner.h
 	panels/Outliner.cpp

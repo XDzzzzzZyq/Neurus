@@ -2,6 +2,7 @@
 
 #include "Icons.h"
 #include "UIContext.h"
+#include "items/Vec3Spin.h"
 
 #include "scene/Scene.h"
 #include "scene/Transform.h"
@@ -90,8 +91,11 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 	int objectId = activeObj->GetObjectID();
 
 	// --- Header: icon + name ---
-	m_iconLabel->setPixmap(Icons::ObjectIcon(static_cast<int>(activeObj->o_type)).pixmap(20, 20));
-	m_nameLabel->setText(QString::fromStdString(activeObj->o_name));
+	if (m_currentObjectId != objectId){
+		m_iconLabel->setPixmap(Icons::ObjectIcon(static_cast<int>(activeObj->o_type)).pixmap(20, 20));
+		m_nameLabel->setText(QString::fromStdString(activeObj->o_name));
+		m_currentObjectId = objectId;
+	}
 
 	// --- Transform ---
 	auto* obj = const_cast<ObjectID*>(activeObj);
@@ -103,22 +107,25 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 		const glm::vec3& rot = xform->GetRotation();
 		const glm::vec3& scl = xform->GetScale();
 
-		m_currentObjectId = objectId;
-		PopulateTransform(
-			static_cast<float>(pos.x), static_cast<float>(pos.y), static_cast<float>(pos.z),
-			static_cast<float>(rot.x), static_cast<float>(rot.y), static_cast<float>(rot.z),
+
+		// Vec3Spin::SetValue handles dirty-check internally
+		m_posSpin->SetValue(
+			static_cast<float>(pos.x), static_cast<float>(pos.y), static_cast<float>(pos.z));
+		m_rotSpin->SetValue(
+			static_cast<float>(rot.x), static_cast<float>(rot.y), static_cast<float>(rot.z));
+		m_sclSpin->SetValue(
 			static_cast<float>(scl.x), static_cast<float>(scl.y), static_cast<float>(scl.z));
+
 		SetEnabled(true);
 	}
 	else
 	{
-		m_currentObjectId = objectId;
 		SetEnabled(false);
 	}
 }
 
 // =========================================================================
-// BuildTransformEditor — QGroupBox with QGridLayout + Reset button
+// BuildTransformEditor — QGroupBox with Vec3Spin rows + Reset button
 // =========================================================================
 
 void PropertyPanel::BuildTransformEditor()
@@ -138,119 +145,59 @@ void PropertyPanel::BuildTransformEditor()
 		return lbl;
 	};
 
-	auto makeSpinBox = [](double min, double max, double step, int decimals,
-	                      const QString& suffix = QString()) {
-		auto* spin = new QDoubleSpinBox();
-		spin->setRange(min, max);
-		spin->setSingleStep(step);
-		spin->setDecimals(decimals);
-		spin->setAlignment(Qt::AlignRight);
-		spin->setMinimumWidth(80);
-		if (!suffix.isEmpty())
-			spin->setSuffix(suffix);
-		return spin;
-	};
-
-	// Row 0: Axis headers
+	// Row 0: axis column headers (X=red, Y=green, Z=blue)
 	grid->addWidget(new QLabel(""), 0, 0);
 	grid->addWidget(makeAxisLabel("X", "#e74c3c"), 0, 1);
 	grid->addWidget(makeAxisLabel("Y", "#2ecc71"), 0, 2);
 	grid->addWidget(makeAxisLabel("Z", "#3498db"), 0, 3);
 
-	// Row 1: Position
+	// Row 1: Position — Vec3Spin spans columns 1–3
 	grid->addWidget(new QLabel("Position"), 1, 0);
-	m_posX = makeSpinBox(-100000.0, 100000.0, 0.01, 2);
-	m_posY = makeSpinBox(-100000.0, 100000.0, 0.01, 2);
-	m_posZ = makeSpinBox(-100000.0, 100000.0, 0.01, 2);
-	grid->addWidget(m_posX, 1, 1);
-	grid->addWidget(m_posY, 1, 2);
-	grid->addWidget(m_posZ, 1, 3);
+	m_posSpin = new Vec3Spin(-100000.0, 100000.0, 0.01, 2, QString());
+	grid->addWidget(m_posSpin, 1, 1, 1, 3);
 
-	// Row 2: Rotation
+	// Row 2: Rotation — Vec3Spin spans columns 1–3
 	grid->addWidget(new QLabel("Rotation"), 2, 0);
-	m_rotX = makeSpinBox(-360.0, 360.0, 1.0, 1, "\u00B0");
-	m_rotY = makeSpinBox(-360.0, 360.0, 1.0, 1, "\u00B0");
-	m_rotZ = makeSpinBox(-360.0, 360.0, 1.0, 1, "\u00B0");
-	grid->addWidget(m_rotX, 2, 1);
-	grid->addWidget(m_rotY, 2, 2);
-	grid->addWidget(m_rotZ, 2, 3);
+	m_rotSpin = new Vec3Spin(-360.0, 360.0, 1.0, 1, "\u00B0");
+	grid->addWidget(m_rotSpin, 2, 1, 1, 3);
 
-	// Row 3: Scale
+	// Row 3: Scale — Vec3Spin spans columns 1–3
 	grid->addWidget(new QLabel("Scale"), 3, 0);
-	m_sclX = makeSpinBox(0.001, 1000.0, 0.1, 3);
-	m_sclY = makeSpinBox(0.001, 1000.0, 0.1, 3);
-	m_sclZ = makeSpinBox(0.001, 1000.0, 0.1, 3);
-	m_sclX->setValue(1.0);
-	m_sclY->setValue(1.0);
-	m_sclZ->setValue(1.0);
-	grid->addWidget(m_sclX, 3, 1);
-	grid->addWidget(m_sclY, 3, 2);
-	grid->addWidget(m_sclZ, 3, 3);
+	m_sclSpin = new Vec3Spin(0.001, 1000.0, 0.1, 3, QString());
+	m_sclSpin->SetValue(1.0f, 1.0f, 1.0f);  // initial identity
+	grid->addWidget(m_sclSpin, 3, 1, 1, 3);
 
-	// Row 4: Reset button
+	// Row 4: Reset button — spans all 4 columns
 	auto* resetBtn = new QPushButton("Reset Transform");
 	resetBtn->setToolTip("Reset position, rotation, and scale to identity values.");
 	grid->addWidget(resetBtn, 4, 0, 1, 4, Qt::AlignCenter);
 
 	// --- Signal wiring ---
-	QObject::connect(m_posX, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-	                 this, [this]() {
-		if (m_currentObjectId < 0) return;
-		PositionChanged e;
-		e.objectId = m_currentObjectId;
-		e.posX = static_cast<float>(m_posX->value());
-		e.posY = static_cast<float>(m_posY->value());
-		e.posZ = static_cast<float>(m_posZ->value());
-		emit positionChanged(e);
-	});
-	auto emitPosition = [this]() {
-		if (m_currentObjectId < 0) return;
-		PositionChanged e;
-		e.objectId = m_currentObjectId;
-		e.posX = static_cast<float>(m_posX->value());
-		e.posY = static_cast<float>(m_posY->value());
-		e.posZ = static_cast<float>(m_posZ->value());
-		emit positionChanged(e);
-	};
-	QObject::connect(m_posY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitPosition);
-	QObject::connect(m_posZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitPosition);
+	// Each Vec3Spin emits valueChanged(x, y, z); one signal per transform component.
+	QObject::connect(m_posSpin, &Vec3Spin::valueChanged, this,
+		[this](float x, float y, float z) {
+			if (m_currentObjectId < 0) return;
+			emit positionChanged({m_currentObjectId, x, y, z});
+		});
 
-	auto emitRotation = [this]() {
-		if (m_currentObjectId < 0) return;
-		RotationChanged e;
-		e.objectId = m_currentObjectId;
-		e.rotX = static_cast<float>(m_rotX->value());
-		e.rotY = static_cast<float>(m_rotY->value());
-		e.rotZ = static_cast<float>(m_rotZ->value());
-		emit rotationChanged(e);
-	};
-	QObject::connect(m_rotX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitRotation);
-	QObject::connect(m_rotY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitRotation);
-	QObject::connect(m_rotZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitRotation);
+	QObject::connect(m_rotSpin, &Vec3Spin::valueChanged, this,
+		[this](float x, float y, float z) {
+			if (m_currentObjectId < 0) return;
+			emit rotationChanged({m_currentObjectId, x, y, z});
+		});
 
-	auto emitScale = [this]() {
-		if (m_currentObjectId < 0) return;
-		ScaleChanged e;
-		e.objectId = m_currentObjectId;
-		e.sclX = static_cast<float>(m_sclX->value());
-		e.sclY = static_cast<float>(m_sclY->value());
-		e.sclZ = static_cast<float>(m_sclZ->value());
-		emit scaleChanged(e);
-	};
-	QObject::connect(m_sclX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitScale);
-	QObject::connect(m_sclY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitScale);
-	QObject::connect(m_sclZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, emitScale);
+	QObject::connect(m_sclSpin, &Vec3Spin::valueChanged, this,
+		[this](float x, float y, float z) {
+			if (m_currentObjectId < 0) return;
+			emit scaleChanged({m_currentObjectId, x, y, z});
+		});
 
-	QObject::connect(resetBtn, &QPushButton::clicked, this, [this, emitPosition, emitRotation, emitScale]() {
-		{
-			QSignalBlocker b1(m_posX); QSignalBlocker b2(m_posY); QSignalBlocker b3(m_posZ);
-			QSignalBlocker b4(m_rotX); QSignalBlocker b5(m_rotY); QSignalBlocker b6(m_rotZ);
-			QSignalBlocker b7(m_sclX); QSignalBlocker b8(m_sclY); QSignalBlocker b9(m_sclZ);
+	// --- Reset button ---
+	QObject::connect(resetBtn, &QPushButton::clicked, this, [this]() {
+		m_posSpin->SetValue(0.0f, 0.0f, 0.0f);
+		m_rotSpin->SetValue(0.0f, 0.0f, 0.0f);
+		m_sclSpin->SetValue(1.0f, 1.0f, 1.0f);
 
-			m_posX->setValue(0.0); m_posY->setValue(0.0); m_posZ->setValue(0.0);
-			m_rotX->setValue(0.0); m_rotY->setValue(0.0); m_rotZ->setValue(0.0);
-			m_sclX->setValue(1.0); m_sclY->setValue(1.0); m_sclZ->setValue(1.0);
-		}
 		if (m_currentObjectId >= 0)
 		{
 			PositionChanged pe = {m_currentObjectId, 0, 0, 0};
@@ -261,30 +208,6 @@ void PropertyPanel::BuildTransformEditor()
 			emit scaleChanged(se);
 		}
 	});
-}
-
-// =========================================================================
-// PopulateTransform — set spinboxes from raw floats (with QSignalBlocker)
-// =========================================================================
-
-void PropertyPanel::PopulateTransform(
-	float px, float py, float pz,
-	float rx, float ry, float rz,
-	float sx, float sy, float sz)
-{
-	QSignalBlocker b1(m_posX); QSignalBlocker b2(m_posY); QSignalBlocker b3(m_posZ);
-	QSignalBlocker b4(m_rotX); QSignalBlocker b5(m_rotY); QSignalBlocker b6(m_rotZ);
-	QSignalBlocker b7(m_sclX); QSignalBlocker b8(m_sclY); QSignalBlocker b9(m_sclZ);
-
-	m_posX->setValue(static_cast<double>(px));
-	m_posY->setValue(static_cast<double>(py));
-	m_posZ->setValue(static_cast<double>(pz));
-	m_rotX->setValue(static_cast<double>(rx));
-	m_rotY->setValue(static_cast<double>(ry));
-	m_rotZ->setValue(static_cast<double>(rz));
-	m_sclX->setValue(static_cast<double>(sx));
-	m_sclY->setValue(static_cast<double>(sy));
-	m_sclZ->setValue(static_cast<double>(sz));
 }
 
 // =========================================================================
