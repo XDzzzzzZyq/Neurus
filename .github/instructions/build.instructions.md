@@ -11,6 +11,13 @@
 ## Quick Start
 
 ```
+# Clone with submodules
+git clone --recurse-submodules https://github.com/XDzzzzzZyq/Neurus.git
+cd Neurus
+
+# Download pre-compiled dependency libraries (optional but recommended)
+make update
+
 # Configure + build debug
 cmake --preset default
 cmake --build build/debug
@@ -27,10 +34,38 @@ make nobuild
 make check
 ```
 
+## Dependency System
+
+Neurus supports two modes for third-party dependencies that can be compiled ahead of time:
+
+### Pre-compiled (recommended)
+
+Run `make update` to download pre-compiled binaries from the
+[Neurus-Lib](https://github.com/XDzzzzzZyq/Neurus-Lib) GitHub Release.
+Binaries are extracted into `lib/<platform>/` (git-ignored).
+
+The CMake build system automatically detects pre-compiled libraries and skips
+source builds for:
+
+- **shaderc** — shader compilation library (saves ~40-60s per build)
+- **qtadvanceddocking** — Qt Advanced Docking System (saves ~15s per build)
+
+### Source build (fallback)
+
+If `lib/<platform>/` does not contain pre-compiled binaries, CMake falls
+back to building from source in `dep/` (the existing behavior). This
+requires a one-time shaderc dependency sync:
+
+```
+cd dep/shaderc
+python utils/git-sync-deps
+```
+
 ## CI
 
 - See `.github/workflows/ci.yml` for the exact matrix and steps.
 - CI runs Windows x64 only. GPU tests are excluded from CI.
+- CI attempts to fetch pre-compiled dependencies first; falls back to source build on failure.
 
 ## Testing
 

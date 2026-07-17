@@ -49,6 +49,9 @@ with modern rendering algorithms.
 git clone --recurse-submodules https://github.com/XDzzzzzZyq/Neurus.git
 cd Neurus
 
+# Download pre-compiled third-party libraries (recommended)
+make update
+
 # Configure and build (Debug)
 cmake --preset default
 cmake --build build/debug
@@ -75,9 +78,11 @@ Neurus/
 ├── .github/
 │   ├── instructions/       # Architecture/component docs
 │   └── workflows/          # CI configuration
-├── cmake/                  # CMake helper modules
-├── dep/                    # Git submodule dependencies
+├── cmake/                  # CMake helper modules (Dependencies.cmake)
+├── dep/                    # Git submodule dependencies (source fallback)
+├── lib/                    # Pre-compiled third-party libraries (git-ignored)
 ├── res/shaders/            # GLSL shader source files
+├── scripts/                # Utility scripts (setup_dependencies.py)
 ├── src/
 │   ├── render/             # Renderer layer (Vulkan-HPP)
 │   ├── editor/             # Editor layer (logic, controllers)
@@ -115,6 +120,16 @@ screen-space ambient occlusion, image-based lighting, and full G-Buffer pipeline
 - OBJ mesh loading with MeshData (icosphere, cube, etc.)
 - Deferred PBR pipeline: ShadowDepthPass → GeometryPass → SSAOPass → LightingPass → IBLPass
 - Reference-image regression tests (capture → compare PNG)
+
+## Dependency Management
+
+Third-party libraries that benefit from ahead-of-time compilation (shaderc,
+qtadvanceddocking) can be used as pre-compiled binaries via
+[Neurus-Lib](https://github.com/XDzzzzzZyq/Neurus-Lib).
+Run `make update` to download the latest binaries into `lib/<platform>/`.
+The CMake build system prefers pre-compiled binaries and falls back to
+source builds in `dep/` automatically. See
+[build instructions](.github/instructions/build.instructions.md) for details.
 
 ## Code Style
 

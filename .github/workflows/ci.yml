@@ -36,7 +36,11 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Sync shaderc dependencies
+      - name: Fetch pre-compiled dependencies
+        run: python scripts/setup_dependencies.py
+        continue-on-error: true
+
+      - name: Sync shaderc dependencies (fallback)
         run: |
           cd dep/shaderc
           python utils/git-sync-deps
