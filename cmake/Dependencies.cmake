@@ -100,18 +100,52 @@ function(neurus_find_dependency name)
 	# -----------------------------------------------------------------------
 	elseif(name STREQUAL "qtadvanceddocking")
 
-		# ADS is NOT pre-compiled because static libraries are Qt-version specific.
-		# The pre-compiled .lib would embed a qt_version_tag that only matches
-		# the Qt version it was built with (e.g. Qt 6.11 vs CI's Qt 6.10).
-		# Always build from source to ensure ABI compatibility.
-		message(STATUS "Building qtadvanceddocking from source (static libs are Qt-version specific)")
+		# ADS uses "_static" suffix for static builds and "d" debug postfix.
+		# Pre-compiled libs must match Qt version (CI and local both use Qt 6.11).
+		set(ADS_LIB_RELEASE "${LIB_DIR}/lib/qtadvanceddocking-qt6_static.lib")
+		set(ADS_LIB_DEBUG   "${LIB_DIR}/lib/qtadvanceddocking-qt6d_static.lib")
 
-		set(ADS_VERSION "4.5.0")
-		set(BUILD_EXAMPLES OFF)
-		set(BUILD_STATIC ON)
-		add_subdirectory("${DEP_DIR}")
+		if(EXISTS "${ADS_LIB_RELEASE}")
+			message(STATUS "Using pre-compiled qtadvanceddocking from ${LIB_DIR}")
 
-		set(NEURUS_DEP_${name}_FROM_LIB FALSE PARENT_SCOPE)
+			add_library(qtadvanceddocking-qt6 STATIC IMPORTED)
+			set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+				IMPORTED_LOCATION_RELEASE "${ADS_LIB_RELEASE}"
+			)
+			if(EXISTS "${ADS_LIB_DEBUG}")
+				set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+					IMPORTED_LOCATION_DEBUG "${ADS_LIB_DEBUG}"
+				)
+			else()
+				set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+					IMPORTED_LOCATION_DEBUG "${ADS_LIB_RELEASE}"
+				)
+			endif()
+			set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+				MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+				MAP_IMPORTED_CONFIG_MINSIZEREL     Release
+			)
+
+			set_property(TARGET qtadvanceddocking-qt6 PROPERTY
+				INTERFACE_INCLUDE_DIRECTORIES "${DEP_DIR}/src"
+			)
+			target_link_libraries(qtadvanceddocking-qt6 INTERFACE
+				Qt6::Core Qt6::Gui Qt6::Widgets
+			)
+			add_library(ads::qtadvanceddocking-qt6 ALIAS qtadvanceddocking-qt6)
+
+			set(NEURUS_DEP_${name}_FROM_LIB TRUE PARENT_SCOPE)
+
+		else()
+			message(STATUS "Pre-compiled qtadvanceddocking not found in ${LIB_DIR}, building from source")
+
+			set(ADS_VERSION "4.5.0")
+			set(BUILD_EXAMPLES OFF)
+			set(BUILD_STATIC ON)
+			add_subdirectory("${DEP_DIR}")
+
+			set(NEURUS_DEP_${name}_FROM_LIB FALSE PARENT_SCOPE)
+		endif()
 
 	# -----------------------------------------------------------------------
 	# Unknown dependency
