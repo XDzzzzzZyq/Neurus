@@ -23,7 +23,6 @@ add_executable(neurus_test
 	render/test_mesh.cpp
 	render/test_pipeline.cpp
 	render/test_attachments.cpp
-	render/test_commandbuffer.cpp
 	render/test_renderpass.cpp
 	render/test_gbuffer.cpp
 	render/test_ibl.cpp

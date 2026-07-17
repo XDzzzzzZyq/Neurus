@@ -21,7 +21,6 @@ add_library(neurus_render STATIC
 	Image.cpp
 	DescriptorManager.h
 	DescriptorManager.cpp
-	CommandBuffer.h
 	Swapchain.h
 	Swapchain.cpp
 	shaders/Shader.h
