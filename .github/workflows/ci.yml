@@ -24,9 +24,9 @@ jobs:
       - name: Test AQT
         run: |
           pip install aqtinstall
-          python -m aqt version
+          aqt version
           aqt list-qt windows desktop
-          python -m aqt install-qt windows desktop 6.11.1 win64_msvc2022_64 --autodesktop --outputdir D:\a\Neurus\Qt
+          aqt install-qt windows desktop 6.11.1 win64_msvc2022_64 --autodesktop --outputdir D:\a\Neurus\Qt
 
       - name: Setup Qt
         uses: jurplel/install-qt-action@v4
