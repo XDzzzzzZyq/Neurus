@@ -16,12 +16,11 @@
 
 #pragma once
 
-#include "../buffers/GPUBuffer.h"
+#include "../buffers/ArrayBuffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
 #include <cstdint>
-#include <memory>
 #include <vector>
 
 namespace neurus {
@@ -109,13 +108,12 @@ static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must 
 /**
  * @brief Manages light SSBO storage for the PBR lighting pipeline.
  *
- * Owns device-local GPUBuffers for point light and sun light arrays.
+ * Owns templated ArrayBuffer instances for point light and sun light arrays.
  * UpdatePointLights() / UpdateSunLights() accept pre-converted GPU struct
- * vectors and create/re-create the SSBO as needed.  When a vector is empty
- * the corresponding SSBO is released and the count is set to zero.
+ * vectors and delegate to ArrayBuffer::Upload().  Empty vectors release
+ * the underlying GPU buffer (ArrayBuffer resizes to zero).
  *
- * Non-copyable, movable.  All borrowed Vulkan handles must outlive this
- * object.
+ * Non-copyable.  All borrowed Vulkan handles must outlive this object.
  */
 class LightingGPU
 {
@@ -123,39 +121,34 @@ public:
 	/**
 	 * @brief Constructs the light GPU storage manager.
 	 *
+	 * The underlying GPU buffers are allocated lazily on the first
+	 * UpdatePointLights() / UpdateSunLights() call.  The supplied queue
+	 * is used for staging transfers and resize copies.
+	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for buffer memory queries).
 	 * @param graphicsQueue     Graphics queue for staging uploads.
 	 * @param queueFamilyIndex  Queue family index for staging command pool.
 	 */
 	LightingGPU(const vk::raii::Device& device,
-	            const vk::raii::PhysicalDevice& physicalDevice);
+	            const vk::raii::PhysicalDevice& physicalDevice,
+	            vk::Queue graphicsQueue,
+	            uint32_t queueFamilyIndex);
 
-	/**
-	 * @brief Initialise the staging queue for SSBO uploads.
-	 *
-	 * Must be called before UpdatePointLights() or UpdateSunLights().
-	 * @param graphicsQueue     Graphics queue for staging uploads.
-	 * @param queueFamilyIndex  Queue family index for staging command pool.
-	 */
-	void Init(vk::Queue graphicsQueue, uint32_t queueFamilyIndex);
-
-	// Non-copyable — owns GPU resources
+	// Non-copyable — owns GPU resources (reference members prevent move-assign)
 	LightingGPU(const LightingGPU&) = delete;
 	LightingGPU& operator=(const LightingGPU&) = delete;
 
 	// Movable
 	LightingGPU(LightingGPU&&) noexcept = default;
-	LightingGPU& operator=(LightingGPU&&) noexcept = default;
 
 	// --- Point light SSBO ---
 
 	/**
 	 * @brief Creates or updates the point light SSBO from a pre-converted vector.
 	 *
-	 * If @a lights is empty the SSBO is released and the count is set to zero.
-	 * Otherwise a new GPUBuffer is allocated with eStorageBuffer usage and
-	 * the data is uploaded via a staging buffer.
+	 * If @a lights is empty the underlying buffer is released.  Otherwise
+	 * the buffer is resized as needed and the data is uploaded via staging.
 	 *
 	 * @param lights  Point light GPU structs to upload.
 	 */
@@ -178,9 +171,8 @@ public:
 	/**
 	 * @brief Creates or updates the sun light SSBO from a pre-converted vector.
 	 *
-	 * If @a lights is empty the SSBO is released and the count is set to zero.
-	 * Otherwise a new GPUBuffer is allocated with eStorageBuffer usage and
-	 * the data is uploaded via a staging buffer.
+	 * If @a lights is empty the underlying buffer is released.  Otherwise
+	 * the buffer is resized as needed and the data is uploaded via staging.
 	 *
 	 * @param lights  Sun light GPU structs to upload.
 	 */
@@ -199,18 +191,9 @@ public:
 	uint32_t GetSunLightCount() const;
 
 private:
-	// --- Borrowed Vulkan handles (must outlive this object) ---
-	const vk::raii::Device& m_device;
-	const vk::raii::PhysicalDevice& m_physicalDevice;
-	vk::Queue m_graphicsQueue;
-	uint32_t m_queueFamilyIndex;
-
-	// --- Owned light SSBOs ---
-	std::unique_ptr<GPUBuffer> m_pointLightSSBO;
-	uint32_t m_pointLightCount = 0;
-
-	std::unique_ptr<GPUBuffer> m_sunLightSSBO;
-	uint32_t m_sunLightCount = 0;
+	// --- Owned GPU buffers ---
+	ArrayBuffer<PointLightStruct> m_pointLightSSBO;
+	ArrayBuffer<SunLightStruct> m_sunLightSSBO;
 };
 
 } // namespace neurus

@@ -22,8 +22,8 @@ RenderCache::RenderCache(const vk::raii::Device& device,
 
 void RenderCache::InitLightingGPU(vk::Queue graphicsQueue, uint32_t queueFamilyIndex)
 {
-	rc_lightingGPU = std::make_unique<LightingGPU>(*rc_device, *rc_physicalDevice);
-	rc_lightingGPU->Init(graphicsQueue, queueFamilyIndex);
+	rc_lightingGPU = std::make_unique<LightingGPU>(*rc_device, *rc_physicalDevice,
+	                                               graphicsQueue, queueFamilyIndex);
 	NEURUS_LOG("[RenderCache] LightingGPU initialized");
 }
 

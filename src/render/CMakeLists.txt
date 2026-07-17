@@ -1,6 +1,7 @@
 # src/render/CMakeLists.txt - Renderer Layer
 
 add_library(neurus_render STATIC
+	buffers/ArrayBuffer.h
 	buffers/Buffer.h
 	buffers/Buffer.cpp
 	buffers/BufferLayout.h

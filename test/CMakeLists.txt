@@ -5,6 +5,7 @@ add_executable(neurus_test
 	shared/TestVulkanShared.h
 	shared/TestMinimalSpv.h
 	shared/test_main.cpp
+	render/test_arraybuffer.cpp
 	render/test_buffers.cpp
 	render/test_buffer.cpp
 	render/test_vulkan_context.cpp
