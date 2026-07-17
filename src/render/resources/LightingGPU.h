@@ -5,8 +5,7 @@
  * LightingGPU manages point light and sun light SSBOs (storage buffers)
  * and defines the std140-compatible GPU data structures used by the
  * PBR lighting compute shader.  Separated from LightingPass so the
- * SSBO lifecycle can be managed independently of the compute pass
- * (e.g. shared across passes, or owned by DeferredRenderer).
+ * SSBO lifecycle can be managed independently of the compute pass.
  *
  * The structs defined here (PointLightStruct, SunLightStruct,
  * LightingPushConstants) are byte-for-byte replacements for the
@@ -108,10 +107,13 @@ static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must 
 /**
  * @brief Manages light SSBO storage for the PBR lighting pipeline.
  *
- * Owns templated ArrayBuffer instances for point light and sun light arrays.
- * UpdatePointLights() / UpdateSunLights() accept pre-converted GPU struct
- * vectors and delegate to ArrayBuffer::Upload().  Empty vectors release
- * the underlying GPU buffer (ArrayBuffer resizes to zero).
+ * Owns ArrayBuffer instances for point light and sun light arrays.
+ * UpdatePointLights() / UpdateSunLights() accept pre-sorted vectors with
+ * shadowMapIndex already stamped by the caller (RenderCache).
+ *
+ * UpdatePointLight(index) / UpdateSunLight(index) provide single-element
+ * updates via ArrayBuffer::Update() — used by RenderCache for per-light
+ * property changes without a full SSBO rebuild.
  *
  * Non-copyable.  All borrowed Vulkan handles must outlive this object.
  */
@@ -121,9 +123,7 @@ public:
 	/**
 	 * @brief Constructs the light GPU storage manager.
 	 *
-	 * The underlying GPU buffers are allocated lazily on the first
-	 * UpdatePointLights() / UpdateSunLights() call.  The supplied queue
-	 * is used for staging transfers and resize copies.
+	 * The underlying GPU buffers are allocated lazily on the first upload.
 	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (for buffer memory queries).
@@ -142,52 +142,63 @@ public:
 	// Movable
 	LightingGPU(LightingGPU&&) noexcept = default;
 
-	// --- Point light SSBO ---
+	// --- Full SSBO rebuild ---
 
 	/**
-	 * @brief Creates or updates the point light SSBO from a pre-converted vector.
+	 * @brief Creates or updates the point light SSBO from a pre-built vector.
 	 *
-	 * If @a lights is empty the underlying buffer is released.  Otherwise
-	 * the buffer is resized as needed and the data is uploaded via staging.
+	 * The vector must already be sorted and have shadowMapIndex fields
+	 * populated by the caller.  An empty vector releases the buffer.
 	 *
-	 * @param lights  Point light GPU structs to upload.
+	 * @param lights  Point light GPU structs (sorted, shadow indices set).
 	 */
 	void UpdatePointLights(const std::vector<PointLightStruct>& lights);
 
 	/**
-	 * @brief Returns the point light SSBO, or nullptr when no lights exist.
-	 * @return Non-owning pointer to GPUBuffer, or nullptr.
-	 */
-	const GPUBuffer* GetPointLightSSBO() const;
-
-	/**
-	 * @brief Returns the number of point lights currently in the SSBO.
-	 * @return Light count (0 if no lights uploaded).
-	 */
-	uint32_t GetPointLightCount() const;
-
-	// --- Sun light SSBO ---
-
-	/**
-	 * @brief Creates or updates the sun light SSBO from a pre-converted vector.
+	 * @brief Creates or updates the sun light SSBO from a pre-built vector.
 	 *
-	 * If @a lights is empty the underlying buffer is released.  Otherwise
-	 * the buffer is resized as needed and the data is uploaded via staging.
+	 * Same semantics as UpdatePointLights().
 	 *
-	 * @param lights  Sun light GPU structs to upload.
+	 * @param lights  Sun light GPU structs (sorted, shadow indices set).
 	 */
 	void UpdateSunLights(const std::vector<SunLightStruct>& lights);
 
-	/**
-	 * @brief Returns the sun light SSBO, or nullptr when no sun lights exist.
-	 * @return Non-owning pointer to GPUBuffer, or nullptr.
-	 */
-	const GPUBuffer* GetSunLightSSBO() const;
+	// --- Per-light update (single element, no full rebuild) ---
 
 	/**
-	 * @brief Returns the number of sun lights currently in the SSBO.
-	 * @return Sun light count (0 if no sun lights uploaded).
+	 * @brief Overwrites a single point light element at the given SSBO index.
+	 *
+	 * Uses ArrayBuffer::Update() — no full re-upload.  The caller
+	 * (RenderCache) is responsible for providing the correct index and
+	 * a struct with shadowMapIndex already stamped.
+	 *
+	 * @param light  Updated point light struct.
+	 * @param index  Zero-based SSBO element index.
 	 */
+	void UpdatePointLight(const PointLightStruct& light, uint32_t index);
+
+	/**
+	 * @brief Overwrites a single sun light element at the given SSBO index.
+	 *
+	 * Same semantics as UpdatePointLight().
+	 *
+	 * @param light  Updated sun light struct.
+	 * @param index  Zero-based SSBO element index.
+	 */
+	void UpdateSunLight(const SunLightStruct& light, uint32_t index);
+
+	// --- Accessors ---
+
+	/** @brief Returns the point light SSBO, or nullptr when no lights exist. */
+	const GPUBuffer* GetPointLightSSBO() const;
+
+	/** @brief Returns the sun light SSBO, or nullptr when no sun lights exist. */
+	const GPUBuffer* GetSunLightSSBO() const;
+
+	/** @brief Number of point lights in the SSBO. */
+	uint32_t GetPointLightCount() const;
+
+	/** @brief Number of sun lights in the SSBO. */
 	uint32_t GetSunLightCount() const;
 
 private:

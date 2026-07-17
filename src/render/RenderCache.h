@@ -300,30 +300,32 @@ public:
 	const LightingGPU* GetLightingGPU() const;
 
 	/**
-	 * @brief Updates the point light and sun light SSBOs from pre-converted GPU structs.
+	 * @brief Updates the point light and sun light SSBOs from a variant dict.
 	 *
-	 * Asserts that InitLightingGPU() has been called first.
-	 * When a vector is empty, the corresponding SSBO is released.
-	 *
-	 * @param pointLights  Pre-converted point light GPU structs.
-	 * @param sunLights    Pre-converted sun light GPU structs.
-	 */
-	void UpdateLighting(const std::vector<PointLightStruct>& pointLights,
-	                    const std::vector<SunLightStruct>& sunLights);
-
-	/**
-	 * @brief Updates the point light and sun light SSBOs from a variant-based light dict.
-	 *
-	 * Uses std::holds_alternative<> to separate PointLightStruct and SunLightStruct
-	 * entries.  Assigns sequential SSBO indices (point lights first, then sun lights)
-	 * and assigns shadow map indices (shared pool, point first then sun, max 4).
-	 *
-	 * Stores uid→index mappings for later lookup via GetShadowIndex().
+	 * Separates point/sun entries, sorts by UID, assigns shadow map indices,
+	 * and uploads to LightingGPU.  Maintains internal uid→SSBO-index and
+	 * uid→shadow-index maps for later per-light updates.
 	 *
 	 * @param lightDict  Map: light UID → variant<PointLightStruct, SunLightStruct>.
 	 */
 	void UpdateLighting(const std::unordered_map<int,
 	                    std::variant<PointLightStruct, SunLightStruct>>& lightDict);
+
+	/**
+	 * @brief Updates a single light in the SSBO without rebuilding the array.
+	 *
+	 * Looks up @a lightUID in the internal uid→index maps, stamps
+	 * shadowMapIndex, and delegates to LightingGPU::UpdatePointLight or
+	 * UpdateSunLight.  No-op if the uid is not found (light added after
+	 * the last full rebuild — call UpdateLighting first).
+	 *
+	 * @param lightUID  Unique light identifier.
+	 * @param light     Variant containing the updated GPU struct
+	 *                  (shadowMapIndex = -1 is OK; it will be restored
+	 *                  from the shadow index map).
+	 */
+	void UpdateLight(int lightUID,
+	                 const std::variant<PointLightStruct, SunLightStruct>& light);
 
 	/**
 	 * @brief Returns the shadow map index for a light UID.
@@ -374,8 +376,9 @@ private:
 	// --- Lighting SSBO storage (owned) ---
 	std::unique_ptr<LightingGPU> rc_lightingGPU;
 
-	// --- Light UID → SSBO index / shadow index maps (populated by variant UpdateLighting) ---
-	std::unordered_map<int, uint32_t> rc_uidToShadowIndex;
+	// --- Light UID → SSBO index / shadow index maps (populated by UpdateLighting) ---
+	std::unordered_map<int, uint32_t> rc_uidToSSBOIdx;     ///< uid → SSBO element index
+	std::unordered_map<int, uint32_t> rc_uidToShadowLayer; ///< uid → shadow intensity layer
 };
 
 /**

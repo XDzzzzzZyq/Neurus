@@ -206,7 +206,8 @@ void Editor::Initialize(Scene& scene)
 		if (it == scene.light_list.end()) return;
 		it->second->SetPower(e.power);
 		ed_project->MarkDirty();
-		UploadLighting();
+		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
+		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
 	});
 
 	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
@@ -215,7 +216,8 @@ void Editor::Initialize(Scene& scene)
 		if (it == scene.light_list.end()) return;
 		it->second->SetRadius(e.radius);
 		ed_project->MarkDirty();
-		UploadLighting();
+		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
+		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
 	});
 
 	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {

@@ -35,8 +35,12 @@ LightingGPU::LightingGPU(const vk::raii::Device& device,
 void LightingGPU::UpdatePointLights(const std::vector<PointLightStruct>& lights)
 {
 	m_pointLightSSBO.Upload(lights);
-
 	NEURUS_LOG("[LightingGPU] Uploaded " << m_pointLightSSBO.size() << " point lights");
+}
+
+void LightingGPU::UpdatePointLight(const PointLightStruct& light, uint32_t index)
+{
+	m_pointLightSSBO.Update(light, index);
 }
 
 const GPUBuffer* LightingGPU::GetPointLightSSBO() const
@@ -56,8 +60,12 @@ uint32_t LightingGPU::GetPointLightCount() const
 void LightingGPU::UpdateSunLights(const std::vector<SunLightStruct>& lights)
 {
 	m_sunLightSSBO.Upload(lights);
-
 	NEURUS_LOG("[LightingGPU] Uploaded " << m_sunLightSSBO.size() << " sun lights");
+}
+
+void LightingGPU::UpdateSunLight(const SunLightStruct& light, uint32_t index)
+{
+	m_sunLightSSBO.Update(light, index);
 }
 
 const GPUBuffer* LightingGPU::GetSunLightSSBO() const
