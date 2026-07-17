@@ -194,7 +194,7 @@ public:
 		{
 			NEURUS_ERR("[Project] No camera in scene, adding default camera.");
 			auto defaultCam = std::make_shared<Camera>();
-			defaultCam->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+			defaultCam->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 			defaultCam->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 			proj_scene->UseCamera(defaultCam);
 		}

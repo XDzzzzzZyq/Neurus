@@ -11,11 +11,21 @@ add_library(neurus_ui STATIC
 	items/ScalarSlider.cpp
 	items/OutlinerRow.h
 	items/OutlinerRow.cpp
+	items/Vec3Spin.h
+	items/Vec3Spin.cpp
+	presets/CameraProperties.h
+	presets/CameraProperties.cpp
+	presets/MeshProperties.h
+	presets/MeshProperties.cpp
+	presets/LightProperties.h
+	presets/LightProperties.cpp
+	presets/EnvironmentProperties.h
+	presets/EnvironmentProperties.cpp
 	panels/UIPanel.h
 	panels/Outliner.h
 	panels/Outliner.cpp
-	panels/PropertyEditor.h
-	panels/PropertyEditor.cpp
+	panels/PropertyPanel.h
+	panels/PropertyPanel.cpp
 	panels/RenderConfigPanel.h
 	panels/RenderConfigPanel.cpp
 	panels/Viewport.h

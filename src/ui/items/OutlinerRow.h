@@ -9,8 +9,8 @@
  *
  * Architecture:
  * - Constructor creates the layout and child widgets once.
- * - SetObject() binds object data (icon name, name, id); resets toggles.
- * - SetStyle() applies visual state (selection highlight, alternating bg).
+ * - setObject() binds object data (icon name, name, id); resets toggles.
+ * - setSelectionMode() / setRowIndex() apply visual state (QSS property + alternating bg).
  * - Signal lambdas read from m_objectId at emission time, so recycling
  *   a row to a new objectId is transparent — no manual rewire needed.
  * - Visibility toggle buttons swap between visible/invisible icons
@@ -19,9 +19,12 @@
 
 #pragma once
 
+#include <QIcon>
 #include <QWidget>
 
 #include "editor/events/EditorEvents.h"
+
+#include <cstdint>
 
 #include <string>
 
@@ -30,6 +33,9 @@ class QPushButton;
 
 namespace neurus
 {
+
+/** @brief Forward declaration (defined in core/Selections.h). */
+enum class SelectionMode : uint32_t;
 
 /**
  * @brief A single row in the Outliner list view (pool-compatible).
@@ -46,7 +52,7 @@ public:
 	 * @brief Constructs an empty outliner row (no object bound yet).
 	 * @param parent Parent widget.
 	 *
-	 * Creates the layout and child widgets once. Call SetObject() to
+	 * Creates the layout and child widgets once. Call setObject() to
 	 * bind a scene object to this row.
 	 */
 	explicit OutlinerRow(QWidget* parent = nullptr);
@@ -66,11 +72,11 @@ public:
 	 * Resets visibility toggles to checked (signals blocked to avoid
 	 * cascading events during pool recycling) and sets their icons.
 	 *
-	 * @param iconName Icon name in "folder:name" format (e.g. "scene:camera").
+	 * @param icon     Type icon for this object.
 	 * @param name     Display name shown in the row.
 	 * @param objectId Unique object identifier.
 	 */
-	void SetObject(const std::string& iconName, const QString& name, int objectId);
+	void setObject(const QIcon& icon, const QString& name, int objectId);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
@@ -82,24 +88,32 @@ public:
 	 * @param viewportVisible True to enable viewport visibility.
 	 * @param renderVisible   True to enable render visibility.
 	 */
-	void SetVisibilities(bool viewportVisible, bool renderVisible);
+	void setVisibilities(bool viewportVisible, bool renderVisible);
 
 	/**
-	 * @brief Applies visual styling: selection highlight and row background.
+	 * @brief Sets selection visual state via QSS dynamic property.
 	 *
-	 * Active  → orange name text (#ff6f00).
-	 * Selected (non-active) → blue name text (#4A90D9).
-	 * Neither → black name text (#000000).
-	 * Row background alternates on odd/even rowIndex for readability.
+	 * Maps SelectionMode to "selectionState" property on m_nameBtn:
+	 *   Active   → "active"   (#ff6f00 via QSS)
+	 *   Selected → "selected" (#4A90D9 via QSS)
+	 *   Neither  → "normal"   (#000000 via QSS)
 	 *
-	 * @param isActive   True if this row is the primary (active) selection.
-	 * @param isSelected True if this row is in the selection set.
-	 * @param rowIndex   0-based row position for alternating background.
+	 * @param mode   Selection mode bitmask (Active / Selected).
 	 */
-	void SetStyle(bool isActive, bool isSelected, int rowIndex);
+	void setSelectionMode(SelectionMode mode);
+
+	/**
+	 * @brief Sets row index for alternating background.
+	 *
+	 * Odd rows get a translucent white background, even rows are transparent.
+	 * No-op if rowIndex hasn't changed (dirty check).
+	 *
+	 * @param rowIndex  0-based row position.
+	 */
+	void setRowIndex(int rowIndex);
 
 	/** @brief Returns the stored object identifier. */
-	int GetObjectId() const { return m_objectId; }
+	int getObjectId() const { return m_objectId; }
 
 signals:
 	/** @brief Emitted when the name button is clicked. */
@@ -109,14 +123,21 @@ signals:
 	void visibilityChanged(const VisibilityChanged& e);
 
 private:
-	/** @brief Updates both visibility toggle icons from the Icons cache. */
-	void UpdateToggleIcons();
+	/** @brief Sets the eye button colorize effect from current checked state. */
+	void setEyeBtnColor();
 
-	QLabel*      m_typeLabel  = nullptr;
-	QPushButton* m_nameBtn    = nullptr;
-	QPushButton* m_eyeBtn     = nullptr;
-	QPushButton* m_renderBtn  = nullptr;
-	int          m_objectId   = 0;
+	/** @brief Sets the render button colorize effect from current checked state. */
+	void setRenderBtnColor();
+
+	QLabel*      m_typeLabel     = nullptr;
+	QPushButton* m_nameBtn       = nullptr;
+	QPushButton* m_eyeBtn        = nullptr;
+	QPushButton* m_renderBtn     = nullptr;
+	int          m_objectId      = -1;
+	int 		 m_mode          = -1;
+	int 		 m_idx           = -1;
+	bool         m_eyeVisible    = true;
+	bool         m_renderVisible = true;
 };
 
 } // namespace neurus

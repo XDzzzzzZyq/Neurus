@@ -28,7 +28,7 @@ std::shared_ptr<Scene> CreateDefaultScene(const std::string& objPath)
 	// Default constructor: FOV 60°, near 0.1, far 100, pos(0,0,0), tar(0,0,0)
 	NEURUS_LOG("[DefaultScene] Creating camera...");
 	auto camera = std::make_shared<Camera>();
-	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 	scene->UseCamera(camera);
 

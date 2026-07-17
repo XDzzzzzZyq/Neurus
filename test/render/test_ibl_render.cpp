@@ -274,7 +274,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 		static_cast<float>(kRenderWidth),
 		static_cast<float>(kRenderHeight),
 		60.0f, 0.1f, 100.0f);
-	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	// (camUBO removed; passes get camera from ctx.scene->GetActiveCamera())
@@ -400,7 +400,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		static_cast<float>(kRenderWidth),
 		static_cast<float>(kRenderHeight),
 		60.0f, 0.1f, 100.0f);
-	camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	// --- Light ---

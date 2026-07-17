@@ -136,7 +136,7 @@ inline CornellBoxResources LoadCornellBox(
 		static_cast<float>(256),  // width (placeholder, caller adjusts)
 		static_cast<float>(256),  // height
 		60.0f, 0.1f, 100.0f);
-	res.camera->SetCamPos(glm::vec3(-2.5f, 0.0f, 1.0f));  // Z-up: left side, cube mid-height Z=1
+	res.camera->SetPosition(glm::vec3(-2.5f, 0.0f, 1.0f));  // Z-up: left side, cube mid-height Z=1
 	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 1.0f));   // looking into cube at mid-height
 	res.camera->SetRotation(glm::vec3(0.0f, 0.0f, 0.0f));  // no explicit rotation, lookAt handles it
 

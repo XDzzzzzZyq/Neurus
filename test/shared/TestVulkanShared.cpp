@@ -259,7 +259,7 @@ std::shared_ptr<Camera> VulkanTestShared::CreateTestCamera(uint32_t width, uint3
 {
 	auto cam = std::make_shared<Camera>(
 		static_cast<float>(width), static_cast<float>(height), 60.0f, 0.1f, 100.0f);
-	cam->SetCamPos(glm::vec3(0.0f, -2.0f, 0.0f));
+	cam->SetPosition(glm::vec3(0.0f, -2.0f, 0.0f));
 	cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	return cam;
 }

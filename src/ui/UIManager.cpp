@@ -1,7 +1,7 @@
 #include "UIManager.h"
 #include "Icons.h"
 #include "panels/Outliner.h"
-#include "panels/PropertyEditor.h"
+#include "panels/PropertyPanel.h"
 #include "panels/RenderConfigPanel.h"
 #include "panels/Viewport.h"
 #include "UIContext.h"
@@ -249,15 +249,15 @@ void UIManager::CreateDocks()
 	m_panels[PanelType::Outliner] = outliner.release();
 	m_docks[PanelType::Outliner] = outlinerDock;
 
-	// --- Right: Property Editor ---
-	auto propertyEditor = std::make_unique<PropertyEditor>(nullptr);
-	auto* propDock = new ads::CDockWidget(win_dockManager, propertyEditor->PanelName());
-	propDock->setWidget(propertyEditor.get());
+	// --- Right: Property Panel ---
+	auto propertyPanel = std::make_unique<PropertyPanel>();
+	auto* propDock = new ads::CDockWidget(win_dockManager, propertyPanel->PanelName());
+	propDock->setWidget(propertyPanel.get());
 	propDock->resize(280, 300);
 	propDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, propDock, outlinerDock->dockAreaWidget());
-	m_panels[PanelType::PropertyEditor] = propertyEditor.release();
-	m_docks[PanelType::PropertyEditor] = propDock;
+	m_panels[PanelType::PropertyPanel] = propertyPanel.release();
+	m_docks[PanelType::PropertyPanel] = propDock;
 
 	// --- Right: Render Config ---
 	auto renderConfigPanel = std::make_unique<RenderConfigPanel>();

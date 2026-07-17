@@ -79,7 +79,7 @@ protected:
 		TS r; r.s=std::make_shared<Scene>();
 		// Camera at origin targeting (0,0,0) - used for orthographic center computation
 		auto cam=std::make_shared<Camera>();
-		cam->SetCamPos(glm::vec3(0.f, -5.f, 2.f));
+		cam->SetPosition(glm::vec3(0.f, -5.f, 2.f));
 		cam->SetTarPos(glm::vec3(0.f, 0.f, 0.f));
 		cam->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
 		r.s->UseCamera(cam);

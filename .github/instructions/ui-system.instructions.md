@@ -14,10 +14,15 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/UIPanel.h` | Base class for all dock panels with `PanelType` enum |
 | `src/ui/panels/Viewport.h/cpp` | Native HWND Vulkan surface widget (Viewport dock) |
 | `src/ui/panels/Outliner.h/cpp` | Scene object hierarchy tree (Outliner dock) |
-| `src/ui/panels/PropertyEditor.h/cpp` | Object property inspector (Property Editor dock) |
+| `src/ui/panels/PropertyPanel.h/cpp` | Object property inspector with GOType-aware subpanels (Property dock) |
 | `src/ui/panels/RenderConfigPanel.h/cpp` | Live render config controls (Render Config dock) |
+| `src/ui/presets/CameraProperties.h/cpp` | Camera property editor preset (target Vec3Spin + FOV ScalarSlider) |
+| `src/ui/presets/MeshProperties.h/cpp` | Mesh property editor preset (path label + shadow/material checkboxes) |
+| `src/ui/presets/LightProperties.h/cpp` | Light property editor preset (type label + power/radius sliders + shadow checkbox) |
+| `src/ui/presets/EnvironmentProperties.h/cpp` | Environment property editor preset (path label + intensity/rotation sliders) |
 | `src/ui/Icons.h/cpp` | Static SVG icon library with lazy-loaded QIcon cache |
 | `src/ui/items/ScalarSlider.h/cpp` | Reusable slider+spinbox composite widget |
+| `src/ui/items/Vec3Spin.h/cpp` | Reusable XYZ triple-spinbox composite widget |
 | `src/ui/items/OutlinerRow.h/cpp` | Pool-recyclable outliner row with type icon, name, toggles |
 | `src/ui/qml/` | Qt resource files: QML layouts, QSS stylesheets (embedded at build time) |
 | `src/ui/VulkanWindow.h/cpp` | QVulkanWindow subclass hosting the triangle renderer |
@@ -136,7 +141,8 @@ Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Appl
 
 Items in `src/ui/items/` are self-contained composite widgets used across panels.
 They do NOT belong to any specific panel and should be reused rather than
-redefined.
+redefined. For type-specific property editors built from items, see
+[Property Presets](#property-presets) in `src/ui/presets/`.
 
 ### Icons
 
@@ -159,6 +165,16 @@ Icons are embedded in the binary via `qt_add_resources(neurus_ui "icons" PREFIX 
 - Emits a single `valueChanged()` signal regardless of which control moved
 - Step and decimals auto-derived: `step = (max-min)/sliderSteps`, `decimals = ceil(-log10(step))`
 - Tick marks enabled with interval = `max(1, sliderSteps/10)`
+
+### Vec3Spin
+
+`Vec3Spin` (`src/ui/items/Vec3Spin.h`) is a reusable composite `QWidget`:
+- Three `QDoubleSpinBox` widgets in a horizontal row (X, Y, Z)
+- Configurable range, step, decimals, and suffix
+- Emits `valueChanged(x, y, z)` signal when any spinbox changes
+- `setValue(x, y, z)` with internal dirty-check — no-ops if all three values unchanged
+- Uses `QSignalBlocker` internally to prevent feedback loops during programmatic updates
+
 
 ## Patterns
 
@@ -189,6 +205,64 @@ childBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
 
 See `src/ui/qml/outliner.qss` for the canonical example using
 `QPushButton#outlinerNameBtn` and `QPushButton#outlinerToggleBtn` selectors.
+
+## Performance Optimization
+
+### Lazy Updates via Logical State Tracking
+
+Avoid redundant widget operations by storing the last-known state and skipping
+updates when nothing changed:
+
+```cpp
+// DO: dirty-check before applying
+if (m_eyeVisible != viewportVisible)
+{
+    m_eyeBtn->blockSignals(true);
+    m_eyeBtn->setChecked(viewportVisible);
+    m_eyeBtn->blockSignals(false);
+    m_eyeVisible = viewportVisible;
+    setEyeBtnColor();
+}
+
+// DON'T: always apply, even when identical
+m_eyeBtn->setChecked(viewportVisible);
+setEyeBtnColor();
+```
+
+This applies to any `Refresh()`-based panel — cache the previous value of each
+widget-modifying input and gate the write behind an equality check.
+
+### Prefer QSS Over Inline Stylesheets
+
+Setting `setStyleSheet()` on individual widgets forces Qt to re-parse the CSS
+text and re-resolve all selectors, which is measurably slower than QSS class
+selectors with dynamic properties:
+
+```cpp
+// DO: QSS with dynamic property (fast, declarative)
+//  .qss: QPushButton#outlinerNameBtn[selectionState="active"] { color: #ff6f00; }
+m_nameBtn->setProperty("selectionState", "active");
+m_nameBtn->style()->unpolish(m_nameBtn);
+m_nameBtn->style()->polish(m_nameBtn);
+
+// DON'T: inline stylesheet (slow, re-parses CSS text each time)
+m_nameBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
+```
+
+The same principle applies to `setIcon()` on toggle buttons — use
+`GetIconPair()` to pre-bake On/Off states into a single `QIcon` instead of
+string-building icon names and calling `GetIcon()` on every toggle.
+
+### Naming Convention: `set*` for Refresh-Path Methods
+
+Widget methods called from `Refresh()` or other per-frame update paths must
+use Qt-style lowercase naming (e.g. `setObject()`, `setValue()`, `setRowIndex()`)
+rather than PascalCase. This aligns with Qt's own convention for setter methods
+(`QSpinBox::setValue()`, `QWidget::setVisible()`) and distinguishes them from
+application-level PascalCase methods (`BuildTransformEditor()`, `PopulateTransform()`).
+
+New reusable items in `src/ui/items/` should follow this convention for all
+public setters that participate in the Refresh pipeline.
 
 ### ✅ UI MAY:
 - Own QVulkanInstance, VulkanWindow, QMainWindow

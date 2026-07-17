@@ -24,6 +24,7 @@ ScalarSlider::ScalarSlider(double min, double max, int sliderSteps,
 	, m_min(min)
 	, m_max(max)
 	, m_sliderSteps(sliderSteps)
+	, m_v(initial)
 {
 	auto* layout = new QHBoxLayout(this);
 	layout->setContentsMargins(0, 0, 0, 0);
@@ -81,10 +82,15 @@ double ScalarSlider::value() const
 
 void ScalarSlider::setValue(double v)
 {
+	if (m_v == v)
+		return;
+
 	QSignalBlocker b1(m_slider);
 	QSignalBlocker b2(m_spin);
 	m_spin->setValue(v);
 	m_slider->setValue(static_cast<int>((v - m_min) / (m_max - m_min) * m_sliderSteps));
+	
+	m_v = v;
 }
 
 } // namespace neurus

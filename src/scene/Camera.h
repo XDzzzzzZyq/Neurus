@@ -163,7 +163,7 @@ public:
 	 * @param pos New camera position
 	 * @note Delegates to Transform3D::SetPosition().
 	 */
-	void SetCamPos(const glm::vec3& pos);
+	void SetPosition(const glm::vec3& pos) override;
 
 	/**
 	 * @brief Sets the look-at target position.

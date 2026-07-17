@@ -40,7 +40,7 @@
 #include "ui/UIManager.h"
 #include "ui/UIContext.h"
 #include "ui/panels/Outliner.h"
-#include "ui/panels/PropertyEditor.h"
+#include "ui/panels/PropertyPanel.h"
 #include "ui/panels/RenderConfigPanel.h"
 #include "ui/panels/Viewport.h"
 
@@ -353,6 +353,31 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
 		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
+	}
+
+	// Handle Transform changes from Property Panel → Editor
+	if (auto* propPanel = app_mainWindow->GetPanel<neurus::PropertyPanel>())
+	{
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::positionChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::rotationChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::scaleChanged);
+
+		// Camera properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::cameraTargetChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::cameraFovChanged);
+
+		// Mesh properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::meshShadowChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::meshMaterialChanged);
+
+		// Light properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightPowerChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightRadiusChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightShadowChanged);
+
+		// Environment properties
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::envIntensityChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::envRotationChanged);
 	}
 }
 

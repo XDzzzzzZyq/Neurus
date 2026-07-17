@@ -1,5 +1,10 @@
 # Git Workflow
 
+## Issue & Label Conventions
+
+- **Title**: clean, no prefix. Category expressed via label instead (e.g. title `Transform Editor panel` + label `UI & UX`, not `feat(ui): Transform Editor panel`).
+- **Labels**: `Feature`, `Bug`, `Documentation`, `Core`, `UI & UX`, `Render`, `Good First Issue`, `Duplicated`.
+
 ## General Rules
 
 - Prefer Git submodule.

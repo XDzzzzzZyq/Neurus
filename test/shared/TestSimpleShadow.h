@@ -177,7 +177,7 @@ f 1 2 3 4
 	{
 		auto cam = std::make_shared<Camera>(256.0f, 256.0f, 75.0f, 0.1f, 100.0f);
 		cam->o_name = "SimpleShadowCamera";
-		cam->SetCamPos(glm::vec3(0.0f, 0.001f, 2.0f));  // small Y offset avoids degenerate lookAt
+		cam->SetPosition(glm::vec3(0.0f, 0.001f, 2.0f));  // small Y offset avoids degenerate lookAt
 		cam->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		res.scene->UseCamera(cam);
 	}

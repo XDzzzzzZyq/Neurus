@@ -122,6 +122,7 @@ public:
 	 * and from OnProjectOpen() / OnProjectNew().
 	 */
 	void UploadSceneResources();
+	void UploadLighting();
 
 	/**
 	 * @brief Selects a scene object by ID through scene.selections.

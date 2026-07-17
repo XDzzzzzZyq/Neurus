@@ -87,4 +87,116 @@ struct VisibilityChanged
 	bool renderVisible;   ///< Render (pipeline) visibility.
 };
 
+/**
+ * @brief Emitted when the position of a selected object is edited from the Property Panel.
+ *
+ * Rotation values are in degrees (Euler: pitch=X, yaw=Z, roll=Y).
+ */
+struct PositionChanged
+{
+	int   objectId;      ///< Target scene object identifier.
+	float posX = 0.0f;   ///< World-space X position.
+	float posY = 0.0f;   ///< World-space Y position (forward).
+	float posZ = 0.0f;   ///< World-space Z position (up).
+};
+
+/** @brief Emitted when the rotation of a selected object is edited. */
+struct RotationChanged
+{
+	int   objectId;      ///< Target scene object identifier.
+	float rotX = 0.0f;   ///< Pitch rotation in degrees.
+	float rotY = 0.0f;   ///< Roll rotation in degrees.
+	float rotZ = 0.0f;   ///< Yaw rotation in degrees.
+};
+
+/** @brief Emitted when the scale of a selected object is edited. */
+struct ScaleChanged
+{
+	int   objectId;      ///< Target scene object identifier.
+	float sclX = 1.0f;   ///< X-axis scale.
+	float sclY = 1.0f;   ///< Y-axis scale.
+	float sclZ = 1.0f;   ///< Z-axis scale.
+};
+
+// ---------------------------------------------------------------------------
+// Camera property events
+// ---------------------------------------------------------------------------
+
+/** @brief Emitted when the camera look-at target is edited. */
+struct CameraTargetChanged
+{
+	int   objectId;
+	float targetX = 0.0f;
+	float targetY = 0.0f;
+	float targetZ = 0.0f;
+};
+
+/** @brief Emitted when the camera FOV is edited. */
+struct CameraFovChanged
+{
+	int   objectId;
+	float fov = 60.0f;
+};
+
+// ---------------------------------------------------------------------------
+// Mesh property events
+// ---------------------------------------------------------------------------
+
+/** @brief Emitted when mesh shadow casting flag is toggled. */
+struct MeshShadowChanged
+{
+	int  objectId;
+	bool enabled = true;
+};
+
+/** @brief Emitted when mesh material usage flag is toggled. */
+struct MeshMaterialChanged
+{
+	int  objectId;
+	bool enabled = true;
+};
+
+// ---------------------------------------------------------------------------
+// Light property events
+// ---------------------------------------------------------------------------
+
+/** @brief Emitted when light power/intensity is edited. */
+struct LightPowerChanged
+{
+	int   objectId;
+	float power = 10.0f;
+};
+
+/** @brief Emitted when light radius is edited. */
+struct LightRadiusChanged
+{
+	int   objectId;
+	float radius = 0.05f;
+};
+
+/** @brief Emitted when light shadow casting flag is toggled. */
+struct LightShadowChanged
+{
+	int  objectId;
+	bool enabled = true;
+};
+
+// ---------------------------------------------------------------------------
+// Environment property events
+// ---------------------------------------------------------------------------
+
+/** @brief Emitted when IBL environment intensity is edited. */
+struct EnvironmentIntensityChanged
+{
+	int   objectId;
+	float intensity = 1.0f;
+};
+
+/** @brief Emitted when IBL environment rotation is edited. */
+struct EnvironmentRotationChanged
+{
+	int   objectId;
+	float rotation = 0.0f;
+};
+
 } // namespace neurus

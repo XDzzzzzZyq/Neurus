@@ -76,7 +76,7 @@ TEST(Camera, NonCopyable)
 TEST(Camera, ViewMatrix_ChangesWithPosition)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(0.0f, -5.0f, 0.0f));
+	cam.SetPosition(glm::vec3(0.0f, -5.0f, 0.0f));
 
 	glm::mat4 view = cam.GetViewMatrix();
 
@@ -101,7 +101,7 @@ TEST(Camera, ViewMatrix_ChangesWithPosition)
 TEST(Camera, ViewMatrix_ChangesWithTarget)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(0.0f, -5.0f, 0.0f));
+	cam.SetPosition(glm::vec3(0.0f, -5.0f, 0.0f));
 
 	glm::mat4 viewAtOrigin = cam.GetViewMatrix();
 
@@ -121,10 +121,10 @@ TEST(Camera, ViewMatrix_Deterministic)
 	Camera camA;
 	Camera camB;
 
-	camA.SetCamPos(glm::vec3(10.0f, -3.0f, 5.0f));
+	camA.SetPosition(glm::vec3(10.0f, -3.0f, 5.0f));
 	camA.SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	camB.SetCamPos(glm::vec3(10.0f, -3.0f, 5.0f));
+	camB.SetPosition(glm::vec3(10.0f, -3.0f, 5.0f));
 	camB.SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	EXPECT_EQ(camA.GetViewMatrix(), camB.GetViewMatrix());
@@ -168,7 +168,7 @@ TEST(Camera, ProjectionMatrix_CorrectStructure)
 TEST(Camera, ProjectionMatrix_AspectChanges)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(0.0f, 0.0f, 5.0f));
+	cam.SetPosition(glm::vec3(0.0f, 0.0f, 5.0f));
 
 	glm::mat4 squareProj = cam.GetProjectionMatrix();
 
@@ -279,16 +279,16 @@ TEST(Camera, ChangeCamPersp_UpdatesFOV)
 }
 
 // -----------------------------------------------------------------------
-// SetCamPos / SetTarPos
+// SetPosition / SetTarPos
 // -----------------------------------------------------------------------
 
 /**
- * @test SetCamPos updates the Transform3D position.
+ * @test SetPosition updates the Transform3D position.
  */
-TEST(Camera, SetCamPos_UpdatesTransform)
+TEST(Camera, SetPosition_UpdatesTransform)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(10.0f, 20.0f, 30.0f));
+	cam.SetPosition(glm::vec3(10.0f, 20.0f, 30.0f));
 
 	EXPECT_EQ(cam.GetPosition(), glm::vec3(10.0f, 20.0f, 30.0f));
 }
@@ -314,7 +314,7 @@ TEST(Camera, SetTarPos_UpdatesTarget)
 TEST(Camera, GenFloatData_Size)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(1.0f, 2.0f, 3.0f));
+	cam.SetPosition(glm::vec3(1.0f, 2.0f, 3.0f));
 	cam.SetRotation(glm::vec3(10.0f, 20.0f, 30.0f));
 	cam.ChangeCamRatio(16.0f, 9.0f);
 	cam.ChangeCamPersp(45.0f);
@@ -346,7 +346,7 @@ TEST(Camera, GenFloatData_Size)
 TEST(Camera, GenFloatData_Idempotent)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(5.0f, 5.0f, 5.0f));
+	cam.SetPosition(glm::vec3(5.0f, 5.0f, 5.0f));
 
 	cam.GenFloatData();
 	std::vector<float> first = cam.cam_floatData;
@@ -422,7 +422,7 @@ TEST(Camera, GetTransform_IsTransform)
 TEST(Camera, GetTransform_PointsToSelf)
 {
 	Camera cam;
-	cam.SetCamPos(glm::vec3(42.0f, 0.0f, 0.0f));
+	cam.SetPosition(glm::vec3(42.0f, 0.0f, 0.0f));
 
 	void* ptr = cam.GetTransform();
 	Transform* trans = static_cast<Transform*>(ptr);

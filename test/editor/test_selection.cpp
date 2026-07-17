@@ -302,7 +302,7 @@ protected:
 
 		// Camera looking along +Y at origin (Z-up convention)
 		m_camera = std::make_shared<Camera>();
-		m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+		m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 		m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		m_camera->cam_w = 800.0f;
 		m_camera->cam_h = 600.0f;
@@ -413,7 +413,7 @@ protected:
 		m_scene = std::make_unique<Scene>();
 
 		m_camera = std::make_shared<Camera>();
-		m_camera->SetCamPos(glm::vec3(0.0f, 5.0f, 0.0f));
+		m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 		m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		m_camera->cam_w = 800.0f;
 		m_camera->cam_h = 600.0f;

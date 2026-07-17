@@ -114,7 +114,7 @@ public:
 	 * @brief Returns a typed pointer to this Transform3D.
 	 * @return Non-owning pointer to this Transform3D instance.
 	 */
-	Transform3D* GetTransformPtr() override { return this; }
+	virtual Transform3D* GetTransformPtr() override { return this; }
 
 	// -----------------------------------------------------------------------
 	// Setters - mark cached matrix dirty
@@ -125,21 +125,21 @@ public:
 	 * @param pos New position in world space.
 	 * @note Model matrix is recomputed immediately.
 	 */
-	void SetPosition(const glm::vec3& pos);
+	virtual void SetPosition(const glm::vec3& pos);
 
 	/**
 	 * @brief Sets the rotation as Euler angles.
 	 * @param degrees Rotation in degrees (pitch=X, yaw=Z, roll=Y).
 	 * @note Model matrix is recomputed immediately.
 	 */
-	void SetRotation(const glm::vec3& degrees);
+	virtual void SetRotation(const glm::vec3& degrees);
 
 	/**
 	 * @brief Sets the local scale.
 	 * @param scale Per-axis scale factors.
 	 * @note Model matrix is recomputed immediately.
 	 */
-	void SetScale(const glm::vec3& scale);
+	virtual void SetScale(const glm::vec3& scale);
 
 	// -----------------------------------------------------------------------
 	// Getters

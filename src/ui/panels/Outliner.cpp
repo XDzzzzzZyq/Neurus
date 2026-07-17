@@ -5,7 +5,7 @@
  * Architecture:
  * - Constructor sets up the QScrollArea + container layout (empty).
  * - Refresh() reads scene objects from UIContext and reconfigures rows
- *   via OutlinerRow::SetObject() from a growing pool.
+ *   via OutlinerRow::setObject() from a growing pool.
  * - New rows are created when pool < scene objects, and connected to
  *   Outliner signals once. Extra rows are hidden (not destroyed).
  * - Signal lambdas on OutlinerRow read m_objectId at emission time,
@@ -16,6 +16,7 @@
 
 #include "Outliner.h"
 
+#include "Icons.h"
 #include "UIContext.h"
 #include "items/OutlinerRow.h"
 
@@ -32,36 +33,6 @@
 
 namespace neurus
 {
-
-// =========================================================================
-// Type-icon helpers (mapped from GOType → Icons key name)
-// =========================================================================
-
-namespace
-{
-
-/**
- * @brief Returns the icon name in "folder:name" format for a GOType.
- */
-static std::string TypeIconName(ObjectID::GOType type)
-{
-	switch (type)
-	{
-	case ObjectID::GOType::GO_CAM:
-		return "scene:camera";
-	case ObjectID::GOType::GO_LIGHT:
-	case ObjectID::GOType::GO_POLYLIGHT:
-		return "scene:light";
-	case ObjectID::GOType::GO_MESH:
-		return "scene:mesh";
-	case ObjectID::GOType::GO_ENVIR:
-		return "scene:environment";
-	default:
-		return "scene:mesh";  // fallback
-	}
-}
-
-} // anonymous namespace
 
 // =========================================================================
 // Constructor — scroll area + empty container (no hard-coded rows)
@@ -85,6 +56,9 @@ Outliner::Outliner(QWidget* parent)
 	m_listLayout->setAlignment(Qt::AlignTop);
 
 	m_scrollArea->setWidget(m_container);
+
+	m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
+	m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
 }
 
 // =========================================================================
@@ -124,6 +98,14 @@ void Outliner::EnsureRowPool(std::size_t needed)
 		m_groupLayout->addWidget(row);
 		m_rowPool.push_back(row);
 	}
+
+	// m_rowPool.size() >= needed
+
+	// Hide surplus rows (pool larger than current scene).
+	for (std::size_t i = needed; i < m_rowPool.size(); ++i)
+	{
+		m_rowPool[i]->setVisible(false);
+	}
 }
 
 // =========================================================================
@@ -134,67 +116,36 @@ void Outliner::Refresh(const UIContext& ctx)
 {
 	auto ids = ctx.GetObjectIDs();
 
-	// Create the "Scene" category group once.
-	if (!m_sceneGroup)
-	{
-		m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
-		m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
-	}
-
 	// --- Query selection state from the scene's Selections<const ObjectID*> ---
 	const Scene* scene = static_cast<const Scene*>(ctx.scene);
-	const ObjectID* activeObj = nullptr;
-	if (scene)
-	{
-		activeObj = scene->selections.GetActiveObject();
-	}
-
-	// Count valid (non-null) objects.
-	std::size_t validCount = 0;
-	for (const auto* obj : ids)
-	{
-		if (obj) ++validCount;
-	}
 
 	// Ensure pool is large enough for valid objects.
-	EnsureRowPool(validCount);
+	EnsureRowPool(ids.size());
 
 	// Configure visible rows.
 	std::size_t poolIndex = 0;
-	int rowIndex = 0;
 	for (const auto* obj : ids)
 	{
-		if (!obj) continue;
-
-		auto iconName = TypeIconName(obj->o_type);
-
-		// Phase 1 — bind object identity data (icon name, name, id).
-		m_rowPool[poolIndex]->SetObject(
-			iconName,
+		// Phase 1 — bind object identity data (icon, name, id).
+		m_rowPool[poolIndex]->setObject(
+			Icons::ObjectIcon(static_cast<int>(obj->o_type)),
 			QString::fromStdString(obj->o_name),
 			obj->GetObjectID());
 
 		// Sync visibility toggles to the object's actual flags.
-		m_rowPool[poolIndex]->SetVisibilities(obj->is_viewport, obj->is_rendered);
+		m_rowPool[poolIndex]->setVisibilities(obj->is_viewport, obj->is_rendered);
 
-		// Phase 2 — apply visual styling (selection highlight + row bg).
-		bool isActive   = (activeObj == obj);
-		bool isSelected = scene && scene->selections.IsSelected(obj);
-		m_rowPool[poolIndex]->SetStyle(isActive, isSelected && !isActive, rowIndex);
+		// Phase 2 — apply selection highlight (QSS property) + row background.
+		neurus::SelectionMode mode = scene->selections.GetMode(obj);
+		m_rowPool[poolIndex]->setSelectionMode(mode);
+		m_rowPool[poolIndex]->setRowIndex(static_cast<int>(poolIndex));
 
 		m_rowPool[poolIndex]->setVisible(true);
 		++poolIndex;
-		++rowIndex;
-	}
-
-	// Hide surplus rows (pool larger than current scene).
-	for (std::size_t i = validCount; i < m_rowPool.size(); ++i)
-	{
-		m_rowPool[i]->setVisible(false);
 	}
 
 	// Show/hide the category group based on whether we have objects.
-	m_sceneGroup->setVisible(validCount > 0);
+	m_sceneGroup->setVisible(!ids.empty());
 }
 
 } // namespace neurus

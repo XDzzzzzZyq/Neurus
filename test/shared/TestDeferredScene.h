@@ -111,7 +111,7 @@ inline DeferredSceneResources BuildDeferredScene(
 
 	// --- Create camera (pos 0,-5,2, target origin, 60° FOV, Z-up) ---
 	res.camera = std::make_shared<Camera>(width, height, 60.0f, 0.1f, 100.0f);
-	res.camera->SetCamPos(glm::vec3(0.0f, -5.0f, 2.0f));
+	res.camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	res.camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
 	// --- Create point light (pos 2,2,2, power 10, radius 10, white) ---
