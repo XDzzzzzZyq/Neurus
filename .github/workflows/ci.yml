@@ -21,19 +21,11 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Test AQT
-        run: |
-          pip install aqtinstall
-          aqt version
-          aqt list-qt windows desktop
-          aqt install-qt windows desktop 6.11.1 win64_msvc2022_64 --autodesktop --outputdir D:\a\Neurus\Qt
-        continue-on-error: true
-
       - name: Setup Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: 6.11.1
-          aqtversion: 'git+https://github.com/miurahr/aqtinstall.git'
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git'
         
       - name: Setup Vulkan SDK
         uses: humbletim/setup-vulkan-sdk@v1.2.1
