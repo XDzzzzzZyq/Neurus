@@ -103,8 +103,6 @@ void GPUBuffer::Unmap()
 	vk::SubmitInfo submitInfo({}, {}, *cmdBufs[0]);
 	b_queue.submit(submitInfo);
 	b_queue.waitIdle();
-
-	NEURUS_LOG("[GPUBuffer::Unmap] " << b_size << " bytes transferred to GPU");
 }
 
 } // namespace neurus

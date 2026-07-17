@@ -72,6 +72,9 @@ public:
 	 * trigger the GPU transfer.
 	 *
 	 * @return Writable pointer to the staging buffer memory.
+	 * @todo Read mapping
+	 * @todo Offset + Size for partial mapping/
+	 * @todo Safer API
 	 */
 	void* Map() override;
 
