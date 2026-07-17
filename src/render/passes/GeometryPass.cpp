@@ -13,7 +13,7 @@
 #include "shaders/ShaderLibrary.h"
 #include "shaders/RenderShader.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include "../resources/MeshGPU.h"
 #include "scene/Mesh.h"

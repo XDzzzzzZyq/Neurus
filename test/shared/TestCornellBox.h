@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "Log.h"
+#include "core/Log.h"
 #include "scene/Material.h"
 #include "scene/Scene.h"
 #include "scene/Mesh.h"

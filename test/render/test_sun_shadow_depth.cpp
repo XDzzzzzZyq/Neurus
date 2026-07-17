@@ -29,7 +29,7 @@
 #include "render/buffers/IndexBuffer.h"
 #include "render/passes/GeometryPass.h"
 #include "shared/TestReferenceImage.h"
-#include "Log.h"
+#include "core/Log.h"
 #include <glm/glm.hpp>
 #include <cmath>
 #include <iostream>

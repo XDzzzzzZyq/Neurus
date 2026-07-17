@@ -3,7 +3,7 @@
 #include "asset/ImageData.h"
 #include "render/Barrier.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include <stb_image.h>
 

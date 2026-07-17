@@ -22,7 +22,7 @@
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include <algorithm>
 #include <cstdint>

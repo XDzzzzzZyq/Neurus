@@ -5,7 +5,7 @@
 
 #include "render/resources/LightingGPU.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include <cstdint>
 #include <vector>

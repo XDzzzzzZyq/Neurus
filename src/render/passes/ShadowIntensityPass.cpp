@@ -13,7 +13,7 @@
 #include "RenderContext.h"
 #include "shaders/ShaderModule.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include "scene/Light.h"
 #include "scene/Scene.h"

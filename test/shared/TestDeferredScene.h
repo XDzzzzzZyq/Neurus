@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include "asset/MeshData.h"
 #include "scene/Camera.h"

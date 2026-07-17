@@ -14,7 +14,7 @@
 #include "shaders/ComputeShader.h"
 #include "Texture.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include "scene/Light.h"
 #include "scene/Scene.h"

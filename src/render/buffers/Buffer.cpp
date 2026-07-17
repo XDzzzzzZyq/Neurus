@@ -1,6 +1,6 @@
 #include "Buffer.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include <stdexcept>
 #include <cstring>

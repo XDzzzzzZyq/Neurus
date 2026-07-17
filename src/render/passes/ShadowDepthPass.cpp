@@ -34,7 +34,7 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 

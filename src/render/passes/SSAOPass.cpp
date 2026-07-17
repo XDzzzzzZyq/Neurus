@@ -13,7 +13,7 @@
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include "scene/Camera.h"
 #include "scene/Scene.h"

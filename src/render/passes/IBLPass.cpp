@@ -11,7 +11,7 @@
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
 
-#include "Log.h"
+#include "core/Log.h"
 
 #include <cstring>
 #include <stdexcept>

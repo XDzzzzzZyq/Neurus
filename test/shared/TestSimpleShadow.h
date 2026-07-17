@@ -20,7 +20,7 @@
 
 #pragma once
 
-#include "Log.h"
+#include "core/Log.h"
 #include "scene/Scene.h"
 #include "scene/Mesh.h"
 #include "scene/Light.h"
