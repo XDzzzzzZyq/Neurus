@@ -382,8 +382,8 @@ Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device& device)
 	}
 #endif
 
-	return Pipeline(std::move(pipeline), std::move(pipelineLayout),
-	                PipelineType::Geometry);
+	return Pipeline{std::move(pipeline), std::move(pipelineLayout),
+	                PipelineType::Geometry};
 }
 
 // ---------------------------------------------------------------------------
@@ -426,8 +426,8 @@ Pipeline PipelineBuilder::BuildComputePipeline(const vk::raii::Device& device)
 	}
 #endif
 
-	return Pipeline(std::move(pipeline), std::move(pipelineLayout),
-	                PipelineType::Compute);
+	return Pipeline{std::move(pipeline), std::move(pipelineLayout),
+	                PipelineType::Compute};
 }
 
 } // namespace neurus
