@@ -12,7 +12,7 @@
  *   and light SSBO (GPUBuffer).
  * - Borrows RenderCache for G-Buffer and HDR colour image views.
  * - Reads IBL cubemap resources per-frame from the Scene's Environment list.
- * - Uses ComputePipelineBuilder for pipeline construction.
+ * - Uses PipelineBuilder for pipeline construction.
  *
  * @note Direct lighting + IBL (diffuse + specular).
  * @note Descriptor set layout: 10 bindings (5 sampled images, 1 storage image, 1 SSBO, 2 cube samplers, 1 shadow).
@@ -36,7 +36,7 @@ namespace neurus {
 
 // --- Forward declarations ---
 class RenderCache;
-class ComputePipelineBuilder;
+class PipelineBuilder;
 class Texture;
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ public:
 private:
 
 	/**
-	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
+	 * @brief Creates the compute pipeline via PipelineBuilder.
 	 * ShaderModule from self-loaded ComputeShader.
 	 */
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);

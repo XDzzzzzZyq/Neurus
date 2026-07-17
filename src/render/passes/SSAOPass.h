@@ -168,7 +168,7 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates the compute pipeline via ComputePipelineBuilder.
+	 * @brief Creates the compute pipeline via PipelineBuilder.
 	 * ShaderModule from self-loaded ComputeShader.
 	 */
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);

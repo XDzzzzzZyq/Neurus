@@ -21,7 +21,7 @@
 #pragma once
 
 #include "Pass.h"
-#include "../ComputePipelineBuilder.h"
+#include "../PipelineBuilder.h"
 #include "../DescriptorManager.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -164,7 +164,7 @@ protected:
 	std::vector<DescriptorSet> p_descriptorSets;
 
 	/// Pipeline builder (must outlive the compute pipeline created by subclass).
-	std::unique_ptr<ComputePipelineBuilder> p_pipelineBuilder;
+	std::unique_ptr<PipelineBuilder> p_pipelineBuilder;
 };
 
 // ===================================================================
@@ -179,7 +179,7 @@ inline ComputePass::ComputePass(const vk::raii::Device& device,
 	, p_physicalDevice(&physicalDevice)
 	, p_sampler(CreateSampler(device, physicalDevice))
 	, p_descriptorSetLayout(std::move(descriptorSetLayout))
-	, p_pipelineBuilder(std::make_unique<ComputePipelineBuilder>(device))
+	, p_pipelineBuilder(std::make_unique<PipelineBuilder>())
 {
 	p_device = &device;
 	CreateDescriptorSets(numSets);

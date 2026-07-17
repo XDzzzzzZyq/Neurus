@@ -5,7 +5,6 @@
 
 #include "passes/IBLPass.h"
 
-#include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
 #include "shaders/ShaderLibrary.h"
@@ -156,7 +155,7 @@ void IBLPass::Generate(vk::Queue graphicsQueue, uint32_t queueFamilyIndex,
 
 		dispatchCompute(cmdBufs[0],
 		                p_irradiancePipeline,
-		                *p_irradiancePipelineBuilder->pipelineLayout(),
+		                p_irradiancePipelineBuilder->pipelineLayout(),
 		                groupsX, groupsY, groupsZ,
 		                /*mipLevel=*/0,
 		                kDefaultIrradianceSteps,
@@ -200,7 +199,7 @@ void IBLPass::Generate(vk::Queue graphicsQueue, uint32_t queueFamilyIndex,
 
 		dispatchCompute(cmdBufs[0],
 		                p_specularPipeline,
-		                *p_specularPipelineBuilder->pipelineLayout(),
+		                p_specularPipelineBuilder->pipelineLayout(),
 		                groupsX, groupsY, groupsZ,
 		                static_cast<int32_t>(mip),
 		                kDefaultSpecularSteps,
@@ -304,7 +303,7 @@ vk::raii::Sampler IBLPass::CreateEquirectSampler(const vk::raii::Device& device)
 
 vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
                                             std::shared_ptr<ComputeShader> computeShader,
-                                            std::unique_ptr<ComputePipelineBuilder>& outBuilder,
+                                             std::unique_ptr<PipelineBuilder>& outBuilder,
                                             const char* debugName)
 {
 	if (!computeShader || !computeShader->IsValid())
@@ -314,18 +313,18 @@ vk::raii::Pipeline IBLPass::CreatePipeline(const vk::raii::Device& device,
 
 	auto compModule = computeShader->GetShaderModule(ShaderType::COMPUTE);
 
-	outBuilder = std::make_unique<ComputePipelineBuilder>(device);
+	outBuilder = std::make_unique<PipelineBuilder>();
 
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute,
 		0,
 		sizeof(IBLPushConstants));
 
-	return outBuilder->SetShaderStage(*compModule, "main")
+	return outBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 		.SetDebugName(debugName)
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(device);
 }
 
 // ---------------------------------------------------------------------------

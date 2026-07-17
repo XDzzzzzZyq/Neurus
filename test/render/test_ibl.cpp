@@ -20,7 +20,7 @@
 
 #include "asset/ImageData.h"
 #include "render/Barrier.h"
-#include "render/ComputePipelineBuilder.h"
+#include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/Image.h"
 #include "render/shaders/ShaderModule.h"
@@ -138,10 +138,10 @@ protected:
 		ASSERT_NE(e2cShader, nullptr);
 		e2cShader->CreateModule(dev);
 		auto compModule = e2cShader->GetShaderModule(ShaderType::COMPUTE);
-		m_e2cBuilder = std::make_unique<ComputePipelineBuilder>(dev);
-		m_e2cPipeline = m_e2cBuilder->SetShaderStage(*compModule, "main")
+		m_e2cBuilder = std::make_unique<PipelineBuilder>();
+		m_e2cPipeline = m_e2cBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 			.AddDescriptorSetLayout(*m_e2cSetLayout->layout())
-			.BuildComputePipeline();
+			.BuildComputePipeline(dev);
 	}
 
 	void createC2EPipeline(const vk::raii::Device& dev)
@@ -163,10 +163,10 @@ protected:
 		ASSERT_NE(c2eShader, nullptr);
 		c2eShader->CreateModule(dev);
 		auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
-		m_c2eBuilder = std::make_unique<ComputePipelineBuilder>(dev);
-		m_c2ePipeline = m_c2eBuilder->SetShaderStage(*compModule, "main")
+		m_c2eBuilder = std::make_unique<PipelineBuilder>();
+		m_c2ePipeline = m_c2eBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 			.AddDescriptorSetLayout(*m_c2eSetLayout->layout())
-			.BuildComputePipeline();
+			.BuildComputePipeline(dev);
 	}
 
 	// -------------------------------------------------------------------
@@ -239,7 +239,7 @@ protected:
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_e2cPipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                       *m_e2cBuilder->pipelineLayout(),
+		                       m_e2cBuilder->pipelineLayout(),
 		                       0, {m_e2cSets[0].handle()}, {});
 
 		const uint32_t gx = (kCubeFaceRes + 3) / 4;
@@ -286,7 +286,7 @@ protected:
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_c2ePipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                       *m_c2eBuilder->pipelineLayout(),
+		                       m_c2eBuilder->pipelineLayout(),
 		                       0, {m_c2eSets[0].handle()}, {});
 
 		const uint32_t gx = (kEquiWidth  + 15) / 16;
@@ -314,14 +314,14 @@ protected:
 	std::unique_ptr<DescriptorSetLayout> m_e2cSetLayout;
 	std::unique_ptr<DescriptorPool> m_e2cPool;
 	std::vector<DescriptorSet> m_e2cSets;
-	std::unique_ptr<ComputePipelineBuilder> m_e2cBuilder;
+	std::unique_ptr<PipelineBuilder> m_e2cBuilder;
 	vk::raii::Pipeline m_e2cPipeline = nullptr;
 
 	// C2E
 	std::unique_ptr<DescriptorSetLayout> m_c2eSetLayout;
 	std::unique_ptr<DescriptorPool> m_c2ePool;
 	std::vector<DescriptorSet> m_c2eSets;
-	std::unique_ptr<ComputePipelineBuilder> m_c2eBuilder;
+	std::unique_ptr<PipelineBuilder> m_c2eBuilder;
 	vk::raii::Pipeline m_c2ePipeline = nullptr;
 };
 

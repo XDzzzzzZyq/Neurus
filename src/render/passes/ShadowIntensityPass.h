@@ -123,7 +123,7 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates the point-light cubemap compute pipeline via ComputePipelineBuilder.
+	 * @brief Creates the point-light cubemap compute pipeline via PipelineBuilder.
 	 *
 	 * Uses the ShaderModule from p_pointLightShader loaded via ShaderLibrary.
 	 */
@@ -179,7 +179,7 @@ private:
 	// --- Sun-light 2D pipeline ---
 	DescriptorSetLayout p_sunDescSetLayout;                       ///< Sun descriptor set layout (sampler2D at binding 1)
 	vk::raii::Pipeline  p_sunPipeline = nullptr;                  ///< Sun compute pipeline (sun_shadow_eval.comp)
-	std::unique_ptr<ComputePipelineBuilder> p_sunPipelineBuilder; ///< Builder owning the sun pipeline layout
+	std::unique_ptr<PipelineBuilder> p_sunPipelineBuilder; ///< Builder owning the sun pipeline layout
 	vk::raii::Sampler   p_sunShadowSampler = nullptr;             ///< Sampler for sun shadow map (clamp-to-border, black)
 	DescriptorPool      p_sunDescPool;                            ///< Descriptor pool for sun descriptor sets
 	std::vector<DescriptorSet> p_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)

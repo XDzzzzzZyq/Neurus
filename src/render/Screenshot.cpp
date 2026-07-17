@@ -7,7 +7,7 @@
 #include "render/Barrier.h"
 #include "Log.h"
 
-#include "ComputePipelineBuilder.h"
+#include "PipelineBuilder.h"
 #include "DescriptorManager.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
@@ -253,13 +253,13 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 	c2eShader->CreateModule(m_device);
 	auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
 
-	ComputePipelineBuilder c2eBuilder(m_device);
-	c2eBuilder.SetShaderStage(*compModule, "main");
+	PipelineBuilder c2eBuilder;
+	c2eBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main");
 	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 
-	auto c2ePipeline = c2eBuilder.BuildComputePipeline();
-	vk::PipelineLayout c2ePipelineLayout = *c2eBuilder.pipelineLayout();
+	auto c2ePipeline = c2eBuilder.BuildComputePipeline(m_device);
+	vk::PipelineLayout c2ePipelineLayout = c2eBuilder.pipelineLayout();
 
 	// --- 5. Record & dispatch ---
 	{

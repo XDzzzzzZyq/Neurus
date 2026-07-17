@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "render/ComputePipelineBuilder.h"
+#include "render/PipelineBuilder.h"
 #include "render/shaders/ShaderModule.h"
 #include "render/DescriptorManager.h"
 #include "app/VulkanContext.h"
@@ -94,9 +94,9 @@ TEST_F(ComputePipelineTest, Build_ReturnsValidPipeline)
 	ASSERT_NE(*shader.handle(), VK_NULL_HANDLE);
 
 	// Build the compute pipeline
-	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
-		.SetShaderStage(shader)
-		.BuildComputePipeline();
+	vk::raii::Pipeline pipeline = PipelineBuilder()
+		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
+		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
 }
@@ -124,10 +124,10 @@ TEST_F(ComputePipelineTest, WithDescriptorSetLayout_BuildsSuccessfully)
 		            vk::ShaderStageFlagBits::eCompute)
 		.Build(*m_device);
 
-	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
-		.SetShaderStage(shader)
+	vk::raii::Pipeline pipeline = PipelineBuilder()
+		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
 		.AddDescriptorSetLayout(*layout.layout())
-		.BuildComputePipeline();
+		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
 }
@@ -152,10 +152,10 @@ TEST_F(ComputePipelineTest, WithPushConstants_BuildsSuccessfully)
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute, 0, 16);
 
-	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
-		.SetShaderStage(shader)
+	vk::raii::Pipeline pipeline = PipelineBuilder()
+		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
 }
@@ -185,17 +185,17 @@ TEST_F(ComputePipelineTest, WithLayoutAndPushConstants_BuildsSuccessfully)
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute, 0, 32);
 
-	vk::raii::Pipeline pipeline = ComputePipelineBuilder(*m_device)
-		.SetShaderStage(shader)
+	vk::raii::Pipeline pipeline = PipelineBuilder()
+		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
 		.AddDescriptorSetLayout(*layout.layout())
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
-// ComputePipelineBuilder is reusable - two successive builds
+// PipelineBuilder is reusable - two successive builds
 // ---------------------------------------------------------------------------
 
 TEST_F(ComputePipelineTest, TwoBuilds_BothProduceValidPipelines)
@@ -214,15 +214,15 @@ TEST_F(ComputePipelineTest, TwoBuilds_BothProduceValidPipelines)
 	ShaderModule shaderB(*m_device, spirv);
 	ASSERT_NE(*shaderB.handle(), VK_NULL_HANDLE);
 
-	vk::raii::Pipeline pipelineA = ComputePipelineBuilder(*m_device)
-		.SetShaderStage(shaderA)
-		.BuildComputePipeline();
+	vk::raii::Pipeline pipelineA = PipelineBuilder()
+		.AddShaderStage(shaderA, vk::ShaderStageFlagBits::eCompute)
+		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipelineA, VK_NULL_HANDLE);
 
-	vk::raii::Pipeline pipelineB = ComputePipelineBuilder(*m_device)
-		.SetShaderStage(shaderB)
-		.BuildComputePipeline();
+	vk::raii::Pipeline pipelineB = PipelineBuilder()
+		.AddShaderStage(shaderB, vk::ShaderStageFlagBits::eCompute)
+		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipelineB, VK_NULL_HANDLE);
 

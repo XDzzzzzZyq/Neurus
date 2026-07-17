@@ -7,7 +7,6 @@
 
 #include "RenderCache.h"
 #include "RenderContext.h"
-#include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
 #include "shaders/ShaderLibrary.h"
@@ -151,11 +150,11 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device)
 		sizeof(LightingPushConstants));  // 176 bytes, from LightingGPU.h
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
+	return p_pipelineBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 		.SetDebugName("LightingPass")
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(device);
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +390,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 
 	// --- 4. Bind descriptor set ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          *p_pipelineBuilder->pipelineLayout(),
+	                          p_pipelineBuilder->pipelineLayout(),
 	                          0,                                    // firstSet
 	                          {p_descriptorSets[frameIndex].handle()},
 	                          {});
@@ -426,7 +425,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 
 		cmdBuf.pushConstants<LightingPushConstants>(
-			*p_pipelineBuilder->pipelineLayout(),
+			p_pipelineBuilder->pipelineLayout(),
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pc);

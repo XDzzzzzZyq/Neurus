@@ -121,7 +121,7 @@ private:
 
 	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
 	                                  std::shared_ptr<ComputeShader> computeShader,
-	                                  std::unique_ptr<ComputePipelineBuilder>& outBuilder,
+									  std::unique_ptr<PipelineBuilder>& outBuilder,
 	                                  const char* debugName);
 
 	void WriteDescriptors(const Image& equirectImage,
@@ -144,9 +144,9 @@ private:
 	std::shared_ptr<ComputeShader> p_specularShader;
 
 	// --- Pipelines ---
-	std::unique_ptr<ComputePipelineBuilder> p_irradiancePipelineBuilder;
+	std::unique_ptr<PipelineBuilder> p_irradiancePipelineBuilder;
 	vk::raii::Pipeline p_irradiancePipeline;
-	std::unique_ptr<ComputePipelineBuilder> p_specularPipelineBuilder;
+	std::unique_ptr<PipelineBuilder> p_specularPipelineBuilder;
 	vk::raii::Pipeline p_specularPipeline;
 };
 

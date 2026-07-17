@@ -6,7 +6,6 @@
 #include "RenderCache.h"
 #include "passes/SSAOPass.h"
 
-#include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
 #include "RenderContext.h"
@@ -252,11 +251,11 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device)
 		4 * sizeof(int32_t));  // kernelLength, radius (float), noiseSize, frameIndex
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
+	return p_pipelineBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 		.SetDebugName("SSAOPass")
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(device);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +377,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 
 	// --- 4. Bind descriptor set ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          *p_pipelineBuilder->pipelineLayout(),
+	                          p_pipelineBuilder->pipelineLayout(),
 	                          0,                                    // firstSet
 	                          {p_descriptorSets[frameIndex].handle()},
 	                          {});
@@ -400,7 +399,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 		pc.frameIndex   = static_cast<int32_t>(frameIndex);
 
 		cmdBuf.pushConstants<SSAOPushConstants>(
-			*p_pipelineBuilder->pipelineLayout(),
+			p_pipelineBuilder->pipelineLayout(),
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pc);

@@ -7,7 +7,6 @@
 #include "passes/ShadowIntensityPass.h"
 #include "render/RenderConfig.h"
 
-#include "ComputePipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
 #include "RenderContext.h"
@@ -111,7 +110,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	           << " farPlane=" << Light::point_shadow_far);
 
 	// --- Sun pipeline builder (owns the sun pipeline layout) ---
-	p_sunPipelineBuilder = std::make_unique<ComputePipelineBuilder>(device);
+	p_sunPipelineBuilder = std::make_unique<PipelineBuilder>();
 
 	// --- Sun compute pipeline (sun_shadow_eval.comp) ---
 	const uint32_t sunSetCount = numSets * kSetsPerFrameSlot;
@@ -208,11 +207,11 @@ vk::raii::Pipeline ShadowIntensityPass::CreatePipeline(const vk::raii::Device& d
 		6 * sizeof(float));   // 24 bytes
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->SetShaderStage(*compModule, "main")
+	return p_pipelineBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 		.SetDebugName("ShadowIntensityPass")
 		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(device);
 }
 
 // ---------------------------------------------------------------------------
@@ -239,11 +238,11 @@ vk::raii::Pipeline ShadowIntensityPass::CreateSunPipeline(const vk::raii::Device
 		20 * sizeof(float));   // 80 bytes — matches sizeof(SunShadowEvalPushConstants)
 
 	// --- Build sun compute pipeline ---
-	return p_sunPipelineBuilder->SetShaderStage(*compModule, "main")
+	return p_sunPipelineBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 		.SetDebugName("ShadowIntensityPass_Sun")
 		.AddDescriptorSetLayout(*p_sunDescSetLayout.layout())
 		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline();
+		.BuildComputePipeline(device);
 }
 
 // ---------------------------------------------------------------------------
@@ -461,7 +460,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		// --- Bind descriptor set ---
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                          *p_pipelineBuilder->pipelineLayout(),
+		                          p_pipelineBuilder->pipelineLayout(),
 		                          0,
 		                          {p_descriptorSets[setIdx].handle()},
 		                          {});
@@ -488,7 +487,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.layerIndex = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
-				*p_pipelineBuilder->pipelineLayout(),
+				p_pipelineBuilder->pipelineLayout(),
 				vk::ShaderStageFlagBits::eCompute,
 				0,
 				pc);
@@ -531,7 +530,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		// --- Bind sun pipeline + descriptor set ---
 		cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_sunPipeline);
 		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                          *p_sunPipelineBuilder->pipelineLayout(),
+		                          p_sunPipelineBuilder->pipelineLayout(),
 		                          0,
 		                          {p_sunDescSets[setIdx].handle()},
 		                          {});
@@ -569,7 +568,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.layerIndex    = static_cast<int32_t>(layer);
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(
-				*p_sunPipelineBuilder->pipelineLayout(),
+				p_sunPipelineBuilder->pipelineLayout(),
 				vk::ShaderStageFlagBits::eCompute,
 				0,
 				pc);

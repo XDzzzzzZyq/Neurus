@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -12,17 +13,22 @@ class BufferLayout;
 class ShaderModule;
 
 // ---------------------------------------------------------------------------
-// PipelineBuilder - Fluent API for constructing graphics pipelines
+// PipelineBuilder - Fluent API for constructing graphics AND compute pipelines
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Fluent builder for VkGraphicsPipelineCreateInfo with
- *        VK_KHR_dynamic_rendering support.
+ * @brief Fluent builder for VkGraphicsPipelineCreateInfo (with
+ *        VK_KHR_dynamic_rendering) and VkComputePipelineCreateInfo.
  *
  * Accumulates state via chained method calls and produces a vk::raii::Pipeline
- * on BuildGraphicsPipeline(). Viewport and scissor are always dynamic.
+ * on BuildGraphicsPipeline() or BuildComputePipeline(). Viewport and scissor
+ * are always dynamic for graphics pipelines.
  *
- * Usage:
+ * The pipeline layout created during the build is retained and accessible via
+ * pipelineLayout() — this is required for descriptor set binding at command-
+ * recording time for compute passes.
+ *
+ * Usage (graphics):
  *   auto pipeline = PipelineBuilder()
  *       .AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
  *       .AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
@@ -34,6 +40,16 @@ class ShaderModule;
  *       .SetColorBlendAttachment()
  *       .SetColorFormats({ vk::Format::eB8G8R8A8Srgb })
  *       .BuildGraphicsPipeline(device);
+ *
+ * Usage (compute):
+ *   auto pipeline = PipelineBuilder()
+ *       .AddShaderStage(compModule, vk::ShaderStageFlagBits::eCompute)
+ *       .AddDescriptorSetLayout(*descSetLayout.layout())
+ *       .SetDebugName("MyComputePass")
+ *       .BuildComputePipeline(device);
+ *   // Builder must outlive the pipeline (holds pipelineLayout for binding).
+ *   cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+ *                             builder.pipelineLayout(), ...);
  */
 class PipelineBuilder
 {
@@ -225,9 +241,7 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Sets the descriptor set layouts used by the pipeline.
-	 *
-	 * These are used to create the VkPipelineLayout internally.
+	 * @brief Replaces all descriptor set layouts (clear + set).
 	 *
 	 * @param layouts  Vector of raw VkDescriptorSetLayout handles.
 	 * @return *this for chaining.
@@ -235,20 +249,34 @@ public:
 	PipelineBuilder& SetDescriptorSetLayouts(
 		const std::vector<vk::DescriptorSetLayout>& layouts);
 
+	/**
+	 * @brief Appends one descriptor set layout.
+	 *
+	 * @param layout  Raw VkDescriptorSetLayout handle.
+	 * @return *this for chaining.
+	 */
+	PipelineBuilder& AddDescriptorSetLayout(vk::DescriptorSetLayout layout);
+
 	// -----------------------------------------------------------------------
 	// Push constant ranges
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Sets the push-constant ranges used by the pipeline.
-	 *
-	 * These are baked into the VkPipelineLayout.
+	 * @brief Replaces all push-constant ranges (clear + set).
 	 *
 	 * @param ranges  Vector of VkPushConstantRange entries.
 	 * @return *this for chaining.
 	 */
 	PipelineBuilder& SetPushConstantRanges(
 		const std::vector<vk::PushConstantRange>& ranges);
+
+	/**
+	 * @brief Appends one push-constant range.
+	 *
+	 * @param range  Push constant range descriptor.
+	 * @return *this for chaining.
+	 */
+	PipelineBuilder& AddPushConstantRange(const vk::PushConstantRange& range);
 
 	// -----------------------------------------------------------------------
 	// Pipeline cache
@@ -295,7 +323,7 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Sets a debug name for the pipeline (applied inside BuildGraphicsPipeline).
+	 * @brief Sets a debug name for the pipeline (applied inside Build*Pipeline).
 	 *
 	 * The name is assigned to the VkPipeline object via
 	 * vkSetDebugUtilsObjectNameEXT in Debug builds.
@@ -306,7 +334,7 @@ public:
 	PipelineBuilder& SetDebugName(const char* name);
 
 	// -----------------------------------------------------------------------
-	// Build
+	// Build (graphics)
 	// -----------------------------------------------------------------------
 
 	/**
@@ -316,11 +344,52 @@ public:
 	 * and push-constant ranges. Appends VkPipelineRenderingCreateInfo for
 	 * dynamic rendering. Returns a RAII pipeline.
 	 *
+	 * After this call, pipelineLayout() returns the created pipeline layout.
+	 *
 	 * @param device  Logical device (must outlive the returned pipeline).
 	 * @return Fully constructed vk::raii::Pipeline.
 	 * @throws std::runtime_error if required fields are missing or invalid.
 	 */
 	vk::raii::Pipeline BuildGraphicsPipeline(const vk::raii::Device& device);
+
+	// -----------------------------------------------------------------------
+	// Build (compute)
+	// -----------------------------------------------------------------------
+
+	/**
+	 * @brief Builds the compute pipeline from accumulated state.
+	 *
+	 * Creates a VkPipelineLayout from the descriptor set layouts and
+	 * push-constant ranges. The layout is retained and accessible via
+	 * pipelineLayout() for descriptor-set binding at command-recording time.
+	 *
+	 * This builder must outlive the returned pipeline because the pipeline
+	 * layout is needed for descriptor-set binding.
+	 *
+	 * @param device  Logical device (must outlive the returned pipeline).
+	 * @return Fully constructed vk::raii::Pipeline.
+	 * @throws std::runtime_error if no shader stage is set.
+	 */
+	vk::raii::Pipeline BuildComputePipeline(const vk::raii::Device& device);
+
+	// -----------------------------------------------------------------------
+	// Accessors
+	// -----------------------------------------------------------------------
+
+	/**
+	 * @brief Returns the most recently created pipeline layout.
+	 *
+	 * Valid after the first call to BuildGraphicsPipeline() or
+	 * BuildComputePipeline().  Useful for binding descriptor sets at
+	 * command-recording time.
+	 *
+	 * @return The underlying VkPipelineLayout handle (never null after a
+	 *         successful build).
+	 */
+	vk::PipelineLayout pipelineLayout() const
+	{
+		return p_pipelineLayout ? **p_pipelineLayout : VK_NULL_HANDLE;
+	}
 
 private:
 	// --- Shader stages ---
@@ -368,6 +437,9 @@ private:
 	// --- Pipeline layout ---
 	std::vector<vk::DescriptorSetLayout> p_descriptorSetLayouts;
 	std::vector<vk::PushConstantRange> p_pushConstantRanges;
+
+	// --- Owned pipeline layout (created by Build*Pipeline, retained for binding) ---
+	std::unique_ptr<vk::raii::PipelineLayout> p_pipelineLayout;
 
 	// --- Pipeline cache ---
 	vk::PipelineCache p_pipelineCache = VK_NULL_HANDLE;

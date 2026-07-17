@@ -220,6 +220,12 @@ PipelineBuilder& PipelineBuilder::SetDescriptorSetLayouts(
 	return *this;
 }
 
+PipelineBuilder& PipelineBuilder::AddDescriptorSetLayout(vk::DescriptorSetLayout layout)
+{
+	p_descriptorSetLayouts.push_back(layout);
+	return *this;
+}
+
 // ---------------------------------------------------------------------------
 // Push constant ranges
 // ---------------------------------------------------------------------------
@@ -228,6 +234,12 @@ PipelineBuilder& PipelineBuilder::SetPushConstantRanges(
 	const std::vector<vk::PushConstantRange>& ranges)
 {
 	p_pushConstantRanges = ranges;
+	return *this;
+}
+
+PipelineBuilder& PipelineBuilder::AddPushConstantRange(const vk::PushConstantRange& range)
+{
+	p_pushConstantRanges.push_back(range);
 	return *this;
 }
 
@@ -316,13 +328,13 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 			vk::LogicOp::eCopy, nullptr);
 	}
 
-	// --- Pipeline layout ---
+	// --- Pipeline layout (retained for pipelineLayout() accessor) ---
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo(
 		{},
 		p_descriptorSetLayouts,
 		p_pushConstantRanges);
 
-	vk::raii::PipelineLayout pipelineLayout(device, pipelineLayoutCreateInfo);
+	p_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, pipelineLayoutCreateInfo);
 
 	// --- Dynamic rendering pipeline create info ---
 	vk::PipelineRenderingCreateInfo renderingCreateInfo(
@@ -351,7 +363,7 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 		pDepthStencil,
 		&p_colorBlend,
 		&p_dynamicState,
-		*pipelineLayout,
+		**p_pipelineLayout,
 		nullptr,       // No render pass (dynamic rendering)
 		0,             // Subpass index (unused)
 		nullptr,       // No base pipeline
@@ -359,6 +371,49 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 		&renderingCreateInfo);
 
 	auto pipeline = vk::raii::Pipeline(device, nullptr, pipelineCreateInfo);
+
+#ifdef _DEBUG
+	if (!p_debugName.empty())
+	{
+		device.setDebugUtilsObjectNameEXT(vk::DebugUtilsObjectNameInfoEXT(
+			vk::ObjectType::ePipeline,
+			reinterpret_cast<uint64_t>(static_cast<VkPipeline>(*pipeline)),
+			p_debugName.c_str()));
+	}
+#endif
+
+	return pipeline;
+}
+
+// ---------------------------------------------------------------------------
+// BuildComputePipeline
+// ---------------------------------------------------------------------------
+
+vk::raii::Pipeline PipelineBuilder::BuildComputePipeline(const vk::raii::Device& device)
+{
+	if (p_stages.empty())
+	{
+		throw std::runtime_error(
+			"PipelineBuilder::BuildComputePipeline: "
+			"no shader stages added - call AddShaderStage() at least once.");
+	}
+
+	// --- Pipeline layout (retained for pipelineLayout() accessor) ---
+	vk::PipelineLayoutCreateInfo layoutCreateInfo(
+		{},
+		p_descriptorSetLayouts,
+		p_pushConstantRanges);
+
+	p_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, layoutCreateInfo);
+
+	// --- Create compute pipeline (first stage is the compute shader) ---
+	vk::ComputePipelineCreateInfo computeCreateInfo(
+		{},                // flags
+		p_stages[0],       // stage
+		**p_pipelineLayout // layout
+	);
+
+	auto pipeline = vk::raii::Pipeline(device, nullptr, computeCreateInfo);
 
 #ifdef _DEBUG
 	if (!p_debugName.empty())
