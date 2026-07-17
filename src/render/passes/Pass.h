@@ -16,9 +16,12 @@
 
 #pragma once
 
+#include "../Pipeline.h"
+
 #include <vulkan/vulkan_raii.hpp>
 
 #include <span>
+#include <string>
 #include <vector>
 
 namespace neurus {
@@ -108,8 +111,33 @@ public:
 protected:
 	Pass() = default;
 
-	// --- Device reference (non-owning) ---
-	const vk::raii::Device* p_device = nullptr;
+	// --- Device / physical device references (non-owning) ---
+	const vk::raii::Device*         p_device         = nullptr;
+	const vk::raii::PhysicalDevice* p_physicalDevice = nullptr;
+
+	/**
+	 * @brief All pipelines owned by this pass.
+	 *
+	 * Subclasses push each Pipeline (graphics or compute) into this vector
+	 * during their constructor via BuildPipeline().  Single-pipeline passes
+	 * access p_pipelines[0]; multi-pipeline passes access p_pipelines[i].
+	 */
+	std::vector<Pipeline> p_pipelines;
+
+	/**
+	 * @brief Builds all pipelines for this pass and pushes them into
+	 *        p_pipelines.
+	 *
+	 * Override in each subclass to create graphics / compute pipelines from
+	 * the subclass's specific shaders, descriptor layouts, and push-constant
+	 * ranges.  Each pipeline is push_back()'d into p_pipelines in order.
+	 *
+	 * @param device     Logical device.
+	 * @param debugName  Human-readable name for the pass (e.g. "SSAOPass").
+	 */
+	virtual void BuildPipeline(const vk::raii::Device& device,
+	                           const std::string& debugName)
+	{}
 };
 
 } // namespace neurus

@@ -99,11 +99,8 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
                                     uint32_t resolution)
 	: Pass()
 	, p_resolution(resolution)
-	, p_physicalDevice(&physicalDevice)
 	, m_queue(graphicsQueue)
 	, m_queueFamilyIndex(queueFamilyIndex)
-	, p_pipelineLayout(nullptr)
-	, p_pipeline(nullptr)
 	// --- Self-load shaders via ShaderLibrary ---
 	, m_multiviewShader(
 		ShaderLibrary::LoadRenderShader("ShadowDepthMultiview",
@@ -115,6 +112,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag"))
 {
 	p_device = &device;
+	p_physicalDevice = &physicalDevice;
 
 	// --- Create modules from self-loaded shaders (creates ShaderModules from SPIR-V) ---
 	if (m_multiviewShader) { m_multiviewShader->CreateModule(device); }
@@ -125,8 +123,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	p_vtxLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
 
 	createSSBOResources(device, physicalDevice, graphicsQueue, queueFamilyIndex);
-	createPipeline(device);
-	createSunPipeline(device);
+	BuildPipeline(device, "ShadowDepthPass");
 
 	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " faceVPSize=" << kFaceVPSize
@@ -175,105 +172,88 @@ void ShadowDepthPass::createSSBOResources(const vk::raii::Device& device,
 // createPipeline - multiview colour+depth pipeline (all 6 faces in single pass)
 // ===========================================================================
 
-void ShadowDepthPass::createPipeline(const vk::raii::Device& device)
+void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
+                                     const std::string& debugName)
 {
-	// --- Guard: shader must be valid ---
-	if (!m_multiviewShader || !m_multiviewShader->IsValid())
+	// --- Multiview cubemap depth pipeline ---
 	{
-		throw std::runtime_error("ShadowDepthPass: Multiview shader not loaded or invalid");
+		if (!m_multiviewShader || !m_multiviewShader->IsValid())
+		{
+			throw std::runtime_error("ShadowDepthPass: Multiview shader not loaded or invalid");
+		}
+
+		auto& vertModule = *m_multiviewShader->GetVertexModule();
+		auto& fragModule = *m_multiviewShader->GetFragmentModule();
+
+		std::vector<vk::PushConstantRange> pushRanges = {
+			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex |
+			                      vk::ShaderStageFlagBits::eFragment,
+			                      0, kTotalPushSize)
+		};
+
+		std::vector<vk::DescriptorSetLayout> dslayouts = { *p_ssboLayout.layout() };
+
+		PipelineBuilder builder;
+		p_pipelines.push_back(
+			builder
+				.SetDebugName((debugName + "::Multiview").c_str())
+				.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+				.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+				.SetVertexInput(p_vtxLayout)
+				.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+				.SetViewMask(0x3f)  // 6 faces of cubemap
+				.SetRasterization(vk::PolygonMode::eFill,
+				                  vk::CullModeFlagBits::eNone,
+				                  vk::FrontFace::eClockwise)
+				.SetMultisampling()
+				.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
+				.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
+					VK_FALSE,
+					vk::BlendFactor::eOne, vk::BlendFactor::eZero,
+					vk::BlendOp::eAdd,
+					vk::BlendFactor::eOne, vk::BlendFactor::eZero,
+					vk::BlendOp::eAdd,
+					vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+					vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA))
+				.SetColorFormats({vk::Format::eR32G32B32A32Sfloat})
+				.SetDepthFormat(kDepthFmt)
+				.SetDescriptorSetLayouts(dslayouts)
+				.SetPushConstantRanges(pushRanges)
+				.BuildGraphicsPipeline(device));
 	}
 
-	// --- Use self-loaded shader modules ---
-	auto& vertModule = *m_multiviewShader->GetVertexModule();
-	auto& fragModule = *m_multiviewShader->GetFragmentModule();
-
-	// Push constant range: 80 bytes (lightPos+farPlane at offset 0, model at offset 16)
-	// Accessible by both vertex (full struct) and fragment (light data only).
-	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex |
-		                      vk::ShaderStageFlagBits::eFragment,
-		                      0, kTotalPushSize)
-	};
-
-	std::vector<vk::DescriptorSetLayout> dslayouts = { *p_ssboLayout.layout() };
-
-	PipelineBuilder builder;
-	p_pipeline = builder
-		.SetDebugName("ShadowDepthPass::Multiview")
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(p_vtxLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetViewMask(0x3f)  // 6 faces of cubemap
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
-		.AddColorBlendAttachment(vk::PipelineColorBlendAttachmentState(
-			VK_FALSE,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::BlendFactor::eOne, vk::BlendFactor::eZero,
-			vk::BlendOp::eAdd,
-			vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
-			vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA))
-		.SetColorFormats({vk::Format::eR32G32B32A32Sfloat})
-		.SetDepthFormat(kDepthFmt)
-		.SetDescriptorSetLayouts(dslayouts)
-		.SetPushConstantRanges(pushRanges)
-		.BuildGraphicsPipeline(device);
-
-	vk::PipelineLayoutCreateInfo layoutCI({}, dslayouts, pushRanges);
-	p_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-
-	NEURUS_LOG("[ShadowDepthPass] Pipeline created (SSBO + push-constant based)");
-}
-
-// ===========================================================================
-// createSunPipeline - non-multiview depth-only pipeline (mat4 lightViewProj push)
-// ===========================================================================
-
-void ShadowDepthPass::createSunPipeline(const vk::raii::Device& device)
-{
-	// --- Guard: shader must be valid ---
-	if (!m_sunShader || !m_sunShader->IsValid())
+	// --- Sun orthographic depth-only pipeline ---
 	{
-		throw std::runtime_error("ShadowDepthPass: Sun shader not loaded or invalid");
+		if (!m_sunShader || !m_sunShader->IsValid())
+		{
+			throw std::runtime_error("ShadowDepthPass: Sun shader not loaded or invalid");
+		}
+
+		auto& vertModule = *m_sunShader->GetVertexModule();
+		auto& fragModule = *m_sunShader->GetFragmentModule();
+
+		std::vector<vk::PushConstantRange> pushRanges = {
+			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
+			                      0, sizeof(glm::mat4))
+		};
+
+		PipelineBuilder builder;
+		p_pipelines.push_back(
+			builder
+				.SetDebugName((debugName + "::Sun").c_str())
+				.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+				.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+				.SetVertexInput(p_vtxLayout)
+				.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+				.SetRasterization(vk::PolygonMode::eFill,
+				                  vk::CullModeFlagBits::eNone,
+				                  vk::FrontFace::eClockwise)
+				.SetMultisampling()
+				.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
+				.SetDepthFormat(kDepthFmt)
+				.SetPushConstantRanges(pushRanges)
+				.BuildGraphicsPipeline(device));
 	}
-
-	// --- Use self-loaded shader modules ---
-	auto& vertModule = *m_sunShader->GetVertexModule();
-	auto& fragModule = *m_sunShader->GetFragmentModule();
-
-	// Push constant range: 64 bytes (mat4 lightViewProj)
-	std::vector<vk::PushConstantRange> pushRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
-		                      0, sizeof(glm::mat4))
-	};
-
-	PipelineBuilder builder;
-	p_sunPipeline = builder
-		.SetDebugName("ShadowDepthPass::Sun")
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(p_vtxLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		// No SetViewMask - single view (non-multiview)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual)
-		// No color attachments - depth-only
-		.SetDepthFormat(kDepthFmt)
-		.SetPushConstantRanges(pushRanges)
-		.BuildGraphicsPipeline(device);
-
-	vk::PipelineLayoutCreateInfo layoutCI({}, {}, pushRanges);
-	p_sunPipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-
-	NEURUS_LOG("[ShadowDepthPass] Sun pipeline created (depth-only, push-constant mat4 lightViewProj)");
 }
 
 // ===========================================================================
@@ -317,7 +297,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			lp.lpz = lightPos.z;
 			lp.farPlane = farPlane;
 
-			cmdBuf.pushConstants<LightPushData>(p_pipelineLayout,
+			cmdBuf.pushConstants<LightPushData>(*p_pipelines[0].pipelineLayout,
 			    vk::ShaderStageFlagBits::eVertex |
 			    vk::ShaderStageFlagBits::eFragment,
 			    0, lp);
@@ -335,9 +315,9 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		}
 
 		// --- Render all 6 faces in a single multiview pass ---
-		cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipeline);
-		cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-		                          p_pipelineLayout, 0,
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[0].pipeline);
+	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+	                          *p_pipelines[0].pipelineLayout, 0,
 		                          vk::ArrayProxy<const vk::DescriptorSet>(p_ssboSet->handle()), {});
 
 		// --- Transition colour cubemap to ColorAttachment for rendering ---
@@ -399,7 +379,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 				// Push model matrix at offset 16 (light data at offset 0
 				// persists from the per-light push above).
-				cmdBuf.pushConstants<glm::mat4>(p_pipelineLayout,
+				cmdBuf.pushConstants<glm::mat4>(*p_pipelines[0].pipelineLayout,
 				    vk::ShaderStageFlagBits::eVertex |
 				    vk::ShaderStageFlagBits::eFragment,
 				    kModelPushOffset, model);
@@ -467,7 +447,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			const glm::mat4 lightViewProj = orthoProj * lightView;
 
 			// --- Push lightViewProj (64 bytes, offset 0) ---
-			cmdBuf.pushConstants<glm::mat4>(p_sunPipelineLayout,
+			cmdBuf.pushConstants<glm::mat4>(*p_pipelines[1].pipelineLayout,
 			                                vk::ShaderStageFlagBits::eVertex,
 			                                0, lightViewProj);
 
@@ -494,7 +474,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 			cmdBuf.setViewport(0, sunViewport);
 			cmdBuf.setScissor(0, sunScissor);
-			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_sunPipeline);
+			cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[1].pipeline);
 
 			cmdBuf.beginRendering(renderInfo);
 
@@ -510,7 +490,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 					const glm::mat4 model = mesh->GetModelMatrix();
 					const glm::mat4 mvp = lightViewProj * model;
 
-					cmdBuf.pushConstants<glm::mat4>(p_sunPipelineLayout,
+					cmdBuf.pushConstants<glm::mat4>(*p_pipelines[1].pipelineLayout,
 					    vk::ShaderStageFlagBits::eVertex,
 					    0, mvp);
 

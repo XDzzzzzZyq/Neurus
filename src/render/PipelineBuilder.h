@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Pipeline.h"
+
 #include <vulkan/vulkan_raii.hpp>
 
 #include <memory>
@@ -20,16 +22,12 @@ class ShaderModule;
  * @brief Fluent builder for VkGraphicsPipelineCreateInfo (with
  *        VK_KHR_dynamic_rendering) and VkComputePipelineCreateInfo.
  *
- * Accumulates state via chained method calls and produces a vk::raii::Pipeline
- * on BuildGraphicsPipeline() or BuildComputePipeline(). Viewport and scissor
- * are always dynamic for graphics pipelines.
- *
- * The pipeline layout created during the build is retained and accessible via
- * pipelineLayout() — this is required for descriptor set binding at command-
- * recording time for compute passes.
+ * Accumulates state via chained method calls and produces a Pipeline struct
+ * (which owns both the vk::raii::Pipeline and its vk::raii::PipelineLayout)
+ * on BuildGraphicsPipeline() or BuildComputePipeline().
  *
  * Usage (graphics):
- *   auto pipeline = PipelineBuilder()
+ *   Pipeline p = PipelineBuilder()
  *       .AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
  *       .AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
  *       .SetVertexInput(layout)
@@ -42,14 +40,13 @@ class ShaderModule;
  *       .BuildGraphicsPipeline(device);
  *
  * Usage (compute):
- *   auto pipeline = PipelineBuilder()
+ *   Pipeline p = PipelineBuilder()
  *       .AddShaderStage(compModule, vk::ShaderStageFlagBits::eCompute)
  *       .AddDescriptorSetLayout(*descSetLayout.layout())
  *       .SetDebugName("MyComputePass")
  *       .BuildComputePipeline(device);
- *   // Builder must outlive the pipeline (holds pipelineLayout for binding).
  *   cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
- *                             builder.pipelineLayout(), ...);
+ *                             *p.pipelineLayout, ...);
  */
 class PipelineBuilder
 {
@@ -342,15 +339,14 @@ public:
 	 *
 	 * Creates a VkPipelineLayout internally from the descriptor set layouts
 	 * and push-constant ranges. Appends VkPipelineRenderingCreateInfo for
-	 * dynamic rendering. Returns a RAII pipeline.
+	 * dynamic rendering. Returns a Pipeline struct that owns both the
+	 * vk::raii::Pipeline and its pipeline layout.
 	 *
-	 * After this call, pipelineLayout() returns the created pipeline layout.
-	 *
-	 * @param device  Logical device (must outlive the returned pipeline).
-	 * @return Fully constructed vk::raii::Pipeline.
+	 * @param device  Logical device.
+	 * @return Fully constructed Pipeline (type = Geometry).
 	 * @throws std::runtime_error if required fields are missing or invalid.
 	 */
-	vk::raii::Pipeline BuildGraphicsPipeline(const vk::raii::Device& device);
+	Pipeline BuildGraphicsPipeline(const vk::raii::Device& device);
 
 	// -----------------------------------------------------------------------
 	// Build (compute)
@@ -360,36 +356,15 @@ public:
 	 * @brief Builds the compute pipeline from accumulated state.
 	 *
 	 * Creates a VkPipelineLayout from the descriptor set layouts and
-	 * push-constant ranges. The layout is retained and accessible via
-	 * pipelineLayout() for descriptor-set binding at command-recording time.
+	 * push-constant ranges. Returns a Pipeline struct that owns both the
+	 * vk::raii::Pipeline and its pipeline layout — the layout is available
+	 * for descriptor-set binding at command-recording time.
 	 *
-	 * This builder must outlive the returned pipeline because the pipeline
-	 * layout is needed for descriptor-set binding.
-	 *
-	 * @param device  Logical device (must outlive the returned pipeline).
-	 * @return Fully constructed vk::raii::Pipeline.
+	 * @param device  Logical device.
+	 * @return Fully constructed Pipeline (type = Compute).
 	 * @throws std::runtime_error if no shader stage is set.
 	 */
-	vk::raii::Pipeline BuildComputePipeline(const vk::raii::Device& device);
-
-	// -----------------------------------------------------------------------
-	// Accessors
-	// -----------------------------------------------------------------------
-
-	/**
-	 * @brief Returns the most recently created pipeline layout.
-	 *
-	 * Valid after the first call to BuildGraphicsPipeline() or
-	 * BuildComputePipeline().  Useful for binding descriptor sets at
-	 * command-recording time.
-	 *
-	 * @return The underlying VkPipelineLayout handle (never null after a
-	 *         successful build).
-	 */
-	vk::PipelineLayout pipelineLayout() const
-	{
-		return p_pipelineLayout ? **p_pipelineLayout : VK_NULL_HANDLE;
-	}
+	Pipeline BuildComputePipeline(const vk::raii::Device& device);
 
 private:
 	// --- Shader stages ---
@@ -437,9 +412,6 @@ private:
 	// --- Pipeline layout ---
 	std::vector<vk::DescriptorSetLayout> p_descriptorSetLayouts;
 	std::vector<vk::PushConstantRange> p_pushConstantRanges;
-
-	// --- Owned pipeline layout (created by Build*Pipeline, retained for binding) ---
-	std::unique_ptr<vk::raii::PipelineLayout> p_pipelineLayout;
 
 	// --- Pipeline cache ---
 	vk::PipelineCache p_pipelineCache = VK_NULL_HANDLE;

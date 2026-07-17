@@ -9,9 +9,9 @@
  *
  * Architecture:
  * - Inherits from Pass (non-copyable, movable, pure virtual Record).
- * - Owns the descriptor set layout, pool, sets, sampler, and pipeline builder.
- * - Subclasses own their compute pipeline, push constants, and any pass-
- *   specific UBOs / SSBOs.
+ * - Owns the descriptor set layout, pool, sets, and sampler.
+ * - Subclasses own their Pipeline (pipeline + layout), push constants,
+ *   and any pass-specific UBOs / SSBOs.
  *
  * @note p_descriptorSetLayout is moved in via the constructor — subclasses
  *       create their own layout via their static CreateDescriptorSetLayout()
@@ -21,7 +21,6 @@
 #pragma once
 
 #include "Pass.h"
-#include "../PipelineBuilder.h"
 #include "../DescriptorManager.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -148,9 +147,6 @@ protected:
 	// Members (accessible to subclasses)
 	// -------------------------------------------------------------------
 
-	/// Physical device (non-owning reference, for format / memory queries).
-	const vk::raii::PhysicalDevice* p_physicalDevice = nullptr;
-
 	/// Nearest-neighbour sampler for G-Buffer reads.
 	vk::raii::Sampler p_sampler = nullptr;
 
@@ -162,9 +158,6 @@ protected:
 
 	/// Descriptor sets (one per in-flight frame).
 	std::vector<DescriptorSet> p_descriptorSets;
-
-	/// Pipeline builder (must outlive the compute pipeline created by subclass).
-	std::unique_ptr<PipelineBuilder> p_pipelineBuilder;
 };
 
 // ===================================================================
@@ -176,12 +169,11 @@ inline ComputePass::ComputePass(const vk::raii::Device& device,
                                 DescriptorSetLayout&& descriptorSetLayout,
                                 uint32_t numSets)
 	: Pass()
-	, p_physicalDevice(&physicalDevice)
 	, p_sampler(CreateSampler(device, physicalDevice))
 	, p_descriptorSetLayout(std::move(descriptorSetLayout))
-	, p_pipelineBuilder(std::make_unique<PipelineBuilder>())
 {
 	p_device = &device;
+	p_physicalDevice = &physicalDevice;
 	CreateDescriptorSets(numSets);
 }
 

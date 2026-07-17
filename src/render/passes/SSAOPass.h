@@ -168,10 +168,11 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates the compute pipeline via PipelineBuilder.
+	 * @brief Creates the compute pipeline.
 	 * ShaderModule from self-loaded ComputeShader.
 	 */
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);
+	void BuildPipeline(const vk::raii::Device& device,
+	                   const std::string& debugName) override;
 
 	/**
 	 * @brief Generates the hemisphere kernel samples.
@@ -195,8 +196,7 @@ private:
 	 */
 	static std::array<NoiseEntryGpu, kNoiseEntryCount> GenerateNoise();
 
-	// --- Pipeline ---
-	vk::raii::Pipeline p_pipeline;
+	// (Pipelines inherited from Pass — p_pipelines[0])
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
 	std::shared_ptr<ComputeShader> p_computeShader;

@@ -107,12 +107,9 @@ private:
 	/**
 	 * @brief Creates the graphics pipeline using PipelineBuilder.
 	 * ShaderModules from self-loaded RenderShader.
-	 * Sets p_pipelineLayout as a side effect.
 	 */
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);
-
-	// --- References (non-owning) ---
-	const vk::raii::PhysicalDevice* p_physicalDevice;
+	void BuildPipeline(const vk::raii::Device& device,
+	                   const std::string& debugName) override;
 
 	// --- Descriptor resources ---
 	DescriptorSetLayout p_cameraLayout;             ///< Set 0 layout definition
@@ -124,9 +121,7 @@ private:
 	DescriptorPool p_descriptorPool;
 	DescriptorSet p_cameraDescriptorSet;
 
-	// --- Pipeline ---
-	vk::raii::PipelineLayout p_pipelineLayout;
-	vk::raii::Pipeline p_pipeline;
+	// (Pipelines inherited from Pass — p_pipelines[0])
 
 	// --- Self-loaded render shader (via ShaderLibrary) ---
 	std::shared_ptr<RenderShader> p_renderShader;

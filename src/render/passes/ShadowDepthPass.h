@@ -15,6 +15,8 @@
 #include "../buffers/BufferLayout.h"
 #include "../buffers/GPUBuffer.h"
 
+#include <string>
+
 #include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
 #include <memory>
@@ -75,11 +77,11 @@ private:
 	void createSSBOResources(const vk::raii::Device& device,
 	                         const vk::raii::PhysicalDevice& physicalDevice,
 	                         vk::Queue queue, uint32_t qfi);
-	void createPipeline(const vk::raii::Device& device);
+	void BuildPipeline(const vk::raii::Device& device,
+	                   const std::string& debugName) override;
 
 	// --- Parameters ---
 	uint32_t p_resolution;
-	const vk::raii::PhysicalDevice* p_physicalDevice = nullptr;
 	vk::Queue m_queue = nullptr;          ///< Graphics queue (for MeshGPU staging uploads)
 	uint32_t m_queueFamilyIndex = 0;      ///< Queue family index (for MeshGPU staging uploads)
 
@@ -94,14 +96,7 @@ private:
 	// --- Shaders (self-loaded via ShaderLibrary) ---
 	std::shared_ptr<RenderShader> m_multiviewShader;  ///< Point-light cubemap depth+colour (multiview)
 	std::shared_ptr<RenderShader> m_sunShader;         ///< Sun-light orthographic depth-only
-	// Graphics pipeline (multiview depth+colour)
-	vk::raii::PipelineLayout p_pipelineLayout = nullptr;
-	vk::raii::Pipeline p_pipeline = nullptr;
-
-	// Sun light pipeline (non-multiview depth-only, push-constant mat4 lightViewProj)
-	vk::raii::PipelineLayout p_sunPipelineLayout = nullptr;
-	vk::raii::Pipeline p_sunPipeline = nullptr;
-	void createSunPipeline(const vk::raii::Device& device);
+	// (Pipelines inherited from Pass — p_pipelines[0]=multiview, p_pipelines[1]=sun)
 
 };
 

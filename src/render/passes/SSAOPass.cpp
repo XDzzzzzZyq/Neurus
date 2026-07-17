@@ -6,6 +6,7 @@
 #include "RenderCache.h"
 #include "passes/SSAOPass.h"
 
+#include "../PipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
 #include "RenderContext.h"
@@ -86,7 +87,6 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
                    uint32_t queueFamilyIndex)
 	: ComputePass(device, physicalDevice,
 	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
-	, p_pipeline(nullptr)
 	// --- Self-load compute shader via ShaderLibrary ---
 	, p_computeShader(
 		ShaderLibrary::LoadComputeShader("ssao",
@@ -96,7 +96,7 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	if (p_computeShader) { p_computeShader->CreateModule(device); }
 
 	// --- Create pipeline from self-loaded shader ---
-	p_pipeline = CreatePipeline(device);
+	BuildPipeline(device, "SSAOPass");
 
 	NEURUS_LOG("[SSAOPass] numSets=" << numSets
 	           << " kernelLength=" << kDefaultKernelLength
@@ -233,7 +233,8 @@ DescriptorSetLayout SSAOPass::CreateDescriptorSetLayout(const vk::raii::Device& 
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device)
+void SSAOPass::BuildPipeline(const vk::raii::Device& device,
+                              const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
 	if (!p_computeShader || !p_computeShader->IsValid())
@@ -251,11 +252,13 @@ vk::raii::Pipeline SSAOPass::CreatePipeline(const vk::raii::Device& device)
 		4 * sizeof(int32_t));  // kernelLength, radius (float), noiseSize, frameIndex
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
-		.SetDebugName("SSAOPass")
-		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
-		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline(device);
+	PipelineBuilder builder;
+	p_pipelines.push_back(
+		builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+			.SetDebugName(debugName.c_str())
+			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
+			.AddPushConstantRange(pushRange)
+			.BuildComputePipeline(device));
 }
 
 // ---------------------------------------------------------------------------
@@ -373,11 +376,11 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	}
 
 	// --- 3. Bind compute pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipelines[0].pipeline);
 
 	// --- 4. Bind descriptor set ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          p_pipelineBuilder->pipelineLayout(),
+	                          *p_pipelines[0].pipelineLayout,
 	                          0,                                    // firstSet
 	                          {p_descriptorSets[frameIndex].handle()},
 	                          {});
@@ -399,7 +402,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 		pc.frameIndex   = static_cast<int32_t>(frameIndex);
 
 		cmdBuf.pushConstants<SSAOPushConstants>(
-			p_pipelineBuilder->pipelineLayout(),
+			*p_pipelines[0].pipelineLayout,
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pc);

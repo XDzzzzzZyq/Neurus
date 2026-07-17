@@ -133,7 +133,7 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_CreatesValidPipeline)
 		.SetColorFormats({vk::Format::eB8G8R8A8Srgb})   // One color attachment
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ TEST_F(PipelineBuilderTest, SetVertexInput_FromBufferLayout_ValidPipeline)
 		.SetColorFormats({vk::Format::eB8G8R8A8Srgb})
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ TEST_F(PipelineBuilderTest, SetDepthStencil_WithDepthTest_ValidPipeline)
 		.SetDepthFormat(vk::Format::eD32Sfloat)
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ TEST_F(PipelineBuilderTest, SetRasterization_Wireframe_CullBack)
 		.SetColorFormats({vk::Format::eB8G8R8A8Srgb})
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ TEST_F(PipelineBuilderTest, SetInputAssembly_LineStrip_ValidPipeline)
 		.SetColorFormats({vk::Format::eB8G8R8A8Srgb})
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ TEST_F(PipelineBuilderTest, SetDescriptorSetLayouts_ValidPipeline)
 		.SetDescriptorSetLayouts(layouts)
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ TEST_F(PipelineBuilderTest, SetPushConstantRanges_ValidPipeline)
 		.SetPushConstantRanges({pushRange})
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +346,7 @@ TEST_F(PipelineBuilderTest, SetPipelineCache_CreatesValidPipeline)
 		.SetPipelineCache(&cache)
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }
 
 // ---------------------------------------------------------------------------
@@ -426,5 +426,5 @@ TEST_F(PipelineBuilderTest, DepthOnly_NoColorAttachments_ValidPipeline)
 		.SetDepthFormat(vk::Format::eD32Sfloat)       // Depth only
 		.BuildGraphicsPipeline(*m_device);
 
-	EXPECT_NE(*pipeline, VK_NULL_HANDLE);
+	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
 }

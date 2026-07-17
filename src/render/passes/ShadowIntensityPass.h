@@ -123,11 +123,11 @@ private:
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
 	/**
-	 * @brief Creates the point-light cubemap compute pipeline via PipelineBuilder.
-	 *
-	 * Uses the ShaderModule from p_pointLightShader loaded via ShaderLibrary.
+	 * @brief Builds both point-light cubemap and sun-light 2D compute
+	 *        pipelines, pushing them into p_pipelines.
 	 */
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device);
+	void BuildPipeline(const vk::raii::Device& device,
+	                   const std::string& debugName) override;
 
 	// -------------------------------------------------------------------
 	// Sun (directional) shadow evaluation — second descriptor set + pipeline
@@ -143,16 +143,6 @@ private:
 	 *   2: outputShadow    (storage image, R8)
 	 */
 	static DescriptorSetLayout CreateSunDescriptorSetLayout(const vk::raii::Device& device);
-
-	/**
-	 * @brief Creates the sun-light compute pipeline (sun_shadow_eval.comp SPIR-V).
-	 *
-	 * Push constant range: 80 bytes — matches sizeof(SunShadowEvalPushConstants)
-	 * (72B GLSL layout + 8B C++ alignment padding after mat4).
-	 *
-	 * Uses the ShaderModule from p_sunLightShader loaded via ShaderLibrary.
-	 */
-	vk::raii::Pipeline CreateSunPipeline(const vk::raii::Device& device);
 
 	/**
 	 * @brief Creates a clamp-to-border sampler for sun shadow map reads.
@@ -173,13 +163,10 @@ private:
 	 */
 	void WriteSunDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache);
 
-	// --- Point-light cubemap pipeline ---
-	std::unique_ptr<vk::raii::Pipeline> p_pipeline;             ///< Point-light compute pipeline (shadow_eval.comp)
+	// (Pipelines inherited from Pass — p_pipelines[0]=cubemap, p_pipelines[1]=sun)
 
-	// --- Sun-light 2D pipeline ---
+	// --- Sun-light 2D pipeline resources ---
 	DescriptorSetLayout p_sunDescSetLayout;                       ///< Sun descriptor set layout (sampler2D at binding 1)
-	vk::raii::Pipeline  p_sunPipeline = nullptr;                  ///< Sun compute pipeline (sun_shadow_eval.comp)
-	std::unique_ptr<PipelineBuilder> p_sunPipelineBuilder; ///< Builder owning the sun pipeline layout
 	vk::raii::Sampler   p_sunShadowSampler = nullptr;             ///< Sampler for sun shadow map (clamp-to-border, black)
 	DescriptorPool      p_sunDescPool;                            ///< Descriptor pool for sun descriptor sets
 	std::vector<DescriptorSet> p_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)

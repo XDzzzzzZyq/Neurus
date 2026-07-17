@@ -138,8 +138,8 @@ protected:
 		ASSERT_NE(e2cShader, nullptr);
 		e2cShader->CreateModule(dev);
 		auto compModule = e2cShader->GetShaderModule(ShaderType::COMPUTE);
-		m_e2cBuilder = std::make_unique<PipelineBuilder>();
-		m_e2cPipeline = m_e2cBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		PipelineBuilder e2cBuilder;
+		m_e2cPipeline = e2cBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 			.AddDescriptorSetLayout(*m_e2cSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}
@@ -163,8 +163,8 @@ protected:
 		ASSERT_NE(c2eShader, nullptr);
 		c2eShader->CreateModule(dev);
 		auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
-		m_c2eBuilder = std::make_unique<PipelineBuilder>();
-		m_c2ePipeline = m_c2eBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		PipelineBuilder c2eBuilder;
+		m_c2ePipeline = c2eBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
 			.AddDescriptorSetLayout(*m_c2eSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}
@@ -237,9 +237,9 @@ protected:
 		vk::ImageSubresourceRange cubeRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
 		Barrier::Transition(*cmd, cubeDst, ImageState::ShaderWrite, cubeRange);
 
-		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_e2cPipeline);
+		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_e2cPipeline.pipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                       m_e2cBuilder->pipelineLayout(),
+		                       *m_e2cPipeline.pipelineLayout,
 		                       0, {m_e2cSets[0].handle()}, {});
 
 		const uint32_t gx = (kCubeFaceRes + 3) / 4;
@@ -284,9 +284,9 @@ protected:
 		// Transition output equirect: UNDEFINED → ShaderWrite
 		Barrier::Transition(*cmd, equiDst, ImageState::ShaderWrite);
 
-		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_c2ePipeline);
+		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_c2ePipeline.pipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                       m_c2eBuilder->pipelineLayout(),
+		                       *m_c2ePipeline.pipelineLayout,
 		                       0, {m_c2eSets[0].handle()}, {});
 
 		const uint32_t gx = (kEquiWidth  + 15) / 16;
@@ -314,15 +314,13 @@ protected:
 	std::unique_ptr<DescriptorSetLayout> m_e2cSetLayout;
 	std::unique_ptr<DescriptorPool> m_e2cPool;
 	std::vector<DescriptorSet> m_e2cSets;
-	std::unique_ptr<PipelineBuilder> m_e2cBuilder;
-	vk::raii::Pipeline m_e2cPipeline = nullptr;
+	Pipeline m_e2cPipeline;
 
 	// C2E
 	std::unique_ptr<DescriptorSetLayout> m_c2eSetLayout;
 	std::unique_ptr<DescriptorPool> m_c2ePool;
 	std::vector<DescriptorSet> m_c2eSets;
-	std::unique_ptr<PipelineBuilder> m_c2eBuilder;
-	vk::raii::Pipeline m_c2ePipeline = nullptr;
+	Pipeline m_c2ePipeline;
 };
 
 // ===========================================================================

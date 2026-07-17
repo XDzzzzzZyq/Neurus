@@ -289,7 +289,7 @@ PipelineBuilder& PipelineBuilder::SetDebugName(const char* name)
 // BuildGraphicsPipeline
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device& device)
+Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device& device)
 {
 	// --- Validate required fields ---
 	if (p_stages.empty())
@@ -328,13 +328,13 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 			vk::LogicOp::eCopy, nullptr);
 	}
 
-	// --- Pipeline layout (retained for pipelineLayout() accessor) ---
+	// --- Pipeline layout ---
 	vk::PipelineLayoutCreateInfo pipelineLayoutCreateInfo(
 		{},
 		p_descriptorSetLayouts,
 		p_pushConstantRanges);
 
-	p_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, pipelineLayoutCreateInfo);
+	vk::raii::PipelineLayout pipelineLayout(device, pipelineLayoutCreateInfo);
 
 	// --- Dynamic rendering pipeline create info ---
 	vk::PipelineRenderingCreateInfo renderingCreateInfo(
@@ -363,7 +363,7 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 		pDepthStencil,
 		&p_colorBlend,
 		&p_dynamicState,
-		**p_pipelineLayout,
+		*pipelineLayout,
 		nullptr,       // No render pass (dynamic rendering)
 		0,             // Subpass index (unused)
 		nullptr,       // No base pipeline
@@ -382,14 +382,15 @@ vk::raii::Pipeline PipelineBuilder::BuildGraphicsPipeline(const vk::raii::Device
 	}
 #endif
 
-	return pipeline;
+	return Pipeline(std::move(pipeline), std::move(pipelineLayout),
+	                PipelineType::Geometry);
 }
 
 // ---------------------------------------------------------------------------
 // BuildComputePipeline
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline PipelineBuilder::BuildComputePipeline(const vk::raii::Device& device)
+Pipeline PipelineBuilder::BuildComputePipeline(const vk::raii::Device& device)
 {
 	if (p_stages.empty())
 	{
@@ -398,19 +399,19 @@ vk::raii::Pipeline PipelineBuilder::BuildComputePipeline(const vk::raii::Device&
 			"no shader stages added - call AddShaderStage() at least once.");
 	}
 
-	// --- Pipeline layout (retained for pipelineLayout() accessor) ---
+	// --- Pipeline layout ---
 	vk::PipelineLayoutCreateInfo layoutCreateInfo(
 		{},
 		p_descriptorSetLayouts,
 		p_pushConstantRanges);
 
-	p_pipelineLayout = std::make_unique<vk::raii::PipelineLayout>(device, layoutCreateInfo);
+	vk::raii::PipelineLayout pipelineLayout(device, layoutCreateInfo);
 
 	// --- Create compute pipeline (first stage is the compute shader) ---
 	vk::ComputePipelineCreateInfo computeCreateInfo(
 		{},                // flags
 		p_stages[0],       // stage
-		**p_pipelineLayout // layout
+		*pipelineLayout    // layout
 	);
 
 	auto pipeline = vk::raii::Pipeline(device, nullptr, computeCreateInfo);
@@ -425,7 +426,8 @@ vk::raii::Pipeline PipelineBuilder::BuildComputePipeline(const vk::raii::Device&
 	}
 #endif
 
-	return pipeline;
+	return Pipeline(std::move(pipeline), std::move(pipelineLayout),
+	                PipelineType::Compute);
 }
 
 } // namespace neurus

@@ -119,10 +119,8 @@ private:
 	// --- Pipeline / descriptor helpers ---
 	static DescriptorSetLayout CreateDescriptorSetLayout(const vk::raii::Device& device);
 
-	vk::raii::Pipeline CreatePipeline(const vk::raii::Device& device,
-	                                  std::shared_ptr<ComputeShader> computeShader,
-									  std::unique_ptr<PipelineBuilder>& outBuilder,
-	                                  const char* debugName);
+	void BuildPipeline(const vk::raii::Device& device,
+	                   const std::string& debugName) override;
 
 	void WriteDescriptors(const Image& equirectImage,
 	                      const vk::raii::Sampler& equirectSampler,
@@ -143,11 +141,7 @@ private:
 	std::shared_ptr<ComputeShader> p_irradianceShader;
 	std::shared_ptr<ComputeShader> p_specularShader;
 
-	// --- Pipelines ---
-	std::unique_ptr<PipelineBuilder> p_irradiancePipelineBuilder;
-	vk::raii::Pipeline p_irradiancePipeline;
-	std::unique_ptr<PipelineBuilder> p_specularPipelineBuilder;
-	vk::raii::Pipeline p_specularPipeline;
+	// (Pipelines inherited from Pass — p_pipelines[0]=irradiance, p_pipelines[1]=specular)
 };
 
 } // namespace neurus

@@ -258,8 +258,7 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 
-	auto c2ePipeline = c2eBuilder.BuildComputePipeline(m_device);
-	vk::PipelineLayout c2ePipelineLayout = c2eBuilder.pipelineLayout();
+	Pipeline c2ePipeline = c2eBuilder.BuildComputePipeline(m_device);
 
 	// --- 5. Record & dispatch ---
 	{
@@ -283,9 +282,9 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 		}
 
 		// Bind and dispatch
-		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *c2ePipeline);
+		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *c2ePipeline.pipeline);
 		cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-		                       c2ePipelineLayout, 0,
+		                       *c2ePipeline.pipelineLayout, 0,
 		                       {c2eSet.handle()}, {});
 
 		uint32_t gx = (equiWidth  + 15) / 16;

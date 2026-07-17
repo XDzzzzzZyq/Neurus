@@ -31,9 +31,8 @@ namespace neurus {
 
 GeometryPass::GeometryPass(const vk::raii::Device& device,
                            const vk::raii::PhysicalDevice& physicalDevice)
-	: p_physicalDevice(&physicalDevice)
 	// --- Descriptor set layout ---
-	, p_cameraLayout(CreateCameraLayout(device))
+	: p_cameraLayout(CreateCameraLayout(device))
 	// --- Camera UBO (host-visible for per-frame memcpy update) ---
 	, p_cameraUBO(device, physicalDevice, "CameraUBO")
 	// --- Descriptor pool (1 set, 1 UBO) ---
@@ -43,8 +42,6 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	// --- Camera descriptor set (allocated from pool) ---
 	, p_cameraDescriptorSet(std::move(
 	      p_descriptorPool.Allocate(p_cameraLayout, 1).front()))
-	, p_pipelineLayout(nullptr)
-	, p_pipeline(nullptr)
 	// --- Self-load shaders via ShaderLibrary ---
 	, p_renderShader(
 		ShaderLibrary::LoadRenderShader("GeometryPass",
@@ -52,6 +49,7 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 		                                "res/shaders/render/gbuffer.frag"))
 {
 	p_device = &device;
+	p_physicalDevice = &physicalDevice;
 
 	// --- Create modules from self-loaded shader (creates ShaderModules from SPIR-V) ---
 	if (p_renderShader) { p_renderShader->CreateModule(device); }
@@ -70,7 +68,7 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	p_vertexLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);      // uv @ 24
 
 	// --- Create graphics pipeline from self-loaded shader ---
-	p_pipeline = CreatePipeline(device);
+	BuildPipeline(device, "GeometryPass");
 
 	NEURUS_LOG("[GeometryPass] shader=" << (p_renderShader ? "OK" : "FAIL")
 	          << " colorAttachments=4"
@@ -95,7 +93,8 @@ DescriptorSetLayout GeometryPass::CreateCameraLayout(const vk::raii::Device& dev
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device)
+void GeometryPass::BuildPipeline(const vk::raii::Device& device,
+                                  const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
 	if (!p_renderShader || !p_renderShader->IsValid())
@@ -138,34 +137,27 @@ vk::raii::Pipeline GeometryPass::CreatePipeline(const vk::raii::Device& device)
 
 	// --- Build pipeline via PipelineBuilder ---
 	PipelineBuilder builder;
-	auto pipeline = builder
-		.SetDebugName("GeometryPass::G-Buffer")
-		.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
-		.SetVertexInput(p_vertexLayout)
-		.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-		.SetRasterization(vk::PolygonMode::eFill,
-		                  vk::CullModeFlagBits::eNone,
-		                  vk::FrontFace::eClockwise)
-		.SetMultisampling()
-		.SetDepthStencil(true, true, vk::CompareOp::eLess)
-		.AddColorBlendAttachment(blendState)
-		.AddColorBlendAttachment(blendState)
-		.AddColorBlendAttachment(blendState)
-		.AddColorBlendAttachment(blendState)
-		.SetColorFormats(colorFormats)
-		.SetDepthFormat(vk::Format::eD32Sfloat)
-		.SetDescriptorSetLayouts(descriptorSetLayouts)
-		.SetPushConstantRanges(pushConstantRanges)
-		.BuildGraphicsPipeline(device);
-
-	// --- Create matching pipeline layout for binding calls ---
-	vk::PipelineLayoutCreateInfo layoutCI({},
-	                                       descriptorSetLayouts,
-	                                       pushConstantRanges);
-	p_pipelineLayout = vk::raii::PipelineLayout(device, layoutCI);
-
-	return pipeline;
+	p_pipelines.push_back(
+		builder
+			.SetDebugName(debugName.c_str())
+			.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
+			.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+			.SetVertexInput(p_vertexLayout)
+			.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
+			.SetRasterization(vk::PolygonMode::eFill,
+			                  vk::CullModeFlagBits::eNone,
+			                  vk::FrontFace::eClockwise)
+			.SetMultisampling()
+			.SetDepthStencil(true, true, vk::CompareOp::eLess)
+			.AddColorBlendAttachment(blendState)
+			.AddColorBlendAttachment(blendState)
+			.AddColorBlendAttachment(blendState)
+			.AddColorBlendAttachment(blendState)
+			.SetColorFormats(colorFormats)
+			.SetDepthFormat(vk::Format::eD32Sfloat)
+			.SetDescriptorSetLayouts(descriptorSetLayouts)
+			.SetPushConstantRanges(pushConstantRanges)
+			.BuildGraphicsPipeline(device));
 }
 
 // ---------------------------------------------------------------------------
@@ -225,11 +217,11 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	cmdBuf.setScissor(0, scissor);
 
 	// --- 5. Bind pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[0].pipeline);
 
 	// --- 6. Bind camera descriptor set (set 0) ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-	                          *p_pipelineLayout,
+	                          *p_pipelines[0].pipelineLayout,
 	                          0,
 	                          {p_cameraDescriptorSet.handle()},
 	                          {});
@@ -253,7 +245,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
 
 			MeshPushConstants pushConstants{model, normalMat};
-			cmdBuf.pushConstants<MeshPushConstants>(*p_pipelineLayout,
+			cmdBuf.pushConstants<MeshPushConstants>(*p_pipelines[0].pipelineLayout,
 			                                    vk::ShaderStageFlagBits::eVertex,
 			                                    0, pushConstants);
 

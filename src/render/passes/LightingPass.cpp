@@ -5,6 +5,7 @@
 
 #include "passes/LightingPass.h"
 
+#include "../PipelineBuilder.h"
 #include "RenderCache.h"
 #include "RenderContext.h"
 #include "Image.h"
@@ -37,7 +38,6 @@ LightingPass::LightingPass(const vk::raii::Device& device,
                            uint32_t numSets)
 	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
-	, p_pipeline(nullptr)
 	// --- Self-load compute shader via ShaderLibrary ---
 	, p_computeShader(
 		ShaderLibrary::LoadComputeShader("pbr_lighting",
@@ -47,7 +47,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	if (p_computeShader) { p_computeShader->CreateModule(device); }
 
 	// --- Create pipeline from self-loaded shader ---
-	p_pipeline = CreatePipeline(device);
+	BuildPipeline(device, "LightingPass");
 
 	// --- Create 1x1 black cubemap empty placeholder for IBL bindings when no env exists ---
 	auto emptyImage = std::make_unique<Image>(
@@ -132,7 +132,8 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 // Pipeline creation
 // ---------------------------------------------------------------------------
 
-vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device)
+void LightingPass::BuildPipeline(const vk::raii::Device& device,
+                                  const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
 	if (!p_computeShader || !p_computeShader->IsValid())
@@ -150,11 +151,13 @@ vk::raii::Pipeline LightingPass::CreatePipeline(const vk::raii::Device& device)
 		sizeof(LightingPushConstants));  // 176 bytes, from LightingGPU.h
 
 	// --- Build compute pipeline ---
-	return p_pipelineBuilder->AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
-		.SetDebugName("LightingPass")
-		.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
-		.AddPushConstantRange(pushRange)
-		.BuildComputePipeline(device);
+	PipelineBuilder builder;
+	p_pipelines.push_back(
+		builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+			.SetDebugName(debugName.c_str())
+			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
+			.AddPushConstantRange(pushRange)
+			.BuildComputePipeline(device));
 }
 
 // ---------------------------------------------------------------------------
@@ -386,11 +389,11 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	}
 
 	// --- 3. Bind compute pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipeline);
+	cmdBuf.bindPipeline(vk::PipelineBindPoint::eCompute, *p_pipelines[0].pipeline);
 
 	// --- 4. Bind descriptor set ---
 	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
-	                          p_pipelineBuilder->pipelineLayout(),
+	                          *p_pipelines[0].pipelineLayout,
 	                          0,                                    // firstSet
 	                          {p_descriptorSets[frameIndex].handle()},
 	                          {});
@@ -425,7 +428,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 
 		cmdBuf.pushConstants<LightingPushConstants>(
-			p_pipelineBuilder->pipelineLayout(),
+			*p_pipelines[0].pipelineLayout,
 			vk::ShaderStageFlagBits::eCompute,
 			0,
 			pc);
