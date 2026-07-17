@@ -12,7 +12,6 @@
 
 // Forward declarations (no render headers!)
 namespace neurus {
-class VulkanContext;
 class DeferredRenderer;
 class Scene;
 class Environment;
@@ -36,7 +35,7 @@ namespace neurus {
 class Editor
 {
 public:
-	Editor(VulkanContext* vkCtx, DeferredRenderer* renderer);
+	Editor(DeferredRenderer* renderer, UploadManager* uploadManager);
 	~Editor();
 
 	Editor(const Editor&) = delete;
@@ -166,12 +165,11 @@ private:
 	// --- Owned ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
 	std::unique_ptr<neurus::project::Project> ed_project;
-	std::unique_ptr<UploadManager> ed_uploadManager;
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---
-	VulkanContext* ed_vkContext = nullptr;
 	DeferredRenderer* ed_renderer = nullptr;
+	UploadManager* ed_uploadManager = nullptr;    ///< Borrowed from Application.
 	Scene* ed_ownerScene = nullptr;  ///< Scene passed to Initialize()
 };
 

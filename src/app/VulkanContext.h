@@ -2,6 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <memory>
@@ -44,6 +45,8 @@ public:
 	const vk::raii::PhysicalDevice& physicalDevice() const { return ctx_physicalDevices[ctx_selectedDeviceIndex]; }
 	uint32_t graphicsQueueFamily() const { return ctx_graphicsQueueFamily; }
 	vk::Queue graphicsQueue() const { return ctx_graphicsQueue; }
+	uint32_t transferQueueFamily() const { return ctx_transferQueueFamily; }
+	vk::Queue transferQueue() const { return ctx_transferQueue; }
 	const std::string& gpuName() const { return ctx_gpuName; }
 
 private:
@@ -51,6 +54,7 @@ private:
 	uint32_t selectPhysicalDeviceIndex();
 	uint32_t findGraphicsQueueFamily();
 	uint32_t findGraphicsQueueFamilyWithPresent(const vk::raii::SurfaceKHR& surface);
+	uint32_t findTransferQueueFamily();
 
 	std::unique_ptr<vk::raii::Instance> ctx_instance;
 	vk::raii::PhysicalDevices ctx_physicalDevices = nullptr;
@@ -59,6 +63,10 @@ private:
 
 	uint32_t ctx_graphicsQueueFamily = 0;
 	vk::Queue ctx_graphicsQueue = nullptr;
+
+	uint32_t ctx_transferQueueFamily = 0;
+	vk::Queue ctx_transferQueue = nullptr;
+
 	std::string ctx_gpuName;
 };
 

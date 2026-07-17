@@ -228,10 +228,10 @@ protected:
 		const neurus::Scene& scene,
 		const vk::raii::Device& device,
 		const vk::raii::PhysicalDevice& pd,
-		vk::Queue /*queue*/,
+		vk::Queue queue,
 		uint32_t qfi)
 	{
-		neurus::UploadManager upload(device, pd, qfi);
+		neurus::UploadManager upload(device, pd, queue, qfi);
 		for (const auto& [id, mesh] : scene.mesh_list)
 		{
 			if (!mesh || !mesh->o_mesh) continue;
@@ -252,10 +252,10 @@ protected:
 		const neurus::Scene& scene,
 		const vk::raii::Device& device,
 		const vk::raii::PhysicalDevice& pd,
-		vk::Queue /*queue*/,
+		vk::Queue queue,
 		uint32_t qfi)
 	{
-		neurus::UploadManager upload(device, pd, qfi);
+		neurus::UploadManager upload(device, pd, queue, qfi);
 		for (const auto& [uid, light] : scene.light_list)
 		{
 			if (!light || !light->use_shadow) continue;

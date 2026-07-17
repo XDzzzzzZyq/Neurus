@@ -20,11 +20,10 @@ RenderCache::RenderCache(const vk::raii::Device& device,
 	NEURUS_LOG("[RenderCache] Created");
 }
 
-void RenderCache::InitLightingGPU(vk::Queue graphicsQueue, uint32_t queueFamilyIndex)
+void RenderCache::SetLightingGPU(std::unique_ptr<LightingGPU> lightingGPU)
 {
-	rc_lightingGPU = std::make_unique<LightingGPU>(*rc_device, *rc_physicalDevice,
-	                                               graphicsQueue, queueFamilyIndex);
-	NEURUS_LOG("[RenderCache] LightingGPU initialized");
+	rc_lightingGPU = std::move(lightingGPU);
+	NEURUS_LOG("[RenderCache] LightingGPU set");
 }
 
 // ---------------------------------------------------------------------------

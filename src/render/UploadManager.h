@@ -35,7 +35,8 @@ class UploadManager
 public:
 	UploadManager(const vk::raii::Device& device,
 	              const vk::raii::PhysicalDevice& physicalDevice,
-	              uint32_t queueFamilyIndex);
+	              vk::Queue transferQueue,
+	              uint32_t transferQueueFamily);
 	~UploadManager();
 
 	// Non-copyable
@@ -86,12 +87,25 @@ public:
 	/** @brief Wait for all pending upload operations to complete. */
 	void WaitIdle();
 
+	/**
+	 * @brief Creates a LightingGPU (light SSBO storage) using the transfer queue.
+	 *
+	 * The LightingGPU holds device-local SSBOs for point and sun light data.
+	 * Staging uploads use the transfer queue for true async operation.
+	 *
+	 * @param device          Logical device.
+	 * @param physicalDevice  Physical device (for buffer memory queries).
+	 * @return Fully constructed LightingGPU, ready to be passed to RenderCache::SetLightingGPU().
+	 */
+	std::unique_ptr<LightingGPU> CreateLightingGPU(const vk::raii::Device& device,
+	                                               const vk::raii::PhysicalDevice& physicalDevice);
+
 private:
 	const vk::raii::Device* um_device = nullptr;
 	const vk::raii::PhysicalDevice* um_physicalDevice = nullptr;
 	vk::raii::CommandPool um_commandPool{ nullptr };
-	vk::Queue um_queue = nullptr;
-	uint32_t um_queueFamilyIndex = 0;
+	vk::Queue um_transferQueue = nullptr;
+	uint32_t um_transferQueueFamily = 0;
 
 	/** @brief Internal IBL pass for environment map generation on upload. */
 	std::unique_ptr<class IBLPass> um_iblPass;

@@ -64,15 +64,16 @@ public:
 	            const vk::raii::PhysicalDevice& physicalDevice);
 
 	/**
-	 * @brief Initialises the LightingGPU with staging queue info.
+	 * @brief Sets the LightingGPU (light SSBO storage) for this cache.
 	 *
-	 * Must be called after construction and before any UpdateLighting() calls.
-	 * Creates the internal LightingGPU and configures its staging queue.
+	 * Must be called before any UpdateLighting() calls.  The LightingGPU
+	 * is typically created by UploadManager::CreateLightingGPU() using
+	 * the transfer queue so that SSBO staging uploads do not block the
+	 * graphics queue.
 	 *
-	 * @param graphicsQueue     Graphics queue for SSBO staging uploads.
-	 * @param queueFamilyIndex  Queue family index for staging command pool.
+	 * @param lightingGPU  Fully constructed LightingGPU (moved in).
 	 */
-	void InitLightingGPU(vk::Queue graphicsQueue, uint32_t queueFamilyIndex);
+	void SetLightingGPU(std::unique_ptr<LightingGPU> lightingGPU);
 
 	~RenderCache() = default;
 

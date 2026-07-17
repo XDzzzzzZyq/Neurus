@@ -86,11 +86,19 @@ void VulkanContext::InitDevice()
 	auto props = pd.getProperties();
 	ctx_gpuName = props.deviceName.data();
 
-	// Find any graphics-capable queue family (surface validation deferred to InitQueue)
+	// Find queue families
 	ctx_graphicsQueueFamily = findGraphicsQueueFamily();
+	ctx_transferQueueFamily = findTransferQueueFamily();
 
-	float prio = 1.0f;
-	vk::DeviceQueueCreateInfo qCI({}, ctx_graphicsQueueFamily, 1, &prio);
+	float graphicsPriority = 1.0f;
+	std::vector<vk::DeviceQueueCreateInfo> queueCIs;
+	queueCIs.push_back(vk::DeviceQueueCreateInfo({}, ctx_graphicsQueueFamily, 1, &graphicsPriority));
+
+	if (ctx_transferQueueFamily != ctx_graphicsQueueFamily)
+	{
+		float transferPriority = 0.5f;
+		queueCIs.push_back(vk::DeviceQueueCreateInfo({}, ctx_transferQueueFamily, 1, &transferPriority));
+	}
 
 	vk::PhysicalDeviceMultiviewFeatures multiviewFeature;
 	multiviewFeature.multiview = VK_TRUE;
@@ -120,9 +128,12 @@ void VulkanContext::InitDevice()
 		}
 	}
 
-	vk::DeviceCreateInfo devCI({}, qCI, {}, devExts, &features, &descriptorIndexing);
+	vk::DeviceCreateInfo devCI({}, queueCIs, {}, devExts, &features, &descriptorIndexing);
 
 	ctx_device = std::make_unique<vk::raii::Device>(pd, devCI);
+
+	// Get transfer queue handle immediately (does not need present check)
+	ctx_transferQueue = ctx_device->getQueue(ctx_transferQueueFamily, 0);
 }
 
 void VulkanContext::InitQueue(const vk::raii::SurfaceKHR& surface)
@@ -167,6 +178,29 @@ uint32_t VulkanContext::findGraphicsQueueFamilyWithPresent(const vk::raii::Surfa
 		return i;
 	}
 	throw std::runtime_error("No queue family with graphics + present.");
+}
+
+// ---------------------------------------------------------------------------
+// findTransferQueueFamily
+// ---------------------------------------------------------------------------
+
+uint32_t VulkanContext::findTransferQueueFamily()
+{
+	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
+	auto qf = pd.getQueueFamilyProperties();
+
+	// Prefer a dedicated transfer-only queue (has eTransfer but not eGraphics).
+	for (uint32_t i = 0; i < (uint32_t)qf.size(); ++i)
+	{
+		if (qf[i].queueFlags & vk::QueueFlagBits::eTransfer &&
+		    !(qf[i].queueFlags & vk::QueueFlagBits::eGraphics))
+		{
+			return i;
+		}
+	}
+
+	// Fall back to the graphics queue family (graphics queues always support transfer).
+	return ctx_graphicsQueueFamily;
 }
 
 } // namespace neurus

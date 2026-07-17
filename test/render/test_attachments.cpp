@@ -41,7 +41,8 @@ TEST_F(RenderCacheTest, CreateGBuffer_AllAttachmentsHaveCorrectFormatAndExtent)
 	}
 
 	RenderCache manager(*m_device, pd);
-	manager.InitLightingGPU(m_queue, m_graphicsQueueFamily);
+	manager.SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 	// Lazy creation via first GetAttachment call
 	manager.GetAttachment(AttachmentName::Position, extent);
@@ -105,7 +106,8 @@ TEST_F(RenderCacheTest, CreatePostFX_AllAttachmentsHaveCorrectFormatAndExtent)
 	auto& pd = PhysicalDevice();
 
 	RenderCache manager(*m_device, pd);
-	manager.InitLightingGPU(m_queue, m_graphicsQueueFamily);
+	manager.SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 	// Lazy creation via first GetAttachment call
 	manager.GetAttachment(AttachmentName::Position, extent);
@@ -158,7 +160,8 @@ TEST_F(RenderCacheTest, Resize_AllAttachmentsHaveNewExtent)
 	const vk::Extent2D newExtent(3840, 2160);
 
 	RenderCache manager(*m_device, pd);
-	manager.InitLightingGPU(m_queue, m_graphicsQueueFamily);
+	manager.SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 	// Lazy creation at initial extent via first GetAttachment
 	manager.GetAttachment(AttachmentName::Position, initialExtent);
@@ -215,7 +218,8 @@ TEST_F(RenderCacheTest, GetAllAttachments_ByEnumAndString)
 
 	const vk::Extent2D extent(1280, 720);
 	RenderCache manager(*m_device, pd);
-	manager.InitLightingGPU(m_queue, m_graphicsQueueFamily);
+	manager.SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 	// Lazy creation via first GetAttachment call
 	manager.GetAttachment(AttachmentName::Position, extent);
@@ -276,7 +280,8 @@ TEST_F(RenderCacheTest, HasAttachment_TrueForCreatedAttachments)
 
 	const vk::Extent2D extent(800, 600);
 	RenderCache manager(*m_device, pd);
-	manager.InitLightingGPU(m_queue, m_graphicsQueueFamily);
+	manager.SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 	// Lazy creation via GetAttachment calls
 	manager.GetAttachment(AttachmentName::Position, extent);

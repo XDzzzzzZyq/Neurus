@@ -111,7 +111,7 @@ void VulkanTestShared::SetUp()
 
 		// --- Reusable upload manager for tests ---
 		m_uploadManager = std::make_unique<UploadManager>(
-			*m_device, PhysicalDevice(), m_graphicsQueueFamily);
+			*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 
 		m_hasVulkan = true;
 	}

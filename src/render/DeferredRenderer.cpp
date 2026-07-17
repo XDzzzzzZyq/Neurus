@@ -56,7 +56,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 
 	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
 	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
-	r_renderCache->InitLightingGPU(graphicsQueue, queueFamilyIndex);
+	// LightingGPU is set via Application after construction (from UploadManager).
 
 	// --- 3. Create geometry pass ---
 	{

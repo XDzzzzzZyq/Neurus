@@ -11,7 +11,6 @@
 #include "editor/events/EventBus.h"
 #include "asset/Project.h"
 
-#include "app/VulkanContext.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
 #include "render/UploadManager.h"
@@ -56,18 +55,10 @@ static QString resolveResourcePath(const char* relativePath)
 
 namespace neurus {
 
-Editor::Editor(VulkanContext* vkCtx, DeferredRenderer* renderer)
-	: ed_vkContext(vkCtx)
-	, ed_renderer(renderer)
-{
-	if (ed_vkContext && ed_renderer)
-	{
-		ed_uploadManager = std::make_unique<UploadManager>(
-			ed_vkContext->device(),
-			ed_vkContext->physicalDevice(),
-			ed_vkContext->graphicsQueueFamily());
-	}
-}
+Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
+	: ed_renderer(renderer)
+	, ed_uploadManager(uploadManager)
+{}
 
 void Editor::SetProject(std::unique_ptr<neurus::project::Project> project)
 {

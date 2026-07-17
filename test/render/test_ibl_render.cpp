@@ -132,7 +132,8 @@ protected:
 
 		// --- Render pass infrastructure ---
 		m_renderCache = std::make_unique<RenderCache>(dev, pd);
-		m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
+		m_renderCache->SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -478,7 +479,8 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	// 2e. Recreate RenderCache + passes (simulating renderer init).
 	SCOPED_TRACE("Recreate passes");
 	m_renderCache = std::make_unique<RenderCache>(dev, pd);
-	m_renderCache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
+	m_renderCache->SetLightingGPU(
+		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 	m_geometryPass = std::make_unique<GeometryPass>(
 		dev, pd);

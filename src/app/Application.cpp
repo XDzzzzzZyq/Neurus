@@ -119,6 +119,19 @@ int Application::Run()
 		return -1;
 	}
 
+	// --- Create UploadManager (uses transfer queue for async GPU uploads) ---
+	app_uploadManager = std::make_unique<neurus::UploadManager>(
+		app_vkContext->device(),
+		app_vkContext->physicalDevice(),
+		app_vkContext->transferQueue(),
+		app_vkContext->transferQueueFamily());
+
+	// --- Wire LightingGPU to RenderCache via transfer queue ---
+	app_renderer->GetRenderCache().SetLightingGPU(
+		app_uploadManager->CreateLightingGPU(
+			app_vkContext->device(),
+			app_vkContext->physicalDevice()));
+
 	InitEditor(std::move(project));
 
 	app_mainWindow->show();
@@ -267,7 +280,7 @@ void Application::ResizeViewport(int width, int height)
 void Application::InitEditor(std::unique_ptr<project::Project> project)
 {
 	auto& scene = project->GetScene();  // Grab reference before ownership transfer
-	app_editor = std::make_unique<neurus::Editor>(app_vkContext.get(), app_renderer.get());
+	app_editor = std::make_unique<neurus::Editor>(app_renderer.get(), app_uploadManager.get());
 	app_editor->SetProject(std::move(project));
 	app_editor->Initialize(scene);
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");

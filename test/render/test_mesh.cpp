@@ -109,7 +109,7 @@ protected:
 		if (!m_hasVulkan) return;
 
 		m_cache = std::make_unique<RenderCache>(*m_device, PhysicalDevice());
-		m_cache->InitLightingGPU(m_queue, m_graphicsQueueFamily);
+		m_cache->SetLightingGPU(std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 	}
 
 	void TearDown() override

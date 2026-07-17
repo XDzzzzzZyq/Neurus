@@ -31,18 +31,18 @@ namespace neurus {
 
 UploadManager::UploadManager(const vk::raii::Device& device,
                              const vk::raii::PhysicalDevice& physicalDevice,
-                             uint32_t queueFamilyIndex)
+                             vk::Queue transferQueue,
+                             uint32_t transferQueueFamily)
 	: um_device(&device)
 	, um_physicalDevice(&physicalDevice)
-	, um_queueFamilyIndex(queueFamilyIndex)
+	, um_transferQueue(transferQueue)
+	, um_transferQueueFamily(transferQueueFamily)
 {
-	um_queue = um_device->getQueue(queueFamilyIndex, 0);
-
-	vk::CommandPoolCreateInfo poolInfo({}, queueFamilyIndex);
+	vk::CommandPoolCreateInfo poolInfo({}, transferQueueFamily);
 	poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
 	um_commandPool = vk::raii::CommandPool(device, poolInfo);
 
-	NEURUS_LOG("[UploadManager] Created with queue family " << queueFamilyIndex);
+	NEURUS_LOG("[UploadManager] Created with transfer queue family " << transferQueueFamily);
 }
 
 UploadManager::~UploadManager()
@@ -53,6 +53,18 @@ UploadManager::~UploadManager()
 void UploadManager::WaitIdle()
 {
 	um_device->waitIdle();
+}
+
+// ---------------------------------------------------------------------------
+// LightingGPU creation (transfer queue)
+// ---------------------------------------------------------------------------
+
+std::unique_ptr<LightingGPU> UploadManager::CreateLightingGPU(
+	const vk::raii::Device& device,
+	const vk::raii::PhysicalDevice& physicalDevice)
+{
+	return std::make_unique<LightingGPU>(device, physicalDevice,
+	                                     um_transferQueue, um_transferQueueFamily);
 }
 
 MeshGPU UploadManager::UploadMesh(const Mesh& mesh)
@@ -93,14 +105,14 @@ MeshGPU UploadManager::UploadMesh(const Mesh& mesh)
 
 	// --- Create GPU buffers ---
 	auto vbo = std::make_unique<VertexBuffer>(
-		*um_device, *um_physicalDevice, um_queue, um_queueFamilyIndex,
+		*um_device, *um_physicalDevice, um_transferQueue, um_transferQueueFamily,
 		strippedVertices.data(), vertexDataSize,
 		vertexStride,
 		static_cast<uint32_t>(vertexCount),
 		"UploadMesh_VBO");
 
 	auto ibo = std::make_unique<IndexBuffer>(
-		*um_device, *um_physicalDevice, um_queue, um_queueFamilyIndex,
+		*um_device, *um_physicalDevice, um_transferQueue, um_transferQueueFamily,
 		rawMesh.indexArray.data(), indexDataSize,
 		static_cast<uint32_t>(indexCount),
 		"UploadMesh_IBO");
@@ -151,7 +163,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 
 	// --- 2. Upload equirect to GPU ---
 	auto equirectImage = Image::FromImageData(*um_device, *um_physicalDevice,
-	                                                  um_queue, um_queueFamilyIndex,
+	                                                  um_transferQueue, um_transferQueueFamily,
 	                                                  equirectData,
 	                                                  "Env_Equirect",
 	                                                  vk::ImageUsageFlagBits::eStorage);
@@ -213,7 +225,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	auto specularSampler = vk::raii::Sampler(*um_device, samplerCI);
 
 	// --- 5. Run IBL convolution ---
-	um_iblPass->Generate(um_queue, um_queueFamilyIndex, *equirectImage, *diffuseImage, *specularImage);
+	um_iblPass->Generate(um_transferQueue, um_transferQueueFamily, *equirectImage, *diffuseImage, *specularImage);
 
 	// --- 6. Wrap in Textures and return ---
 	EnvironmentGPU gpu;

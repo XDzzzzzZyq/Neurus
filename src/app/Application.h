@@ -12,6 +12,7 @@
 #include "asset/Project.h"
 #include "render/DeferredRenderer.h"
 #include "render/Screenshot.h"
+#include "render/UploadManager.h"
 #include "ui/UIManager.h"
 
 namespace neurus {
@@ -94,7 +95,8 @@ private:
 	std::unique_ptr<vk::raii::SurfaceKHR> app_surface;         // 3rd declared → destroyed 4th
 	std::unique_ptr<Screenshot>           app_screenshot;      // 4th declared → destroyed 3rd
 	std::unique_ptr<Editor>               app_editor;          // 5th declared → destroyed 2nd
-	std::unique_ptr<DeferredRenderer>     app_renderer;        // 6th declared → destroyed 1st (FIRST)
+	std::unique_ptr<UploadManager>        app_uploadManager;   // 6th declared → destroyed 1.5th
+	std::unique_ptr<DeferredRenderer>     app_renderer;        // 7th declared → destroyed 1st (FIRST)
 };
 
 } // namespace neurus
