@@ -75,6 +75,9 @@ imgui.ini
 result/
 output/
 
+# Pre-compiled third-party libraries (downloaded via make update)
+lib/
+
 # Temp
 tmp/
 temp/

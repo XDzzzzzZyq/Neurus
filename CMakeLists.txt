@@ -49,27 +49,21 @@ if(NOT Vulkan_FOUND)
 	message(FATAL_ERROR "Vulkan SDK not found. Set VULKAN_SDK environment variable.")
 endif()
 
-# Qt-Advanced-Docking-System (submodule)
-set(ADS_VERSION "4.5.0")
-set(BUILD_EXAMPLES OFF)
-set(BUILD_STATIC ON)       # Static library - no DLL deployment needed
-add_subdirectory(dep/qtadvanceddocking)
-
-# Shaderc (shader compilation library — git submodule)
-set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
-set(SHADERC_ENABLE_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(SHADERC_SKIP_INSTALL ON CACHE BOOL "" FORCE)
-set(SHADERC_ENABLE_HLSL OFF CACHE BOOL "" FORCE)
-# Shaderc's third_party CMake sets GLSLANG_ENABLE_INSTALL via a generator
-# expression ($<NOT:...>) that leaks as a truthy literal at config time,
-# causing glslang's install(EXPORT) to run and fail because SPIRV-Tools-opt
-# is not in the export set. Disable ENABLE_OPT to drop the SPIRV-Tools-opt
-# link (we don't need spirv-opt for ShaderLibrary's runtime compilation).
-set(ENABLE_OPT OFF CACHE BOOL "Enable spirv-opt capability" FORCE)
-add_subdirectory(dep/shaderc)
-
 # Qt6 (window, QML, EventBus)
 find_package(Qt6 REQUIRED COMPONENTS Core Gui GuiPrivate Quick Qml Widgets Test)
+
+# ---------------------------------------------------------------------------
+# Pre-compiled / Source Dependency Resolution
+# ---------------------------------------------------------------------------
+# Dependencies.cmake provides neurus_find_dependency() which prefers
+# pre-compiled libraries in lib/<platform>/<name>/ over source builds in
+# dep/<name>/. Run `make update` to download pre-compiled binaries.
+# ---------------------------------------------------------------------------
+include(cmake/Dependencies.cmake)
+neurus_detect_platform()
+
+neurus_find_dependency(qtadvanceddocking)
+neurus_find_dependency(shaderc)
 
 # Locate windeployqt for DLL deployment (Windows only)
 if(WIN32)
