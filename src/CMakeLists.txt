@@ -65,6 +65,9 @@ if(WIN32)
 		VS_DEBUGGER_WORKING_DIRECTORY "$(OutDir)"
 	)
 
+	# Suppress LNK4099 for pre-compiled libraries without PDBs
+	target_link_options(Neurus PRIVATE /ignore:4099)
+
 	# Deploy Qt DLLs via windeployqt (handles Core, Gui, Qml, Quick and their dependencies)
 	add_custom_command(TARGET Neurus POST_BUILD
 		COMMAND "${WINDEPLOYQT}"

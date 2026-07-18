@@ -75,4 +75,5 @@ help:
 
 update:
 	python scripts/setup_dependencies.py
+	cmake --preset default
 	@echo ""

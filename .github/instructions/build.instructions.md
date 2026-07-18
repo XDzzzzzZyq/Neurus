@@ -15,11 +15,10 @@
 git clone --recurse-submodules https://github.com/XDzzzzzZyq/Neurus.git
 cd Neurus
 
-# Download pre-compiled dependency libraries (optional but recommended)
+# Download pre-compiled dependency libraries + configure
 make update
 
-# Configure + build debug
-cmake --preset default
+# Build debug
 cmake --build build/debug
 
 # Build release

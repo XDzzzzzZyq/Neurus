@@ -49,12 +49,15 @@ with modern rendering algorithms.
 git clone --recurse-submodules https://github.com/XDzzzzzZyq/Neurus.git
 cd Neurus
 
-# Download pre-compiled third-party libraries (recommended)
+# Download pre-compiled third-party libraries + configure (recommended)
 make update
 
-# Configure and build (Debug)
-cmake --preset default
-cmake --build build/debug
+# Build Debug
+make build
+
+# Or only build the app or the test
+make app
+make test
 
 # Run the application
 ./build/debug/Neurus.exe
