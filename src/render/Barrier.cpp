@@ -163,4 +163,87 @@ void Barrier::Transition(VkCommandBuffer cmd,
 	vk::CommandBuffer(cmd).pipelineBarrier2(depInfo);
 }
 
+// ---------------------------------------------------------------------------
+// Buffer state → Vulkan mapping
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct VulkanBufferState
+{
+	vk::PipelineStageFlags2 stage;
+	vk::AccessFlags2 access;
+};
+
+VulkanBufferState ToVulkanBufferState(BufferState state)
+{
+	switch (state)
+	{
+	case BufferState::Undefined:
+		return { vk::PipelineStageFlagBits2::eTopOfPipe,
+		         vk::AccessFlagBits2::eNone };
+
+	case BufferState::HostWrite:
+		return { vk::PipelineStageFlagBits2::eHost,
+		         vk::AccessFlagBits2::eHostWrite };
+
+	case BufferState::HostRead:
+		return { vk::PipelineStageFlagBits2::eHost,
+		         vk::AccessFlagBits2::eHostRead };
+
+	case BufferState::TransferSrc:
+		return { vk::PipelineStageFlagBits2::eTransfer,
+		         vk::AccessFlagBits2::eTransferRead };
+
+	case BufferState::TransferDst:
+		return { vk::PipelineStageFlagBits2::eTransfer,
+		         vk::AccessFlagBits2::eTransferWrite };
+
+	case BufferState::ShaderRead:
+		return { vk::PipelineStageFlagBits2::eVertexShader |
+		         vk::PipelineStageFlagBits2::eFragmentShader |
+		         vk::PipelineStageFlagBits2::eComputeShader,
+		         vk::AccessFlagBits2::eShaderRead };
+
+	case BufferState::ShaderWrite:
+		return { vk::PipelineStageFlagBits2::eComputeShader,
+		         vk::AccessFlagBits2::eShaderWrite };
+
+	case BufferState::General:
+		return { vk::PipelineStageFlagBits2::eAllCommands,
+		         vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite };
+	}
+
+	return { vk::PipelineStageFlagBits2::eTopOfPipe,
+	         vk::AccessFlagBits2::eNone };
+}
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Buffer transition (state-tracked)
+// ---------------------------------------------------------------------------
+
+void Barrier::Transition(VkCommandBuffer cmd,
+                         Buffer& buffer,
+                         BufferState after)
+{
+	const BufferState before = buffer.b_state;
+
+	const auto beforeState = ToVulkanBufferState(before);
+	const auto afterState  = ToVulkanBufferState(after);
+
+	const vk::BufferMemoryBarrier2 barrier(
+		beforeState.stage, beforeState.access,
+		afterState.stage, afterState.access,
+		VK_QUEUE_FAMILY_IGNORED, VK_QUEUE_FAMILY_IGNORED,
+		buffer.buffer(),
+		0, VK_WHOLE_SIZE);
+
+	const vk::DependencyInfo depInfo({}, {}, barrier, {});
+	vk::CommandBuffer(cmd).pipelineBarrier2(depInfo);
+
+	buffer.b_state = after;
+}
+
 } // namespace neurus

@@ -1,6 +1,7 @@
 #include "MeshData.h"
 
 #include "core/Log.h"
+#include "core/Timer.h"
 
 #include <algorithm>
 #include <cmath>
@@ -326,6 +327,7 @@ void MeshData::ComputeCenter()
 
 bool MeshData::LoadObj(const std::string& path)
 {
+	NEURUS_TIMER("mesh load '" + path + "'");
 	std::ifstream file(path);
 	if (!file.is_open())
 	{

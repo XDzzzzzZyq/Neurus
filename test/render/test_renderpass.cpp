@@ -39,7 +39,7 @@ TEST(PassTypeTest, EnumValuesExist)
 
 TEST(PassTypeTest, ColorAttachmentCount_PerPassType)
 {
-	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::G_BUFFER), 4u);
+	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::G_BUFFER), 5u);
 	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::LIGHTING), 1u);
 	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::SHADOW), 0u);
 	EXPECT_EQ(Pass::ColorAttachmentCount(Pass::PassType::COMPOSITE), 1u);
@@ -67,11 +67,11 @@ TEST(PassTypeTest, PresetClearValues_G_Buffer)
 {
 	const auto clearValues = Pass::PresetClearValues(Pass::PassType::G_BUFFER);
 
-	// G_BUFFER: 4 color clear values + 1 depth clear value = 5
-	ASSERT_EQ(clearValues.size(), 5u);
+	// G_BUFFER: 5 color clear values + 1 depth clear value = 6
+	ASSERT_EQ(clearValues.size(), 6u);
 
 	// All color clear values should be black
-	for (size_t i = 0; i < 4; ++i)
+	for (size_t i = 0; i < 5; ++i)
 	{
 		EXPECT_EQ(clearValues[i].color.float32[0], 0.0f);
 		EXPECT_EQ(clearValues[i].color.float32[1], 0.0f);
@@ -80,8 +80,8 @@ TEST(PassTypeTest, PresetClearValues_G_Buffer)
 	}
 
 	// Depth clear value: 1.0f (far plane)
-	EXPECT_FLOAT_EQ(clearValues[4].depthStencil.depth, 1.0f);
-	EXPECT_EQ(clearValues[4].depthStencil.stencil, 0u);
+	EXPECT_FLOAT_EQ(clearValues[5].depthStencil.depth, 1.0f);
+	EXPECT_EQ(clearValues[5].depthStencil.stencil, 0u);
 }
 
 TEST(PassTypeTest, PresetClearValues_Lighting)

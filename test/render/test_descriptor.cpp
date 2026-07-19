@@ -378,8 +378,6 @@ TEST_F(DescriptorManagerTest, WriteBuffer_OnAllocatedSet_Succeeds)
 	constexpr vk::DeviceSize kBufSize = 256;
 	StagingBuffer buf(*m_device,
 	                  PhysicalDevice(),
-	                  m_queue,
-	                  m_graphicsQueueFamily,
 	                  kBufSize);
 
 	vk::DescriptorBufferInfo bufInfo = buf.GetDescriptorInfo();
@@ -415,8 +413,6 @@ TEST_F(DescriptorManagerTest, WriteBuffer_DefaultType_UniformBuffer)
 	constexpr vk::DeviceSize kBufSize = 128;
 	StagingBuffer buf(*m_device,
 	                  PhysicalDevice(),
-	                  m_queue,
-	                  m_graphicsQueueFamily,
 	                  kBufSize);
 
 	vk::DescriptorBufferInfo bufInfo = buf.GetDescriptorInfo();

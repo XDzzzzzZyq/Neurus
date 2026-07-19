@@ -206,8 +206,9 @@ protected:
 	                                                const char* debugName)
 	{
 		ImageData imgData(pixelData.data(), width, height, PixelFormat::RGBA32F);
-		return Image::FromImageData(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
-		                            imgData, debugName, vk::ImageUsageFlagBits::eStorage);
+		return std::make_shared<Image>(Image::FromImageData(
+			*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily,
+			imgData, debugName, vk::ImageUsageFlagBits::eStorage));
 	}
 
 	// -------------------------------------------------------------------

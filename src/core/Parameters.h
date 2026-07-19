@@ -34,6 +34,7 @@ enum class ParaType : int
 
 	FLOAT,  ///< GLSL float
 	INT,    ///< GLSL int
+	UINT,   ///< GLSL uint
 	BOOL,   ///< GLSL bool
 	STRING, ///< Generic string (not a GLSL uniform type)
 
@@ -60,6 +61,7 @@ inline std::string ToString(ParaType type)
 	{
 		case ParaType::FLOAT:   return "float";
 		case ParaType::INT:     return "int";
+		case ParaType::UINT:    return "uint";
 		case ParaType::BOOL:    return "bool";
 		case ParaType::STRING:  return "string";
 		case ParaType::VEC2:    return "vec2";
@@ -82,6 +84,7 @@ inline ParaType FromString(const std::string& type)
 {
 	if (type == "float")       return ParaType::FLOAT;
 	if (type == "int")         return ParaType::INT;
+	if (type == "uint")        return ParaType::UINT;
 	if (type == "bool")        return ParaType::BOOL;
 	if (type == "string")      return ParaType::STRING;
 	if (type == "vec2")        return ParaType::VEC2;

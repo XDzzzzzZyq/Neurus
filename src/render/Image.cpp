@@ -1,5 +1,6 @@
 #include "Image.h"
 #include "Barrier.h"
+#include "buffers/StagingBuffer.h"
 #include "asset/PixelFormat.h"
 
 #include "core/Log.h"
@@ -84,43 +85,44 @@ Image::Image(const vk::raii::Device& device,
 // Static factory: FromImageData
 // ---------------------------------------------------------------------------
 
-std::shared_ptr<Image> Image::FromImageData(const vk::raii::Device& device,
-                                           const vk::raii::PhysicalDevice& physicalDevice,
-                                           vk::Queue queue,
-                                           uint32_t queueFamilyIndex,
-                                           ImageData& imageData,
-                                           const char* debugName,
-                                           vk::ImageUsageFlags extraUsage)
+Image Image::FromImageData(const vk::raii::Device& device,
+                          const vk::raii::PhysicalDevice& physicalDevice,
+                          vk::Queue queue,
+                          uint32_t queueFamilyIndex,
+                          ImageData& imageData,
+                          const char* debugName,
+                          vk::ImageUsageFlags extraUsage,
+                          uint32_t mipLevels)
 {
 	if (!imageData.IsValid())
 	{
 		NEURUS_ERR("[Image] FromImageData: invalid ImageData provided");
-		auto empty = std::make_shared<Image>();
-		empty->im_state = ImageState::Invalid;
-		return empty;
+		Image bad;
+		bad.im_state = ImageState::Invalid;
+		return bad;
 	}
 
 	const vk::Format vkFmt = ToVkFormat(imageData.GetFormat());
 	if (vkFmt == vk::Format::eUndefined)
 	{
 		NEURUS_ERR("[Image] FromImageData: unsupported PixelFormat");
-		auto empty = std::make_shared<Image>();
-		empty->im_state = ImageState::Invalid;
-		return empty;
+		Image bad;
+		bad.im_state = ImageState::Invalid;
+		return bad;
 	}
 
-	auto image = std::make_shared<Image>(
+	Image image(
 		device, physicalDevice,
 		vk::Extent2D{imageData.GetWidth(), imageData.GetHeight()},
 		vkFmt,
 		vk::ImageUsageFlagBits::eSampled |
 		    vk::ImageUsageFlagBits::eTransferDst |
 		    extraUsage,
-		1,
+		mipLevels,
 		ImageType::e2D,
 		debugName);
 
-	image->UploadImageData(device, physicalDevice, queue, queueFamilyIndex, imageData);
+	image.UploadImageData(device, physicalDevice, queue, queueFamilyIndex, imageData);
 
 	return image;
 }
@@ -382,36 +384,15 @@ void Image::UploadImageData(const vk::raii::Device& device,
 	const auto& pixelData = imageData.GetPixelData();
 	const vk::DeviceSize bufferSize = static_cast<vk::DeviceSize>(pixelData.size());
 
-	// --- Create staging buffer ---
-	vk::BufferCreateInfo stagingCI({}, bufferSize, vk::BufferUsageFlagBits::eTransferSrc);
-	vk::raii::Buffer stagingBuffer(device, stagingCI);
+	// --- Create staging buffer and upload pixel data ---
+	StagingBuffer staging(device, physicalDevice,
+	                      bufferSize, "ImageUploadStaging");
+	staging.Upload(pixelData.data(), bufferSize);
 
-	auto stagingMemReqs = stagingBuffer.getMemoryRequirements();
-	uint32_t stagingMemType = FindMemoryType(physicalDevice,
-	                                         stagingMemReqs.memoryTypeBits,
-	                                         vk::MemoryPropertyFlagBits::eHostVisible |
-	                                         vk::MemoryPropertyFlagBits::eHostCoherent);
-
-	vk::MemoryAllocateInfo stagingAlloc(stagingMemReqs.size, stagingMemType);
-	vk::raii::DeviceMemory stagingMemory(device, stagingAlloc);
-	stagingBuffer.bindMemory(*stagingMemory, 0);
-
-	// --- Copy pixel data to staging buffer ---
-	void* mapped = stagingMemory.mapMemory(0, bufferSize);
-	std::memcpy(mapped, pixelData.data(), static_cast<size_t>(bufferSize));
-	stagingMemory.unmapMemory();
-
-	// --- Transient command buffer ---
-	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
-	                                 queueFamilyIndex);
-	vk::raii::CommandPool cmdPool(device, poolCI);
-	vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-	vk::raii::CommandBuffers cmdBufs(device, allocInfo);
-
-	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+	auto& cmd = staging.BeginStaging(queueFamilyIndex);
 
 	// --- Transition image Undefined → TransferDst ---
-	Barrier::Transition(*cmdBufs[0], *this, ImageState::TransferDst);
+	Barrier::Transition(cmd, *this, ImageState::TransferDst);
 
 	// --- Copy buffer → image ---
 	{
@@ -424,25 +405,21 @@ void Image::UploadImageData(const vk::raii::Device& device,
 		copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 		copyRegion.imageExtent = vk::Extent3D(im_extent.width, im_extent.height, 1);
 
-		cmdBufs[0].copyBufferToImage(*stagingBuffer, *im_image,
-		                             vk::ImageLayout::eTransferDstOptimal,
-		                             { copyRegion });
+		cmd.copyBufferToImage(staging.buffer(), *im_image,
+		                      vk::ImageLayout::eTransferDstOptimal,
+		                      { copyRegion });
 	}
 
 	// --- Transition mip level 0 TransferDst → ShaderRead (only the uploaded mip) ---
 	{
 		vk::ImageSubresourceRange mip0Range(AspectFromFormat(im_format), 0, 1, 0, im_arrayLayers);
-		Barrier::Transition(*cmdBufs[0], *this, ImageState::ColorShaderRead, mip0Range);
+		Barrier::Transition(cmd, *this, ImageState::ColorShaderRead, mip0Range);
 	}
 
 	// Update CPU-side state tracking (other mips stay in TransferDst for mipmap generation)
 	im_state = ImageState::ColorShaderRead;
 
-	cmdBufs[0].end();
-
-	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-	queue.submit(submitInfo);
-	queue.waitIdle();
+	staging.EndStaging(queue);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,30 +457,15 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	const vk::DeviceSize imageSize = static_cast<vk::DeviceSize>(copyExtent.width) *
 	                                 copyExtent.height * bytesPerPixel * layerCount;
 
-	// --- Staging buffer ---
-	vk::BufferCreateInfo stagingCI({}, imageSize, vk::BufferUsageFlagBits::eTransferDst);
-	vk::raii::Buffer stagingBuffer(device, stagingCI);
+	// --- Staging buffer (host-visible, transfer-dst for GPU→CPU) ---
+	StagingBuffer staging(device, physicalDevice,
+	                      imageSize, "ReadImageDataStaging",
+	                      vk::BufferUsageFlagBits::eTransferDst);
 
-	auto stagingMemReqs = stagingBuffer.getMemoryRequirements();
-	uint32_t stagingMemType = FindMemoryType(physicalDevice,
-	                                         stagingMemReqs.memoryTypeBits,
-	                                         vk::MemoryPropertyFlagBits::eHostVisible |
-	                                         vk::MemoryPropertyFlagBits::eHostCoherent);
-	vk::MemoryAllocateInfo stagingAlloc(stagingMemReqs.size, stagingMemType);
-	vk::raii::DeviceMemory stagingMemory(device, stagingAlloc);
-	stagingBuffer.bindMemory(*stagingMemory, 0);
-
-	// --- Transient command buffer ---
-	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
-	                                 queueFamilyIndex);
-	vk::raii::CommandPool cmdPool(device, poolCI);
-	vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-	vk::raii::CommandBuffers cmdBufs(device, allocInfo);
-
-	cmdBufs[0].begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
+	auto& cmd = staging.BeginStaging(queueFamilyIndex);
 
 	// --- Transition the requested subresource range to TransferSrc ---
-	Barrier::Transition(*cmdBufs[0], *this, ImageState::TransferSrc, range);
+	Barrier::Transition(cmd, *this, ImageState::TransferSrc, range);
 
 	// --- Copy image to buffer ---
 	vk::BufferImageCopy copyRegion;
@@ -515,25 +477,101 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 	copyRegion.imageOffset = vk::Offset3D(0, 0, 0);
 	copyRegion.imageExtent = vk::Extent3D(copyExtent.width, copyExtent.height, 1);
 
-	cmdBufs[0].copyImageToBuffer(*im_image, vk::ImageLayout::eTransferSrcOptimal,
-	                             *stagingBuffer, { copyRegion });
+	cmd.copyImageToBuffer(*im_image, vk::ImageLayout::eTransferSrcOptimal,
+	                      staging.buffer(), { copyRegion });
 
-	vk::MemoryBarrier barrier(vk::AccessFlagBits::eTransferWrite,
-	                          vk::AccessFlagBits::eHostRead);
-	cmdBufs[0].pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
-	                           vk::PipelineStageFlagBits::eHost,
-	                           {}, {barrier}, {}, {});
+	// --- Buffer barrier: transfer write → host read ---
+	Barrier::Transition(cmd, staging, BufferState::HostRead);
 
-	cmdBufs[0].end();
+	staging.EndStaging(queue);
 
-	vk::SubmitInfo submitInfo({}, {}, {}, 1, &(*cmdBufs[0]));
-	queue.submit(submitInfo);
-	queue.waitIdle();
-
-	void* mapped = stagingMemory.mapMemory(0, imageSize);
+	void* mapped = staging.Map();
 	const PixelFormat pf = FromVkFormat(im_format);
 	ImageData result(mapped, copyExtent.width, copyExtent.height, pf, layerCount);
-	stagingMemory.unmapMemory();
+	staging.Unmap();
+
+	return result;
+}
+
+// ---------------------------------------------------------------------------
+// Single-pixel readback
+// ---------------------------------------------------------------------------
+
+std::vector<uint8_t> Image::PickPixel(const vk::raii::Device& device,
+                                       const vk::raii::PhysicalDevice& physicalDevice,
+                                       vk::Queue queue,
+                                       uint32_t queueFamilyIndex,
+                                       uint32_t x,
+                                       uint32_t y,
+                                       const vk::ImageSubresourceRange* subresourceRange) const
+{
+	const uint32_t bytesPerPixel = PixelByteSize(im_format);
+
+	if (bytesPerPixel == 0)
+	{
+		NEURUS_ERR("[Image] PickPixel: unsupported format " << vk::to_string(im_format));
+		return {};
+	}
+
+	// --- Bounds checking ---
+	if (x >= im_extent.width || y >= im_extent.height)
+	{
+		NEURUS_ERR("[Image] PickPixel: pixel (" << x << ", " << y
+		           << ") out of bounds [" << im_extent.width << "x" << im_extent.height << "]");
+		return {};
+	}
+
+	const auto range = subresourceRange
+		? *subresourceRange
+		: vk::ImageSubresourceRange(AspectFromFormat(im_format), 0, 1, 0, 1);
+
+	const vk::DeviceSize bufferSize = bytesPerPixel;
+
+	// --- Save original state for restoration after readback ---
+	const ImageState originalState = im_state;
+
+	// --- Staging buffer (host-visible, transfer-dst) ---
+	StagingBuffer staging(device, physicalDevice,
+	                      bufferSize, "PickPixelStaging",
+	                      vk::BufferUsageFlagBits::eTransferDst);
+
+	auto& cmd = staging.BeginStaging(queueFamilyIndex);
+
+	// --- Transition the subresource to TransferSrc ---
+	Barrier::Transition(cmd, const_cast<Image&>(*this), ImageState::TransferSrc, range);
+	// The 4-arg Transition does NOT update im_state.  The restore barrier below
+	// reads im_state as the "before" layout, so we must keep it in sync manually
+	// for the restore to emit TransferSrc → original (not a no-op same-state barrier).
+	const_cast<Image&>(*this).im_state = ImageState::TransferSrc;
+
+	// --- Copy single pixel (1×1 region at (x,y)) to staging buffer ---
+	vk::BufferImageCopy copyRegion;
+	copyRegion.bufferOffset      = 0;
+	copyRegion.bufferRowLength   = 0;
+	copyRegion.bufferImageHeight = 0;
+	copyRegion.imageSubresource  = vk::ImageSubresourceLayers(
+		AspectFromFormat(im_format), range.baseMipLevel, range.baseArrayLayer, range.layerCount);
+	copyRegion.imageOffset = vk::Offset3D(static_cast<int32_t>(x), static_cast<int32_t>(y), 0);
+	copyRegion.imageExtent = vk::Extent3D(1, 1, 1);
+
+	cmd.copyImageToBuffer(*im_image, vk::ImageLayout::eTransferSrcOptimal,
+	                      staging.buffer(), { copyRegion });
+
+	// --- Buffer barrier: transfer write → host read ---
+	Barrier::Transition(cmd, staging, BufferState::HostRead);
+
+	// --- Restore the image subresource back to its original state ---
+	// Done before EndStaging so it's part of the same submission (one submit + one waitIdle).
+	Barrier::Transition(cmd, const_cast<Image&>(*this), originalState, range);
+	const_cast<Image&>(*this).im_state = originalState;
+
+	staging.EndStaging(queue);
+
+	// --- Read back the single pixel ---
+	std::vector<uint8_t> result(bytesPerPixel);
+	void* mapped = staging.Map();
+	std::memcpy(result.data(), mapped, bytesPerPixel);
+	staging.Unmap();
 
 	return result;
 }
@@ -647,6 +685,7 @@ PixelFormat Image::FromVkFormat(const vk::Format format)
 	case vk::Format::eR16G16B16A16Unorm:    return PixelFormat::RGBA16U;
 	case vk::Format::eR16G16B16A16Snorm:    return PixelFormat::RGBA16SN;
 	case vk::Format::eR8Srgb:               return PixelFormat::R8S;
+	case vk::Format::eR32Uint:              return PixelFormat::R32U;
 	default:                                return PixelFormat::Undefined;
 	}
 }
@@ -670,6 +709,8 @@ uint32_t Image::PixelByteSize(const vk::Format format)
 	case vk::Format::eR8Srgb:
 		return 1;
 	case vk::Format::eD32Sfloat:
+		return 4;
+	case vk::Format::eR32Uint:
 		return 4;
 	default:
 		return 0;

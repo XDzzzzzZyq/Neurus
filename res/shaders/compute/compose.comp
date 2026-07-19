@@ -1,0 +1,75 @@
+#version 450
+// ---------------------------------------------------------------------------
+// Compose Compute Shader — final compositing + gamma correction
+//
+// Reads HDRColor (RGBA16F) and GizmoHighlight (R8), blends the highlight
+// onto the HDR output, applies gamma correction, and writes the final
+// composed image to the output attachment.
+//
+// The composed output is then blitted to the swapchain by the renderer.
+//
+// Dispatch: ceil(width/16), ceil(height/16), 1
+// ---------------------------------------------------------------------------
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// --- Inputs ---
+layout(binding = 0) uniform sampler2D gHDRColor;
+layout(binding = 1) uniform sampler2D gHighlight;
+
+// --- Output ---
+layout(rgba16f, binding = 2) uniform writeonly image2D outputComposed;
+
+// --- Push constants ---
+layout(push_constant) uniform PushConstants
+{
+	float gamma;     // gamma correction factor (default 2.2)
+};
+
+// Highlight colour: orange outline, 50 % intensity
+const vec3 kHighlightColour = vec3(1.0, 0.55, 0.0);
+const float kHighlightAlpha = 0.5;
+
+// Checkerboard background for transparent/empty regions
+const int kCheckerSize   = 8;
+const vec3 kCheckerGray1 = vec3(0.0);
+const vec3 kCheckerGray2 = vec3(0.01);
+
+void main()
+{
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 imgSize    = imageSize(outputComposed);
+
+	if (pixelCoord.x >= imgSize.x || pixelCoord.y >= imgSize.y)
+		return;
+
+	// Read inputs (RGBA for background detection)
+	vec4 hdrSample   = texelFetch(gHDRColor, pixelCoord, 0);
+	float highlight  = texelFetch(gHighlight, pixelCoord, 0).r;
+
+	// --- Background detection (alpha = 0 means no geometry rendered) ---
+	bool isBackground = (hdrSample.a < 0.01);
+
+	if (isBackground)
+	{
+		// Checkerboard grid
+		ivec2 cell = pixelCoord / kCheckerSize;
+		bool isGray1 = (cell.x % 8 > 3) != (cell.y % 8 > 3);
+		vec3 bgColor = isGray1 ? kCheckerGray1 : kCheckerGray2;
+
+		// Gamma-correct the background too (consistent look)
+		float invGamma = 1.0 / max(gamma, 0.01);
+		bgColor = pow(max(bgColor, vec3(0.0)), vec3(invGamma));
+		imageStore(outputComposed, pixelCoord, vec4(bgColor, 1.0));
+		return;
+	}
+
+	// --- Foreground: blend highlight on top of HDR colour ---
+	vec3 composed = mix(hdrSample.rgb, kHighlightColour, highlight * kHighlightAlpha);
+
+	// Gamma correction
+	float invGamma = 1.0 / max(gamma, 0.01);
+	composed = pow(max(composed, vec3(0.0)), vec3(invGamma));
+
+	imageStore(outputComposed, pixelCoord, vec4(composed, 1.0));
+}

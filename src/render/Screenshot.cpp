@@ -45,6 +45,7 @@ static PixelFormat vkFormatToPixelFormat(vk::Format format)
 	case vk::Format::eR16G16B16A16Unorm:    return PixelFormat::RGBA16U;
 	case vk::Format::eR16G16B16A16Snorm:    return PixelFormat::RGBA16SN;
 	case vk::Format::eR8Srgb:               return PixelFormat::R8S;
+	case vk::Format::eR32Uint:              return PixelFormat::R32U;
 	default:                                return PixelFormat::Undefined;
 	}
 }
@@ -72,6 +73,8 @@ static uint32_t vkFormatByteSize(vk::Format format)
 	case vk::Format::eR8Srgb:
 		return 1;
 	case vk::Format::eD32Sfloat:
+		return 4;
+	case vk::Format::eR32Uint:
 		return 4;
 	default:
 		return 0;
@@ -704,6 +707,7 @@ int Screenshot::CaptureAllAttachments(const vk::raii::Device& device,
 		AttachmentName::Normal,
 		AttachmentName::Albedo,
 		AttachmentName::MetallicRoughness,
+		AttachmentName::IDBuffer,
 		AttachmentName::HDRColor,
 		AttachmentName::SSAO,
 		AttachmentName::SSR,

@@ -9,6 +9,7 @@ layout(location = 2) in vec2 inUV;
 layout(location = 0) out vec3 fragWorldPos;
 layout(location = 1) out vec3 fragNormalVS;
 layout(location = 2) out vec2 fragUV;
+layout(location = 3) flat out uint fragObjectID;
 
 // --- Camera UBO (set 0, binding 0) ---
 layout(set = 0, binding = 0) uniform CameraUBO
@@ -22,6 +23,7 @@ layout(push_constant) uniform PushConstants
 {
 	mat4 model;
 	mat4 normalMatrix;  // mat3 stored as mat4 for 16-byte alignment
+	uint objectID;
 } pc;
 
 void main()
@@ -37,4 +39,7 @@ void main()
 	fragNormalVS = normalize(mat3(camera.view) * mat3(pc.normalMatrix) * inNormal);
 
 	fragUV = inUV;
+
+	// Forward objectID to fragment shader for ID buffer rasterization
+	fragObjectID = pc.objectID;
 }

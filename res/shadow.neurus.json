@@ -35,8 +35,8 @@
                                         "z": 1.0
                                     }
                                 },
-                                "cam_w": 1144.0,
-                                "cam_h": 679.0,
+                                "cam_w": 935.0,
+                                "cam_h": 656.0,
                                 "cam_pers": 60.0,
                                 "cam_near": 0.10000000149011612,
                                 "cam_far": 100.0,
@@ -340,10 +340,11 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.0020000000949949028,
+            "r_shadow_bias": 0.002,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
-            "r_sample_pf": 128
+            "r_sample_pf": 128,
+            "r_transparent": true
         }
     }
 }

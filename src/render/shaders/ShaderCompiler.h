@@ -14,7 +14,7 @@ namespace neurus {
  * Owns a single shaderc::Compiler instance and a persistent set of
  * shaderc::CompileOptions that can be modified via the public API.
  *
- * This class is **internal** to src/render/shaders/ — only ShaderLibrary
+ * This class is **internal** to src/render/shaders/ - only ShaderLibrary
  * should instantiate or use it.  Renderer passes and DeferredRenderer
  * never see this type.
  *
@@ -36,7 +36,7 @@ public:
 	ShaderCompiler();
 	~ShaderCompiler() = default;
 
-	// Non-copyable — owns internal glslang state
+	// Non-copyable - owns internal glslang state
 	ShaderCompiler(const ShaderCompiler&) = delete;
 	ShaderCompiler& operator=(const ShaderCompiler&) = delete;
 
@@ -71,9 +71,9 @@ public:
 	/**
 	 * @brief Sets the optimization level for subsequent compilations.
 	 *
-	 * shaderc_optimization_level_zero     — no optimization
-	 * shaderc_optimization_level_size     — smallest code
-	 * shaderc_optimization_level_performance — fastest code
+	 * shaderc_optimization_level_zero     - no optimization
+	 * shaderc_optimization_level_size     - smallest code
+	 * shaderc_optimization_level_performance - fastest code
 	 */
 	void SetOptimizationLevel(shaderc_optimization_level level);
 

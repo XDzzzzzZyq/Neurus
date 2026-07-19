@@ -9,9 +9,11 @@
 
 #include "RenderShader.h"
 
-#include "ShaderCompiler.h"
 #include "ShaderParser.h"
+#include "ShaderGenerator.h"
+#include "ShaderCompiler.h"
 #include "core/Log.h"
+#include "core/Timer.h"
 
 #include <shaderc/shaderc.hpp>
 
@@ -55,6 +57,7 @@ RenderShader::RenderShader(const std::string& name,
 
 bool RenderShader::Compile(ShaderCompiler& compiler)
 {
+	NEURUS_TIMER("shader compile '" + m_name + "'");
 	NEURUS_LOG("[RenderShader] Compiling '" << m_name << "'...");
 
 	// Reset state before compilation
@@ -196,7 +199,7 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 	// -- Re-generate GLSL if the struct has changed --
 	if (shaderStruct.is_struct_changed)
 	{
-		shaderStruct.GenerateShader();
+		ShaderGenerator::Generate(shaderStruct);
 		// is_struct_changed is now false (cleared by GenerateShader)
 	}
 
@@ -209,7 +212,7 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 	}
 
 	// -- Generate GLSL --
-	std::string glsl = shaderStruct.GenerateShader();
+	std::string glsl = ShaderGenerator::Generate(shaderStruct);
 
 	// -- Compile GLSL to SPIR-V --
 	spirv = compiler.CompileGlslToSpv(
@@ -297,15 +300,20 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 	const std::string stageName = Shader::TypeToString(type);
 
 	// -- 1. Parse GLSL source file into ShaderStruct IR --
-	if (!ShaderParser::ParseShaderFile(filepath, type, shaderStruct))
 	{
-		m_errorMessage = "Failed to parse shader file: " + filepath;
-		NEURUS_ERR("[RenderShader] " << m_errorMessage);
-		return false;
+		NEURUS_TIMER("shader parse (" + stageName + ")");
+		if (!ShaderParser::ParseShaderFile(filepath, type, shaderStruct))
+		{
+			m_errorMessage = "Failed to parse shader file: " + filepath;
+			NEURUS_ERR("[RenderShader] " << m_errorMessage);
+			return false;
+		}
+		NEURUS_LOG("[RenderShader] " << stageName << " parse complete: " << filepath);
 	}
 
 	// -- 2. Generate Vulkan GLSL from the IR --
-	std::string glsl = shaderStruct.GenerateShader();
+	NEURUS_TIMER("shader generate (" + stageName + ")");
+	std::string glsl = ShaderGenerator::Generate(shaderStruct);
 
 	if (glsl.empty())
 	{
@@ -326,6 +334,7 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 		m_errorMessage = "SPIR-V compilation failed for " + stageName
 			+ " stage: " + compiler.GetErrorMessage();
 		NEURUS_ERR("[RenderShader] " << m_errorMessage);
+		NEURUS_ERR("[RenderShader] Generated GLSL (" << stageName << "):\n" << glsl);
 		return false;
 	}
 

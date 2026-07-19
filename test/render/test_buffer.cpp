@@ -56,8 +56,6 @@ TEST_F(BufferTest, StagingBuffer_Create_Succeeds)
 	ASSERT_NO_THROW({
 		StagingBuffer buf(*m_device,
 		                  PhysicalDevice(),
-		                  m_queue,
-		                  m_graphicsQueueFamily,
 		                  kSize);
 		EXPECT_EQ(buf.size(), kSize);
 		EXPECT_NE(buf.buffer(), vk::Buffer{});
@@ -80,8 +78,6 @@ TEST_F(BufferTest, StagingBuffer_MapWriteThenRead)
 
 	StagingBuffer buf(*m_device,
 	                  PhysicalDevice(),
-	                  m_queue,
-	                  m_graphicsQueueFamily,
 	                  kSize);
 
 	// Direct Map + write
@@ -117,8 +113,6 @@ TEST_F(BufferTest, StagingBuffer_Upload_DataRoundtrips)
 
 	StagingBuffer buf(*m_device,
 	                  PhysicalDevice(),
-	                  m_queue,
-	                  m_graphicsQueueFamily,
 	                  kSize);
 
 	// Upload via Upload (Map + memcpy + Unmap internally)

@@ -31,6 +31,15 @@ enum class AttachmentName
 	SSAO,               ///< Screen-space ambient occlusion (R8)
 	SSR,                ///< Screen-space reflections (RGBA16F)
 
+	// --- ID ---
+	IDBuffer,           ///< Per-pixel object ID (R32_UINT)
+
+	// --- Gizmo ---
+	GizmoHighlight,     ///< Selected-object edge highlight (R8_UNORM)
+
+	// --- Composite ---
+	ComposedOutput,     ///< Final composed output before swapchain blit (RGBA16F)
+
 	// --- Shadow ---
 	ShadowDepth,        ///< Point light shadow depth cubemap (D32_SFLOAT, eCube)
 

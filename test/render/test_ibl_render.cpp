@@ -165,9 +165,10 @@ protected:
 		const int envId = m_env->GetObjectID();
 
 		// 1. Upload equirect to GPU
-		auto equirectImage = Image::FromImageData(dev, pd, m_queue, m_graphicsQueueFamily,
-		                                                  imgData, "Env_Equirect",
-		                                                  vk::ImageUsageFlagBits::eStorage);
+		auto equirectImage = std::make_shared<Image>(Image::FromImageData(
+			dev, pd, m_queue, m_graphicsQueueFamily,
+			imgData, "Env_Equirect",
+			vk::ImageUsageFlagBits::eStorage));
 		ASSERT_NE(equirectImage->State(), ImageState::Invalid) << "Failed to upload equirect";
 
 		// 2. Create cubemap Images
@@ -509,9 +510,10 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		const int envId = m_env->GetObjectID();
 
 		// 1. Upload equirect to GPU
-		auto equirectImage = Image::FromImageData(device, physDev, m_queue, m_graphicsQueueFamily,
-		                                                  imgData, "Env_Equirect",
-		                                                  vk::ImageUsageFlagBits::eStorage);
+		auto equirectImage = std::make_shared<Image>(Image::FromImageData(
+			device, physDev, m_queue, m_graphicsQueueFamily,
+			imgData, "Env_Equirect",
+			vk::ImageUsageFlagBits::eStorage));
 		ASSERT_NE(equirectImage->State(), ImageState::Invalid) << "Failed to upload equirect";
 
 		// 2. Create cubemap Images

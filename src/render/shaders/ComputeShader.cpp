@@ -6,6 +6,7 @@
 #include "ComputeShader.h"
 
 #include "ShaderCompiler.h"
+#include "ShaderGenerator.h"
 #include "ShaderModule.h"
 #include "ShaderParser.h"
 
@@ -47,7 +48,7 @@ bool ComputeShader::Compile(ShaderCompiler& compiler)
 	}
 
 	// -- Step 2: Generate Vulkan GLSL from the IR --
-	m_generatedSource = m_struct.GenerateShader();
+	m_generatedSource = ShaderGenerator::Generate(m_struct);
 	m_source = m_generatedSource; // Update base class source
 
 	// -- Step 3: Compile GLSL to SPIR-V --
@@ -114,7 +115,7 @@ void ComputeShader::GetWorkgroupSize(uint32_t& x, uint32_t& y, uint32_t& z) cons
 bool ComputeShader::Recompile(ShaderCompiler& compiler)
 {
 	// Re-generate GLSL from the current IR (may have been modified externally)
-	m_generatedSource = m_struct.GenerateShader();
+	m_generatedSource = ShaderGenerator::Generate(m_struct);
 	m_source = m_generatedSource;
 
 	// Re-compile to SPIR-V

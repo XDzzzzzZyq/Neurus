@@ -71,7 +71,7 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	BuildPipeline(device, "GeometryPass");
 
 	NEURUS_LOG("[GeometryPass] shader=" << (p_renderShader ? "OK" : "FAIL")
-	          << " colorAttachments=4"
+	          << " colorAttachments=5"
 	          << " depthAttachments=1"
 	          << " vertexStride=" << p_vertexLayout.GetStride());
 }
@@ -112,9 +112,10 @@ void GeometryPass::BuildPipeline(const vk::raii::Device& device,
 		vk::Format::eR16G16B16A16Sfloat,  // Normal
 		vk::Format::eR8G8B8A8Srgb,        // Albedo
 		vk::Format::eR8G8B8A8Unorm,       // MetallicRoughness
+		vk::Format::eR32Uint,             // IDBuffer
 	};
 
-	// --- Colour blend: 4 attachments, no blending (write all channels) ---
+	// --- Colour blend: 5 attachments, no blending (write all channels) ---
 	vk::PipelineColorBlendAttachmentState blendState;
 	blendState.blendEnable = VK_FALSE;
 	blendState.colorWriteMask =
@@ -123,9 +124,9 @@ void GeometryPass::BuildPipeline(const vk::raii::Device& device,
 		vk::ColorComponentFlagBits::eB |
 		vk::ColorComponentFlagBits::eA;
 
-	// --- Push constant range: model + normalMatrix (vertex stage only) ---
+	// --- Push constant range: model + normalMatrix + objectID (vertex + fragment stages) ---
 	std::vector<vk::PushConstantRange> pushConstantRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
+		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
 		                      0,
 		                      sizeof(MeshPushConstants))
 	};
@@ -149,6 +150,7 @@ void GeometryPass::BuildPipeline(const vk::raii::Device& device,
 			                  vk::FrontFace::eClockwise)
 			.SetMultisampling()
 			.SetDepthStencil(true, true, vk::CompareOp::eLess)
+			.AddColorBlendAttachment(blendState)
 			.AddColorBlendAttachment(blendState)
 			.AddColorBlendAttachment(blendState)
 			.AddColorBlendAttachment(blendState)
@@ -181,15 +183,16 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	p_cameraUBO.Upload(cameraData);
 
 	// --- 2. Collect G-Buffer attachment image views ---
-	const std::array<AttachmentName, 4> gBufferColorAttachments = {
+	const std::array<AttachmentName, 5> gBufferColorAttachments = {
 		AttachmentName::Position,
 		AttachmentName::Normal,
 		AttachmentName::Albedo,
 		AttachmentName::MetallicRoughness,
+		AttachmentName::IDBuffer,
 	};
 
 	std::vector<vk::ImageView> colorViews;
-	colorViews.reserve(4);
+	colorViews.reserve(5);
 	for (const auto& attName : gBufferColorAttachments)
 	{
 		auto& att = cache.GetAttachment(attName, renderExtent);
@@ -244,9 +247,10 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			const glm::mat4 model = mesh->GetModelMatrix();
 			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
 
-			MeshPushConstants pushConstants{model, normalMat};
+			MeshPushConstants pushConstants{model, normalMat,
+			                               static_cast<uint32_t>(mesh->GetObjectID())};
 			cmdBuf.pushConstants<MeshPushConstants>(*p_pipelines[0].pipelineLayout,
-			                                    vk::ShaderStageFlagBits::eVertex,
+			                                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
 			                                    0, pushConstants);
 
 			const vk::DeviceSize vbOffset = 0;
@@ -275,7 +279,7 @@ void GeometryPass::BeginPass(vk::CommandBuffer cmdBuf,
 	if (colorCount != Pass::ColorAttachmentCount(Pass::PassType::G_BUFFER))
 	{
 		throw std::invalid_argument(
-			"GeometryPass::BeginPass: expected 4 color attachments, got "
+			"GeometryPass::BeginPass: expected " + std::to_string(Pass::ColorAttachmentCount(Pass::PassType::G_BUFFER)) + " color attachments, got "
 			+ std::to_string(colorCount));
 	}
 

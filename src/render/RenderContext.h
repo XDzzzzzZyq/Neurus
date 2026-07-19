@@ -53,7 +53,6 @@ struct RenderContext
 	/// @brief Opaque pointer to RenderConfig (lifetime managed by Editor/UI layer).
 	/// Passes cast to RenderConfig* to read quality/feature flags set by the user.
 	void* config = nullptr;
-
 };
 
 } // namespace neurus

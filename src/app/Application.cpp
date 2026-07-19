@@ -346,7 +346,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
 	}
 
-	// --- Viewport signals: resize + camera control ---
+	// --- Viewport signals: resize + camera control + pixel selection ---
 	if (auto* viewport = app_mainWindow->GetPanel<neurus::Viewport>())
 	{
 		// Handle Viewport resize
@@ -360,6 +360,35 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 
 		// Forward mouse scroll to Editor for camera zoom
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseScrolled);
+
+		// Handle left-click for pixel-perfect object selection via IDBuffer
+		QObject::connect(viewport, &neurus::Viewport::mousePressed,
+		                 [this, viewport](const neurus::MousePressEvent& e) {
+		                     if (e.button != Input::MouseButton::Left)
+		                         return;
+
+		                     const auto renderExtent = app_renderer->GetExtent();
+		                     const int   widgetW     = viewport->width();
+		                     const int   widgetH     = viewport->height();
+
+		                     // Map from logical (Qt widget) to physical (Vulkan) pixels
+		                     uint32_t px = static_cast<uint32_t>(
+		                         e.position.x * renderExtent.width  / static_cast<float>(widgetW));
+		                     uint32_t py = static_cast<uint32_t>(
+		                         e.position.y * renderExtent.height / static_cast<float>(widgetH));
+
+		                     // Read the object ID from the IDBuffer at the click
+		                     // position (GPU → CPU readback via PickPixel).
+		                     uint32_t objectID = app_renderer->ReadIDBufferPixel(px, py);
+
+		                     // Forward to Editor; objectID=0 means background
+		                     // (handled by SelectObject → ClearSelection).
+		                     ObjectSelected selEvent {
+		                         static_cast<int>(objectID),
+		                         static_cast<int>(e.modifiers)
+		                     };
+		                     app_editor->OnUIEvent(selEvent);
+		                 });
 	}
 
 	// Handle RenderConfig changes → Editor (via ConnectUIEvent → OnUIEvent → EventQueue)

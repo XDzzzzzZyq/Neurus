@@ -12,7 +12,7 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Image.h/cpp` - GPU image with ImageState tracking (including Invalid) and mipmap generation
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
-- `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer
+- `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
 - `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 - `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
@@ -164,7 +164,13 @@ LightingPass (compute: reads G-Buffer + AO + shadow intensity array,
 IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
     │
     ▼
-Blit HDRColor → Swapchain (vkCmdBlitImage)
+GizmoPass (compute: reads IDBuffer, 3×3 edge detection for activeObjectId, writes R8 highlight)
+    │
+    ▼
+ComposePass (compute: blends GizmoHighlight onto HDRColor, applies gamma correction, writes ComposedOutput)
+    │
+    ▼
+Blit ComposedOutput → Swapchain (vkCmdBlitImage)
 ```
 
 ### ImageState & Barrier Convention
@@ -208,6 +214,30 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Lighting**: Ambient term multiplied by `(1.0 - ao)` so occluded areas receive less ambient light
 - **Radius**: Default 0.15 (appropriate for [-1, 1] scene scale)
 
+### GizmoPass Convention
+- **IDBuffer**: Reads `VK_FORMAT_R32_UINT` attachment at binding 0, written by GeometryPass
+  (stores `objectId` as a 32-bit unsigned integer per pixel).
+- **Edge detection**: 3×3 Laplacian-style kernel over neighboring IDBuffer pixels.
+  A pixel is highlighted when at least one neighbor has a different objectId AND
+  the center pixel's objectId matches `activeObjectId` (push constant).
+- **Output**: `VK_FORMAT_R8_UNORM` attachment (`AttachmentName::GizmoHighlight`) at binding 1.
+  Highlighted pixels = 255 (edge of selected object); all others = 0.
+- **Push constant**: `uint32_t activeObjectId` — set to the currently selected object ID
+  from `RenderContext::activeObjectId`. When `activeObjectId == 0`, the pass early-outs
+  (no highlight written).
+
+### ComposePass Convention
+- **Inputs**: Reads `HDRColor` (binding 0, `R16G16B16A16_SFLOAT`) and
+  `GizmoHighlight` (binding 1, `R8_UNORM`).
+- **Highlight blending**: When a pixel's highlight value > 0, an orange highlight
+  (`rgb(1.0, 0.5, 0.0)`) is blended at 50% alpha onto the HDR color:
+  `composed = mix(hdr, highlightColor, highlight * 0.5)`.
+- **Gamma correction**: After highlight blending, applies `pow(color, 1.0 / gamma)` where
+  `gamma` is read from `RenderConfig::r_gamma` (default 1.0) via the push constant
+  `float gamma`.
+- **Output**: `ComposedOutput` (`R16G16B16A16_SFLOAT`) at binding 2, the final
+  framebuffer before swapchain blit.
+
 ### Sun Shadow Convention
 - **Projection**: Orthographic (`glm::ortho()`) with configurable left/right/bottom/top planes and near/far planes
 - **Depth range**: NDC Z in `[0, 1]` (Vulkan convention, requires `GLM_FORCE_DEPTH_ZERO_TO_ONE`)
@@ -250,6 +280,8 @@ assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
 | HDRColor | R16G16B16A16_SFLOAT | (0,0,0,0) | Lighting output |
 | SSAO | R8_UNORM | 0 (no occlusion) | Screen-space ambient occlusion |
 | SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
+| GizmoHighlight | R8_UNORM | 0 | Selected-object edge highlight (GizmoPass output) |
+| ComposedOutput | R16G16B16A16_SFLOAT | (0,0,0,0) | Final composed output before swapchain blit (ComposePass output) |
 | ShadowMap | D32_SFLOAT | 1.0 | Per-light shadow depth (RenderCache-owned). Cubemap (6-layer 2D_ARRAY, 1024×1024) for point lights; 2D (2048×2048) for sun lights |
 | ShadowIntensity | R8_UNORM | 0 (no shadow) | Layered 2D_ARRAY, one layer per shadow-casting light (RenderCache-owned) |
 

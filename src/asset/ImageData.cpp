@@ -142,6 +142,8 @@ ImageData::ImageData(const void* data, uint32_t w, uint32_t h, PixelFormat fmt,
 bool ImageData::SavePNG(const std::string& path, bool remapSigned) const
 {
 	const uint32_t channels = ChannelCount();
+	// R32U conversion produces 4-channel RGBA, override channel count
+	const uint32_t outChannels = (im_format == PixelFormat::R32U) ? 4u : channels;
 	std::vector<uint8_t> pngData;
 
 	if (im_format == PixelFormat::RGBA16F ||
@@ -149,6 +151,22 @@ bool ImageData::SavePNG(const std::string& path, bool remapSigned) const
 	    im_format == PixelFormat::RGBA16SN)
 	{
 		pngData = ConvertHalfToU8(im_pixelData.data(), im_width, im_height, remapSigned);
+	}
+	else if (im_format == PixelFormat::R32U)
+	{
+		// Convert R32_UINT → RGBA8: map each uint32 ID to a visible colour.
+		const auto* src = static_cast<const uint32_t*>(
+			static_cast<const void*>(im_pixelData.data()));
+		const size_t pixelCount = static_cast<size_t>(im_width) * im_height;
+		pngData.resize(pixelCount * 4);
+		for (size_t i = 0; i < pixelCount; ++i)
+		{
+			const uint32_t id = src[i];
+			pngData[i * 4 + 0] = static_cast<uint8_t>(id & 0xFF);          // R
+			pngData[i * 4 + 1] = static_cast<uint8_t>((id >> 8) & 0xFF);   // G
+			pngData[i * 4 + 2] = static_cast<uint8_t>((id >> 16) & 0xFF);  // B
+			pngData[i * 4 + 3] = (id == 0) ? 0 : 255;                     // A=0 for background
+		}
 	}
 	else
 	{
@@ -158,11 +176,11 @@ bool ImageData::SavePNG(const std::string& path, bool remapSigned) const
 	}
 
 	EnsureDirectory(path);
-	const int stride = static_cast<int>(im_width) * static_cast<int>(channels);
+	const int stride = static_cast<int>(im_width) * static_cast<int>(outChannels);
 	return stbi_write_png(path.c_str(),
 	                      static_cast<int>(im_width),
 	                      static_cast<int>(im_height),
-	                      static_cast<int>(channels),
+	                      static_cast<int>(outChannels),
 	                      pngData.data(), stride) != 0;
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Image.h"
+#include "buffers/Buffer.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -71,7 +72,7 @@ public:
 	 * of the image's default m_subresourceRange.  Useful for per-mip or per-face
 	 * transitions (e.g. during mipmap generation).
 	 *
-	 * @note This does NOT update image.m_state — callers should manage state
+	 * @note This does NOT update image.im_state — callers should manage state
 	 *       manually for partial transitions or use the simpler overload.
 	 *
 	 * @param cmd               Command buffer handle (raw VkCommandBuffer).
@@ -123,6 +124,32 @@ public:
 	                       const vk::ImageSubresourceRange& subresourceRange)
 	{
 		Transition(*cmd, image, before, after, subresourceRange);
+	}
+
+	// --- Buffer barriers (state-tracked) ---
+
+	/**
+	 * @brief Records a buffer memory barrier, tracking state.
+	 *
+	 * Reads buffer.State() as the source, emits a vk::BufferMemoryBarrier2
+	 * mapping @p after through ToVulkanBufferState(), and updates
+	 * buffer.b_state to @p after.
+	 *
+	 * Follows the same pattern as Transition(Image&, ...).
+	 *
+	 * @param cmd    Command buffer (raw VkCommandBuffer).
+	 * @param buffer Buffer to transition.
+	 * @param after  Target logical buffer state.
+	 */
+	static void Transition(VkCommandBuffer cmd,
+	                       Buffer& buffer,
+	                       BufferState after);
+
+	static void Transition(const vk::raii::CommandBuffer& cmd,
+	                       Buffer& buffer,
+	                       BufferState after)
+	{
+		Transition(*cmd, buffer, after);
 	}
 };
 

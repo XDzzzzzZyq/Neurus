@@ -18,6 +18,8 @@
 #include "passes/SSAOPass.h"
 #include "passes/ShadowDepthPass.h"
 #include "passes/ShadowIntensityPass.h"
+#include "passes/GizmoPass.h"
+#include "passes/ComposePass.h"
 
 #include "scene/Light.h"
 #include "scene/Scene.h"
@@ -104,6 +106,26 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		r_shadowIntensityPass = shadowIntensity.get();
 		r_passes.push_back(std::move(shadowIntensity));
 		NEURUS_LOG("[DeferredRenderer] ShadowIntensityPass created");
+	}
+
+	// --- 8c. Create gizmo highlight pass (3×3 IDBuffer edge detection) ---
+	{
+		auto gizmoPass = std::make_unique<GizmoPass>(
+			device, physicalDevice,
+			kMaxFramesInFlight);
+		r_gizmoPass = gizmoPass.get();
+		r_passes.push_back(std::move(gizmoPass));
+		NEURUS_LOG("[DeferredRenderer] GizmoPass created");
+	}
+
+	// --- 8d. Create compose pass (highlight blend + gamma correction) ---
+	{
+		auto composePass = std::make_unique<ComposePass>(
+			device, physicalDevice,
+			kMaxFramesInFlight);
+		r_composePass = composePass.get();
+		r_passes.push_back(std::move(composePass));
+		NEURUS_LOG("[DeferredRenderer] ComposePass created");
 	}
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
@@ -267,6 +289,34 @@ void DeferredRenderer::WaitIdle()
 	r_device.waitIdle();
 }
 
+uint32_t DeferredRenderer::ReadIDBufferPixel(uint32_t x, uint32_t y)
+{
+	const vk::Extent2D extent = GetExtent();
+
+	// Clamp or reject out-of-bounds clicks
+	if (x >= extent.width || y >= extent.height)
+	{
+		return 0;
+	}
+
+	auto& idBuffer = r_renderCache->GetAttachment(AttachmentName::IDBuffer, extent);
+
+	// PickPixel handles its own transient command buffer, readback, and state
+	// restoration — the image is left in its original state on return.
+	auto bytes = idBuffer.PickPixel(r_device, r_physicalDevice,
+	                                 r_graphicsQueue, r_queueFamilyIndex,
+	                                 x, y);
+
+	if (bytes.size() < sizeof(uint32_t))
+	{
+		return 0;
+	}
+
+	uint32_t objectID;
+	std::memcpy(&objectID, bytes.data(), sizeof(objectID));
+	return objectID;
+}
+
 void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
 {
 	uint32_t oldGen = r_swapchain->generation();
@@ -386,22 +436,26 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
 	r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);
 
-	// --- Phase 4: Blit HDRColor → swapchain image ---
-	auto& hdrColor = r_renderCache->GetAttachment(AttachmentName::HDRColor, extent);
-	const vk::Image hdrImage = *hdrColor.ImageHandle();
+	// --- Phase 3b: GizmoPass → compute edge highlight for active selection ---
+	r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);
+
+	// --- Phase 3c: ComposePass → blend highlight + gamma correction → ComposedOutput ---
+	r_composePass->Record(cmdBuf, *r_renderCache, ctx);
+
+	// --- Phase 4: Blit ComposedOutput → swapchain image ---
+	auto& composedOutput = r_renderCache->GetAttachment(AttachmentName::ComposedOutput, extent);
+	const vk::Image composedImage = *composedOutput.ImageHandle();
 	const vk::Image swapchainImage = r_swapchain->images()[imageIndex];
 
-	// Barrier 1: HDRColor GENERAL → TRANSFER_SRC_OPTIMAL
+	// Barrier 1: ComposedOutput is already in TransferSrc from ComposePass
 	// Barrier 2: Swapchain image UNDEFINED → TRANSFER_DST_OPTIMAL
 	{
-		Barrier::Transition(*cmdBuf, hdrColor, ImageState::TransferSrc);
-
 		Barrier::Transition(*cmdBuf, swapchainImage,
 			ImageState::Undefined, ImageState::TransferDst,
 			vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 	}
 
-	// --- Blit: HDRColor → swapchain image ---
+	// --- Blit: ComposedOutput → swapchain image ---
 	{
 		vk::ImageBlit blitRegion;
 		blitRegion.srcSubresource = vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1);
@@ -413,7 +467,7 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 		blitRegion.dstOffsets[1] = vk::Offset3D(static_cast<int32_t>(extent.width),
 		                                         static_cast<int32_t>(extent.height), 1);
 
-		cmdBuf.blitImage(hdrImage,
+		cmdBuf.blitImage(composedImage,
 		                 vk::ImageLayout::eTransferSrcOptimal,
 		                 swapchainImage,
 		                 vk::ImageLayout::eTransferDstOptimal,
