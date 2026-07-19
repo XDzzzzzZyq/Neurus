@@ -363,24 +363,31 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 
 		// Handle left-click for pixel-perfect object selection via IDBuffer
 		QObject::connect(viewport, &neurus::Viewport::mousePressed,
-		                 [this](const neurus::MousePressEvent& e) {
+		                 [this, viewport](const neurus::MousePressEvent& e) {
 		                     if (e.button != Input::MouseButton::Left)
 		                         return;
 
+		                     const auto renderExtent = app_renderer->GetExtent();
+		                     const int   widgetW     = viewport->width();
+		                     const int   widgetH     = viewport->height();
+
+		                     // Map from logical (Qt widget) to physical (Vulkan) pixels
+		                     uint32_t px = static_cast<uint32_t>(
+		                         e.position.x * renderExtent.width  / static_cast<float>(widgetW));
+		                     uint32_t py = static_cast<uint32_t>(
+		                         e.position.y * renderExtent.height / static_cast<float>(widgetH));
+
 		                     // Read the object ID from the IDBuffer at the click
 		                     // position (GPU → CPU readback via PickPixel).
-		                     uint32_t objectID = app_renderer->ReadIDBufferPixel(
-		                         static_cast<uint32_t>(e.position.x),
-		                         static_cast<uint32_t>(e.position.y));
+		                     uint32_t objectID = app_renderer->ReadIDBufferPixel(px, py);
 
-		                     // Forward selection to Editor (0 = background, skip)
+		                     // Forward to Editor; objectID=0 means background
+		                     // (handled by SelectObject → ClearSelection).
 		                     ObjectSelected selEvent {
 		                         static_cast<int>(objectID),
 		                         static_cast<int>(e.modifiers)
-		                      };
+		                     };
 		                     app_editor->OnUIEvent(selEvent);
-
-							 NEURUS_LOG("[Selection] Mouse Position: " << e.position.x << "," << e.position.y << "| Object ID: " << objectID);
 		                 });
 	}
 

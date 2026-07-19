@@ -130,7 +130,10 @@ public:
 	 * selections.Select(). increment=true adds to the set (or makes
 	 * active if already selected); increment=false replaces entirely.
 	 *
-	 * @param objectId  Unique object identifier.
+	 * objectId=0 is reserved for "deselect all" — calls
+	 * scene.selections.ClearSelection() to clear the selection.
+	 *
+	 * @param objectId  Unique object identifier (0 = deselect all).
 	 * @param increment If true, add to selection; if false, single select.
 	 */
 	void SelectObject(int objectId, bool increment);

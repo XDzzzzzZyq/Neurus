@@ -535,6 +535,13 @@ void Editor::SelectObject(int objectId, bool increment)
 {
 	auto& scene = ed_project->GetScene();
 
+	// id=0 means background click — clear everything
+	if (objectId == 0)
+	{
+		if (!increment)	scene.selections.ClearSelection();
+		return;
+	}
+
 	auto it = scene.obj_list.find(objectId);
 	if (it == scene.obj_list.end())
 	{
