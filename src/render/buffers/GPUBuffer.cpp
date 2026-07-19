@@ -1,5 +1,6 @@
 #include "GPUBuffer.h"
 
+#include "render/Barrier.h"
 #include "core/Log.h"
 
 #include <stdexcept>
@@ -28,8 +29,6 @@ GPUBuffer::GPUBuffer(const vk::raii::Device& device,
 	             debugName);
 	b_staging = std::make_unique<StagingBuffer>(*b_device,
 		                                        *b_physicalDevice,
-		                                        b_queue,
-		                                        b_queueFamilyIndex,
 		                                        b_size,
 		                                        b_debugName.empty() ? nullptr
 		                                                            : (b_debugName + "_Staging").c_str());
@@ -70,39 +69,18 @@ void GPUBuffer::Unmap()
 {
 	b_staging->Unmap();
 
-	// --- Create transient command pool and one-shot command buffer ---
-	vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
-	                                 b_queueFamilyIndex);
-	vk::raii::CommandPool cmdPool(*b_device, poolCI);
+	auto& cmd = b_staging->BeginStaging(b_queueFamilyIndex);
 
-	vk::CommandBufferAllocateInfo allocInfo(*cmdPool,
-	                                        vk::CommandBufferLevel::ePrimary, 1);
-	vk::raii::CommandBuffers cmdBufs(*b_device, allocInfo);
-
-	// --- Record copy ---
-	vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-	cmdBufs[0].begin(beginInfo);
+	// --- Transition device-local buffer: ready to receive transfer write ---
+	Barrier::Transition(cmd, *this, BufferState::TransferDst);
 
 	vk::BufferCopy copyRegion(0, 0, b_size);
-	cmdBufs[0].copyBuffer(b_staging->buffer(), this->buffer(), copyRegion);
+	cmd.copyBuffer(b_staging->buffer(), this->buffer(), copyRegion);
 
-	// Memory barrier to ensure transfer writes are visible to all
-	// subsequent GPU operations on this buffer.
-	vk::MemoryBarrier barrier(
-		vk::AccessFlagBits::eTransferWrite,
-		vk::AccessFlagBits::eMemoryRead | vk::AccessFlagBits::eMemoryWrite);
-	cmdBufs[0].pipelineBarrier(
-		vk::PipelineStageFlagBits::eTransfer,
-		vk::PipelineStageFlagBits::eAllCommands,
-		{},
-		{barrier}, {}, {});
+	// --- Buffer barrier: transfer write → visible to all GPU operations ---
+	Barrier::Transition(cmd, *this, BufferState::General);
 
-	cmdBufs[0].end();
-
-	// --- Submit and wait for completion ---
-	vk::SubmitInfo submitInfo({}, {}, *cmdBufs[0]);
-	b_queue.submit(submitInfo);
-	b_queue.waitIdle();
+	b_staging->EndStaging(b_queue);
 }
 
 } // namespace neurus

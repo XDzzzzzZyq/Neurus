@@ -8,6 +8,27 @@
 namespace neurus {
 
 /**
+ * @brief Logical state of a GPU buffer for barrier tracking.
+ *
+ * Models the pipeline stage + access mask that the buffer's contents
+ * are in, analogous to ImageState for images but without layout tracking
+ * (buffers have no concept of image layout).
+ *
+ * Transition orderings are enforced by Barrier::Transition(Buffer&, ...).
+ */
+enum class BufferState
+{
+	Undefined,   // Initial: no valid data, any access allowed
+	HostWrite,   // CPU has written data (after Upload / Map+Unmap)
+	HostRead,    // CPU can read data (after transfer→host barrier)
+	TransferSrc, // GPU transfer source (before vkCmdCopyBufferToImage)
+	TransferDst, // GPU transfer destination (after vkCmdCopyImageToBuffer)
+	ShaderRead,  // Shader can read (uniform buffer, SSBO read)
+	ShaderWrite, // Shader can write (SSBO write)
+	General,     // All pipeline stages can read/write (after staging→device copy)
+};
+
+/**
  * @brief Virtual base class for all GPU buffer types.
  *
  * Encapsulates common buffer lifecycle: creation, memory allocation,
@@ -31,6 +52,8 @@ namespace neurus {
  */
 class Buffer
 {
+	friend class Barrier;
+
 public:
 	virtual ~Buffer() = default;
 
@@ -94,6 +117,9 @@ public:
 	/** @brief Returns the buffer size in bytes. */
 	vk::DeviceSize size() const { return b_size; }
 
+	/** @brief Returns the current logical buffer state (for barrier tracking). */
+	BufferState State() const { return b_state; }
+
 protected:
 	/**
 	 * @brief Default constructor for move operations (derived classes only).
@@ -132,6 +158,8 @@ protected:
 	vk::BufferUsageFlags b_usageFlags;
 	vk::MemoryPropertyFlags b_memoryProperties;
 	std::string b_debugName;
+
+	BufferState b_state = BufferState::Undefined;
 };
 
 } // namespace neurus

@@ -162,11 +162,12 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	}
 
 	// --- 2. Upload equirect to GPU ---
-	auto equirectImage = Image::FromImageData(*um_device, *um_physicalDevice,
-	                                                  um_transferQueue, um_transferQueueFamily,
-	                                                  equirectData,
-	                                                  "Env_Equirect",
-	                                                  vk::ImageUsageFlagBits::eStorage);
+	auto equirectImage = std::make_shared<Image>(Image::FromImageData(
+		*um_device, *um_physicalDevice,
+		um_transferQueue, um_transferQueueFamily,
+		equirectData,
+		"Env_Equirect",
+		vk::ImageUsageFlagBits::eStorage));
 	if (equirectImage->State() == ImageState::Invalid)
 	{
 		NEURUS_ERR("[UploadManager] Failed to upload equirect image to GPU");

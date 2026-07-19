@@ -249,77 +249,28 @@ Texture Texture::createFromPixelData(const vk::raii::Device& device,
 
 	try
 	{
-		// --- 1. Create Image ---
-		const vk::ImageUsageFlags usage = vk::ImageUsageFlagBits::eTransferDst
-		                                  | vk::ImageUsageFlagBits::eTransferSrc
-		                                  | vk::ImageUsageFlagBits::eSampled;
+		ImageData imageData(pixelData, width, height, Image::FromVkFormat(format));
 
-		tex.tex_image = std::make_unique<Image>(
-			device, physicalDevice,
-			vk::Extent2D{width, height}, format, usage,
-			mipLevels,
-			Image::ImageType::e2D);
-
-		// --- 2. Create staging buffer (host-visible) ---
-
-		StagingBuffer stagingBuffer(device, physicalDevice, queue, queueFamilyIndex,
-		                            dataSize);
-
-		// Copy pixel data into staging buffer
-		void* mapped = stagingBuffer.Map();
-		std::memcpy(mapped, pixelData, static_cast<size_t>(dataSize));
-		stagingBuffer.Unmap();
-
-		// --- 3. Create transient command pool and one-shot command buffer ---
-		const vk::CommandPoolCreateInfo poolCI(
-			vk::CommandPoolCreateFlagBits::eTransient, queueFamilyIndex);
-		vk::raii::CommandPool cmdPool(device, poolCI);
-
-		const vk::CommandBufferAllocateInfo allocInfo(*cmdPool, vk::CommandBufferLevel::ePrimary, 1);
-		vk::raii::CommandBuffers cmdBufs(device, allocInfo);
-
-		vk::CommandBufferBeginInfo beginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
-		cmdBufs[0].begin(beginInfo);
-
-		// --- 4. Transition all levels: UNDEFINED → TRANSFER_DST ---
-		Barrier::Transition(*cmdBufs[0], *tex.tex_image, ImageState::TransferDst);
-
-		// --- 5. Copy staging buffer → image (level 0 only) ---
-		const vk::BufferImageCopy copyRegion(
-			0,  // bufferOffset
-			0,  // bufferRowLength (tightly packed)
-			0,  // bufferImageHeight (tightly packed)
-			vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1),
-			vk::Offset3D{0, 0, 0},
-			vk::Extent3D{width, height, 1});
-
-		cmdBufs[0].copyBufferToImage(
-			stagingBuffer.buffer(),
-			tex.tex_image->ImageHandle(),
-			vk::ImageLayout::eTransferDstOptimal,
-			{ copyRegion });
-
-		// --- 6. Generate mipmaps (if requested) ---
-		// GenerateMipmaps expects all levels in TRANSFER_DST already,
-		// which they are after step 4.
+		// --- 1. Create and upload Image via FromImageData ---
 		if (generateMipmaps && mipLevels > 1)
 		{
-			tex.tex_image->GenerateMipmaps(cmdBufs[0]);
+			tex.tex_image = std::make_unique<Image>(Image::FromImageData(
+				device, physicalDevice, queue, queueFamilyIndex,
+				imageData, "Tex", vk::ImageUsageFlagBits::eTransferSrc, mipLevels));
+
+			// --- 2. Generate mipmaps ---
+			StagingBuffer staging(device, physicalDevice, 1, "TexMipStaging");
+			auto& cmd = staging.BeginStaging(queueFamilyIndex);
+			Barrier::Transition(cmd, *tex.tex_image, ImageState::TransferDst);
+			tex.tex_image->GenerateMipmaps(cmd);
+			staging.EndStaging(queue);
 		}
 		else
 		{
-			// Single mip level: transition directly to SHADER_READ_ONLY
-			Barrier::Transition(*cmdBufs[0], *tex.tex_image, ImageState::ColorShaderRead);
+			tex.tex_image = std::make_unique<Image>(Image::FromImageData(
+				device, physicalDevice, queue, queueFamilyIndex,
+				imageData, "Tex"));
 		}
-
-		cmdBufs[0].end();
-
-		// --- 7. Submit and wait ---
-		const vk::SubmitInfo submitInfo({}, {}, *cmdBufs[0]);
-		queue.submit(submitInfo);
-		queue.waitIdle();
-
-		// --- 8. Create sampler ---
 		tex.tex_sampler = createSampler(device, config, mipLevels);
 	}
 	catch (const std::exception& e)

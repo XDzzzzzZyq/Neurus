@@ -107,19 +107,20 @@ public:
 	 * @param physicalDevice  Physical device for memory allocation.
 	 * @param queue           Queue for staging upload.
 	 * @param queueFamilyIndex Queue family index for transient command pools.
-	 * @param imageData       CPU-side image data (moved in, must be valid).
+	 * @param imageData       CPU-side image data (must be valid).
 	 * @param debugName       Optional debug name for the image.
 	 * @param extraUsage      Additional usage flags (OR-ed with Sampled|TransferDst).
-	 * @return A shared pointer to the GPU Image.  Returns a shared_ptr
-	 *         containing an empty Image with ImageState::Invalid on failure.
+	 * @param mipLevels       Number of mipmap levels (default 1 = no mipmap chain).
+	 * @return A fully initialised Image, or an Image with ImageState::Invalid on failure.
 	 */
-	static std::shared_ptr<Image> FromImageData(const vk::raii::Device& device,
-	                                            const vk::raii::PhysicalDevice& physicalDevice,
-	                                            vk::Queue queue,
-	                                            uint32_t queueFamilyIndex,
-	                                            ImageData& imageData,
-	                                            const char* debugName = "Image",
-	                                            vk::ImageUsageFlags extraUsage = {});
+	static Image FromImageData(const vk::raii::Device& device,
+	                           const vk::raii::PhysicalDevice& physicalDevice,
+	                           vk::Queue queue,
+	                           uint32_t queueFamilyIndex,
+	                           ImageData& imageData,
+	                           const char* debugName = "Image",
+	                           vk::ImageUsageFlags extraUsage = {},
+	                           uint32_t mipLevels = 1);
 
 	/**
 	 * @brief Default constructor — creates an empty/invalid Image.
@@ -178,6 +179,37 @@ public:
 	                        uint32_t queueFamilyIndex,
 	                        const vk::ImageSubresourceRange* subresourceRange = nullptr,
 	                        vk::Extent2D readExtent = {});
+
+	/**
+	 * @brief Reads back a single pixel at the specified coordinates from the GPU.
+	 *
+	 * Creates a minimal staging buffer, records vkCmdCopyImageToBuffer for a
+	 * 1×1 pixel region at (@p x, @p y), submits, and waits synchronously.
+	 * Designed for viewport mouse-picking — fast enough for click events
+	 * (sub-millisecond GPU transfer + pipeline drain).
+	 *
+	 * The image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT.
+	 * The image is left in ImageState::TransferSrc on the accessed subresource;
+	 * the caller is responsible for transitioning back if needed.
+	 *
+	 * @param device            Logical device.
+	 * @param physicalDevice    Physical device for memory allocation.
+	 * @param queue             Queue for staging upload.
+	 * @param queueFamilyIndex  Queue family index for transient command pools.
+	 * @param x                 Pixel x-coordinate (0 = left edge).
+	 * @param y                 Pixel y-coordinate (0 = top edge, Vulkan convention).
+	 * @param subresourceRange  Subresource range to read.  nullptr means
+	 *                          mip level 0, layer 0 only.
+	 * @return Raw pixel bytes (size = PixelByteSize(format)), or empty vector
+	 *         on failure (OOB coordinates or unsupported format).
+	 */
+	std::vector<uint8_t> PickPixel(const vk::raii::Device& device,
+	                               const vk::raii::PhysicalDevice& physicalDevice,
+	                               vk::Queue queue,
+	                               uint32_t queueFamilyIndex,
+	                               uint32_t x,
+	                               uint32_t y,
+	                               const vk::ImageSubresourceRange* subresourceRange = nullptr) const;
 
 	// --- Getters ---
 
@@ -281,7 +313,8 @@ private:
 	 *
 	 * Creates a host-visible staging buffer, copies the pixel data to it,
 	 * records vkCmdCopyBufferToImage, submits, and waits.
-	 * Transitions: Undefined → TransferDst → (copy) → ColorShaderRead.
+	 * Transitions: Undefined → TransferDst → (copy) → ColorShaderRead (mip 0 only).
+	 * Other mip levels remain in TransferDst — ready for GenerateMipmaps().
 	 */
 	void UploadImageData(const vk::raii::Device& device,
 	                     const vk::raii::PhysicalDevice& physicalDevice,
