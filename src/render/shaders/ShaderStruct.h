@@ -343,7 +343,8 @@ public:
 	 * @return Valid Vulkan GLSL source code.  Returns a minimal stub
 	 *         (@c "#version 450 core\\nvoid main() {}") when IsEmpty().
 	 */
-	std::string GenerateShader();
+	// GenerateShader removed - use ShaderGenerator::Generate(shaderStruct) directly.
+
 
 	/** @brief Reset the static type registration table. Call between independent parse sessions. */
 	static void ResetTypeTable();

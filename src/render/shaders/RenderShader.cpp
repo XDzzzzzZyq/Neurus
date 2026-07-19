@@ -9,8 +9,9 @@
 
 #include "RenderShader.h"
 
-#include "ShaderCompiler.h"
 #include "ShaderParser.h"
+#include "ShaderGenerator.h"
+#include "ShaderCompiler.h"
 #include "core/Log.h"
 #include "core/Timer.h"
 
@@ -198,7 +199,7 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 	// -- Re-generate GLSL if the struct has changed --
 	if (shaderStruct.is_struct_changed)
 	{
-		shaderStruct.GenerateShader();
+		ShaderGenerator::Generate(shaderStruct);
 		// is_struct_changed is now false (cleared by GenerateShader)
 	}
 
@@ -211,7 +212,7 @@ bool RenderShader::Recompile(ShaderCompiler& compiler, ShaderType type)
 	}
 
 	// -- Generate GLSL --
-	std::string glsl = shaderStruct.GenerateShader();
+	std::string glsl = ShaderGenerator::Generate(shaderStruct);
 
 	// -- Compile GLSL to SPIR-V --
 	spirv = compiler.CompileGlslToSpv(
@@ -312,7 +313,7 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 
 	// -- 2. Generate Vulkan GLSL from the IR --
 	NEURUS_TIMER("shader generate (" + stageName + ")");
-	std::string glsl = shaderStruct.GenerateShader();
+	std::string glsl = ShaderGenerator::Generate(shaderStruct);
 
 	if (glsl.empty())
 	{

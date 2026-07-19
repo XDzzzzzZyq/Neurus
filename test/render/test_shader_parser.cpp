@@ -3,7 +3,7 @@
  * @brief TDD unit tests for ShaderParser (Task 7).
  *
  * Tests parse ALL 20 GLSL files in res/shaders/ plus edge cases.
- * These tests are PURE C++ — no GPU, no Vulkan, no Qt dependencies.
+ * These tests are PURE C++ - no GPU, no Vulkan, no Qt dependencies.
  *
  * The ShaderParser may not exist yet (Task 7 runs in parallel).
  * These tests WILL fail compilation until ShaderParser.h is created
@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include "render/shaders/ShaderGenerator.h"
 #include "render/shaders/ShaderParser.h"
 #include "render/shaders/ShaderStruct.h"
 #include "core/Parameters.h"
@@ -26,7 +27,7 @@
 using namespace neurus;
 
 // ---------------------------------------------------------------------------
-// Path resolution helper — pure C++, no Vulkan needed
+// Path resolution helper - pure C++, no Vulkan needed
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -44,9 +45,9 @@ namespace {
 std::string ResolveShaderPath(const char* relativePath)
 {
     const char* prefixes[] = {
-        "../../../",  // build/debug/test/ → project root (single-config)
-        "../../",     // build/debug/Debug/ → project root (MSVC multi-config)
-        "../",        // fallback: build/debug/ → build
+        "../../../",  // build/debug/test/ - project root (single-config)
+        "../../",     // build/debug/Debug/ - project root (MSVC multi-config)
+        "../",        // fallback: build/debug/ - build
     };
 
     for (const char* prefix : prefixes)
@@ -223,7 +224,7 @@ void ExpectStructurallyEquivalent(const ShaderStruct& a, const ShaderStruct& b,
 } // namespace
 
 // ---------------------------------------------------------------------------
-// ShaderParserTest — pure C++ fixture (no GPU, no Vulkan, no Qt)
+// ShaderParserTest - pure C++ fixture (no GPU, no Vulkan, no Qt)
 // ---------------------------------------------------------------------------
 
 class ShaderParserTest : public ::testing::Test
@@ -261,7 +262,7 @@ protected:
 };
 
 // ===========================================================================
-// Section 1: ParseShaderFile success + version checks — ALL 20 GLSL files
+// Section 1: ParseShaderFile success + version checks - ALL 20 GLSL files
 // ===========================================================================
 
 // --- render/ vertex shaders (5 files) ---
@@ -646,13 +647,13 @@ TEST_F(ShaderParserTest, ParseFile_GbufferFrag_HasInputList)
     const auto& s = ParseSuccessfully("res/shaders/render/gbuffer.frag");
 
     // gbuffer.frag has 4 inputs: fragWorldPos(0), fragNormalVS(1), fragUV(2), fragObjectID(3)
-    // layout(location=N) in → stored in AB_list (not input_list)
+    // layout(location=N) in - stored in AB_list (not input_list)
     EXPECT_EQ(s.AB_list.size(), 4u)
         << "gbuffer.frag should have 4 inter-stage inputs in AB_list";
 }
 
 // ===========================================================================
-// Section 4: Edge case tests — no file system access needed
+// Section 4: Edge case tests - no file system access needed
 // ===========================================================================
 
 TEST_F(ShaderParserTest, ParseFile_EmptySource_ReturnsFalse)
@@ -668,7 +669,7 @@ TEST_F(ShaderParserTest, ParseFile_MissingFile_ReturnsFalse)
 
 TEST_F(ShaderParserTest, ParseFile_SyntaxError_ReturnsFalse)
 {
-    // Malformed GLSL — missing closing brace
+    // Malformed GLSL - missing closing brace
     const char* broken = R"(#version 450
 void main() {
     gl_Position = vec4(1.0);
@@ -685,7 +686,7 @@ void main() {
 )";
     EXPECT_TRUE(ShaderParser::ParseShaderCode(minimal, ShaderType::VERTEX, m_shaderStruct));
     EXPECT_EQ(m_shaderStruct.version, 450);
-    // Main may be empty for truly empty main() bodies — parser still returns success
+    // Main may be empty for truly empty main() bodies - parser still returns success
 }
 
 TEST_F(ShaderParserTest, ParseFile_OnlyMainBody_ReturnsTrue)
@@ -871,7 +872,7 @@ TEST_F(ShaderParserTest, ErrorHandling_InvalidSourceFails)
 }
 
 // ===========================================================================
-// Section 6: GenerateShader — Valid GLSL output
+// Section 6: GenerateShader - Valid GLSL output
 // ===========================================================================
 
 TEST_F(ShaderParserTest, GenerateShader_ValidGlsl)
@@ -885,7 +886,7 @@ TEST_F(ShaderParserTest, GenerateShader_ValidGlsl)
     m_shaderStruct.SetPass(0, ParaType::VEC4, "fragColor");
     m_shaderStruct.Main = "\tgl_Position = vec4(inPosition, 1.0);\n";
 
-    const std::string glsl = m_shaderStruct.GenerateShader();
+    const std::string glsl = ShaderGenerator::Generate(m_shaderStruct);
 
     EXPECT_FALSE(glsl.empty());
     EXPECT_EQ(glsl.substr(0, 8), "#version") << "Output should start with #version";
@@ -895,7 +896,7 @@ TEST_F(ShaderParserTest, GenerateShader_ValidGlsl)
 }
 
 // ===========================================================================
-// Section 7: GenerateShader — Compilable via shaderc (SKIPPED)
+// Section 7: GenerateShader - Compilable via shaderc (SKIPPED)
 //
 // NOTE: shaderc_combined.lib is built with /MTd (static CRT) while the test
 // binary links Qt which requires /MDd (dynamic CRT).  This causes link-time
@@ -911,7 +912,7 @@ TEST_F(ShaderParserTest, GenerateShader_CompilableViaShaderc)
 #endif
 
 // ===========================================================================
-// Section 8: GenerateShader — Idempotency (Parse → Generate → Parse)
+// Section 8: GenerateShader - Idempotency (Parse - Generate - Parse)
 // ===========================================================================
 
 TEST_F(ShaderParserTest, GenerateShader_Idempotent_AllFiles)
@@ -924,13 +925,13 @@ TEST_F(ShaderParserTest, GenerateShader_Idempotent_AllFiles)
 
         const ShaderType stype = ShaderTypeFromExtension(path);
 
-        // Parse original → ShaderStruct A
+        // Parse original - ShaderStruct A
         ShaderStruct original;
         ASSERT_TRUE(ShaderParser::ParseShaderFile(path, stype, original))
             << "Failed to parse original: " << relPath;
 
-        // Generate GLSL → re-parse → ShaderStruct B
-        const std::string generated = original.GenerateShader();
+        // Generate GLSL - re-parse - ShaderStruct B
+        const std::string generated = ShaderGenerator::Generate(original);
         ASSERT_FALSE(generated.empty()) << "GenerateShader returned empty for: " << relPath;
 
         ShaderStruct regenerated;
@@ -943,7 +944,7 @@ TEST_F(ShaderParserTest, GenerateShader_Idempotent_AllFiles)
 }
 
 // ===========================================================================
-// Section 9: GenerateShader — Edge cases
+// Section 9: GenerateShader - Edge cases
 // ===========================================================================
 
 TEST_F(ShaderParserTest, GenerateShader_EmptyStruct)
@@ -952,7 +953,7 @@ TEST_F(ShaderParserTest, GenerateShader_EmptyStruct)
     m_shaderStruct.Reset();
     EXPECT_TRUE(m_shaderStruct.IsEmpty());
 
-    const std::string glsl = m_shaderStruct.GenerateShader();
+    const std::string glsl = ShaderGenerator::Generate(m_shaderStruct);
     EXPECT_FALSE(glsl.empty());
     EXPECT_EQ(glsl, "#version 450 core\nvoid main() {}\n")
         << "Empty ShaderStruct should produce a minimal valid GLSL stub";
@@ -966,7 +967,7 @@ TEST_F(ShaderParserTest, GenerateShader_IncludesLocalSize)
 
     ASSERT_TRUE(ShaderParser::ParseShaderFile(path, ShaderType::COMPUTE, m_shaderStruct));
 
-    const std::string glsl = m_shaderStruct.GenerateShader();
+    const std::string glsl = ShaderGenerator::Generate(m_shaderStruct);
     EXPECT_NE(glsl.find("layout(local_size_x"), std::string::npos)
         << "Generated compute shader should contain local_size_x declaration";
     EXPECT_NE(glsl.find("local_size_y"), std::string::npos)
@@ -983,13 +984,13 @@ TEST_F(ShaderParserTest, GenerateShader_IncludesExtensions)
 
     ASSERT_TRUE(ShaderParser::ParseShaderFile(path, ShaderType::VERTEX, m_shaderStruct));
 
-    const std::string glsl = m_shaderStruct.GenerateShader();
+    const std::string glsl = ShaderGenerator::Generate(m_shaderStruct);
     EXPECT_NE(glsl.find("#extension GL_EXT_multiview"), std::string::npos)
         << "Generated shader should contain #extension GL_EXT_multiview";
 }
 
 // ===========================================================================
-// Section 10: GenerateShader — Round-trip for specific shaders
+// Section 10: GenerateShader - Round-trip for specific shaders
 // ===========================================================================
 
 TEST_F(ShaderParserTest, GenerateShader_RoundTrip_GbufferVert)
@@ -1002,8 +1003,8 @@ TEST_F(ShaderParserTest, GenerateShader_RoundTrip_GbufferVert)
     ShaderStruct original;
     ASSERT_TRUE(ShaderParser::ParseShaderFile(path, ShaderType::VERTEX, original));
 
-    // Generate → re-parse
-    const std::string generated = original.GenerateShader();
+    // Generate - re-parse
+    const std::string generated = ShaderGenerator::Generate(original);
     ASSERT_FALSE(generated.empty());
 
     ShaderStruct regenerated;
@@ -1040,8 +1041,8 @@ TEST_F(ShaderParserTest, GenerateShader_RoundTrip_PbrLighting)
     ShaderStruct original;
     ASSERT_TRUE(ShaderParser::ParseShaderFile(path, ShaderType::COMPUTE, original));
 
-    // Generate → re-parse
-    const std::string generated = original.GenerateShader();
+    // Generate - re-parse
+    const std::string generated = ShaderGenerator::Generate(original);
     ASSERT_FALSE(generated.empty());
 
     ShaderStruct regenerated;
