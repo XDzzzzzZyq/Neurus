@@ -29,6 +29,18 @@
 namespace neurus {
 
 // --------------------------------------
+// Interpolation qualifier for inter-stage variables
+// --------------------------------------
+
+/** @brief GLSL interpolation qualifier for layout(location=N) declarations. */
+enum class Interp : uint8_t
+{
+	Smooth        = 0,  ///< Default perspective-correct interpolation
+	Flat          = 1,  ///< No interpolation (required for integer types)
+	Noperspective = 2,  ///< Linear interpolation in screen space
+};
+
+// --------------------------------------
 // Named type aliases - replace OpenGL std::tuple patterns
 // --------------------------------------
 
@@ -39,10 +51,11 @@ namespace neurus {
  */
 struct S_IO
 {
-	int location;         ///< GLSL layout location qualifier
-	std::string name;     ///< Variable name
-	ParaType type;        ///< GLSL type of the variable
-	std::string typeName; ///< Original type name string for custom types (empty -> use ParseType(type))
+	int location;             ///< GLSL layout location qualifier
+	std::string name;         ///< Variable name
+	ParaType type;            ///< GLSL type of the variable
+	std::string typeName;     ///< Original type name string for custom types (empty -> use ParseType(type))
+	Interp interpolation = Interp::Smooth;  ///< Interpolation qualifier
 };
 
 /** @brief Ordered parameter list: (type, name, originalTypeName) triples. */
@@ -251,9 +264,11 @@ public:
 	// ----------------------------------
 
 	/** @brief Register a vertex-attribute / input-location binding. */
-	void SetAB(int loc, ParaType type, const std::string& name);
+	void SetAB(int loc, ParaType type, const std::string& name,
+	           Interp interp = Interp::Smooth);
 	/** @brief Register a render-pass output-location binding. */
-	void SetPass(int loc, ParaType type, const std::string& name);
+	void SetPass(int loc, ParaType type, const std::string& name,
+	             Interp interp = Interp::Smooth);
 	/** @brief Register a storage-buffer block declaration. */
 	void SetSB(int loc, const std::string& name, const Args& args);
 	/** @brief Register a uniform-buffer block declaration. */

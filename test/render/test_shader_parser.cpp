@@ -636,19 +636,19 @@ TEST_F(ShaderParserTest, ParseFile_GbufferFrag_HasPassList)
 {
     const auto& s = ParseSuccessfully("res/shaders/render/gbuffer.frag");
 
-    // gbuffer.frag has 4 MRT outputs: gPosition(0), gNormal(1), gAlbedo(2), gMetallicRoughness(3)
-    EXPECT_EQ(s.pass_list.size(), 4u)
-        << "gbuffer.frag should have 4 render-pass outputs (MRT)";
+    // gbuffer.frag has 5 MRT outputs: gPosition(0), gNormal(1), gAlbedo(2), gMetallicRoughness(3), gObjectID(4)
+    EXPECT_EQ(s.pass_list.size(), 5u)
+        << "gbuffer.frag should have 5 render-pass outputs (MRT)";
 }
 
 TEST_F(ShaderParserTest, ParseFile_GbufferFrag_HasInputList)
 {
     const auto& s = ParseSuccessfully("res/shaders/render/gbuffer.frag");
 
-    // gbuffer.frag has 3 inputs: fragWorldPos(0), fragNormalVS(1), fragUV(2)
+    // gbuffer.frag has 4 inputs: fragWorldPos(0), fragNormalVS(1), fragUV(2), fragObjectID(3)
     // layout(location=N) in → stored in AB_list (not input_list)
-    EXPECT_EQ(s.AB_list.size(), 3u)
-        << "gbuffer.frag should have 3 inter-stage inputs in AB_list";
+    EXPECT_EQ(s.AB_list.size(), 4u)
+        << "gbuffer.frag should have 4 inter-stage inputs in AB_list";
 }
 
 // ===========================================================================

@@ -3,6 +3,8 @@
 
 #include "VulkanContext.h"
 
+#include "core/Log.h"
+
 #include <stdexcept>
 #include <set>
 #include <cstring>
@@ -85,6 +87,10 @@ void VulkanContext::InitDevice()
 	auto& pd = ctx_physicalDevices[ctx_selectedDeviceIndex];
 	auto props = pd.getProperties();
 	ctx_gpuName = props.deviceName.data();
+
+	NEURUS_LOG("[VulkanContext] " << ctx_gpuName
+	           << " | limits.maxPushConstantsSize = "
+	           << props.limits.maxPushConstantsSize);
 
 	// Find queue families
 	ctx_graphicsQueueFamily = findGraphicsQueueFamily();

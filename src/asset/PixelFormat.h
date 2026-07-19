@@ -71,6 +71,9 @@ enum class PixelFormat
 
 	/** 1 × 8-bit sRGB (gamma‑encoded) — single channel. */
 	R8S,
+
+	/** 1 × 32-bit unsigned integer — per-pixel object ID. */
+	R32U,
 };
 
 // ---------------------------------------------------------------------------
@@ -97,8 +100,8 @@ inline uint32_t PixelByteSize(PixelFormat fmt)
 	case PixelFormat::RGBA16U:   return 8;
 	case PixelFormat::RGBA16SN:  return 8;
 	case PixelFormat::R8S:       return 1;
-	default:
-	case PixelFormat::Undefined: return 0;
+	case PixelFormat::R32U:      return 4;
+	default:                     return 0;
 	}
 }
 
@@ -113,6 +116,7 @@ inline uint32_t ChannelCount(PixelFormat fmt)
 	{
 	case PixelFormat::R8U:
 	case PixelFormat::R8S:
+	case PixelFormat::R32U:
 		return 1;
 	case PixelFormat::RGBA8U:
 	case PixelFormat::RGBA8S:

@@ -326,6 +326,7 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 		m_errorMessage = "SPIR-V compilation failed for " + stageName
 			+ " stage: " + compiler.GetErrorMessage();
 		NEURUS_ERR("[RenderShader] " << m_errorMessage);
+		NEURUS_ERR("[RenderShader] Generated GLSL (" << stageName << "):\n" << glsl);
 		return false;
 	}
 

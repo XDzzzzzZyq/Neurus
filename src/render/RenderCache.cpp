@@ -474,6 +474,10 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 		return { vk::Format::eD32Sfloat,
 		         vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
 		         eCube };
+
+	// --- ID ---
+	case AttachmentName::IDBuffer:
+		return { vk::Format::eR32Uint, kColorAttachmentUsage, e2D };
 	}
 
 	throw std::invalid_argument("RenderCache::ConfigFor: unknown attachment name");
@@ -496,6 +500,7 @@ const char* AttachmentNameToString(const AttachmentName name)
 	case AttachmentName::SSAO:              return "SSAO";
 	case AttachmentName::SSR:               return "SSR";
 	case AttachmentName::ShadowDepth:       return "ShadowDepth";
+	case AttachmentName::IDBuffer:          return "IDBuffer";
 	}
 	return "Unknown";
 }

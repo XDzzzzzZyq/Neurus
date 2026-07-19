@@ -31,6 +31,9 @@ enum class AttachmentName
 	SSAO,               ///< Screen-space ambient occlusion (R8)
 	SSR,                ///< Screen-space reflections (RGBA16F)
 
+	// --- ID ---
+	IDBuffer,           ///< Per-pixel object ID (R32_UINT)
+
 	// --- Shadow ---
 	ShadowDepth,        ///< Point light shadow depth cubemap (D32_SFLOAT, eCube)
 

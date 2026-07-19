@@ -14,12 +14,12 @@ namespace neurus {
 // --------------------------------------
 
 std::vector<std::string> ShaderStruct::type_table = {
-	"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"
+	"float", "int", "uint", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"
 };
 
 void ShaderStruct::ResetTypeTable()
 {
-	type_table = {"float", "int", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"};
+	type_table = {"float", "int", "uint", "bool", "none", "vec2", "vec3", "vec4", "mat3", "mat4", "sampler2D", "samplerCube", "image2D"};
 }
 
 // --------------------------------------
@@ -160,16 +160,16 @@ void ShaderStruct::ADD_TYPE(const std::string& name)
 // Setters - OpenGL-ported (each sets is_struct_changed = true)
 // --------------------------------------
 
-void ShaderStruct::SetAB(int loc, ParaType type, const std::string& name)
+void ShaderStruct::SetAB(int loc, ParaType type, const std::string& name, Interp interp)
 {
 	is_struct_changed = true;
-	AB_list.push_back({loc, name, type});
+	AB_list.push_back({loc, name, type, "", interp});
 }
 
-void ShaderStruct::SetPass(int loc, ParaType type, const std::string& name)
+void ShaderStruct::SetPass(int loc, ParaType type, const std::string& name, Interp interp)
 {
 	is_struct_changed = true;
-	pass_list.push_back({loc, name, type});
+	pass_list.push_back({loc, name, type, "", interp});
 }
 
 void ShaderStruct::SetSB(int loc, const std::string& name, const Args& args)
@@ -390,13 +390,26 @@ std::string ShaderStruct::GenerateShader()
 		result << "\n";
 	}
 
+	// Helper to emit interpolation qualifier string
+	auto InterpStr = [](Interp i) -> const char* {
+		switch (i) {
+			case Interp::Flat:          return "flat ";
+			case Interp::Noperspective: return "noperspective ";
+			default:                    return "";
+		}
+	};
+
 	// 3. AB_list - vertex inputs: layout(location = N) in type name;
 	if (!AB_list.empty())
 	{
 		for (const auto& io : AB_list)
 		{
-			result << "layout(location = " << io.location << ") in "
-			       << ParseType(io.type) << " " << io.name << ";\n";
+			result << "layout(location = " << io.location << ") "
+			       << InterpStr(io.interpolation)
+			       << "in "
+			       << (io.type == ParaType::CUSTOM && !io.typeName.empty()
+			               ? io.typeName : ParseType(io.type))
+			       << " " << io.name << ";\n";
 		}
 		result << "\n";
 	}
@@ -406,8 +419,12 @@ std::string ShaderStruct::GenerateShader()
 	{
 		for (const auto& io : pass_list)
 		{
-			result << "layout(location = " << io.location << ") out "
-			       << ParseType(io.type) << " " << io.name << ";\n";
+			result << "layout(location = " << io.location << ") "
+			       << InterpStr(io.interpolation)
+			       << "out "
+			       << (io.type == ParaType::CUSTOM && !io.typeName.empty()
+			               ? io.typeName : ParseType(io.type))
+			       << " " << io.name << ";\n";
 		}
 		result << "\n";
 	}

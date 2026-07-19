@@ -297,6 +297,6 @@ TEST_F(GeometryPassTest, CameraUBOData_SizeMatchesShaderExpectation)
 
 TEST_F(GeometryPassTest, PushConstants_SizeMatchesShaderExpectation)
 {
-	// Shader expects 2 mat4s (model + normalMatrix) = 128 bytes
-	EXPECT_EQ(sizeof(MeshPushConstants), 128u);
+	// Shader expects 2 mat4s (model + normalMatrix) + uint32 objectID = 144 bytes
+	EXPECT_EQ(sizeof(MeshPushConstants), 144u);
 }

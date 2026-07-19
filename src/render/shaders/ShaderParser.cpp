@@ -689,33 +689,6 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			continue;
 			}
 
-			// -- layout(location=N) in type name; ???vertex attributes / fragment inputs --
-			if (afterLayout.find("in ") != std::string::npos && afterLayout.find("in;") == std::string::npos)
-			{
-				int location = ExtractIntFromLayout(layoutStr, "location");
-				if (location < 0)
-				{
-					location = 0;
-				}
-
-				// Skip "in" keyword
-				size_t inPos = afterLayout.find("in ");
-				std::string decl = afterLayout.substr(inPos + 3);
-				std::istringstream iss(decl);
-				std::string typeName;
-				iss >> typeName;
-				iss >> word;
-
-				if (!word.empty() && word.back() == ';')
-				{
-					word.pop_back();
-				}
-
-				ParaType pType = ShaderStruct::ParseType(typeName);
-				out.SetAB(location, pType, word);
-				continue;
-			}
-
 			// -- layout(location=N) out type name; ???render-pass outputs --
 			if (afterLayout.find("out ") != std::string::npos)
 			{
@@ -725,9 +698,18 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					location = 0;
 				}
 
+				// Extract interpolation qualifier
+				Interp interp = Interp::Smooth;
+				std::string declBody = afterLayout;
+				// Strip leading whitespace
+				{ size_t ns = declBody.find_first_not_of(" \t"); if (ns != std::string::npos) declBody = declBody.substr(ns); }
+				if      (declBody.find("flat ")          == 0) { interp = Interp::Flat;          declBody = declBody.substr(5); }
+				else if (declBody.find("noperspective ") == 0) { interp = Interp::Noperspective; declBody = declBody.substr(14); }
+				else if (declBody.find("smooth ")        == 0) { interp = Interp::Smooth;        declBody = declBody.substr(7); }
+
 				// Skip "out" keyword
-				size_t outPos = afterLayout.find("out ");
-				std::string decl = afterLayout.substr(outPos + 4);
+				size_t outPos = declBody.find("out ");
+				std::string decl = declBody.substr(outPos + 4);
 				std::istringstream iss(decl);
 				std::string typeName;
 				iss >> typeName;
@@ -739,7 +721,43 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 
 				ParaType pType = ShaderStruct::ParseType(typeName);
-				out.SetPass(location, pType, word);
+				out.SetPass(location, pType, word, interp);
+				continue;
+			}// -- layout(location=N) in type name; ???vertex attributes / fragment inputs --
+			if (afterLayout.find("in ") != std::string::npos && afterLayout.find("in;") == std::string::npos)
+			{
+				int location = ExtractIntFromLayout(layoutStr, "location");
+				if (location < 0)
+				{
+					location = 0;
+				}
+
+				// Extract interpolation qualifier
+				Interp interp = Interp::Smooth;
+				std::string declBody = afterLayout;
+				// Strip leading whitespace
+				size_t nonSpace = declBody.find_first_not_of(" \t");
+				if (nonSpace != std::string::npos) declBody = declBody.substr(nonSpace);
+				// Check for interpolation qualifier
+				if      (declBody.find("flat ")          == 0) { interp = Interp::Flat;          declBody = declBody.substr(5); }
+				else if (declBody.find("noperspective ") == 0) { interp = Interp::Noperspective; declBody = declBody.substr(14); }
+				else if (declBody.find("smooth ")        == 0) { interp = Interp::Smooth;        declBody = declBody.substr(7); }
+
+				// Skip "in" keyword
+				size_t inPos = declBody.find("in ");
+				std::string decl = declBody.substr(inPos + 3);
+				std::istringstream iss(decl);
+				std::string typeName;
+				iss >> typeName;
+				iss >> word;
+
+				if (!word.empty() && word.back() == ';')
+				{
+					word.pop_back();
+				}
+
+				ParaType pType = ShaderStruct::ParseType(typeName);
+				out.SetAB(location, pType, word, interp);
 				continue;
 			}
 
