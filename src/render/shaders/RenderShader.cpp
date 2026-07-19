@@ -12,6 +12,7 @@
 #include "ShaderCompiler.h"
 #include "ShaderParser.h"
 #include "core/Log.h"
+#include "core/Timer.h"
 
 #include <shaderc/shaderc.hpp>
 
@@ -55,6 +56,7 @@ RenderShader::RenderShader(const std::string& name,
 
 bool RenderShader::Compile(ShaderCompiler& compiler)
 {
+	NEURUS_TIMER("shader compile '" + m_name + "'");
 	NEURUS_LOG("[RenderShader] Compiling '" << m_name << "'...");
 
 	// Reset state before compilation
@@ -297,14 +299,19 @@ bool RenderShader::CompileStage(ShaderCompiler& compiler,
 	const std::string stageName = Shader::TypeToString(type);
 
 	// -- 1. Parse GLSL source file into ShaderStruct IR --
-	if (!ShaderParser::ParseShaderFile(filepath, type, shaderStruct))
 	{
-		m_errorMessage = "Failed to parse shader file: " + filepath;
-		NEURUS_ERR("[RenderShader] " << m_errorMessage);
-		return false;
+		NEURUS_TIMER("shader parse (" + stageName + ")");
+		if (!ShaderParser::ParseShaderFile(filepath, type, shaderStruct))
+		{
+			m_errorMessage = "Failed to parse shader file: " + filepath;
+			NEURUS_ERR("[RenderShader] " << m_errorMessage);
+			return false;
+		}
+		NEURUS_LOG("[RenderShader] " << stageName << " parse complete: " << filepath);
 	}
 
 	// -- 2. Generate Vulkan GLSL from the IR --
+	NEURUS_TIMER("shader generate (" + stageName + ")");
 	std::string glsl = shaderStruct.GenerateShader();
 
 	if (glsl.empty())
