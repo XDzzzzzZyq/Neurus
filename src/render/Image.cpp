@@ -542,7 +542,7 @@ std::vector<uint8_t> Image::PickPixel(const vk::raii::Device& device,
 	// The 4-arg Transition does NOT update im_state.  The restore barrier below
 	// reads im_state as the "before" layout, so we must keep it in sync manually
 	// for the restore to emit TransferSrc → original (not a no-op same-state barrier).
-	im_state = ImageState::TransferSrc;
+	const_cast<Image&>(*this).im_state = ImageState::TransferSrc;
 
 	// --- Copy single pixel (1×1 region at (x,y)) to staging buffer ---
 	vk::BufferImageCopy copyRegion;
@@ -563,7 +563,7 @@ std::vector<uint8_t> Image::PickPixel(const vk::raii::Device& device,
 	// --- Restore the image subresource back to its original state ---
 	// Done before EndStaging so it's part of the same submission (one submit + one waitIdle).
 	Barrier::Transition(cmd, const_cast<Image&>(*this), originalState, range);
-	im_state = originalState;
+	const_cast<Image&>(*this).im_state = originalState;
 
 	staging.EndStaging(queue);
 
