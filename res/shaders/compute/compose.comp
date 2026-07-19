@@ -32,8 +32,8 @@ const float kHighlightAlpha = 0.5;
 
 // Checkerboard background for transparent/empty regions
 const int kCheckerSize   = 8;
-const vec3 kCheckerGray1 = vec3(0.12);
-const vec3 kCheckerGray2 = vec3(0.18);
+const vec3 kCheckerGray1 = vec3(0.0);
+const vec3 kCheckerGray2 = vec3(0.01);
 
 void main()
 {
@@ -54,7 +54,7 @@ void main()
 	{
 		// Checkerboard grid
 		ivec2 cell = pixelCoord / kCheckerSize;
-		bool isGray1 = ((cell.x + cell.y) & 1) == 0;
+		bool isGray1 = (cell.x % 8 > 3) != (cell.y % 8 > 3);
 		vec3 bgColor = isGray1 ? kCheckerGray1 : kCheckerGray2;
 
 		// Gamma-correct the background too (consistent look)
