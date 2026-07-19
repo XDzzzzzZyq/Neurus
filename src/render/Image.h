@@ -189,8 +189,8 @@ public:
 	 * (sub-millisecond GPU transfer + pipeline drain).
 	 *
 	 * The image must have VK_IMAGE_USAGE_TRANSFER_SRC_BIT.
-	 * The image is left in ImageState::TransferSrc on the accessed subresource;
-	 * the caller is responsible for transitioning back if needed.
+	 * The image is restored to its original state after readback — callers
+	 * do not need to manage layout transitions afterward.
 	 *
 	 * @param device            Logical device.
 	 * @param physicalDevice    Physical device for memory allocation.

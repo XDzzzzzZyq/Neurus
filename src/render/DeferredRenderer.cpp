@@ -267,6 +267,34 @@ void DeferredRenderer::WaitIdle()
 	r_device.waitIdle();
 }
 
+uint32_t DeferredRenderer::ReadIDBufferPixel(uint32_t x, uint32_t y)
+{
+	const vk::Extent2D extent = GetExtent();
+
+	// Clamp or reject out-of-bounds clicks
+	if (x >= extent.width || y >= extent.height)
+	{
+		return 0;
+	}
+
+	auto& idBuffer = r_renderCache->GetAttachment(AttachmentName::IDBuffer, extent);
+
+	// PickPixel handles its own transient command buffer, readback, and state
+	// restoration — the image is left in its original state on return.
+	auto bytes = idBuffer.PickPixel(r_device, r_physicalDevice,
+	                                 r_graphicsQueue, r_queueFamilyIndex,
+	                                 x, y);
+
+	if (bytes.size() < sizeof(uint32_t))
+	{
+		return 0;
+	}
+
+	uint32_t objectID;
+	std::memcpy(&objectID, bytes.data(), sizeof(objectID));
+	return objectID;
+}
+
 void DeferredRenderer::HandleResize(uint32_t width, uint32_t height)
 {
 	uint32_t oldGen = r_swapchain->generation();

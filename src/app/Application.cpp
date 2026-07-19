@@ -346,7 +346,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
 	}
 
-	// --- Viewport signals: resize + camera control ---
+	// --- Viewport signals: resize + camera control + pixel selection ---
 	if (auto* viewport = app_mainWindow->GetPanel<neurus::Viewport>())
 	{
 		// Handle Viewport resize
@@ -360,6 +360,28 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 
 		// Forward mouse scroll to Editor for camera zoom
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseScrolled);
+
+		// Handle left-click for pixel-perfect object selection via IDBuffer
+		QObject::connect(viewport, &neurus::Viewport::mousePressed,
+		                 [this](const neurus::MousePressEvent& e) {
+		                     if (e.button != Input::MouseButton::Left)
+		                         return;
+
+		                     // Read the object ID from the IDBuffer at the click
+		                     // position (GPU → CPU readback via PickPixel).
+		                     uint32_t objectID = app_renderer->ReadIDBufferPixel(
+		                         static_cast<uint32_t>(e.position.x),
+		                         static_cast<uint32_t>(e.position.y));
+
+		                     // Forward selection to Editor (0 = background, skip)
+		                     ObjectSelected selEvent {
+		                         static_cast<int>(objectID),
+		                         static_cast<int>(e.modifiers)
+		                      };
+		                     app_editor->OnUIEvent(selEvent);
+
+							 NEURUS_LOG("[Selection] Mouse Position: " << e.position.x << "," << e.position.y << "| Object ID: " << objectID);
+		                 });
 	}
 
 	// Handle RenderConfig changes → Editor (via ConnectUIEvent → OnUIEvent → EventQueue)

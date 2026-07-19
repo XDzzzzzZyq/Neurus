@@ -135,7 +135,23 @@ public:
 	RenderCache& GetRenderCache() { return *r_renderCache; }
 
 	/**
-	 * @brief Handles window resize by proactively recreating swapchain and
+	 * @brief Reads a single pixel from the IDBuffer attachment and returns the object ID.
+	 *
+	 * Performs a GPU→CPU readback via Image::PickPixel() using a transient
+	 * command buffer. The GPU is drained (queue.waitIdle) before the readback
+	 * to ensure the IDBuffer from the most recent frame is available.
+	 *
+	 * The IDBuffer image state is restored to ColorAttachment afterward so
+	 * the next GeometryPass can write to it.
+	 *
+	 * @param x Pixel x-coordinate (0 = left edge).
+	 * @param y Pixel y-coordinate (0 = top edge, Vulkan convention).
+	 * @return Object ID at the pixel (0 = background / no object), or 0 on OOB/failure.
+	 */
+	uint32_t ReadIDBufferPixel(uint32_t x, uint32_t y);
+
+	/**
+	 * @brief Handles viewport resize by proactively recreating swapchain and
 	 *        dependent resources.
 	 *
 	 * Calls Swapchain::Recreate() with the new dimensions, then rebuilds

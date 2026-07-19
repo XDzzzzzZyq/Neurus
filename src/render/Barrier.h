@@ -72,7 +72,7 @@ public:
 	 * of the image's default m_subresourceRange.  Useful for per-mip or per-face
 	 * transitions (e.g. during mipmap generation).
 	 *
-	 * @note This does NOT update image.m_state — callers should manage state
+	 * @note This does NOT update image.im_state — callers should manage state
 	 *       manually for partial transitions or use the simpler overload.
 	 *
 	 * @param cmd               Command buffer handle (raw VkCommandBuffer).
