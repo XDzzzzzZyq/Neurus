@@ -1,9 +1,13 @@
 # src/render/passes/CMakeLists.txt - Render Pass Library
 
 add_library(neurus_render_passes STATIC
+	ComposePass.h
+	ComposePass.cpp
 	ComputePass.h
 	GeometryPass.h
 	GeometryPass.cpp
+	GizmoPass.h
+	GizmoPass.cpp
 	IBLPass.h
 	IBLPass.cpp
 	LightingPass.h

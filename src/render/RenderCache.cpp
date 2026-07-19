@@ -478,6 +478,16 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 	// --- ID ---
 	case AttachmentName::IDBuffer:
 		return { vk::Format::eR32Uint, kColorAttachmentUsage, e2D };
+
+	// --- Gizmo ---
+	case AttachmentName::GizmoHighlight:
+		return { vk::Format::eR8Unorm,
+		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
+
+	// --- Composite ---
+	case AttachmentName::ComposedOutput:
+		return { vk::Format::eR16G16B16A16Sfloat,
+		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
 	}
 
 	throw std::invalid_argument("RenderCache::ConfigFor: unknown attachment name");
@@ -501,6 +511,8 @@ const char* AttachmentNameToString(const AttachmentName name)
 	case AttachmentName::SSR:               return "SSR";
 	case AttachmentName::ShadowDepth:       return "ShadowDepth";
 	case AttachmentName::IDBuffer:          return "IDBuffer";
+	case AttachmentName::GizmoHighlight:    return "GizmoHighlight";
+	case AttachmentName::ComposedOutput:    return "ComposedOutput";
 	}
 	return "Unknown";
 }

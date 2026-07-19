@@ -291,8 +291,14 @@ Scene& Editor::GetScene()
 RenderContext Editor::GetRenderContext() const
 {
 	RenderContext ctx;
-	ctx.scene = &ed_project->GetScene();
+	auto& scene = ed_project->GetScene();
+	ctx.scene = &scene;
 	ctx.config = &ed_project->GetRenderConfig();
+
+	// Active object ID for gizmo highlight (0 = nothing selected)
+	const auto* activeObj = scene.selections.GetActiveObject();
+	ctx.activeObjectId = activeObj ? static_cast<uint32_t>(activeObj->GetObjectID()) : 0;
+
 	return ctx;
 }
 

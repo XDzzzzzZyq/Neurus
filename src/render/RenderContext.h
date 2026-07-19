@@ -54,6 +54,10 @@ struct RenderContext
 	/// Passes cast to RenderConfig* to read quality/feature flags set by the user.
 	void* config = nullptr;
 
+	/// @brief Active (selected) object ID for gizmo highlight rendering.
+	/// 0 = nothing selected (matches IDBuffer clear value).
+	uint32_t activeObjectId = 0;
+
 };
 
 } // namespace neurus
