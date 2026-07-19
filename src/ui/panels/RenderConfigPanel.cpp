@@ -156,6 +156,10 @@ void RenderConfigPanel::BuildLightingSection()
 	m_iblCheckBox->setChecked(true);
 	form->addRow(m_iblCheckBox);
 
+	m_transCheckBox = new QCheckBox("Transparent Background");
+	m_transCheckBox->setChecked(false);
+	form->addRow(m_transCheckBox);
+
 	m_exposureSlider = new ScalarSlider(0.0, 5.0, 100, 1.0, this);
 	form->addRow("Exposure", m_exposureSlider);
 }
@@ -232,6 +236,7 @@ void RenderConfigPanel::ConnectAllSignals()
 
 	// --- Lighting ---
 	connect(m_iblCheckBox, &QCheckBox::toggled, this, emitCfg);
+	connect(m_transCheckBox, &QCheckBox::toggled, this, emitCfg);
 	connect(m_exposureSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
 
@@ -302,8 +307,10 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 		case AAAlg::FXAA: m_aaCombo->setCurrentIndex(2); break;
 		}
 
-		QSignalBlocker b2(m_gammaSlider);
 		m_gammaSlider->setValue(config->r_gamma);
+
+		QSignalBlocker bt(m_transCheckBox);
+		m_transCheckBox->setChecked(config->r_transparent);
 	}
 
 	// --- Pipeline ---
@@ -367,6 +374,7 @@ RenderConfig RenderConfigPanel::Save() const
 	case 2: config.r_aa = AAAlg::FXAA; break;
 	}
 	config.r_gamma = static_cast<float>(m_gammaSlider->value());
+	config.r_transparent = m_transCheckBox->isChecked();
 
 	// --- Pipeline ---
 	switch (m_pipelineCombo->currentIndex())

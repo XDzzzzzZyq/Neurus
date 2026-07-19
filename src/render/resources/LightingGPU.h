@@ -82,7 +82,8 @@ static_assert(sizeof(SunLightStruct) == 48, "SunLightStruct must be 48 bytes (st
  *   vec4 cameraPos     offset 16  (16 bytes)
  *   mat4 view          offset 32  (64 bytes)
  *   int  iblEnabled    offset 96  (4 bytes)
- *          padding     offset 100 (12 bytes, aligns mat4 to 16)
+ *   int  transEnabled   offset 100 (4 bytes — transparent background)
+ *          padding     offset 104 (8 bytes, aligns mat4 to 16)
  *   mat4 invProjView   offset 112 (64 bytes - inverse(proj * view) for skybox ray)
  *   Total: 176 bytes. Must NOT use alignas.
  */
@@ -95,7 +96,8 @@ struct LightingPushConstants
 	float    _pad1;                 ///< Padding (vec4 → 16 bytes)
 	float    view[16];              ///< View matrix (for normal transform VS→WS)
 	int32_t  iblEnabled;            ///< IBL enabled flag (0 = disabled, 1 = enabled)
-	float    _pad2[3];              ///< Padding to align invProjView at offset 112 (16-byte alignment)
+	int32_t  transEnabled;          ///< Transparent background flag (0 = opaque, 1 = transparent)
+	float    _pad2[2];              ///< Padding to align invProjView at offset 112 (16-byte alignment)
 	float    invProjView[16];       ///< Inverse of (projection * view) matrix for skybox ray
 };
 static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must be 176 bytes");

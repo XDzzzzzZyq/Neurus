@@ -91,6 +91,7 @@ private:
 	// --- Lighting ---
 	QGroupBox*  m_lightingGroup     = nullptr;
 	QCheckBox*  m_iblCheckBox       = nullptr;
+	QCheckBox*  m_transCheckBox     = nullptr;
 	ScalarSlider* m_exposureSlider   = nullptr;
 
 	// --- Post-Processing ---

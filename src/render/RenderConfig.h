@@ -116,6 +116,7 @@ public:
 	int32_t r_ao_ksize    = 16;       ///< AO kernel size (number of samples)
 	float   r_ao_radius   = 0.5f;     ///< AO sample radius in world-space
 	int32_t r_sample_pf   = 128;      ///< Samples per frame for progressive rendering
+	bool    r_transparent = false;    ///< Transparent background (checkerboard instead of skybox)
 
 public:
 	RenderConfig() = default;
@@ -129,7 +130,7 @@ public:
 		   CEREAL_NVP(r_shadow), CEREAL_NVP(r_ssr),
 		   CEREAL_NVP(r_gamma), CEREAL_NVP(r_shadow_bias),
 		   CEREAL_NVP(r_ao_ksize), CEREAL_NVP(r_ao_radius),
-		   CEREAL_NVP(r_sample_pf));
+		   CEREAL_NVP(r_sample_pf), CEREAL_NVP(r_transparent));
 	}
 
 	// --- Query helpers ---

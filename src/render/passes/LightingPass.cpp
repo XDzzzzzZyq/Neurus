@@ -10,6 +10,7 @@
 #include "RenderContext.h"
 #include "Image.h"
 #include "render/Barrier.h"
+#include "render/RenderConfig.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
 #include "Texture.h"
@@ -419,6 +420,13 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 
 		// Enable IBL when scene has an environment
 		pc.iblEnabled = !scene->env_list.empty() ? 1 : 0;
+
+		// Transparent background (checkerboard) from RenderConfig
+		if (ctx.config)
+		{
+			const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+			pc.transEnabled = cfg->r_transparent ? 1 : 0;
+		}
 
 		// Copy inverse(proj * view) matrix for skybox background ray
 		const float* ipv = &invProjView[0][0];
