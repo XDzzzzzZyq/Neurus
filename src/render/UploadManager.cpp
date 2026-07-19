@@ -162,13 +162,13 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	}
 
 	// --- 2. Upload equirect to GPU ---
-	auto equirectImage = std::make_shared<Image>(Image::FromImageData(
+	auto equirectImage = Image::FromImageData(
 		*um_device, *um_physicalDevice,
 		um_transferQueue, um_transferQueueFamily,
 		equirectData,
 		"Env_Equirect",
-		vk::ImageUsageFlagBits::eStorage));
-	if (equirectImage->State() == ImageState::Invalid)
+		vk::ImageUsageFlagBits::eStorage);
+	if (equirectImage.State() == ImageState::Invalid)
 	{
 		NEURUS_ERR("[UploadManager] Failed to upload equirect image to GPU");
 		return EnvironmentGPU{};
@@ -226,7 +226,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	auto specularSampler = vk::raii::Sampler(*um_device, samplerCI);
 
 	// --- 5. Run IBL convolution ---
-	um_iblPass->Generate(um_transferQueue, um_transferQueueFamily, *equirectImage, *diffuseImage, *specularImage);
+	um_iblPass->Generate(um_transferQueue, um_transferQueueFamily, equirectImage, *diffuseImage, *specularImage);
 
 	// --- 6. Wrap in Textures and return ---
 	EnvironmentGPU gpu;

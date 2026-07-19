@@ -12,7 +12,7 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Image.h/cpp` - GPU image with ImageState tracking (including Invalid) and mipmap generation
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
-- `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer and activeObjectId
+- `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
 - `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 - `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
