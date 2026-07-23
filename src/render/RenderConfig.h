@@ -118,6 +118,11 @@ public:
 	int32_t r_sample_pf   = 128;      ///< Samples per frame for progressive rendering
 	bool    r_transparent = false;    ///< Transparent background (checkerboard instead of skybox)
 
+	// --- FXAA parameters ---
+	float r_fxaa_subpix           = 0.75f;  ///< Sub-pixel aliasing removal amount (0.0-1.0)
+	float r_fxaa_edge_threshold   = 0.166f;  ///< Edge detection threshold (0.063-0.333)
+	float r_fxaa_edge_threshold_min = 0.0833f; ///< Minimum edge threshold (0.0312-0.0833)
+
 public:
 	RenderConfig() = default;
 
@@ -130,7 +135,9 @@ public:
 		   CEREAL_NVP(r_shadow), CEREAL_NVP(r_ssr),
 		   CEREAL_NVP(r_gamma), CEREAL_NVP(r_shadow_bias),
 		   CEREAL_NVP(r_ao_ksize), CEREAL_NVP(r_ao_radius),
-		   CEREAL_NVP(r_sample_pf), CEREAL_NVP(r_transparent));
+		   CEREAL_NVP(r_sample_pf), CEREAL_NVP(r_transparent),
+		   CEREAL_NVP(r_fxaa_subpix), CEREAL_NVP(r_fxaa_edge_threshold),
+		   CEREAL_NVP(r_fxaa_edge_threshold_min));
 	}
 
 	// --- Query helpers ---

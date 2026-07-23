@@ -488,6 +488,14 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 	case AttachmentName::ComposedOutput:
 		return { vk::Format::eR16G16B16A16Sfloat,
 		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
+
+	// --- Anti-Aliasing ---
+	case AttachmentName::FXAAOutput:
+		return { vk::Format::eR16G16B16A16Sfloat,
+		         kColorAttachmentUsage | vk::ImageUsageFlagBits::eStorage, e2D };
+	case AttachmentName::FXAAOffsets:
+		return { vk::Format::eR16G16Sfloat,
+		         vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc, e2D };
 	}
 
 	throw std::invalid_argument("RenderCache::ConfigFor: unknown attachment name");
@@ -513,6 +521,8 @@ const char* AttachmentNameToString(const AttachmentName name)
 	case AttachmentName::IDBuffer:          return "IDBuffer";
 	case AttachmentName::GizmoHighlight:    return "GizmoHighlight";
 	case AttachmentName::ComposedOutput:    return "ComposedOutput";
+	case AttachmentName::FXAAOutput:        return "FXAAOutput";
+	case AttachmentName::FXAAOffsets:       return "FXAAOffsets";
 	}
 	return "Unknown";
 }

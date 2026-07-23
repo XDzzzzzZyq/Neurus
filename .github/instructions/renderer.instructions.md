@@ -170,7 +170,10 @@ GizmoPass (compute: reads IDBuffer, 3×3 edge detection for activeObjectId, writ
 ComposePass (compute: blends GizmoHighlight onto HDRColor, applies gamma correction, writes ComposedOutput)
     │
     ▼
-Blit ComposedOutput → Swapchain (vkCmdBlitImage)
+FXAAPass (compute: reads ComposedOutput, luma-based edge detection + full-iteration edge search, writes FXAAOutput)
+    │  (conditional: only when AA == AAAlg::FXAA)
+    ▼
+Blit (ComposedOutput or FXAAOutput) → Swapchain (vkCmdBlitImage)
 ```
 
 ### ImageState & Barrier Convention
@@ -248,6 +251,18 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.0005f) via `ctx.config`. No longer hardcoded in the pass.
 - **Shadow mode**: Supports `HARD`, `SOFT_PCF_16`, `SOFT_PCF_64` modes matching point light shadow pipeline
 
+### FXAA Convention
+- **Algorithm**: NVIDIA FXAA 3.11, ported from cuda-vision full-iteration approach
+- **Pipeline**: Two compute dispatches per frame: edge detection (Sobel gradient, subpixel offset) → edge-line iteration (march along edge, check 3 rows per step: center/upper/lower) → endpoint interpolation → bilinear resample
+- **Direction**: Sobel gradient magnitude determines horizontal (`abs(gy) >= abs(gx)`) vs vertical edge
+- **Offset**: Subpixel offset in `[-0.5, 0.5]` computed as `(neighborLo-center)/(neighborLo-neighborHi) - 0.5`
+- **Edge march**: Iterates along the edge line (left/right for horizontal, up/down for vertical), up to 32 steps per direction. FLIP: center pixel luma differs from starting luma (crossed edge). END: off-axis neighbor has same luma as starting luma (left edge region). BOUND: out of image bounds.
+- **Endpoint interpolation**: Endpoint offsets assigned by stop code (END→0, FLIP→±0.5, otherwise→original offset). Final offset = `mix(leftOff, rightOff, leftSteps/(leftSteps+rightSteps))`
+- **Resample**: Bilinear `texture()` at subpixel coordinate offset by `finalOffset * rcpFrame` along the edge normal
+- **Sampler**: Bilinear (`VK_FILTER_LINEAR`) for sub-pixel accuracy; falls back to nearest if `R16G16B16A16_SFLOAT` format doesn't support `VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT`
+- **Config**: `RenderConfig::r_fxaa_subpix` (strength, default 0.75), `r_fxaa_edge_threshold` (default 0.166), `r_fxaa_edge_threshold_min` (default 0.0833)
+- **Gating**: `RenderConfig::RequiresFXAA()` — only records when AA algorithm is set to FXAA in RenderConfigPanel
+
 ### RenderConfig Convention
 
 `RenderConfig` (`src/render/RenderConfig.h`) is user-facing config owned by Editor/Project,
@@ -262,7 +277,8 @@ passed to passes through `RenderContext::config` (opaque `void*`):
 ### Attachment Formats
 
 All screen-space attachments (Position, Normal, Albedo, MetallicRoughness, Depth, HDRColor,
-SSAO) are created lazily via `RenderCache::GetAttachment(name, extent)` on first use.
+SSAO, GizmoHighlight, ComposedOutput, FXAAOutput) are created lazily via
+`RenderCache::GetAttachment(name, extent)` on first use.
 Per-light shadow maps are managed via `RenderCache::GetShadowMap(lightUID, lightType)`:
 - `LightType::POINTLIGHT` → cubemap (6-layer 2D_ARRAY, D32_SFLOAT, 1024×1024 per face)
 - `LightType::SUNLIGHT` → 2D orthographic (D32_SFLOAT, 2048×2048)
@@ -281,7 +297,9 @@ assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
 | SSAO | R8_UNORM | 0 (no occlusion) | Screen-space ambient occlusion |
 | SSR | R16G16B16A16_SFLOAT | (0,0,0,0) | Screen-space reflections (planned) |
 | GizmoHighlight | R8_UNORM | 0 | Selected-object edge highlight (GizmoPass output) |
-| ComposedOutput | R16G16B16A16_SFLOAT | (0,0,0,0) | Final composed output before swapchain blit (ComposePass output) |
+| ComposedOutput | R16G16B16A16_SFLOAT | (0,0,0,0) | Final composed output before FXAA/blit (ComposePass output) |
+| FXAAOutput | R16G16B16A16_SFLOAT | (0,0,0,0) | FXAA anti-aliased output (FXAAPass output, blitted when FXAA active) |
+| FXAAOffsets | R16G16_SFLOAT | (0,0) | FXAA edge subpixel offsets (RG16F, 2-channel, sampled+storage) |
 | ShadowMap | D32_SFLOAT | 1.0 | Per-light shadow depth (RenderCache-owned). Cubemap (6-layer 2D_ARRAY, 1024×1024) for point lights; 2D (2048×2048) for sun lights |
 | ShadowIntensity | R8_UNORM | 0 (no shadow) | Layered 2D_ARRAY, one layer per shadow-casting light (RenderCache-owned) |
 

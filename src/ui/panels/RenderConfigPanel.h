@@ -98,6 +98,9 @@ private:
 	QGroupBox*  m_postGroup         = nullptr;
 	QComboBox*  m_aaCombo           = nullptr;
 	ScalarSlider* m_gammaSlider      = nullptr;
+	ScalarSlider* m_fxaaSubpixSlider  = nullptr;
+	ScalarSlider* m_fxaaEdgeSlider    = nullptr;
+	ScalarSlider* m_fxaaEdgeMinSlider = nullptr;
 
 	// --- Pipeline ---
 	QGroupBox*  m_pipelineGroup     = nullptr;
