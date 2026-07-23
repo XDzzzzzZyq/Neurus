@@ -40,6 +40,10 @@ enum class AttachmentName
 	// --- Composite ---
 	ComposedOutput,     ///< Final composed output before swapchain blit (RGBA16F)
 
+	// --- Anti-Aliasing ---
+	FXAAOutput,         ///< FXAA anti-aliased output (RGBA16F)
+	FXAAOffsets,        ///< FXAA edge subpixel offsets (RG16F, 2-channel)
+
 	// --- Shadow ---
 	ShadowDepth,        ///< Point light shadow depth cubemap (D32_SFLOAT, eCube)
 

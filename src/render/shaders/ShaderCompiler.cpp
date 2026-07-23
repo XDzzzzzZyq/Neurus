@@ -46,6 +46,7 @@ std::vector<uint32_t> ShaderCompiler::CompileGlslToSpv(
 			<< result.GetNumErrors() << " error(s), "
 			<< result.GetNumWarnings() << " warning(s)\n"
 			<< m_lastError);
+		NEURUS_ERR("[ShaderCompiler] GLSL source:\n" << source);
 
 		return {};
 	}

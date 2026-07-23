@@ -20,6 +20,7 @@
 #include "passes/ShadowIntensityPass.h"
 #include "passes/GizmoPass.h"
 #include "passes/ComposePass.h"
+#include "passes/FXAAPass.h"
 
 #include "scene/Light.h"
 #include "scene/Scene.h"
@@ -126,6 +127,16 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		r_composePass = composePass.get();
 		r_passes.push_back(std::move(composePass));
 		NEURUS_LOG("[DeferredRenderer] ComposePass created");
+	}
+
+	// --- 8e. Create FXAA pass (luma-based anti-aliasing) ---
+	{
+		auto fxaaPass = std::make_unique<FXAAPass>(
+			device, physicalDevice,
+			kMaxFramesInFlight);
+		r_fxaaPass = fxaaPass.get();
+		r_passes.push_back(std::move(fxaaPass));
+		NEURUS_LOG("[DeferredRenderer] FXAAPass created");
 	}
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
@@ -442,12 +453,22 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Phase 3c: ComposePass → blend highlight + gamma correction → ComposedOutput ---
 	r_composePass->Record(cmdBuf, *r_renderCache, ctx);
 
-	// --- Phase 4: Blit ComposedOutput → swapchain image ---
-	auto& composedOutput = r_renderCache->GetAttachment(AttachmentName::ComposedOutput, extent);
-	const vk::Image composedImage = *composedOutput.ImageHandle();
+	// --- Phase 3d: FXAAPass → luma-based anti-aliasing (conditional on config) ---
+	const bool useFXAA = ctx.config &&
+		static_cast<const RenderConfig*>(ctx.config)->RequiresFXAA();
+
+	if (useFXAA)
+	{
+		r_fxaaPass->Record(cmdBuf, *r_renderCache, ctx);
+	}
+
+	// --- Phase 4: Blit output → swapchain image ---
+	auto& blitSource = r_renderCache->GetAttachment(
+		useFXAA ? AttachmentName::FXAAOutput : AttachmentName::ComposedOutput, extent);
+	const vk::Image composedImage = *blitSource.ImageHandle();
 	const vk::Image swapchainImage = r_swapchain->images()[imageIndex];
 
-	// Barrier 1: ComposedOutput is already in TransferSrc from ComposePass
+	// Barrier 1: Blit source is already in TransferSrc from ComposePass (or FXAAPass)
 	// Barrier 2: Swapchain image UNDEFINED → TRANSFER_DST_OPTIMAL
 	{
 		Barrier::Transition(*cmdBuf, swapchainImage,

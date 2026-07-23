@@ -181,6 +181,16 @@ void RenderConfigPanel::BuildPostProcessingSection()
 
 	m_gammaSlider = new ScalarSlider(1.0, 3.0, 200, 1.0, this);
 	form->addRow("Gamma", m_gammaSlider);
+
+	// --- FXAA parameters ---
+	m_fxaaSubpixSlider = new ScalarSlider(0.0, 1.0, 100, 0.75, this);
+	form->addRow("FXAA Subpix", m_fxaaSubpixSlider);
+
+	m_fxaaEdgeSlider = new ScalarSlider(0.063, 0.333, 270, 0.166, this);
+	form->addRow("FXAA Edge", m_fxaaEdgeSlider);
+
+	m_fxaaEdgeMinSlider = new ScalarSlider(0.0312, 0.0833, 52, 0.0833, this);
+	form->addRow("FXAA Edge Min", m_fxaaEdgeMinSlider);
 }
 
 // =========================================================================
@@ -245,6 +255,12 @@ void RenderConfigPanel::ConnectAllSignals()
 		this, emitCfg);
 	connect(m_gammaSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	connect(m_fxaaSubpixSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
+	connect(m_fxaaEdgeSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
+	connect(m_fxaaEdgeMinSlider, &ScalarSlider::valueChanged,
+		this, emitCfg);
 
 	// --- Pipeline ---
 	connect(m_pipelineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -308,6 +324,10 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 		}
 
 		m_gammaSlider->setValue(config->r_gamma);
+
+		m_fxaaSubpixSlider->setValue(config->r_fxaa_subpix);
+		m_fxaaEdgeSlider->setValue(config->r_fxaa_edge_threshold);
+		m_fxaaEdgeMinSlider->setValue(config->r_fxaa_edge_threshold_min);
 
 		QSignalBlocker bt(m_transCheckBox);
 		m_transCheckBox->setChecked(config->r_transparent);
@@ -375,6 +395,11 @@ RenderConfig RenderConfigPanel::Save() const
 	}
 	config.r_gamma = static_cast<float>(m_gammaSlider->value());
 	config.r_transparent = m_transCheckBox->isChecked();
+
+	// --- FXAA ---
+	config.r_fxaa_subpix           = static_cast<float>(m_fxaaSubpixSlider->value());
+	config.r_fxaa_edge_threshold   = static_cast<float>(m_fxaaEdgeSlider->value());
+	config.r_fxaa_edge_threshold_min = static_cast<float>(m_fxaaEdgeMinSlider->value());
 
 	// --- Pipeline ---
 	switch (m_pipelineCombo->currentIndex())

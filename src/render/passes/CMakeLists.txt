@@ -4,6 +4,8 @@ add_library(neurus_render_passes STATIC
 	ComposePass.h
 	ComposePass.cpp
 	ComputePass.h
+	FXAAPass.h
+	FXAAPass.cpp
 	GeometryPass.h
 	GeometryPass.cpp
 	GizmoPass.h

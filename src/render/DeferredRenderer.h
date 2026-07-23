@@ -47,6 +47,7 @@ class ShadowDepthPass;
 class ShadowIntensityPass;
 class GizmoPass;
 class ComposePass;
+class FXAAPass;
 struct CameraUBOData;
 
 /**
@@ -228,6 +229,7 @@ private:
 	ShadowIntensityPass* r_shadowIntensityPass = nullptr;
 	GizmoPass*    r_gizmoPass    = nullptr;
 	ComposePass*  r_composePass  = nullptr;
+	FXAAPass*     r_fxaaPass     = nullptr;
 
 	// --- Command pool ---
 	vk::raii::CommandPool r_commandPool;
