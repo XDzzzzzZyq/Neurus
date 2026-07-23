@@ -287,6 +287,15 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 		}
 
 		// --------------------------------
+		// #define MACRO VALUE — store raw directive
+		// --------------------------------
+		if (line.compare(0, 7, "#define") == 0)
+		{
+			out.AddDefine(line);
+			continue;
+		}
+
+		// --------------------------------
 		// layout(...) --the big one.  Handle compute local_size,
 		// push_constant blocks, uniform blocks, storage buffers,
 		// vertex/fragment inputs/outputs, standalone sampler uniforms.

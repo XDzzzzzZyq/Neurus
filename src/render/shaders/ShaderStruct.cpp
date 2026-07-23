@@ -303,6 +303,16 @@ void ShaderStruct::AddExtension(const std::string& ext)
 	extensions.push_back(ext);
 }
 
+void ShaderStruct::AddDefine(const std::string& directive)
+{
+	is_struct_changed = true;
+	for (const auto& existing : define_directives)
+	{
+		if (existing == directive) return;
+	}
+	define_directives.push_back(directive);
+}
+
 // --------------------------------------
 // Reset - clears ALL containers to default/empty state
 // --------------------------------------
@@ -328,6 +338,7 @@ void ShaderStruct::Reset()
 	push_constants_var.clear();
 	spec_constants.clear();
 	extensions.clear();
+	define_directives.clear();
 
 	local_size_x = 0;
 	local_size_y = 0;
@@ -359,6 +370,7 @@ bool ShaderStruct::IsEmpty() const
 	    && push_constants.empty()
 	    && spec_constants.empty()
 	    && extensions.empty()
+	    && define_directives.empty()
 	    && version == 0
 	    && local_size_x == 0;
 }

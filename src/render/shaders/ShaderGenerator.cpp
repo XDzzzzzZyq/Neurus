@@ -43,7 +43,17 @@ std::string ShaderGenerator::Generate(ShaderStruct& s)
 		result << "\n";
 	}
 
-	// 3. AB_list - vertex inputs: layout(location = N) in type name;
+	// 3. Define directives (emitted early — used by all following declarations)
+	if (!s.define_directives.empty())
+	{
+		for (const auto& def : s.define_directives)
+		{
+			result << def << "\n";
+		}
+		result << "\n";
+	}
+
+	// 4. AB_list - vertex inputs: layout(location = N) in type name;
 	if (!s.AB_list.empty())
 	{
 		for (const auto& io : s.AB_list)

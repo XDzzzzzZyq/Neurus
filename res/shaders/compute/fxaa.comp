@@ -15,6 +15,17 @@ layout(push_constant) uniform PushConstants {
 } pc;
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+#define STATE_DEFAULT  0
+#define STATE_END      1
+#define STATE_FLIP     2
+#define STATE_BOUND    3
+#define MAX_ITER       32
+#define GRAY_THRESHOLD 0.04
+#define EPSILON        0.000000001
+
+// ---------------------------------------------------------------------------
 // Helpers (basic types only — ShaderParser requirement)
 // ---------------------------------------------------------------------------
 
@@ -41,14 +52,6 @@ struct MarchInfo
 
 void main()
 {
-#define STATE_DEFAULT  0
-#define STATE_END      1
-#define STATE_FLIP     2
-#define STATE_BOUND    3
-#define MAX_ITER       32
-#define GRAY_THRESHOLD 0.04
-#define EPSILON        0.000000001
-
 	ivec2 pixel  = ivec2(gl_GlobalInvocationID.xy);
 	ivec2 extent = imageSize(outputFXAA);
 	if (IsOut(pixel.x, pixel.y, extent.x, extent.y))
