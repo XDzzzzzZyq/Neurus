@@ -1,0 +1,73 @@
+name: macOS Build & Test
+
+on:
+  push:
+    branches: [master, main, "feature/**"]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build-and-test:
+    name: macOS arm64 Debug
+    runs-on: macos-latest
+
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build/debug
+
+    steps:
+      # ------------------------------------------------------------------
+      # Checkout
+      # ------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # ------------------------------------------------------------------
+      # Dependencies (brew)
+      # ------------------------------------------------------------------
+      - name: Install Qt6 and Ninja
+        run: |
+          brew install qt ninja
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt)" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------------
+      # Vulkan SDK (via humbletim/setup-vulkan-sdk)
+      # ------------------------------------------------------------------
+      - name: Setup Vulkan SDK
+        uses: humbletim/setup-vulkan-sdk@v1.2.1
+        with:
+          vulkan-query-version: 1.4.341.0
+          vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, Glslang
+          vulkan-use-cache: true
+
+      # ------------------------------------------------------------------
+      # Shaderc dependency sync
+      # ------------------------------------------------------------------
+      - name: Sync shaderc dependencies
+        run: |
+          cd dep/shaderc
+          python3 utils/git-sync-deps
+
+      # ------------------------------------------------------------------
+      # Configure (CMake)
+      # ------------------------------------------------------------------
+      - name: Configure CMake
+        run: |
+          cmake --preset macos \
+            -DCMAKE_PREFIX_PATH="${{ env.CMAKE_PREFIX_PATH }}"
+
+      # ------------------------------------------------------------------
+      # Build
+      # ------------------------------------------------------------------
+      - name: Build
+        run: |
+          cmake --build ${{ env.BUILD_DIR }} --parallel
+
+      # ------------------------------------------------------------------
+      # Test (non-GPU only)
+      # ------------------------------------------------------------------
+      - name: Run Non-GPU Tests
+        run: |
+          cd ../Neurus_VS2022
+          ctest -C ${{ matrix.configuration }} --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"
