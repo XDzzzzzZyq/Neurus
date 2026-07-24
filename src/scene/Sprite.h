@@ -40,7 +40,7 @@ class Texture;
 /**
  * @brief Types of billboard sprites, determining the icon texture to display.
  */
-enum SpriteType
+enum SpriteType : int
 {
 	NONE_SPRITE = 0,          ///< No sprite (inactive / uninitialized)
 	POINT_LIGHT_SPRITE,       ///< Point light source marker

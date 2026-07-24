@@ -429,7 +429,11 @@ std::string Screenshot::timestampedFilename(const std::string& prefix,
 	const auto now = std::chrono::system_clock::now();
 	const auto timeT = std::chrono::system_clock::to_time_t(now);
 	std::tm tm{};
+#ifdef _WIN32
 	localtime_s(&tm, &timeT);
+#else
+	localtime_r(&timeT, &tm);
+#endif
 
 	std::ostringstream oss;
 	oss << prefix << "_"

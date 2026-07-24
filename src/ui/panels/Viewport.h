@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/Platform.h"
 #include "UIPanel.h"
 
 #include <glm/glm.hpp>

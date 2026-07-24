@@ -7,7 +7,7 @@
 #   3. find_package()         (system SDK)
 #
 # Functions:
-#   neurus_detect_platform()         - set NEURUS_PLATFORM (windows/linux)
+#   neurus_detect_platform()         - set NEURUS_PLATFORM (windows/linux/macos)
 #   neurus_find_dependency(name)     - resolve a dep from lib/ or dep/
 # ---------------------------------------------------------------------------
 
@@ -80,6 +80,18 @@ function(neurus_find_dependency name)
 			# Mark that this dependency was resolved from lib/
 			set(NEURUS_DEP_${name}_FROM_LIB TRUE PARENT_SCOPE)
 
+		elseif(APPLE AND EXISTS "${LIB_DIR}/lib/libshaderc_shared.dylib")
+			message(STATUS "Using pre-compiled shaderc from ${LIB_DIR}")
+
+			add_library(shaderc_shared SHARED IMPORTED)
+			set_target_properties(shaderc_shared PROPERTIES
+				IMPORTED_LOCATION "${LIB_DIR}/lib/libshaderc_shared.dylib"
+			)
+			set_property(TARGET shaderc_shared PROPERTY
+				INTERFACE_INCLUDE_DIRECTORIES "${SHADERC_INCLUDE_DIR}"
+			)
+			set(NEURUS_DEP_${name}_FROM_LIB TRUE PARENT_SCOPE)
+
 		else()
 			message(STATUS "Pre-compiled shaderc not found in ${LIB_DIR}, building from source")
 
@@ -104,6 +116,8 @@ function(neurus_find_dependency name)
 		# Pre-compiled libs must match Qt version (CI and local both use Qt 6.11).
 		set(ADS_LIB_RELEASE "${LIB_DIR}/lib/qtadvanceddocking-qt6_static.lib")
 		set(ADS_LIB_DEBUG   "${LIB_DIR}/lib/qtadvanceddocking-qt6d_static.lib")
+		set(ADS_LIB_RELEASE_MACOS "${LIB_DIR}/lib/libqtadvanceddocking-qt6_static.a")
+		set(ADS_LIB_DEBUG_MACOS   "${LIB_DIR}/lib/libqtadvanceddocking-qt6d_static.a")
 
 		if(EXISTS "${ADS_LIB_RELEASE}")
 			message(STATUS "Using pre-compiled qtadvanceddocking from ${LIB_DIR}")
@@ -126,6 +140,36 @@ function(neurus_find_dependency name)
 				MAP_IMPORTED_CONFIG_MINSIZEREL     Release
 			)
 
+			set_property(TARGET qtadvanceddocking-qt6 PROPERTY
+				INTERFACE_INCLUDE_DIRECTORIES "${DEP_DIR}/src"
+			)
+			target_link_libraries(qtadvanceddocking-qt6 INTERFACE
+				Qt6::Core Qt6::Gui Qt6::Widgets
+			)
+			add_library(ads::qtadvanceddocking-qt6 ALIAS qtadvanceddocking-qt6)
+
+			set(NEURUS_DEP_${name}_FROM_LIB TRUE PARENT_SCOPE)
+
+		elseif(APPLE AND EXISTS "${ADS_LIB_RELEASE_MACOS}")
+			message(STATUS "Using pre-compiled qtadvanceddocking from ${LIB_DIR}")
+
+			add_library(qtadvanceddocking-qt6 STATIC IMPORTED)
+			set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+				IMPORTED_LOCATION_RELEASE "${ADS_LIB_RELEASE_MACOS}"
+			)
+			if(EXISTS "${ADS_LIB_DEBUG_MACOS}")
+				set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+					IMPORTED_LOCATION_DEBUG "${ADS_LIB_DEBUG_MACOS}"
+				)
+			else()
+				set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+					IMPORTED_LOCATION_DEBUG "${ADS_LIB_RELEASE_MACOS}"
+				)
+			endif()
+			set_target_properties(qtadvanceddocking-qt6 PROPERTIES
+				MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
+				MAP_IMPORTED_CONFIG_MINSIZEREL     Release
+			)
 			set_property(TARGET qtadvanceddocking-qt6 PROPERTY
 				INTERFACE_INCLUDE_DIRECTORIES "${DEP_DIR}/src"
 			)

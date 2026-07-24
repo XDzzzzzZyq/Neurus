@@ -34,7 +34,7 @@ enum SpriteType : int;
 /**
  * @brief Enumeration of supported light types.
  */
-enum LightType
+enum LightType : int
 {
 	NONELIGHT = -1,  ///< Invalid or uninitialized light
 	POINTLIGHT,      ///< Omnidirectional point light

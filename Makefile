@@ -2,15 +2,27 @@
 # Neurus - Convenience Build Wrapper
 #
 # This Makefile provides quick-build shortcuts. All real logic is in CMake.
-# Requires: cmake >= 3.27, Visual Studio 2022 with C++20 toolchain
+# Requires: cmake >= 3.27
+#   Windows: Visual Studio 2022 with C++20 toolchain
+#   macOS:   Ninja, AppleClang, Homebrew Qt6 + Vulkan SDK
 # ---------------------------------------------------------------------------
+
+# --- Platform detection ---
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+  PRESET        := macos
+  PRESET_REL    := macos-release
+else
+  PRESET        := default
+  PRESET_REL    := release
+endif
 
 .PHONY: configure build test clean nobuild release help app check update
 
 # --- Debug (default) ---
 
 configure:
-	cmake --preset default
+	cmake --preset $(PRESET)
 
 # Full build only when no sub-target (app/test) is specified.
 #   make build       → full build
@@ -41,7 +53,7 @@ clean:
 # --- Release ---
 
 release:
-	cmake --preset release && cmake --build build/release --config Release
+	cmake --preset $(PRESET_REL) && cmake --build build/release --config Release
 
 # --- Visual Studio 2022 (outside source tree) ---
 
@@ -74,6 +86,6 @@ help:
 # --- Dependency Setup ---
 
 update:
-	python scripts/setup_dependencies.py
-	cmake --preset default
+	python3 scripts/setup_dependencies.py
+	cmake --preset $(PRESET)
 	@echo ""

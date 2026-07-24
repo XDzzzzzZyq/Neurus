@@ -19,7 +19,11 @@
  */
 
 // Must define platform before including any Vulkan headers
+#ifdef _WIN32
 #define VK_USE_PLATFORM_WIN32_KHR
+#elif __APPLE__
+#define VK_USE_PLATFORM_METAL_EXT
+#endif
 
 #include "app/Application.h"
 
@@ -50,7 +54,14 @@
 #include <QTimer>
 
 #include <cmath>
+#ifdef _WIN32
 #include <windows.h>
+#endif
+
+#ifdef __APPLE__
+#include <vulkan/vulkan_metal.h>
+#include "../ui/MacMetalLayer.h"
+#endif
 
 #include <iostream>
 #include <memory>
@@ -166,11 +177,21 @@ bool Application::InitVulkan()
 
 		// Step 2: Create Qt window with Viewport
 		app_mainWindow = std::make_unique<neurus::UIManager>();
+		app_mainWindow->show();  // Must show before surface creation on macOS
 		// Viewport is created internally by UIManager constructor
 
-		// Step 3: Create VkSurfaceKHR from Viewport's native HWND
+		// Step 3: Create VkSurfaceKHR from Viewport's native handle
+#ifdef _WIN32
 		HINSTANCE hinstance = GetModuleHandle(nullptr);
 		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, app_mainWindow->getViewportHwnd());
+#elif __APPLE__
+		void* metalLayer = makeViewMetalCompatible(app_mainWindow->getViewportHwnd());
+		if (!metalLayer) {
+			NEURUS_ERR("Failed to create CAMetalLayer from Viewport NSView");
+			return false;
+		}
+		vk::MetalSurfaceCreateInfoEXT surfaceCreateInfo({}, static_cast<const CAMetalLayer*>(metalLayer));
+#endif
 		app_surface = std::make_unique<vk::raii::SurfaceKHR>(app_vkContext->instance(), surfaceCreateInfo);
 
 		// Step 4: Create logical device
@@ -439,9 +460,15 @@ void Application::RecreateSignals(neurus::UIEvents& uiEvents)
 	                         return;
 	                     try
 	                     {
+#ifdef _WIN32
 	                         HINSTANCE hinstance = GetModuleHandle(nullptr);
 	                         vk::Win32SurfaceCreateInfoKHR surfaceCI({}, hinstance,
 	                             reinterpret_cast<HWND>(newHwnd));
+#elif __APPLE__
+	                         void* metalLayer = makeViewMetalCompatible(reinterpret_cast<void*>(newHwnd));
+	                         vk::MetalSurfaceCreateInfoEXT surfaceCI({},
+	                             static_cast<const CAMetalLayer*>(metalLayer));
+#endif
 	                         auto new_surface = std::make_unique<vk::raii::SurfaceKHR>(
 	                             app_vkContext->instance(), surfaceCI);
 	                         app_renderer->HandleSurfaceChange(*new_surface);

@@ -21,6 +21,7 @@ Viewport::Viewport(QWidget* parent)
 	// Tell Qt this widget paints all its pixels - no background fill needed.
 	// Vulkan handles all rendering for this widget's area.
 	setAttribute(Qt::WA_OpaquePaintEvent);
+	setAttribute(Qt::WA_NoSystemBackground);
 	setAutoFillBackground(false);
 
 	// Enable keyboard focus for input handling

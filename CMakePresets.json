@@ -57,6 +57,32 @@
 				"NEURUS_BUILD_TESTS": "ON",
 				"NEURUS_ENABLE_VALIDATION": "ON"
 			}
+		},
+		{
+			"name": "macos",
+			"displayName": "macOS arm64 Debug (Ninja)",
+			"description": "Debug build for Apple Silicon - uses Ninja + AppleClang",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/debug",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Debug",
+				"CMAKE_OSX_ARCHITECTURES": "arm64",
+				"NEURUS_BUILD_TESTS": "ON",
+				"NEURUS_ENABLE_VALIDATION": "ON"
+			}
+		},
+		{
+			"name": "macos-release",
+			"displayName": "macOS arm64 Release (Ninja)",
+			"description": "Optimized release build for Apple Silicon",
+			"generator": "Ninja",
+			"binaryDir": "${sourceDir}/build/release",
+			"cacheVariables": {
+				"CMAKE_BUILD_TYPE": "Release",
+				"CMAKE_OSX_ARCHITECTURES": "arm64",
+				"NEURUS_BUILD_TESTS": "OFF",
+				"NEURUS_ENABLE_VALIDATION": "OFF"
+			}
 		}
 	],
 	"buildPresets": [
@@ -67,6 +93,14 @@
 		{
 			"name": "release",
 			"configurePreset": "release"
+		},
+		{
+			"name": "macos",
+			"configurePreset": "macos"
+		},
+		{
+			"name": "macos-release",
+			"configurePreset": "macos-release"
 		}
 	]
 }

@@ -32,6 +32,16 @@ add_library(neurus_ui STATIC
 	panels/Viewport.cpp
 )
 
+# macOS: Add Objective-C++ Metal layer helper
+if(APPLE)
+	target_sources(neurus_ui PRIVATE MacMetalLayer.h MacMetalLayer.mm)
+	target_link_libraries(neurus_ui PRIVATE
+		"-framework AppKit"
+		"-framework QuartzCore"
+		"-framework Metal"
+	)
+endif()
+
 target_link_libraries(neurus_ui PUBLIC
 	Qt6::Core
 	Qt6::Quick
@@ -48,7 +58,7 @@ target_link_libraries(neurus_ui PRIVATE
 # ADS_STATIC: tell Qt-Advanced-Docking-System headers to use static linkage
 target_compile_definitions(neurus_ui PUBLIC ADS_STATIC)
 
-target_include_directories(neurus_ui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(neurus_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # Qt resource file (QML)
 qt_add_resources(neurus_ui "resources"

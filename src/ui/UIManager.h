@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
-#include <Windows.h>
+#include "core/Platform.h"
 #include <map>
 
 #include "panels/UIPanel.h"
