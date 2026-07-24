@@ -1,9 +1,8 @@
-// MacMetalLayer.mm — macOS Objective-C++ helper for Vulkan surface creation.
-//
-// Configures a QWidget's NSView with a CAMetalLayer subview so that
-// VK_EXT_metal_surface can create a VkSurfaceKHR from it.
-// Uses a child NSView (NeurusMetalView) rather than replacing QNSView's
-// own layer, which avoids conflicts with Qt's compositing.
+#define VK_USE_PLATFORM_METAL_EXT
+#include <vulkan/vulkan.h>
+
+#include "MacOSSurface.h"
+#include <vulkan/vulkan_raii.hpp>
 
 #import <AppKit/AppKit.h>
 #import <QuartzCore/CAMetalLayer.h>
@@ -44,8 +43,11 @@
 // Association key to attach the NeurusMetalView to the parent QNSView.
 static const char kMetalViewKey = 0;
 
-extern "C" {
+namespace {
 
+/// Configure the native view for Metal rendering by attaching a NeurusMetalView.
+/// Returns the CAMetalLayer pointer (as void*) for VkMetalSurfaceCreateInfoEXT,
+/// or nullptr on failure.
 void* makeViewMetalCompatible(void* nativeHandle)
 {
     @autoreleasepool {
@@ -86,6 +88,7 @@ void* makeViewMetalCompatible(void* nativeHandle)
     }
 }
 
+/// Update the CAMetalLayer drawable size to match the parent view's current bounds.
 void updateMetalLayerSize(void* nativeHandle)
 {
     @autoreleasepool {
@@ -112,4 +115,37 @@ void updateMetalLayerSize(void* nativeHandle)
     }
 }
 
-} // extern "C"
+} // anonymous namespace
+
+namespace neurus {
+
+std::vector<const char*> MacOSSurface::requiredInstanceExtensions() const
+{
+    return {
+        VK_KHR_SURFACE_EXTENSION_NAME,
+        VK_EXT_METAL_SURFACE_EXTENSION_NAME,
+        VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
+    };
+}
+
+vk::InstanceCreateFlags MacOSSurface::instanceCreateFlags() const
+{
+    return vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR;
+}
+
+vk::raii::SurfaceKHR MacOSSurface::createSurface(
+    const vk::raii::Instance& instance,
+    NativeWindowHandle windowHandle) const
+{
+    CAMetalLayer* metalLayer = (__bridge CAMetalLayer*)makeViewMetalCompatible(windowHandle);
+    vk::MetalSurfaceCreateInfoEXT createInfo({}, metalLayer);
+    return vk::raii::SurfaceKHR(instance, createInfo);
+}
+
+void MacOSSurface::onResize(NativeWindowHandle windowHandle,
+                            uint32_t /*width*/, uint32_t /*height*/) const
+{
+    updateMetalLayerSize(windowHandle);
+}
+
+} // namespace neurus

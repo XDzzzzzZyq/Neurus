@@ -9,12 +9,11 @@
 
 #pragma once
 
-#define VK_USE_PLATFORM_WIN32_KHR
-
 #include <gtest/gtest.h>
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "platform/PlatformSurface.h"
 #include "render/Barrier.h"
 #include "render/RenderCache.h"
 #include "render/UploadManager.h"
@@ -267,6 +266,7 @@ protected:
 
 	// --- Vulkan state (destructor order: reverse declaration) ---
 	bool m_hasVulkan = false;
+	std::unique_ptr<neurus::PlatformSurface> m_platform;
 	vk::raii::Context m_context;
 	std::unique_ptr<vk::raii::Instance> m_instance;
 	vk::raii::PhysicalDevices m_physicalDevices = nullptr;

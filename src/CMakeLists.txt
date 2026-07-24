@@ -7,6 +7,9 @@
 # Core Types (header-only, no dependencies)
 add_subdirectory(core)
 
+# Platform Layer (Vulkan surface abstraction - leaf dependency)
+add_subdirectory(platform)
+
 # Asset Layer (CPU-side data only - no internal dependencies)
 add_subdirectory(asset)
 

@@ -32,16 +32,6 @@ add_library(neurus_ui STATIC
 	panels/Viewport.cpp
 )
 
-# macOS: Add Objective-C++ Metal layer helper
-if(APPLE)
-	target_sources(neurus_ui PRIVATE MacMetalLayer.h MacMetalLayer.mm)
-	target_link_libraries(neurus_ui PRIVATE
-		"-framework AppKit"
-		"-framework QuartzCore"
-		"-framework Metal"
-	)
-endif()
-
 target_link_libraries(neurus_ui PUBLIC
 	Qt6::Core
 	Qt6::Quick

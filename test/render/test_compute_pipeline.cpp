@@ -4,6 +4,7 @@
 #include "render/shaders/ShaderModule.h"
 #include "render/DescriptorManager.h"
 #include "app/VulkanContext.h"
+#include "platform/PlatformSurface.h"
 #include "shared/TestMinimalSpv.h"
 
 using namespace neurus;
@@ -21,7 +22,7 @@ protected:
 	{
 		try
 		{
-			m_instance = VulkanContext::CreateInstance();
+			auto platform = CreatePlatformSurface(); m_instance = VulkanContext::CreateInstance(*platform);
 			m_physicalDevices = vk::raii::PhysicalDevices(m_instance);
 			m_hasVulkan = !m_physicalDevices.empty();
 

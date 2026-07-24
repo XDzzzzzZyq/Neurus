@@ -29,12 +29,21 @@ void VulkanTestShared::SetUp()
 		                            VK_API_VERSION_1_4);
 		std::vector<const char*> instanceExts = {
 			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #ifdef _DEBUG
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif
 		};
-		vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
+
+		// Add platform-specific extensions via PlatformSurface
+		m_platform = neurus::CreatePlatformSurface();
+		auto platformExts = m_platform->requiredInstanceExtensions();
+		for (const auto* ext : platformExts) {
+			// Skip VK_KHR_SURFACE (already added above)
+			if (std::strcmp(ext, VK_KHR_SURFACE_EXTENSION_NAME) != 0)
+				instanceExts.push_back(ext);
+		}
+
+		vk::InstanceCreateInfo instanceCI(m_platform->instanceCreateFlags(), &appInfo, {}, instanceExts);
 		m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
 
 		// --- Physical device ---

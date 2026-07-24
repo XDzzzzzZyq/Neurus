@@ -58,7 +58,7 @@ UIManager::~UIManager()
 // Viewport accessors
 // =========================================================================
 
-HWND UIManager::getViewportHwnd() const
+NativeWindowHandle UIManager::getViewportHwnd() const
 {
 	auto* vp = GetPanel<Viewport>();
 	return vp ? vp->hwnd() : nullptr;
@@ -220,7 +220,7 @@ void UIManager::CreateDocks()
 	auto viewport = std::make_unique<Viewport>();
 	viewport->resize(800, 600);
 	viewport->winId();  // Force native window handle creation
-	HWND newHwnd = viewport->hwnd();
+	NativeWindowHandle newHwnd = viewport->hwnd();
 
 	auto* viewportDock = new ads::CDockWidget(win_dockManager, viewport->PanelName());
 	viewportDock->setWidget(viewport.get(), ads::CDockWidget::ForceNoScrollArea);
@@ -276,7 +276,7 @@ void UIManager::CreateDocks()
 	textureDock->setMinimumSize(200, 150);
 	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
 
-	// Notify Application of the new native HWND for surface recreation
+	// Notify Application of the new native window handle for surface recreation
 	UIEvents::instance().requestUIRecreation(reinterpret_cast<quintptr>(newHwnd));
 }
 

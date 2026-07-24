@@ -4,6 +4,7 @@
 #include "render/shaders/ShaderLibrary.h"
 #include "render/shaders/ComputeShader.h"
 #include "app/VulkanContext.h"
+#include "platform/PlatformSurface.h"
 #include "shared/TestMinimalSpv.h"
 
 using namespace neurus;
@@ -24,7 +25,8 @@ protected:
 	{
 		try
 		{
-			m_instance = VulkanContext::CreateInstance();
+			auto platform = CreatePlatformSurface();
+			m_instance = VulkanContext::CreateInstance(*platform);
 			m_physicalDevices = vk::raii::PhysicalDevices(m_instance);
 			m_hasVulkan = !m_physicalDevices.empty();
 
@@ -208,6 +210,7 @@ TEST_F(ShaderModuleTest, FromEmbedded_ReuseAfterDestruction)
 		*m_device, kMinimalCompSpv, kMinimalCompSpvSize);
 	EXPECT_NE(*module.handle(), VK_NULL_HANDLE);
 
-	// New module gets a fresh handle (old one was destroyed)
-	EXPECT_NE(*module.handle(), firstHandle);
+	// Note: Some drivers (e.g., MoltenVK) may reuse the same handle value
+	// after destruction. We only verify the new module is valid, not that
+	// the handle differs from the destroyed one.
 }

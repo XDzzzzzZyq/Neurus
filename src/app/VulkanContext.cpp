@@ -1,13 +1,7 @@
-// Must define platform before including any Vulkan headers
-#ifdef _WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
-#elif __APPLE__
-#define VK_USE_PLATFORM_METAL_EXT
-#endif
-
 #include "VulkanContext.h"
 
 #include "core/Log.h"
+#include "platform/PlatformSurface.h"
 
 #include <stdexcept>
 #include <set>
@@ -37,31 +31,15 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 	return VK_FALSE;
 }
 
-static std::vector<const char*> getRequiredInstanceExtensions()
-{
-	std::vector<const char*> extensions;
-	extensions.push_back(VK_KHR_SURFACE_EXTENSION_NAME);
-#ifdef _WIN32
-	extensions.push_back(VK_KHR_WIN32_SURFACE_EXTENSION_NAME);
-#elif __APPLE__
-	extensions.push_back(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
-	extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-#endif
-	if constexpr (kEnableValidation)
-		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-	return extensions;
-}
 
-vk::raii::Instance VulkanContext::CreateInstance()
+vk::raii::Instance VulkanContext::CreateInstance(const PlatformSurface& platform)
 {
 	vk::ApplicationInfo appInfo("Neurus", VK_MAKE_VERSION(0,1,0), "NeurusRenderer", VK_MAKE_VERSION(0,1,0), VK_API_VERSION_1_4);
-	auto extensions = getRequiredInstanceExtensions();
+	auto extensions = platform.requiredInstanceExtensions();
+	if constexpr (kEnableValidation)
+		extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
-#ifdef __APPLE__
-	vk::InstanceCreateInfo createInfo(vk::InstanceCreateFlagBits::eEnumeratePortabilityKHR, &appInfo, {}, extensions);
-#else
-	vk::InstanceCreateInfo createInfo({}, &appInfo, {}, extensions);
-#endif
+	vk::InstanceCreateInfo createInfo(platform.instanceCreateFlags(), &appInfo, {}, extensions);
 
 	if constexpr (kEnableValidation)
 	{

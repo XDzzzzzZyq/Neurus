@@ -1,7 +1,7 @@
 #pragma once
 
 #include <QMainWindow>
-#include "core/Platform.h"
+#include "platform/PlatformSurface.h"
 #include <map>
 
 #include "panels/UIPanel.h"
@@ -21,8 +21,8 @@ public:
 	explicit UIManager(QWidget* parent = nullptr);
 	~UIManager() override;
 
-	/** @brief Returns the Viewport's native HWND for VkSurface creation. */
-	HWND getViewportHwnd() const;
+	/** @brief Returns the Viewport's native window handle for VkSurface creation. */
+	NativeWindowHandle getViewportHwnd() const;
 
 	/** @brief Returns viewport widget width in pixels. */
 	int getViewportWidth() const;
