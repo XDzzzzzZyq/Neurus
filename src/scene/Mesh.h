@@ -36,6 +36,7 @@ namespace neurus
 
 class Material;
 class MeshData;
+class Shader;
 /**
  * @brief 3D mesh object representing renderable geometry with material and transform.
  *
@@ -62,8 +63,8 @@ public:
 	/// High-resolution geometry (vertex/index buffers)
 	std::shared_ptr<MeshData> o_mesh;
 
-	/// Shader program for rendering this mesh (non-owning void pointer)
-	void* o_shader = nullptr;
+	/// CPU-side shader for rendering this mesh (null = use default pass shader)
+	std::shared_ptr<Shader> o_shader;
 
 	bool using_shadow   = true;
 	bool using_material = true;
@@ -94,14 +95,14 @@ public:
 
 	void ReloadMeshData(const std::string& assetDir = "");
 
-	void SetObjShader(void* shader);
+	void SetObjShader(std::shared_ptr<Shader> shader);
 	void SetTex(int _type, const std::string& _name);
 	void SetMatColor(int _type, float _val);
 	void SetMatColor(int _type, const glm::vec3& _col);
 	void EnableShadow(bool _enable) { using_shadow = _enable; }
 	void EnableMaterial(bool _enable) { using_material = _enable; }
 	void EnableSDF(bool _enable) { using_sdf = _enable; }
-	void* GetShader() override { return o_shader; }
+	void* GetShader() override { return o_shader.get(); }
 	void* GetMaterial() override { return o_material.get(); }
 	void* GetTransform() override { return static_cast<Transform*>(this); }
 

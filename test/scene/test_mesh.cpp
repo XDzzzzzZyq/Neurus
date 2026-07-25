@@ -11,12 +11,27 @@
 #include <glm/glm.hpp>
 
 #include "scene/Mesh.h"
+#include "render/shaders/Shader.h"
 #include "scene/Transform.h"
 #include "scene/UID.h"
 #include "asset/MeshData.h"
 #include "scene/Material.h"
 
 using namespace neurus;
+
+namespace
+{
+
+/** @brief Minimal test Shader subclass for verifying typed SetObjShader. */
+class TestShader : public Shader
+{
+public:
+	TestShader() : Shader("test") {}
+	bool ParseAndGenerate() override { return true; }
+	ShaderType GetType() const override { return ShaderType::COMPUTE; }
+};
+
+} // anonymous namespace
 
 // -----------------------------------------------------------------------
 // Construction
@@ -257,17 +272,17 @@ TEST(Mesh, SetMatColorNoMaterialNoCrash)
 // -----------------------------------------------------------------------
 
 /**
- * @brief SetObjShader stores the provided shader pointer.
+ * @brief o_shader is null by default and SetObjShader stores the provided shader.
  */
 TEST(Mesh, SetObjShader)
 {
 	Mesh mesh;
 	EXPECT_EQ(mesh.o_shader, nullptr);
 
-	int dummy_shader = 42;
-	mesh.SetObjShader(&dummy_shader);
-	EXPECT_EQ(mesh.o_shader, &dummy_shader);
-	EXPECT_EQ(mesh.GetShader(), &dummy_shader);
+	auto shader = std::make_shared<TestShader>();
+	mesh.SetObjShader(shader);
+	EXPECT_EQ(mesh.o_shader, shader);
+	EXPECT_EQ(mesh.GetShader(), shader.get());
 }
 
 // -----------------------------------------------------------------------

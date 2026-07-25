@@ -34,6 +34,6 @@ void Mesh::ReloadMeshData(const std::string& assetDir)
 	}
 }
 
-void Mesh::SetObjShader(void* shader) { o_shader = shader; }
+void Mesh::SetObjShader(std::shared_ptr<Shader> shader) { o_shader = std::move(shader); }
 
 } // namespace neurus
