@@ -77,8 +77,23 @@ void GPUBuffer::Unmap()
 	vk::BufferCopy copyRegion(0, 0, b_size);
 	cmd.copyBuffer(b_staging->buffer(), this->buffer(), copyRegion);
 
-	// --- Buffer barrier: transfer write → visible to all GPU operations ---
-	Barrier::Transition(cmd, *this, BufferState::General);
+	// --- Release barrier: make transfer writes available to subsequent
+	//     graphics queue usage without using ALL_COMMANDS_BIT (invalid for
+	//     transfer-only command pools per VUID-vkCmdPipelineBarrier2-dstStageMask-09676).
+	//     The buffer stays in General state logically; the graphics queue transitions
+	//     it to ShaderRead/ShaderWrite on first use.
+	{
+		vk::BufferMemoryBarrier2 barrier(
+			vk::PipelineStageFlagBits2::eTransfer,
+			vk::AccessFlagBits2::eTransferWrite,
+			vk::PipelineStageFlagBits2::eBottomOfPipe,
+			vk::AccessFlagBits2::eNone,
+			0, 0,
+			this->buffer(), 0, b_size);
+		vk::DependencyInfo depInfo({}, {}, {}, barrier);
+		cmd.pipelineBarrier2(depInfo);
+	}
+	b_state = BufferState::General;
 
 	b_staging->EndStaging(b_queue);
 }
