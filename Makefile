@@ -11,11 +11,11 @@
 UNAME := $(shell uname -s)
 ifeq ($(UNAME),Darwin)
   PRESET        := macos
-  PRESET_REL    := macos-release
+  PRESET_REL    := macos
   PYTHON        := python3
 else
-  PRESET        := default
-  PRESET_REL    := release
+  PRESET        := win
+  PRESET_REL    := win
   PYTHON        := python
 endif
 
@@ -32,30 +32,30 @@ configure:
 #   make build test  → neurus_test only
 build:
 ifeq ($(filter app test,$(MAKECMDGOALS)),)
-	cmake --build build/debug --config Debug
+	cmake --build build --config Debug
 endif
 
 # Build Neurus.exe only (make app  or  make build app)
 app:
-	cmake --build build/debug --target Neurus --config Debug
+	cmake --build build --target Neurus --config Debug
 
 # Build neurus_test only (make test  or  make build test)
 test:
-	cmake --build build/debug --target neurus_test --config Debug
+	cmake --build build --target neurus_test --config Debug
 
 # Run tests. Pass FILTER for specific tests.
 #   make check                          → all tests
 #   make check FILTER="-R DeferredShading" → filtered
 check:
-	cd build/debug && ctest -C Debug --output-on-failure $(FILTER)
+	cd build && ctest -C Debug --output-on-failure $(FILTER)
 
 clean:
-	cmake --build build/debug --target clean
+	cmake --build build --target clean
 
 # --- Release ---
 
 release:
-	cmake --preset $(PRESET_REL) && cmake --build build/release --config Release
+	cmake --preset $(PRESET_REL) && cmake --build build --config Release
 
 # --- Visual Studio 2022 (outside source tree) ---
 
@@ -90,5 +90,5 @@ help:
 update:
 	git submodule update --init --recursive
 	$(PYTHON) scripts/setup_dependencies.py
-	cmake --preset $(PRESET)
+	cmake --preset $(PRESET) $(if $(BINARY_DIR),-B $(BINARY_DIR),)
 	@echo ""

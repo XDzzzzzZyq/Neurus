@@ -40,12 +40,11 @@ jobs:
 
       - name: Update dependencies and configure
         shell: bash
-        run: make update PRESET=vs2022
+        run: make update
 
       - name: Build
-        run: cmake --build ../Neurus_VS2022 --config ${{ matrix.configuration }} --parallel
+        run: cmake --build build --config ${{ matrix.configuration }} --parallel
 
       - name: Run Non-GPU Tests
-        run: |
-          cd ../Neurus_VS2022
-          ctest -C ${{ matrix.configuration }} --output-on-failure
+        working-directory: build
+        run: ctest -C ${{ matrix.configuration }} --output-on-failure
