@@ -1,7 +1,6 @@
 #include "PipelineBuilder.h"
 
 #include "buffers/BufferLayout.h"
-#include "shaders/ShaderModule.h"
 
 #include <stdexcept>
 
@@ -10,15 +9,6 @@ namespace neurus {
 // ---------------------------------------------------------------------------
 // Shader stages
 // ---------------------------------------------------------------------------
-
-PipelineBuilder& PipelineBuilder::AddShaderStage(
-	const ShaderModule& module,
-	vk::ShaderStageFlagBits stage,
-	const char* entryPoint)
-{
-	p_stages.push_back(module.GetStageInfo(stage, entryPoint));
-	return *this;
-}
 
 PipelineBuilder& PipelineBuilder::AddShaderStage(
 	const vk::PipelineShaderStageCreateInfo& stageInfo)
