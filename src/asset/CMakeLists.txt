@@ -9,6 +9,9 @@ add_library(neurus_asset STATIC
 	MeshData.cpp
 	Project.h
 	Project.cpp
+	SceneComponent.h
+	SceneComponent.cpp
+	Serializable.h
 	TypeRegistration.cpp
 )
 
@@ -18,6 +21,7 @@ target_link_libraries(neurus_asset PUBLIC
 	neurus_core
 	neurus_scene
 	cereal
+	neurus_render      # needed by ConfigComponent.cpp
 )
 
 target_include_directories(neurus_asset PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
