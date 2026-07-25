@@ -123,6 +123,15 @@ if(TARGET shaderc_shared)
 	)
 endif()
 
+# Copy res/ to the build directory so tests can access assets from CWD
+# (ctest runs from CMAKE_BINARY_DIR; no relative path probing needed)
+add_custom_command(TARGET neurus_test POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+		"${CMAKE_SOURCE_DIR}/res"
+		"${CMAKE_BINARY_DIR}/res"
+	COMMENT "Copying res/ to build directory for test access"
+)
+
 # Register tests with CTest
 include(GoogleTest)
 gtest_discover_tests(neurus_test

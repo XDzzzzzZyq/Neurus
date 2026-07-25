@@ -176,26 +176,11 @@ void VulkanTestShared::EndSubmitWait(vk::raii::CommandBuffer& cmd)
 
 std::string VulkanTestShared::ResolveAssetPath(const char* assetRelative)
 {
-	// Try: relative from build/ (Ninja Multi-Config ctest CWD)
-	std::string path0 = std::string("../") + assetRelative;
-	{
-		std::ifstream f(path0);
-		if (f.good()) return path0;
-	}
-	// Try: relative from build/debug/Debug/ (MSVC multi-config layout)
-	std::string path1 = std::string("../../../") + assetRelative;
-	{
-		std::ifstream f(path1);
-		if (f.good()) return path1;
-	}
-	// Try: relative from build/debug/ (single-config layout)
-	std::string path2 = std::string("../../") + assetRelative;
-	{
-		std::ifstream f(path2);
-		if (f.good()) return path2;
-	}
-	// Fallback: return the primary path and let the caller handle failure
-	return path1;
+	// res/ is copied to CMAKE_BINARY_DIR/res by a POST_BUILD step on neurus_test.
+	// CTest runs from CMAKE_BINARY_DIR, so assets resolve directly.
+	std::ifstream f(assetRelative);
+	if (f.good()) return assetRelative;
+	return assetRelative;  // return the path; caller handles missing files
 }
 
 // ===========================================================================
