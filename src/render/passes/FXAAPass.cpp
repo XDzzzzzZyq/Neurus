@@ -16,7 +16,7 @@ FXAAPass::FXAAPass(const vk::raii::Device& device,
                    const vk::raii::PhysicalDevice& physicalDevice,
                    uint32_t numSets)
 	: ComputePass(device, physicalDevice, CreateLayout(device), numSets)
-	, p_shader(ShaderLibrary::LoadComputeShader("fxaa", NEURUS_SHADER_DIR "compute/fxaa.comp"))
+	, m_shader(ShaderLibrary::ParseComputeShader("fxaa", NEURUS_SHADER_DIR "compute/fxaa.comp"))
 {
 	// Check format features: linear filtering required for sub-pixel texture() resample
 	auto fmtProps = physicalDevice.getFormatProperties(vk::Format::eR16G16B16A16Sfloat);
@@ -29,10 +29,9 @@ FXAAPass::FXAAPass(const vk::raii::Device& device,
 		m_hasBilinear = true;
 	}
 
-	if (p_shader) p_shader->CreateModule(device);
 	BuildPipeline(device, "FXAAPass");
 	NEURUS_LOG("[FXAAPass] numSets=" << numSets
-	           << " shader=" << (p_shader && p_shader->IsValid() ? "OK" : "FAIL")
+	           << " shader=" << (m_shader ? "OK" : "FAIL")
 	           << " bilinear=" << (linearOk ? "yes" : "NO (fallback to nearest)"));
 }
 
@@ -64,13 +63,15 @@ DescriptorSetLayout FXAAPass::CreateLayout(const vk::raii::Device& d)
 
 void FXAAPass::BuildPipeline(const vk::raii::Device& device, const std::string& debugName)
 {
-	if (!p_shader || !p_shader->IsValid())
+	if (!m_shader)
 		throw std::runtime_error("FXAAPass: shader invalid");
-	auto mod = p_shader->GetShaderModule(ShaderType::COMPUTE);
+	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	                                  ShaderType::COMPUTE, debugName);
+	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
 	vk::PushConstantRange pc(vk::ShaderStageFlagBits::eCompute, 0, sizeof(FXAAPushConstants));
 	p_pipelines.push_back(
 		PipelineBuilder()
-			.AddShaderStage(*mod, vk::ShaderStageFlagBits::eCompute, "main")
+			.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pc)

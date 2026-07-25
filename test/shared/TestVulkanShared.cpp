@@ -145,9 +145,9 @@ void VulkanTestShared::TearDown()
 	{
 		m_device->waitIdle();
 	}
-	// Clear ShaderLibrary cache between tests — each test has its own vk::Device.
-	// Cached ShaderModule handles from a previous test's device are invalid here.
-	ShaderLibrary::Clear();
+	// ShaderLibrary no longer caches shaders — no explicit cleanup needed.
+	// Each pass owns unique_ptr<Shader>; vk::raii::ShaderModule objects are
+	// temporary and destroyed before BuildPipeline returns.
 }
 
 // ===========================================================================

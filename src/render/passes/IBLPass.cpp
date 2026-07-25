@@ -40,22 +40,18 @@ IBLPass::IBLPass(const vk::raii::Device& device,
                  const vk::raii::PhysicalDevice& physicalDevice)
 	: ComputePass(device, physicalDevice, IBLPass::CreateDescriptorSetLayout(device), 1)
 	// --- Self-load compute shaders via ShaderLibrary ---
-	, p_irradianceShader(
-		ShaderLibrary::LoadComputeShader("irradiance",
-		                                 "res/shaders/compute/irradiance_conv.comp"))
-	, p_specularShader(
-		ShaderLibrary::LoadComputeShader("importance_samp",
-		                                 "res/shaders/compute/importance_samp.comp"))
+	, m_irradianceShader(
+		ShaderLibrary::ParseComputeShader("irradiance",
+		                                  "res/shaders/compute/irradiance_conv.comp"))
+	, m_specularShader(
+		ShaderLibrary::ParseComputeShader("importance_samp",
+		                                  "res/shaders/compute/importance_samp.comp"))
 {
-	// --- Create modules from self-loaded shaders ---
-	if (p_irradianceShader) { p_irradianceShader->CreateModule(device); }
-	if (p_specularShader)   { p_specularShader->CreateModule(device); }
-
 	// --- Create pipelines from self-loaded shaders ---
 	BuildPipeline(device, "IBLPass");
 
-	NEURUS_LOG("[IBLPass] irradiance=" << (p_irradianceShader ? "OK" : "FAIL")
-	           << " specular=" << (p_specularShader ? "OK" : "FAIL"));
+	NEURUS_LOG("[IBLPass] irradiance=" << (m_irradianceShader ? "OK" : "FAIL")
+	           << " specular=" << (m_specularShader ? "OK" : "FAIL"));
 }
 
 IBLPass::~IBLPass() = default;
@@ -295,15 +291,17 @@ vk::raii::Sampler IBLPass::CreateEquirectSampler(const vk::raii::Device& device)
 void IBLPass::BuildPipeline(const vk::raii::Device& device,
                              const std::string& debugName)
 {
-	auto buildOne = [&](std::shared_ptr<ComputeShader> computeShader,
+	auto buildOne = [&](std::unique_ptr<ComputeShader>& computeShader,
 	                    const char* subName) -> Pipeline
 	{
-		if (!computeShader || !computeShader->IsValid())
+		if (!computeShader)
 		{
 			throw std::runtime_error(std::string("IBLPass: ") + subName + " shader not loaded or invalid");
 		}
 
-		auto compModule = computeShader->GetShaderModule(ShaderType::COMPUTE);
+		auto spv = ShaderLibrary::Compile(computeShader->GetStage(ShaderType::COMPUTE),
+		                                  ShaderType::COMPUTE, subName);
+		vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
 
 		PipelineBuilder builder;
 
@@ -312,15 +310,15 @@ void IBLPass::BuildPipeline(const vk::raii::Device& device,
 			0,
 			sizeof(IBLPushConstants));
 
-		return builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		return builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
 			.SetDebugName(subName)
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
 			.BuildComputePipeline(device);
 	};
 
-	p_pipelines.push_back(buildOne(p_irradianceShader, (debugName + "::Irradiance").c_str()));
-	p_pipelines.push_back(buildOne(p_specularShader,   (debugName + "::Specular").c_str()));
+	p_pipelines.push_back(buildOne(m_irradianceShader, (debugName + "::Irradiance").c_str()));
+	p_pipelines.push_back(buildOne(m_specularShader,   (debugName + "::Specular").c_str()));
 }
 
 // ---------------------------------------------------------------------------

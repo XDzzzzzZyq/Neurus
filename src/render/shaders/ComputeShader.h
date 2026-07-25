@@ -71,6 +71,16 @@ public:
 	 */
 	ComputeShader(std::string name, std::string compPath);
 
+	~ComputeShader() override = default;
+
+	// Non-copyable (inherits from Shader)
+	ComputeShader(const ComputeShader&) = delete;
+	ComputeShader& operator=(const ComputeShader&) = delete;
+
+	// Movable
+	ComputeShader(ComputeShader&&) noexcept = default;
+	ComputeShader& operator=(ComputeShader&&) noexcept = default;
+
 	// ----------------------------------
 	// Shader interface (override)
 	// ----------------------------------

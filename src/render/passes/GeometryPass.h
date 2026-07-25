@@ -124,7 +124,7 @@ private:
 	// (Pipelines inherited from Pass — p_pipelines[0])
 
 	// --- Self-loaded render shader (via ShaderLibrary) ---
-	std::shared_ptr<RenderShader> p_renderShader;
+	std::unique_ptr<RenderShader> m_shader;
 
 	// --- Vertex input layout ---
 	BufferLayout p_vertexLayout;

@@ -43,9 +43,7 @@ protected:
 
 	void TearDown() override
 	{
-		// ShaderLibrary cache must be cleared before the device is destroyed,
-		// otherwise cached ShaderModules outlive their Vulkan device.
-		ShaderLibrary::Clear();
+		// ShaderLibrary no longer caches shaders — no cleanup needed.
 	}
 
 	/**

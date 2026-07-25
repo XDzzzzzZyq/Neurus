@@ -123,8 +123,8 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_CreatesValidPipeline)
 
 	// Build a simple triangle pipeline
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()                               // No vertex buffers
 		.SetInputAssembly()                             // TriangleList
 		.SetRasterization()                             // Fill, no cull
@@ -154,8 +154,8 @@ TEST_F(PipelineBuilderTest, SetVertexInput_FromBufferLayout_ValidPipeline)
 	layout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);  // float3 color
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput(layout)
 		.SetInputAssembly()
 		.SetRasterization()
@@ -180,8 +180,8 @@ TEST_F(PipelineBuilderTest, SetDepthStencil_WithDepthTest_ValidPipeline)
 	}
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -207,8 +207,8 @@ TEST_F(PipelineBuilderTest, SetRasterization_Wireframe_CullBack)
 	}
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization(
@@ -236,8 +236,8 @@ TEST_F(PipelineBuilderTest, SetInputAssembly_LineStrip_ValidPipeline)
 	}
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly(vk::PrimitiveTopology::eLineStrip)
 		.SetRasterization()
@@ -274,8 +274,8 @@ TEST_F(PipelineBuilderTest, SetDescriptorSetLayouts_ValidPipeline)
 	std::vector<vk::DescriptorSetLayout> layouts = { *descriptorSetLayout };
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -306,8 +306,8 @@ TEST_F(PipelineBuilderTest, SetPushConstantRanges_ValidPipeline)
 		sizeof(float) * 16);  // Typical 4x4 matrix
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -335,8 +335,8 @@ TEST_F(PipelineBuilderTest, SetPipelineCache_CreatesValidPipeline)
 	vk::raii::PipelineCache cache(*m_device, vk::PipelineCacheCreateInfo());
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()
@@ -390,8 +390,8 @@ TEST_F(PipelineBuilderTest, BuildGraphicsPipeline_NoColorFormats_Throws)
 	EXPECT_THROW(
 		{
 			PipelineBuilder()
-				.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-				.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+				.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+				.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 				.SetVertexInput()
 				.SetInputAssembly()
 				.SetRasterization()
@@ -416,8 +416,8 @@ TEST_F(PipelineBuilderTest, DepthOnly_NoColorAttachments_ValidPipeline)
 	}
 
 	auto pipeline = PipelineBuilder()
-		.AddShaderStage(*m_vertModule, vk::ShaderStageFlagBits::eVertex)
-		.AddShaderStage(*m_fragModule, vk::ShaderStageFlagBits::eFragment)
+		.AddShaderStage(m_vertModule->GetStageInfo(vk::ShaderStageFlagBits::eVertex))
+		.AddShaderStage(m_fragModule->GetStageInfo(vk::ShaderStageFlagBits::eFragment))
 		.SetVertexInput()
 		.SetInputAssembly()
 		.SetRasterization()

@@ -45,9 +45,6 @@ public:
 
 	// --- Build-in constants ---
 	static const S_Const* GetBuildInConstant(const std::string& name);
-
-private:
-	static std::string ResolveShaderPath(const std::string& path);
 };
 
 } // namespace neurus

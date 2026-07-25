@@ -96,7 +96,7 @@ TEST_F(ComputePipelineTest, Build_ReturnsValidPipeline)
 
 	// Build the compute pipeline
 	Pipeline pipeline = PipelineBuilder()
-		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
+		.AddShaderStage(shader.GetStageInfo(vk::ShaderStageFlagBits::eCompute))
 		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipeline.pipeline, VK_NULL_HANDLE);
@@ -126,7 +126,7 @@ TEST_F(ComputePipelineTest, WithDescriptorSetLayout_BuildsSuccessfully)
 		.Build(*m_device);
 
 	Pipeline pipeline = PipelineBuilder()
-		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
+		.AddShaderStage(shader.GetStageInfo(vk::ShaderStageFlagBits::eCompute))
 		.AddDescriptorSetLayout(*layout.layout())
 		.BuildComputePipeline(*m_device);
 
@@ -154,7 +154,7 @@ TEST_F(ComputePipelineTest, WithPushConstants_BuildsSuccessfully)
 		vk::ShaderStageFlagBits::eCompute, 0, 16);
 
 	Pipeline pipeline = PipelineBuilder()
-		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
+		.AddShaderStage(shader.GetStageInfo(vk::ShaderStageFlagBits::eCompute))
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline(*m_device);
 
@@ -187,7 +187,7 @@ TEST_F(ComputePipelineTest, WithLayoutAndPushConstants_BuildsSuccessfully)
 		vk::ShaderStageFlagBits::eCompute, 0, 32);
 
 	Pipeline pipeline = PipelineBuilder()
-		.AddShaderStage(shader, vk::ShaderStageFlagBits::eCompute)
+		.AddShaderStage(shader.GetStageInfo(vk::ShaderStageFlagBits::eCompute))
 		.AddDescriptorSetLayout(*layout.layout())
 		.AddPushConstantRange(pushRange)
 		.BuildComputePipeline(*m_device);
@@ -216,13 +216,13 @@ TEST_F(ComputePipelineTest, TwoBuilds_BothProduceValidPipelines)
 	ASSERT_NE(*shaderB.handle(), VK_NULL_HANDLE);
 
 	Pipeline pipelineA = PipelineBuilder()
-		.AddShaderStage(shaderA, vk::ShaderStageFlagBits::eCompute)
+		.AddShaderStage(shaderA.GetStageInfo(vk::ShaderStageFlagBits::eCompute))
 		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipelineA.pipeline, VK_NULL_HANDLE);
 
 	Pipeline pipelineB = PipelineBuilder()
-		.AddShaderStage(shaderB, vk::ShaderStageFlagBits::eCompute)
+		.AddShaderStage(shaderB.GetStageInfo(vk::ShaderStageFlagBits::eCompute))
 		.BuildComputePipeline(*m_device);
 
 	EXPECT_NE(*pipelineB.pipeline, VK_NULL_HANDLE);

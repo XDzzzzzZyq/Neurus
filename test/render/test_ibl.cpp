@@ -134,12 +134,13 @@ protected:
 		m_e2cSets = m_e2cPool->Allocate(*m_e2cSetLayout, 1);
 
 		auto e2cShader =
-			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
+			ShaderLibrary::ParseComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
 		ASSERT_NE(e2cShader, nullptr);
-		e2cShader->CreateModule(dev);
-		auto compModule = e2cShader->GetShaderModule(ShaderType::COMPUTE);
+		auto e2cSpv = ShaderLibrary::Compile(e2cShader->GetStage(ShaderType::COMPUTE),
+		                                     ShaderType::COMPUTE, "e2c_test");
+		vk::raii::ShaderModule e2cMod(dev, vk::ShaderModuleCreateInfo({}, e2cSpv));
 		PipelineBuilder e2cBuilder;
-		m_e2cPipeline = e2cBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		m_e2cPipeline = e2cBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *e2cMod, "main"))
 			.AddDescriptorSetLayout(*m_e2cSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}
@@ -159,12 +160,13 @@ protected:
 		m_c2eSets = m_c2ePool->Allocate(*m_c2eSetLayout, 1);
 
 		auto c2eShader =
-			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
+			ShaderLibrary::ParseComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
 		ASSERT_NE(c2eShader, nullptr);
-		c2eShader->CreateModule(dev);
-		auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
+		auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
+		                                     ShaderType::COMPUTE, "c2e_test");
+		vk::raii::ShaderModule c2eMod(dev, vk::ShaderModuleCreateInfo({}, c2eSpv));
 		PipelineBuilder c2eBuilder;
-		m_c2ePipeline = c2eBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		m_c2ePipeline = c2eBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *c2eMod, "main"))
 			.AddDescriptorSetLayout(*m_c2eSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}

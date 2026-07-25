@@ -84,10 +84,11 @@ static const std::unordered_map<std::string, S_Const>& GetBuildInConstantsInstan
 }
 
 // =========================================================================
-// File-static helpers
+// File-static helpers (anonymous namespace for internal linkage)
 // =========================================================================
 
-static std::string ResolveShaderPath(const std::string& path)
+namespace {
+std::string ResolveShaderPathImpl(const std::string& path)
 {
 	// Already absolute? (Unix /, Windows \, or X: drive)
 	if (!path.empty()
@@ -137,6 +138,7 @@ static std::string ResolveShaderPath(const std::string& path)
 	NEURUS_LOG("[ShaderLibrary] Could NOT resolve shader path '" << path << "'");
 	return path;
 }
+} // anonymous namespace
 
 // =========================================================================
 // Public API
@@ -147,8 +149,8 @@ std::unique_ptr<RenderShader> ShaderLibrary::ParseRenderShader(
 	const std::string& vertPath,
 	const std::string& fragPath)
 {
-	auto resolvedVert = ResolveShaderPath(vertPath);
-	auto resolvedFrag = ResolveShaderPath(fragPath);
+	auto resolvedVert = ResolveShaderPathImpl(vertPath);
+	auto resolvedFrag = ResolveShaderPathImpl(fragPath);
 
 	auto shader = std::make_unique<RenderShader>(name, resolvedVert, resolvedFrag);
 	if (!shader->ParseAndGenerate())
@@ -164,7 +166,7 @@ std::unique_ptr<ComputeShader> ShaderLibrary::ParseComputeShader(
 	const std::string& name,
 	const std::string& compPath)
 {
-	auto resolvedComp = ResolveShaderPath(compPath);
+	auto resolvedComp = ResolveShaderPathImpl(compPath);
 
 	auto shader = std::make_unique<ComputeShader>(name, resolvedComp);
 	if (!shader->ParseAndGenerate())

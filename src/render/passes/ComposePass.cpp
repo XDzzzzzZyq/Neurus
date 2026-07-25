@@ -31,18 +31,15 @@ ComposePass::ComposePass(const vk::raii::Device& device,
 	: ComputePass(device, physicalDevice,
 	              ComposePass::CreateDescriptorSetLayout(device), numSets)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, p_computeShader(
-		ShaderLibrary::LoadComputeShader("compose",
-		                                NEURUS_SHADER_DIR "compute/compose.comp"))
+	, m_shader(
+		ShaderLibrary::ParseComputeShader("compose",
+		                                  NEURUS_SHADER_DIR "compute/compose.comp"))
 {
-	// --- Create module from self-loaded shader ---
-	if (p_computeShader) { p_computeShader->CreateModule(device); }
-
 	// --- Create pipeline from self-loaded shader ---
 	BuildPipeline(device, "ComposePass");
 
 	NEURUS_LOG("[ComposePass] numSets=" << numSets
-	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
+	           << " shader=" << (m_shader ? "OK" : "FAIL"));
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -83,13 +80,15 @@ void ComposePass::BuildPipeline(const vk::raii::Device& device,
                                 const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!p_computeShader || !p_computeShader->IsValid())
+	if (!m_shader)
 	{
 		throw std::runtime_error("ComposePass: Compute shader not loaded or invalid");
 	}
 
-	// --- Use self-loaded compute shader module ---
-	auto compModule = p_computeShader->GetShaderModule(ShaderType::COMPUTE);
+	// --- Compile and create temporary shader module ---
+	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	                                  ShaderType::COMPUTE, debugName);
+	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
 
 	// --- Push constant range (1 float = 4 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -100,7 +99,7 @@ void ComposePass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)

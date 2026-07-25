@@ -25,7 +25,6 @@
 #include "RenderCache.h"
 #include "../resources/MeshGPU.h"
 #include "../PipelineBuilder.h"
-#include "../shaders/ShaderModule.h"
 #include "render/Barrier.h"
 #include "../shaders/ShaderLibrary.h"
 #include "../shaders/RenderShader.h"
@@ -103,20 +102,16 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	, m_queueFamilyIndex(queueFamilyIndex)
 	// --- Self-load shaders via ShaderLibrary ---
 	, m_multiviewShader(
-		ShaderLibrary::LoadRenderShader("ShadowDepthMultiview",
-		                                NEURUS_SHADER_DIR "render/shadow_depth_multiview.vert",
-		                                NEURUS_SHADER_DIR "render/shadow_depth.frag"))
+		ShaderLibrary::ParseRenderShader("ShadowDepthMultiview",
+		                                 NEURUS_SHADER_DIR "render/shadow_depth_multiview.vert",
+		                                 NEURUS_SHADER_DIR "render/shadow_depth.frag"))
 	, m_sunShader(
-		ShaderLibrary::LoadRenderShader("ShadowDepthSun",
-		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.vert",
-		                                NEURUS_SHADER_DIR "render/sun_shadow_depth.frag"))
+		ShaderLibrary::ParseRenderShader("ShadowDepthSun",
+		                                 NEURUS_SHADER_DIR "render/sun_shadow_depth.vert",
+		                                 NEURUS_SHADER_DIR "render/sun_shadow_depth.frag"))
 {
 	p_device = &device;
 	p_physicalDevice = &physicalDevice;
-
-	// --- Create modules from self-loaded shaders (creates ShaderModules from SPIR-V) ---
-	if (m_multiviewShader) { m_multiviewShader->CreateModule(device); }
-	if (m_sunShader)       { m_sunShader->CreateModule(device); }
 
 	p_vtxLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
 	p_vtxLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
@@ -125,7 +120,7 @@ ShadowDepthPass::ShadowDepthPass(const vk::raii::Device& device,
 	createSSBOResources(device, physicalDevice, graphicsQueue, queueFamilyIndex);
 	BuildPipeline(device, "ShadowDepthPass");
 
-	NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
+		NEURUS_LOG("[ShadowDepthPass] resolution=" << resolution
 	           << " faceVPSize=" << kFaceVPSize
 	           << " staticFarPlane=" << kStaticFarPlane
 	           << " multiviewShader=" << (m_multiviewShader ? "OK" : "FAIL")
@@ -177,13 +172,17 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 {
 	// --- Multiview cubemap depth pipeline ---
 	{
-		if (!m_multiviewShader || !m_multiviewShader->IsValid())
+		if (!m_multiviewShader)
 		{
 			throw std::runtime_error("ShadowDepthPass: Multiview shader not loaded or invalid");
 		}
 
-		auto& vertModule = *m_multiviewShader->GetVertexModule();
-		auto& fragModule = *m_multiviewShader->GetFragmentModule();
+		auto vertSpv = ShaderLibrary::Compile(m_multiviewShader->GetStage(ShaderType::VERTEX),
+		                                      ShaderType::VERTEX, debugName + "_multiview_vert");
+		auto fragSpv = ShaderLibrary::Compile(m_multiviewShader->GetStage(ShaderType::FRAGMENT),
+		                                      ShaderType::FRAGMENT, debugName + "_multiview_frag");
+		vk::raii::ShaderModule vertMod(device, vk::ShaderModuleCreateInfo({}, vertSpv));
+		vk::raii::ShaderModule fragMod(device, vk::ShaderModuleCreateInfo({}, fragSpv));
 
 		std::vector<vk::PushConstantRange> pushRanges = {
 			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex |
@@ -197,8 +196,8 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 		p_pipelines.push_back(
 			builder
 				.SetDebugName((debugName + "::Multiview").c_str())
-				.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-				.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+				.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertMod, "main"))
+				.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragMod, "main"))
 				.SetVertexInput(p_vtxLayout)
 				.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 				.SetViewMask(0x3f)  // 6 faces of cubemap
@@ -224,13 +223,17 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 
 	// --- Sun orthographic depth-only pipeline ---
 	{
-		if (!m_sunShader || !m_sunShader->IsValid())
+		if (!m_sunShader)
 		{
 			throw std::runtime_error("ShadowDepthPass: Sun shader not loaded or invalid");
 		}
 
-		auto& vertModule = *m_sunShader->GetVertexModule();
-		auto& fragModule = *m_sunShader->GetFragmentModule();
+		auto vertSpv = ShaderLibrary::Compile(m_sunShader->GetStage(ShaderType::VERTEX),
+		                                      ShaderType::VERTEX, debugName + "_sun_vert");
+		auto fragSpv = ShaderLibrary::Compile(m_sunShader->GetStage(ShaderType::FRAGMENT),
+		                                      ShaderType::FRAGMENT, debugName + "_sun_frag");
+		vk::raii::ShaderModule vertMod(device, vk::ShaderModuleCreateInfo({}, vertSpv));
+		vk::raii::ShaderModule fragMod(device, vk::ShaderModuleCreateInfo({}, fragSpv));
 
 		std::vector<vk::PushConstantRange> pushRanges = {
 			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
@@ -241,8 +244,8 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 		p_pipelines.push_back(
 			builder
 				.SetDebugName((debugName + "::Sun").c_str())
-				.AddShaderStage(vertModule, vk::ShaderStageFlagBits::eVertex)
-				.AddShaderStage(fragModule, vk::ShaderStageFlagBits::eFragment)
+				.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertMod, "main"))
+				.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragMod, "main"))
 				.SetVertexInput(p_vtxLayout)
 				.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 				.SetRasterization(vk::PolygonMode::eFill,

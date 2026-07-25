@@ -25,7 +25,7 @@ private:
 	void BuildPipeline(const vk::raii::Device& device, const std::string& name) override;
 	static vk::raii::Sampler CreateBilinearSampler(const vk::raii::Device& device);
 
-	std::shared_ptr<ComputeShader> p_shader;
+	std::unique_ptr<ComputeShader> m_shader;
 	vk::raii::Sampler              m_bilinearSampler = nullptr;
 	bool                           m_hasBilinear     = false;
 };

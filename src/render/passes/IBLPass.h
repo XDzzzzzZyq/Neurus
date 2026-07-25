@@ -138,8 +138,8 @@ private:
 	                     float roughnessSq);
 
 	// --- Self-loaded compute shaders (via ShaderLibrary) ---
-	std::shared_ptr<ComputeShader> p_irradianceShader;
-	std::shared_ptr<ComputeShader> p_specularShader;
+	std::unique_ptr<ComputeShader> m_irradianceShader;
+	std::unique_ptr<ComputeShader> m_specularShader;
 
 	// (Pipelines inherited from Pass — p_pipelines[0]=irradiance, p_pipelines[1]=specular)
 };

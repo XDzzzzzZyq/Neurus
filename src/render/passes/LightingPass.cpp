@@ -40,13 +40,10 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 	: ComputePass(device, physicalDevice,
 	              LightingPass::CreateDescriptorSetLayout(device), numSets)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, p_computeShader(
-		ShaderLibrary::LoadComputeShader("pbr_lighting",
-		                                "res/shaders/compute/pbr_lighting.comp"))
+	, m_shader(
+		ShaderLibrary::ParseComputeShader("pbr_lighting",
+		                                  "res/shaders/compute/pbr_lighting.comp"))
 {
-	// --- Create module from self-loaded shader ---
-	if (p_computeShader) { p_computeShader->CreateModule(device); }
-
 	// --- Create pipeline from self-loaded shader ---
 	BuildPipeline(device, "LightingPass");
 
@@ -63,7 +60,7 @@ LightingPass::LightingPass(const vk::raii::Device& device,
 			Texture::FromImage(std::move(emptyImage), std::move(emptySampler)));
 
 	NEURUS_LOG("[LightingPass] numSets=" << numSets
-	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
+	           << " shader=" << (m_shader ? "OK" : "FAIL"));
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -137,13 +134,15 @@ void LightingPass::BuildPipeline(const vk::raii::Device& device,
                                   const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!p_computeShader || !p_computeShader->IsValid())
+	if (!m_shader)
 	{
 		throw std::runtime_error("LightingPass: Compute shader not loaded or invalid");
 	}
 
-	// --- Use self-loaded compute shader module ---
-	auto compModule = p_computeShader->GetShaderModule(ShaderType::COMPUTE);
+	// --- Compile and create temporary shader module ---
+	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	                                  ShaderType::COMPUTE, debugName);
+	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
 
 	// --- Push constant range ---
 	vk::PushConstantRange pushRange(
@@ -154,7 +153,7 @@ void LightingPass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
