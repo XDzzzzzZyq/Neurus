@@ -26,9 +26,9 @@
                                 "transform": {
                                     "cereal_class_version": 0,
                                     "m_position": {
-                                        "x": 0.0,
-                                        "y": -5.0,
-                                        "z": 2.0
+                                        "x": 26.0,
+                                        "y": -35.0,
+                                        "z": 1.35
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -201,7 +201,7 @@
                 }
             ]
         },
-        "*m_config": {
+        "proj_config": {
             "cereal_class_version": 0,
             "r_pipeline": 1,
             "r_aa": 0,
@@ -209,7 +209,7 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.0005000000237487257,
+            "r_shadow_bias": 0.02,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,
