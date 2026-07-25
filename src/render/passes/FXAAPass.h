@@ -25,8 +25,8 @@ private:
 	void BuildPipeline(const vk::raii::Device& device, const std::string& name) override;
 	static vk::raii::Sampler CreateBilinearSampler(const vk::raii::Device& device);
 
-	std::unique_ptr<ComputeShader> m_shader;
-	vk::raii::Sampler              m_bilinearSampler = nullptr;
-	bool                           m_hasBilinear     = false;
+	std::unique_ptr<ComputeShader> p_shader;
+	vk::raii::Sampler              p_bilinearSampler = nullptr;
+	bool                           p_hasBilinear     = false;
 };
 } // namespace neurus

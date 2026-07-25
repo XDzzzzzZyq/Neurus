@@ -121,10 +121,10 @@ private:
 	DescriptorPool p_descriptorPool;
 	DescriptorSet p_cameraDescriptorSet;
 
-	// (Pipelines inherited from Pass â€” p_pipelines[0])
+	// (Pipelines inherited from Pass â€?p_pipelines[0])
 
 	// --- Self-loaded render shader (via ShaderLibrary) ---
-	std::unique_ptr<RenderShader> m_shader;
+	std::unique_ptr<RenderShader> p_shader;
 
 	// --- Vertex input layout ---
 	BufferLayout p_vertexLayout;

@@ -5,7 +5,7 @@
 This is a C++20 Vulkan-HPP 1.4 real-time renderer designed for experimentation
 with modern rendering algorithms. The architecture prioritizes:
 
-- **Strict layer isolation** - Renderer ↔ Editor ↔ UI ↔ Asset
+- **Strict layer isolation** - Renderer �?Editor �?UI �?Asset
   boundaries must not be violated
 - **Minimal global state** - State is explicit and localized
 - **Explicit data flow** - Communication via UIEvents (Qt Signals/Slots),
@@ -17,27 +17,27 @@ with modern rendering algorithms. The architecture prioritizes:
 ## Three-Layer Architecture + Supporting Modules
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                   UI Layer (Qt6)                              │
-│  (Window, surface, UIEvents, user input)                    │
-└──────────────────────┬───────────────────────────────────────┘
-                       │ Qt Signals/Slots (UIEvents)
-                        │ + Typed Events (EventQueue)
-                       ▼
-┌──────────────────────────────────────────────────────────────┐
-│                Editor Layer                                  │
-│  (Application logic, controllers, scene state, event system)│
-└──────────────────────┬───────────────────────────────────────┘
-                       │
-                       ▼
-┌──────────────────────────────────────────────────────────────┐
-│               Renderer Layer (Vulkan-HPP vk::raii)           │
-│  (All GPU resources: device, swapchain, pipeline,            │
-│   buffers, images, descriptors, compute & geometry passes)  │
-├──────────────────────────────────────────────────────────────┤
-│               Asset Layer (src/asset/)                       │
-│  (OBJ mesh loading, PNG/HDR decoding, CPU-side data)        │
-└──────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────�?
+�?                  UI Layer (Qt6)                              �?
+�? (Window, surface, UIEvents, user input)                    �?
+└──────────────────────┬───────────────────────────────────────�?
+                       �?Qt Signals/Slots (UIEvents)
+                        �?+ Typed Events (EventQueue)
+                       �?
+┌──────────────────────────────────────────────────────────────�?
+�?               Editor Layer                                  �?
+�? (Application logic, controllers, scene state, event system)�?
+└──────────────────────┬───────────────────────────────────────�?
+                       �?
+                       �?
+┌──────────────────────────────────────────────────────────────�?
+�?              Renderer Layer (Vulkan-HPP vk::raii)           �?
+�? (All GPU resources: device, swapchain, pipeline,            �?
+�?  buffers, images, descriptors, compute & geometry passes)  �?
+├──────────────────────────────────────────────────────────────�?
+�?              Asset Layer (src/asset/)                       �?
+�? (OBJ mesh loading, PNG/HDR decoding, CPU-side data)        �?
+└──────────────────────────────────────────────────────────────�?
 
 Scene objects (src/scene/) and Core utilities (src/core/, src/project/)
 are shared across layers.
@@ -51,7 +51,7 @@ are shared across layers.
 - Owns VkDevice, VkSwapchainKHR, VkPipeline, VkCommandPool
 - Consumes read-only VkSurfaceKHR from UI layer
 - Consumes per-frame RenderContext (immutable scene snapshot) for pass dispatch
-- Centralized image barrier management via `Barrier::Transition` (ImageState → Vulkan layout/stage/access)
+- Centralized image barrier management via `Barrier::Transition` (ImageState �?Vulkan layout/stage/access)
 - Owns `MeshGPU` (GPU-side mesh resources: VertexBuffer + IndexBuffer) via `RenderCache::GetMeshGPU()`
 - Owns `EnvironmentGPU` (GPU-side IBL resources: diffuse + specular cubemap Textures) via `RenderCache::CreateEnvironmentGPU()`
 - Owns `LightingGPU` (light SSBOs: point + sun) via `RenderCache::InitLightingGPU()` / `GetLightingGPU()`
@@ -66,7 +66,7 @@ are shared across layers.
 - Communicates with Renderer via Context and typed EventQueue
 - Must NOT directly manipulate GPU resources
 - Controller registry pattern: `Editor::RegisterController<T>(bus)` creates controller, calls `Init(bus)`, stores in `m_controllers`
-- Event-driven controller communication: `Editor::Edit(input)` translates InputState → typed events → EventQueue.Process() → controllers handle events
+- Event-driven controller communication: `Editor::Edit(input)` translates InputState �?typed events �?EventQueue.Process() �?controllers handle events
 
 **UI Layer** (`src/ui/`)
 - Qt6 Widgets presentation layer with Qt-Advanced-Docking-System (ADS)
@@ -102,7 +102,7 @@ template forwarding pattern).
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals
 - UI panels emit their own signals (e.g. `Outliner::objectSelected`, `RenderConfigPanel::configValueChanged`)
-- `Application::ConnectUIEvent<T>` template bridges panel signals → `Editor::OnUIEvent<T>` → `EventQueue::enqueue<T>`
+- `Application::ConnectUIEvent<T>` template bridges panel signals �?`Editor::OnUIEvent<T>` �?`EventQueue::enqueue<T>`
 
 **EventQueue System** (Typed Event Dispatcher)
 - Header-only template-based event dispatcher (no Qt dependency)
@@ -114,13 +114,13 @@ template forwarding pattern).
 - Read-only access to scene data for Renderer
 - Data flows: Editor mutates, Renderer consumes
 - `RenderConfig` owned by Project; per-frame snapshots via `RenderContext::config` (`void*`)
-- `Editor::SetRenderConfig()` writes UI config changes → Project → RenderContext
+- `Editor::SetRenderConfig()` writes UI config changes �?Project �?RenderContext
 
 ### Vulkan Ownership Graph (Critical)
 
 ```
 UI Layer owns:
-  QWindow → VkSurfaceKHR
+  QWindow �?VkSurfaceKHR
 
 Renderer Layer owns:
   VkInstance (shared via QVulkanInstance)
@@ -135,7 +135,7 @@ Renderer Layer owns:
    VkBuffer + VkDeviceMemory pairs (Buffer hierarchy: GPUBuffer, StagingBuffer, UniformBuffer<T>)
    VkImage + VkDeviceMemory + VkImageView triples (Image, Texture)
    VkDescriptorPool + VkDescriptorSet (DescriptorManager)
-   Barrier::Transition (centralized layout transitions, ImageState → Vulkan mapping)
+   Barrier::Transition (centralized layout transitions, ImageState �?Vulkan mapping)
    MeshGPU (GPU-side mesh resources: VertexBuffer + IndexBuffer, owned by RenderCache)
    EnvironmentGPU (GPU-side IBL resources: diffuse + specular cubemap Textures, owned by RenderCache)
    LightingGPU (GPU-side light SSBOs: point + sun light, owned by RenderCache)
@@ -160,7 +160,7 @@ been removed.
 
 ### Naming Conventions
 
-- Classes: PascalCase (e.g., `VulkanContext`, `ShaderProgram`)
+- Classes: PascalCase (e.g., `VulkanContext`, `Shader`)
 - Functions: PascalCase for public API; camelCase for internals
 - Members: `m_` prefix for member variables
 - Constants: UPPER_SNAKE_CASE
@@ -213,11 +213,11 @@ compute pass, and full G-Buffer pipeline through the four-layer architecture.
 - `MeshGPU` and `EnvironmentGPU` as RenderCache-owned GPU resources (separated from scene/asset layers)
 - GPU-side mesh resources separated from scene `Mesh` (`MeshGPU` owned by RenderCache)
 - `GeometryRenderItem` removed (CPU/GPU concerns now fully separated)
-- Deferred PBR pipeline: ShadowDepthPass → GeometryPass (G-Buffer) → SSAOPass → Light+ShadowIntensity → LightingPass → IBLPass → GizmoPass (edge highlight) → ComposePass (gamma correction) → FXAAPass (FXAA 3.11, conditional) → Blit to swapchain
+- Deferred PBR pipeline: ShadowDepthPass �?GeometryPass (G-Buffer) �?SSAOPass �?Light+ShadowIntensity �?LightingPass �?IBLPass �?GizmoPass (edge highlight) �?ComposePass (gamma correction) �?FXAAPass (FXAA 3.11, conditional) �?Blit to swapchain
 - Centralized image barrier system (Barrier::Transition, ImageState enum)
 - Screenshot capture + TextureData PNG readback
 - GPU tests with shared VulkanTestShared base class
-- Reference-image regression tests (capture → compare PNG)
+- Reference-image regression tests (capture �?compare PNG)
 - Render caches: RenderCache, DescriptorCache
 - Pass base class with PassType enum + static query helpers; GeometryPass owns BeginPass/EndPass
 

@@ -1,6 +1,6 @@
 /**
  * @file ComposePass.h
- * @brief Final compositing compute pass â€” blends gizmo highlight onto HDRColor
+ * @brief Final compositing compute pass â€?blends gizmo highlight onto HDRColor
  *        and applies gamma correction.
  *
  * ComposePass reads the HDRColor and GizmoHighlight attachments as combined
@@ -18,7 +18,7 @@
  * - Owns the compute pipeline.
  * - Borrows RenderCache for HDRColor, GizmoHighlight, and ComposedOutput images.
  *
- * @note No UBOs or per-frame uploads â€” all data is read from attachments.
+ * @note No UBOs or per-frame uploads â€?all data is read from attachments.
  *       The only push constant is a single float (gamma).
  */
 
@@ -90,7 +90,7 @@ public:
 	/**
 	 * @brief Writes all descriptors (HDRColor, GizmoHighlight, ComposedOutput)
 	 *        into the specified set.
-	 * @param setIndex  Index into p_descriptorSets (0 â€¦ numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 â€?numSets-1).
 	 * @param extent    Render area dimensions.
 	 * @param cache     Mutable render cache for attachment access.
 	 */
@@ -114,10 +114,10 @@ private:
 	void BuildPipeline(const vk::raii::Device& device,
 	                   const std::string& debugName) override;
 
-	// (Pipelines inherited from Pass â€” p_pipelines[0])
+	// (Pipelines inherited from Pass â€?p_pipelines[0])
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 };
 
 } // namespace neurus

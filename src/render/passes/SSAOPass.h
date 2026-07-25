@@ -45,7 +45,7 @@ class RenderCache;
  * @brief Single kernel sample (tangent-space direction, std140 as vec4).
  *
  * The kernel is generated on CPU as hemisphere samples biased toward
- * the normal (z âˆˆ [0, 1]).  Each entry is padded to 16 bytes for UBO.
+ * the normal (z âˆ?[0, 1]).  Each entry is padded to 16 bytes for UBO.
  */
 struct alignas(16) KernelSampleGpu
 {
@@ -55,7 +55,7 @@ struct alignas(16) KernelSampleGpu
 static_assert(sizeof(KernelSampleGpu) == 16, "KernelSampleGpu must be 16 bytes (std140)");
 
 /**
- * @brief SSAO parameters UBO â€” camera matrices + kernel (updated per frame).
+ * @brief SSAO parameters UBO â€?camera matrices + kernel (updated per frame).
  *
  * Layout (std140):
  *   mat4  viewProj       offset 0   (64 bytes)
@@ -149,7 +149,7 @@ public:
 
 	/**
 	 * @brief Writes all descriptors (image + buffer) into the specified set.
-	 * @param setIndex  Index into p_descriptorSets (0 â€¦ numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 â€?numSets-1).
 	 */
 	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 
@@ -196,10 +196,10 @@ private:
 	 */
 	static std::array<NoiseEntryGpu, kNoiseEntryCount> GenerateNoise();
 
-	// (Pipelines inherited from Pass â€” p_pipelines[0])
+	// (Pipelines inherited from Pass â€?p_pipelines[0])
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 
 	// --- Owned UBOs ---
 	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> p_paramsUBO;   ///< SSAO params (camera + kernel), host-visible

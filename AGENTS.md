@@ -27,34 +27,34 @@ isolation. Use this file as the high-level reference; detailed rules live in
 ## Architecture (Hard Requirements)
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│ UI Layer (Qt6 Widgets + ADS)                                 │
-│  owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   │
-│  QML provides window + input ONLY. No rendering logic.      │
-└─────────────────────┬────────────────────────────────────────┘
-                      │ Qt Signals/Slots
-                      ▼
-┌──────────────────────────────────────────────────────────────┐
-│ Editor Layer                                                │
-│  owns: Project, UploadManager, Controllers                   │
-│  Application logic, scene mutation, event orchestration     │
-└─────────────────────┬────────────────────────────────────────┘
-                      │
-            ┌─────────┴──────────┐
-            ▼                    ▼
-┌──────────────────┐  ┌────────────────────────────────────────┐
-│ Asset Layer       │  │ Renderer Layer (Vulkan-HPP vk::raii)   │
-│  Vulkan-free       │  │  owns: VkInstance, VkDevice, VkQueue,  │
-│  MeshData,         │  │   VkSwapchainKHR, VkPipeline,          │
-│  ImageData,        │  │   VkCommandBuffer, all GPU resources   │
-│  PixelFormat       │  │   MeshGPU, EnvironmentGPU (via Cache)  │
-│                    │  │  consumes: VkSurfaceKHR (read-only)    │
-├──────────────────┤  └────────────────────────────────────────┘
-│ Scene Layer       │
-│  Vulkan-free       │
-│  Camera, Light,    │
-│  Mesh, Transform   │
-└──────────────────┘
+┌──────────────────────────────────────────────────────────────�?
+�?UI Layer (Qt6 Widgets + ADS)                                 �?
+�? owns: VkSurfaceKHR, QWindow, UIEvents (QObject singleton)   �?
+�? QML provides window + input ONLY. No rendering logic.      �?
+└─────────────────────┬────────────────────────────────────────�?
+                      �?Qt Signals/Slots
+                      �?
+┌──────────────────────────────────────────────────────────────�?
+�?Editor Layer                                                �?
+�? owns: Project, UploadManager, Controllers                   �?
+�? Application logic, scene mutation, event orchestration     �?
+└─────────────────────┬────────────────────────────────────────�?
+                      �?
+            ┌─────────┴──────────�?
+            �?                   �?
+┌──────────────────�? ┌────────────────────────────────────────�?
+�?Asset Layer       �? �?Renderer Layer (Vulkan-HPP vk::raii)   �?
+�? Vulkan-free       �? �? owns: VkInstance, VkDevice, VkQueue,  �?
+�? MeshData,         �? �?  VkSwapchainKHR, VkPipeline,          �?
+�? ImageData,        �? �?  VkCommandBuffer, all GPU resources   �?
+�? PixelFormat       �? �?  MeshGPU, EnvironmentGPU (via Cache)  �?
+�?                   �? �? consumes: VkSurfaceKHR (read-only)    �?
+├──────────────────�? └────────────────────────────────────────�?
+�?Scene Layer       �?
+�? Vulkan-free       �?
+�? Camera, Light,    �?
+�? Mesh, Transform   �?
+└──────────────────�?
 ```
 
 ### Isolation Chain (Hard Requirement)
@@ -62,7 +62,7 @@ isolation. Use this file as the high-level reference; detailed rules live in
 Data and control flow follow this strict unidirectional chain:
 
 ```
-UI Layer (Qt6) → UIEvents (Qt Signals) → Editor → EventQueue (typed events) → Controllers → Context → Renderer
+UI Layer (Qt6) �?UIEvents (Qt Signals) �?Editor �?EventQueue (typed events) �?Controllers �?Context �?Renderer
 ```
 
 - UI emits signals via UIEvents. NEVER calls the Editor or Renderer directly.
@@ -120,7 +120,7 @@ steps.
 
 Key rules:
 - Plan by tracing the closest existing feature
-- Break into 4 waves: Foundation → Core → Integration → Tests/Docs
+- Break into 4 waves: Foundation �?Core �?Integration �?Tests/Docs
 - Verify EVERY wave: build, ctest, VUID check, Python PIL for references
 - Never commit until user approves, unless user notified you in advance.
 
@@ -152,82 +152,82 @@ After each development phase, stop and wait for user verification.
 ```
 Neurus/
 ├── .github/
-│   ├── instructions/       # Architecture/component docs for AI agents
-│   └── workflows/          # GitHub Actions CI
+�?  ├── instructions/       # Architecture/component docs for AI agents
+�?  └── workflows/          # GitHub Actions CI
 ├── cmake/                  # CMake helper modules
 ├── dep/                    # Git submodule dependencies
-│   └── qtadvanceddocking/  # Qt-Advanced-Docking-System (ADS)
+�?  └── qtadvanceddocking/  # Qt-Advanced-Docking-System (ADS)
 ├── res/shaders/            # GLSL shader source files
 ├── src/
-│   ├── render/             # Renderer layer (Vulkan-HPP)
-│   │   ├── Barrier.h/cpp            # Centralized image barrier management
-│   │   ├── DeferredRenderer.h/cpp   # Deferred PBR pipeline (active renderer)
-│   │   ├── Image.h/cpp              # GPU image with state tracking (ImageState)
-│   │   ├── RenderCache.h/cpp        # Cross-frame mutable resource pool
-│   │   ├── RenderConfig.h           # User-settable pipeline options
-│   │   ├── RenderContext.h          # Per-frame immutable scene snapshot
-│   │   ├── ShaderProgram.h/cpp
-│   │   ├── Swapchain.h/cpp
-│   │   ├── UploadManager.h/cpp      # CPU-to-GPU upload service
-│   │   ├── VulkanContext.h/cpp
-│   │   ├── resources/        # GPU resource structs (owned by RenderCache)
-│   │   │   ├── EnvironmentGPU.h     # IBL cubemap Textures
-│   │   │   ├── LightGPU.h           # Per-light shadow resources
-│   │   │   ├── LightingGPU.h/cpp    # Light SSBO storage (point + sun)
-│   │   │   └── MeshGPU.h           # GPU-side mesh + MeshPushConstants
-│   │   ├── passes/          # Render passes
-│   │   │   ├── GeometryPass.h/cpp
-│   │   │   ├── SSAOPass.h/cpp
-│   │   │   ├── LightingPass.h/cpp
-│   │   │   ├── IBLPass.h/cpp
-│   │   │   ├── ShadowDepthPass.h/cpp
-│   │   │   └── ShadowIntensityPass.h/cpp
-│   │   └── buffers/          # Buffer class hierarchy
-│   │       ├── Buffer.h/cpp         # Virtual base class (Buffer)
-│   │       ├── StagingBuffer.h/cpp  # Host-visible staging
-│   │       ├── GPUBuffer.h/cpp      # Device-local with staging
-│   │       ├── UniformBuffer.h      # Template uniform (UniformBuffer<T>)
-│   │       ├── VertexBuffer.h/cpp   # Vertex buffer (inherits GPUBuffer)
-│   │       ├── IndexBuffer.h/cpp    # Index buffer (inherits GPUBuffer)
-│   │       └── BufferLayout.h/cpp   # Vertex input layout description
-│   ├── editor/             # Editor layer (logic, controllers)
-│   │   ├── events/          # Event system (UIEvents + typed EventQueue)
-│   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor
-│   │   │   ├── EventQueue.h        # Typed EventQueue dispatcher (no Qt)
-│   │   │   └── CameraEvents.h    # Camera event structs
-│   │   ├── controllers/     # Controller implementations
-│   │   │   ├── Controllers.h     # Base class for all controllers
-│   │   │   ├── CameraController.h/cpp  # Event-driven camera controls
-│   │   └── CMakeLists.txt
-│   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
-│   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
-│   │   ├── UIContext.h          # Per-frame UI data snapshot
-│   │   ├── items/               # Reusable composite widgets
-│   │   │   └── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
-│   │   ├── panels/               # Dock panel widgets
-│   │   │   ├── UIPanel.h         # Base class for all panels
-│   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
-│   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
-│   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
-│   │   │   └── RenderConfigPanel.h/cpp  # Live render setting controls
-│   │   └── qml/            # QML source files (legacy)
-│   ├── asset/              # Asset layer (Vulkan-free)
-│   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
-│   │   ├── ImageData.h/cpp # CPU-side image pixels (no Vulkan)
-│   │   └── PixelFormat.h   # Vulkan-free format enum + helpers
-│   ├── scene/              # Scene layer (Vulkan-free)
-│   │   ├── Camera.h        # Camera object
-│   │   ├── Light.h         # Light objects (PointLight, SunLight)
-│   │   ├── Mesh.h          # Mesh + Transform (no GPU buffers)
-│   │   └── Transform.h     # Spatial transform
-│   └── main.cpp            # Application entry point
+�?  ├── render/             # Renderer layer (Vulkan-HPP)
+�?  �?  ├── Barrier.h/cpp            # Centralized image barrier management
+�?  �?  ├── DeferredRenderer.h/cpp   # Deferred PBR pipeline (active renderer)
+�?  �?  ├── Image.h/cpp              # GPU image with state tracking (ImageState)
+�?  �?  ├── RenderCache.h/cpp        # Cross-frame mutable resource pool
+�?  �?  ├── RenderConfig.h           # User-settable pipeline options
+�?  �?  ├── RenderContext.h          # Per-frame immutable scene snapshot
+�?  �?  ├── shaders/ShaderGPU.h,shaders/Shader.h/cpp
+�?  �?  ├── Swapchain.h/cpp
+�?  �?  ├── UploadManager.h/cpp      # CPU-to-GPU upload service
+�?  �?  ├── VulkanContext.h/cpp
+�?  �?  ├── resources/        # GPU resource structs (owned by RenderCache)
+�?  �?  �?  ├── EnvironmentGPU.h     # IBL cubemap Textures
+�?  �?  �?  ├── LightGPU.h           # Per-light shadow resources
+�?  �?  �?  ├── LightingGPU.h/cpp    # Light SSBO storage (point + sun)
+�?  �?  �?  └── MeshGPU.h           # GPU-side mesh + MeshPushConstants
+�?  �?  ├── passes/          # Render passes
+�?  �?  �?  ├── GeometryPass.h/cpp
+�?  �?  �?  ├── SSAOPass.h/cpp
+�?  �?  �?  ├── LightingPass.h/cpp
+�?  �?  �?  ├── IBLPass.h/cpp
+�?  �?  �?  ├── ShadowDepthPass.h/cpp
+�?  �?  �?  └── ShadowIntensityPass.h/cpp
+�?  �?  └── buffers/          # Buffer class hierarchy
+�?  �?      ├── Buffer.h/cpp         # Virtual base class (Buffer)
+�?  �?      ├── StagingBuffer.h/cpp  # Host-visible staging
+�?  �?      ├── GPUBuffer.h/cpp      # Device-local with staging
+�?  �?      ├── UniformBuffer.h      # Template uniform (UniformBuffer<T>)
+�?  �?      ├── VertexBuffer.h/cpp   # Vertex buffer (inherits GPUBuffer)
+�?  �?      ├── IndexBuffer.h/cpp    # Index buffer (inherits GPUBuffer)
+�?  �?      └── BufferLayout.h/cpp   # Vertex input layout description
+�?  ├── editor/             # Editor layer (logic, controllers)
+�?  �?  ├── events/          # Event system (UIEvents + typed EventQueue)
+�?  �?  �?  ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor
+�?  �?  �?  ├── EventQueue.h        # Typed EventQueue dispatcher (no Qt)
+�?  �?  �?  └── CameraEvents.h    # Camera event structs
+�?  �?  ├── controllers/     # Controller implementations
+�?  �?  �?  ├── Controllers.h     # Base class for all controllers
+�?  �?  �?  ├── CameraController.h/cpp  # Event-driven camera controls
+�?  �?  └── CMakeLists.txt
+�?  ├── ui/                 # UI layer (Qt6 Widgets + ADS)
+�?  �?  ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
+�?  �?  ├── UIContext.h          # Per-frame UI data snapshot
+�?  �?  ├── items/               # Reusable composite widgets
+�?  �?  �?  └── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
+�?  �?  ├── panels/               # Dock panel widgets
+�?  �?  �?  ├── UIPanel.h         # Base class for all panels
+�?  �?  �?  ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
+�?  �?  �?  ├── Outliner.h/cpp    # Scene object hierarchy tree
+�?  �?  �?  ├── PropertyEditor.h/cpp  # Object property inspector
+�?  �?  �?  └── RenderConfigPanel.h/cpp  # Live render setting controls
+�?  �?  └── qml/            # QML source files (legacy)
+�?  ├── asset/              # Asset layer (Vulkan-free)
+�?  �?  ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
+�?  �?  ├── ImageData.h/cpp # CPU-side image pixels (no Vulkan)
+�?  �?  └── PixelFormat.h   # Vulkan-free format enum + helpers
+�?  ├── scene/              # Scene layer (Vulkan-free)
+�?  �?  ├── Camera.h        # Camera object
+�?  �?  ├── Light.h         # Light objects (PointLight, SunLight)
+�?  �?  ├── Mesh.h          # Mesh + Transform (no GPU buffers)
+�?  �?  └── Transform.h     # Spatial transform
+�?  └── main.cpp            # Application entry point
 ├── test/
-│   ├── render/             # Renderer GPU tests
-│   │   └── reference/      # Reference images for regression tests
-│   │       └── deferred/   # Deferred-pass reference PNGs
-│   ├── editor/             # Editor unit tests (run in CI, no GPU)
-│   └── shared/             # Test infrastructure
-│       └── TestVulkanShared.h/cpp  # GPU test fixture base class
+�?  ├── render/             # Renderer GPU tests
+�?  �?  └── reference/      # Reference images for regression tests
+�?  �?      └── deferred/   # Deferred-pass reference PNGs
+�?  ├── editor/             # Editor unit tests (run in CI, no GPU)
+�?  └── shared/             # Test infrastructure
+�?      └── TestVulkanShared.h/cpp  # GPU test fixture base class
 ├── AGENTS.md               # This file
 ├── CMakeLists.txt           # Root CMake build
 ├── CMakePresets.json        # CMake presets (default, release, vs2022)
@@ -296,7 +296,7 @@ The entire codebase uses a **Z-up, +Y forward, right-hand** coordinate system
   up=`(0,0,1)`.
 
 **IMPORTANT**: OBJ files exported from Blender use Blender's native convention
-(Z-up, +Y forward) — do NOT edit .obj files.
+(Z-up, +Y forward) �?do NOT edit .obj files.
 
 ---
 
@@ -313,7 +313,7 @@ Multiple parallel subagents can race on `cmake --build` or launching
    "Access denied" or "file in use".
 3. **Subagents may compile-check** individual files via `lsp_diagnostics`
    but must NOT invoke the build system.
-4. **Never run `Neurus.exe` or the test binary from a subagent** — always
+4. **Never run `Neurus.exe` or the test binary from a subagent** �?always
    let the master agent handle it.
 5. **Never use `git stash` while editing files**
 

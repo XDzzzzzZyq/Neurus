@@ -7,6 +7,7 @@
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "../resources/ShaderGPU.h"
 #include "core/Log.h"
 #include <stdexcept>
 
@@ -16,7 +17,7 @@ FXAAPass::FXAAPass(const vk::raii::Device& device,
                    const vk::raii::PhysicalDevice& physicalDevice,
                    uint32_t numSets)
 	: ComputePass(device, physicalDevice, CreateLayout(device), numSets)
-	, m_shader(ShaderLibrary::ParseComputeShader("fxaa", NEURUS_SHADER_DIR "compute/fxaa.comp"))
+	, p_shader(ShaderLibrary::LoadComputeShader("fxaa", NEURUS_SHADER_DIR "compute/fxaa.comp"))
 {
 	// Check format features: linear filtering required for sub-pixel texture() resample
 	auto fmtProps = physicalDevice.getFormatProperties(vk::Format::eR16G16B16A16Sfloat);
@@ -25,13 +26,13 @@ FXAAPass::FXAAPass(const vk::raii::Device& device,
 
 	if (linearOk)
 	{
-		m_bilinearSampler = CreateBilinearSampler(device);
-		m_hasBilinear = true;
+		p_bilinearSampler = CreateBilinearSampler(device);
+		p_hasBilinear = true;
 	}
 
 	BuildPipeline(device, "FXAAPass");
 	NEURUS_LOG("[FXAAPass] numSets=" << numSets
-	           << " shader=" << (m_shader ? "OK" : "FAIL")
+	           << " shader=" << (p_shader ? "OK" : "FAIL")
 	           << " bilinear=" << (linearOk ? "yes" : "NO (fallback to nearest)"));
 }
 
@@ -39,7 +40,7 @@ vk::raii::Sampler FXAAPass::CreateBilinearSampler(const vk::raii::Device& device
 {
 	vk::SamplerCreateInfo ci(
 		{},
-		vk::Filter::eLinear,                             // magFilter — bilinear for sub-pixel resample
+		vk::Filter::eLinear,                             // magFilter �?bilinear for sub-pixel resample
 		vk::Filter::eLinear,                             // minFilter
 		vk::SamplerMipmapMode::eNearest,
 		vk::SamplerAddressMode::eClampToEdge,
@@ -63,15 +64,15 @@ DescriptorSetLayout FXAAPass::CreateLayout(const vk::raii::Device& d)
 
 void FXAAPass::BuildPipeline(const vk::raii::Device& device, const std::string& debugName)
 {
-	if (!m_shader)
+	if (!p_shader)
 		throw std::runtime_error("FXAAPass: shader invalid");
-	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
 	                                  ShaderType::COMPUTE, debugName);
-	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 	vk::PushConstantRange pc(vk::ShaderStageFlagBits::eCompute, 0, sizeof(FXAAPushConstants));
 	p_pipelines.push_back(
 		PipelineBuilder()
-			.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+			.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pc)
@@ -85,7 +86,7 @@ void FXAAPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 	// Use bilinear sampler for sub-pixel texture() resample (fallback to nearest if unsupported)
 	const auto& in = cache.GetAttachment(AttachmentName::ComposedOutput, extent);
 	vk::DescriptorImageInfo ii(
-		m_hasBilinear ? *m_bilinearSampler : *p_sampler,
+		p_hasBilinear ? *p_bilinearSampler : *p_sampler,
 		*in.ImageViewHandle(),
 		vk::ImageLayout::eShaderReadOnlyOptimal);
 	ds.WriteImage(0, ii, vk::DescriptorType::eCombinedImageSampler);

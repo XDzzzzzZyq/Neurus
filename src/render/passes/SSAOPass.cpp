@@ -18,6 +18,8 @@
 #include "scene/Camera.h"
 #include "scene/Scene.h"
 
+#include "../resources/ShaderGPU.h"
+
 #include <array>
 #include <cstring>
 #include <stdexcept>
@@ -88,8 +90,8 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	: ComputePass(device, physicalDevice,
 	              SSAOPass::CreateDescriptorSetLayout(device), numSets)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, m_shader(
-		ShaderLibrary::ParseComputeShader("ssao",
+	, p_shader(
+		ShaderLibrary::LoadComputeShader("ssao",
 		                                  "res/shaders/compute/ssao.comp"))
 {
 	// --- Create pipeline from self-loaded shader ---
@@ -98,7 +100,7 @@ SSAOPass::SSAOPass(const vk::raii::Device& device,
 	NEURUS_LOG("[SSAOPass] numSets=" << numSets
 	           << " kernelLength=" << kDefaultKernelLength
 	           << " qfi=" << queueFamilyIndex
-	           << " shader=" << (m_shader ? "OK" : "FAIL"));
+	           << " shader=" << (p_shader ? "OK" : "FAIL"));
 
 	// --- Generate and upload kernel + initial camera data ---
 	{
@@ -181,7 +183,7 @@ std::array<NoiseEntryGpu, SSAOPass::kNoiseEntryCount> SSAOPass::GenerateNoise()
 
 	for (uint32_t i = 0; i < kNoiseEntryCount; ++i)
 	{
-		// Random unit direction — used to rotate the tangent plane
+		// Random unit direction �?used to rotate the tangent plane
 		const glm::vec3 dir = rng.rand3n();
 
 		noise[i].x   = dir.x;
@@ -234,15 +236,15 @@ void SSAOPass::BuildPipeline(const vk::raii::Device& device,
                               const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!m_shader)
+	if (!p_shader)
 	{
 		throw std::runtime_error("SSAOPass: Compute shader not loaded or invalid");
 	}
 
 	// --- Compile and create temporary shader module ---
-	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
 	                                  ShaderType::COMPUTE, debugName);
-	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 	// --- Push constant range (4 ints = 16 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -253,7 +255,7 @@ void SSAOPass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+		builder.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
@@ -369,7 +371,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 			Barrier::Transition(cmdBuf, attachment, ImageState::ColorShaderRead);
 		}
 
-		// SSAO attachment: current state → ShaderWrite (compute write)
+		// SSAO attachment: current state �?ShaderWrite (compute write)
 		auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
 		Barrier::Transition(cmdBuf, ssaoAtt, ImageState::ShaderWrite);
 	}
@@ -412,7 +414,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
-	// --- 7. Transition SSAO output: General → ShaderRead for lighting pass ---
+	// --- 7. Transition SSAO output: General �?ShaderRead for lighting pass ---
 	{
 		auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
 		Barrier::Transition(cmdBuf, ssaoAtt, ImageState::ColorShaderRead);

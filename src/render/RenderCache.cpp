@@ -223,10 +223,10 @@ void RenderCache::CleanScreenSpace()
 {
 	rc_attachments.clear();
 	rc_shadowIntensityArray.reset();
-	// rc_uidTo*Index maps preserved â€” shadow indexing survives resize
-	// rc_meshGPUs preserved â€” mesh GPU buffers survive resize
-	// rc_environmentGPUs preserved â€” IBL cubemaps survive resize
-	// rc_lightGPUs preserved â€” shadow depth maps survive resize
+	// rc_uidTo*Index maps preserved â€?shadow indexing survives resize
+	// rc_meshGPUs preserved â€?mesh GPU buffers survive resize
+	// rc_environmentGPUs preserved â€?IBL cubemaps survive resize
+	// rc_lightGPUs preserved â€?shadow depth maps survive resize
 }
 
 // ---------------------------------------------------------------------------
@@ -294,17 +294,17 @@ PipelineCache& RenderCache::GetPipelineCache()
 
 Pipeline* RenderCache::GetPipeline(const int uid)
 {
-	return rc_pipelineCache.Get(std::to_string(uid));
+	return rc_pipelineCache.Get(uid);
 }
 
 void RenderCache::UsePipeline(const int uid, Pipeline pipeline)
 {
-	rc_pipelineCache.Store(std::to_string(uid), std::move(pipeline));
+	rc_pipelineCache.Store(uid, std::move(pipeline));
 }
 
 void RenderCache::RemovePipeline(const int uid)
 {
-	rc_pipelineCache.Remove(std::to_string(uid));
+	rc_pipelineCache.Remove(uid);
 }
 
 // ---------------------------------------------------------------------------

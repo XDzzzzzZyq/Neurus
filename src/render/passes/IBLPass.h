@@ -38,7 +38,7 @@ class Image;
 class RenderCache;
 
 /**
- * @brief IBL generation pass - equirect â†’ diffuse + specular cubemaps.
+ * @brief IBL generation pass - equirect â†?diffuse + specular cubemaps.
  *
  * Non-copyable, movable.
  */
@@ -49,7 +49,7 @@ public:
 	static constexpr uint32_t kDiffuseFaceRes = 64;
 	/** Specular prefiltered cubemap face resolution (mip 0). */
 	static constexpr uint32_t kSpecularFaceRes = 2048;
-	/** Specular cubemap mip level count (roughness 0..1 â†’ mip 0..7). */
+	/** Specular cubemap mip level count (roughness 0..1 â†?mip 0..7). */
 	static constexpr uint32_t kSpecularMipLevels = 8;
 	/** Default max step count for irradiance convolution. */
 	static constexpr int32_t kDefaultIrradianceSteps = 64;
@@ -74,7 +74,7 @@ public:
 
 	~IBLPass();
 
-	/** @brief No-op â€” IBL generation is one-shot via Generate(), not per-frame. */
+	/** @brief No-op â€?IBL generation is one-shot via Generate(), not per-frame. */
 	void Record(vk::CommandBuffer cmd, RenderCache& cache, const RenderContext& ctx) override
 	{
 		(void)cmd;
@@ -82,7 +82,7 @@ public:
 		(void)ctx;
 	}
 
-	/** @brief No-op â€” IBLPass manages its own descriptor writes via Generate(). */
+	/** @brief No-op â€?IBLPass manages its own descriptor writes via Generate(). */
 	void WriteDescriptors(uint32_t, vk::Extent2D, RenderCache&) override {}
 
 	// -------------------------------------------------------------------
@@ -138,10 +138,10 @@ private:
 	                     float roughnessSq);
 
 	// --- Self-loaded compute shaders (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_irradianceShader;
-	std::unique_ptr<ComputeShader> m_specularShader;
+	std::unique_ptr<ComputeShader> p_irradianceShader;
+	std::unique_ptr<ComputeShader> p_specularShader;
 
-	// (Pipelines inherited from Pass â€” p_pipelines[0]=irradiance, p_pipelines[1]=specular)
+	// (Pipelines inherited from Pass â€?p_pipelines[0]=irradiance, p_pipelines[1]=specular)
 };
 
 } // namespace neurus

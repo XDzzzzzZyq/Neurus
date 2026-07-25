@@ -19,7 +19,7 @@
 
 ## Naming
 
-- Types / classes: PascalCase (e.g., `VulkanContext`, `ShaderProgram`)
+- Types / classes: PascalCase (e.g., `VulkanContext`, `Shader`)
 - Methods: PascalCase (e.g., `DrawFrame()`, `AcquireNextImage()`)
 - Members: prefixes as needed (`m_` for member variables, or match local style)
 - Functions in .cpp: camelCase if local; match surrounding convention

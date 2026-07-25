@@ -3,8 +3,8 @@
  * @brief Tests for IBL cubemapâ†”equirectangular conversion and HDR/LDR saving.
  *
  * Validates:
- *   - E2C (equirect â†’ cubemap) compute shader produces valid cubemap
- *   - C2E (cubemap â†’ equirect) compute shader roundtrip matches input
+ *   - E2C (equirect â†?cubemap) compute shader produces valid cubemap
+ *   - C2E (cubemap â†?equirect) compute shader roundtrip matches input
  *   - Cubemap 6-face readback and .hdr saving (Radiance format)
  *   - Cubemap 6-face .png saving (LDR)
  *   - Direct HDR float image saving via ImageData::SaveHDR
@@ -101,10 +101,10 @@ protected:
 			Image::ImageType::e2D,
 			"IBLTest_OutEquirect");
 
-		// --- E2C pipeline (equirect â†’ cubemap) ---
+		// --- E2C pipeline (equirect â†?cubemap) ---
 		createE2CPipeline(dev);
 
-		// --- C2E pipeline (cubemap â†’ equirect) ---
+		// --- C2E pipeline (cubemap â†?equirect) ---
 		createC2EPipeline(dev);
 	}
 
@@ -132,7 +132,7 @@ protected:
 		m_e2cSets = m_e2cPool->Allocate(*m_e2cSetLayout, 1);
 
 		auto e2cShader =
-			ShaderLibrary::ParseComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
+			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
 		ASSERT_NE(e2cShader, nullptr);
 		auto e2cSpv = ShaderLibrary::Compile(e2cShader->GetStage(ShaderType::COMPUTE),
 		                                     ShaderType::COMPUTE, "e2c_test");
@@ -158,7 +158,7 @@ protected:
 		m_c2eSets = m_c2ePool->Allocate(*m_c2eSetLayout, 1);
 
 		auto c2eShader =
-			ShaderLibrary::ParseComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
+			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
 		ASSERT_NE(c2eShader, nullptr);
 		auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
 		                                     ShaderType::COMPUTE, "c2e_test");
@@ -216,7 +216,7 @@ protected:
 	// -------------------------------------------------------------------
 
 	/**
-	 * @brief Runs E2C: equirect â†’ cubemap.
+	 * @brief Runs E2C: equirect â†?cubemap.
 	 */
 	void runE2C(const Image& equirectSrc, Image& cubeDst)
 	{
@@ -234,7 +234,7 @@ protected:
 
 		auto& cmd = BeginCmd();
 
-		// Transition cubemap: UNDEFINED â†’ ShaderWrite (all 6 faces)
+		// Transition cubemap: UNDEFINED â†?ShaderWrite (all 6 faces)
 		vk::ImageSubresourceRange cubeRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
 		Barrier::Transition(*cmd, cubeDst, ImageState::ShaderWrite, cubeRange);
 
@@ -264,7 +264,7 @@ protected:
 	}
 
 	/**
-	 * @brief Runs C2E: cubemap â†’ equirect.
+	 * @brief Runs C2E: cubemap â†?equirect.
 	 */
 	void runC2E(const Image& cubeSrc, Image& equiDst)
 	{
@@ -282,7 +282,7 @@ protected:
 
 		auto& cmd = BeginCmd();
 
-		// Transition output equirect: UNDEFINED â†’ ShaderWrite
+		// Transition output equirect: UNDEFINED â†?ShaderWrite
 		Barrier::Transition(*cmd, equiDst, ImageState::ShaderWrite);
 
 		cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *m_c2ePipeline.pipeline);
@@ -325,7 +325,7 @@ protected:
 };
 
 // ===========================================================================
-// 1. E2C â†’ C2E roundtrip test
+// 1. E2C â†?C2E roundtrip test
 // ===========================================================================
 
 TEST_F(IBLConversionTest, E2C_C2E_Roundtrip_ProducesMatchingPixels)
@@ -342,10 +342,10 @@ TEST_F(IBLConversionTest, E2C_C2E_Roundtrip_ProducesMatchingPixels)
 	auto equiImg = createAndUploadEquirect(srcPixels, kEquiWidth, kEquiHeight,
 	                                        "IBLTest_SrcEquirect");
 
-	// E2C: equirect â†’ cubemap
+	// E2C: equirect â†?cubemap
 	runE2C(*equiImg, *m_cubemapImage);
 
-	// C2E: cubemap â†’ equirect
+	// C2E: cubemap â†?equirect
 	runC2E(*m_cubemapImage, *m_outputEquirect);
 
 	// Read back result

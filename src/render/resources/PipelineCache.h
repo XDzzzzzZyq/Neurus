@@ -1,9 +1,8 @@
 #pragma once
 
-#include "Pipeline.h"
+#include "../Pipeline.h"
 
 #include <functional>
-#include <string>
 #include <unordered_map>
 
 namespace neurus {
@@ -19,18 +18,17 @@ public:
 	PipelineCache(PipelineCache&&) noexcept = default;
 	PipelineCache& operator=(PipelineCache&&) noexcept = default;
 
-	Pipeline* Get(const std::string& key);
-	const Pipeline* Get(const std::string& key) const;
+	Pipeline* Get(int uid);
+	const Pipeline* Get(int uid) const;
 
-	Pipeline& GetOrCreate(const std::string& key,
-	                      std::function<Pipeline()> factory);
+	Pipeline& GetOrCreate(int uid, std::function<Pipeline()> factory);
 
-	void Store(const std::string& key, Pipeline pipeline);
-	void Remove(const std::string& key);
+	void Store(int uid, Pipeline pipeline);
+	void Remove(int uid);
 	void Clear();
 
 private:
-	std::unordered_map<std::string, Pipeline> m_pipelines;
+	std::unordered_map<int, Pipeline> p_pipelines;
 };
 
 } // namespace neurus

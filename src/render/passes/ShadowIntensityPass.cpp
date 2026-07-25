@@ -21,13 +21,15 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "../resources/ShaderGPU.h"
+
 #include <stdexcept>
 #include <string>
 
 namespace neurus {
 
 // ---------------------------------------------------------------------------
-// Push constant structs — compile-time verified
+// Push constant structs �?compile-time verified
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -35,7 +37,7 @@ namespace {
 // Sun shadow eval push constants (matches sun_shadow_eval.comp layout).
 // GLSL layout:  mat4(64B) + float(4B) + int(4B) = 72B
 // C++ sizeof:   80B (16-byte alignment padding from glm::mat4).
-// Pipeline range must be ≥ sizeof(C++ struct) to avoid VUID-00369.
+// Pipeline range must be �?sizeof(C++ struct) to avoid VUID-00369.
 struct SunShadowEvalPushConstants
 {
 	glm::mat4 lightViewProj;
@@ -51,10 +53,10 @@ static_assert(
 	"glm::mat4 size mismatch");
 static_assert(
 	offsetof(SunShadowEvalPushConstants, bias) == 64,
-	"bias offset mismatch — must match sun_shadow_eval.comp push constant layout");
+	"bias offset mismatch �?must match sun_shadow_eval.comp push constant layout");
 static_assert(
 	offsetof(SunShadowEvalPushConstants, layerIndex) == 68,
-	"layerIndex offset mismatch — must match sun_shadow_eval.comp push constant layout");
+	"layerIndex offset mismatch �?must match sun_shadow_eval.comp push constant layout");
 
 } // anon
 
@@ -69,13 +71,13 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	              // Allocate 2× descriptor sets per in-flight frame so that
 	              // the per-light loop can alternate between two sets without
 	              // ever updating a currently-bound descriptor set (which would
-	              // invalidate the command buffer — see VUID 00059 et al.).
+	              // invalidate the command buffer �?see VUID 00059 et al.).
 	              ShadowIntensityPass::CreateDescriptorSetLayout(device),
 	              numSets * kSetsPerFrameSlot)
 	, p_sunDescSetLayout(CreateSunDescriptorSetLayout(device))
 {
 	// --- Load point-light cubemap eval shader via ShaderLibrary ---
-	m_pointLightShader = ShaderLibrary::ParseComputeShader(
+	m_pointLightShader = ShaderLibrary::LoadComputeShader(
 		"shadow_eval", "res/shaders/compute/shadow_eval.comp");
 
 	if (!m_pointLightShader)
@@ -84,7 +86,7 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	}
 
 	// --- Load sun-light 2D eval shader via ShaderLibrary ---
-	m_sunLightShader = ShaderLibrary::ParseComputeShader(
+	m_sunLightShader = ShaderLibrary::LoadComputeShader(
 		"sun_shadow_eval", "res/shaders/compute/sun_shadow_eval.comp");
 
 	if (!m_sunLightShader)
@@ -186,7 +188,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		auto spv = ShaderLibrary::Compile(m_pointLightShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, debugName);
-		vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
@@ -195,7 +197,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		PipelineBuilder builder;
 		p_pipelines.push_back(
-			builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+			builder.AddShaderStage(gpu.GetStageCreateInfo())
 				.SetDebugName(debugName.c_str())
 				.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 				.AddPushConstantRange(pushRange)
@@ -211,7 +213,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		auto spv = ShaderLibrary::Compile(m_sunLightShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, debugName + "_Sun");
-		vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
@@ -220,7 +222,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		PipelineBuilder sunBuilder;
 		p_pipelines.push_back(
-			sunBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+			sunBuilder.AddShaderStage(gpu.GetStageCreateInfo())
 				.SetDebugName((debugName + "_Sun").c_str())
 				.AddDescriptorSetLayout(*p_sunDescSetLayout.layout())
 				.AddPushConstantRange(pushRange)
@@ -427,7 +429,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		p_currentLightUID = uid;
 
-		// --- Transition shadow depth cubemap: post-ShadowDepthPass → DepthShaderRead ---
+		// --- Transition shadow depth cubemap: post-ShadowDepthPass �?DepthShaderRead ---
 		{
 			LightGPU* lgpu = cache.GetLightGPU(uid);
 			if (!lgpu || !lgpu->shadowDepthMap) continue;
@@ -496,7 +498,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		p_currentLightUID = uid;
 
-		// --- Transition sun shadow depth map: post-ShadowDepthPass → DepthShaderRead ---
+		// --- Transition sun shadow depth map: post-ShadowDepthPass �?DepthShaderRead ---
 		{
 			LightGPU* slgpu = cache.GetLightGPU(uid);
 			if (!slgpu || !slgpu->shadowDepthMap) continue;
@@ -565,7 +567,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		++sunLightIndex;
 	}
 
-	// --- 5. Transition shadow intensity array: General → ColorShaderRead for lighting pass ---
+	// --- 5. Transition shadow intensity array: General �?ColorShaderRead for lighting pass ---
 	{
 		auto& shadowArray = cache.GetShadowIntensityArray(renderExtent);
 		Barrier::Transition(cmdBuf, shadowArray, ImageState::ColorShaderRead);

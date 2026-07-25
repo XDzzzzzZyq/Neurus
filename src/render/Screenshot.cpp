@@ -11,6 +11,7 @@
 #include "DescriptorManager.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 
 #include <algorithm>
 #include <chrono>
@@ -128,12 +129,12 @@ int Screenshot::TakeScreenshotAllAttachments(RenderCache& renderCache,
 	                                           extent,
 	                                           "screenshots/gbuffer");
 
-	// --- Export shadow maps: cubemaps → equirect, 2D → direct depth readback ---
+	// --- Export shadow maps: cubemaps �?equirect, 2D �?direct depth readback ---
 	{
 		const auto shadowUIDs = renderCache.GetShadowMapUIDs();
 		for (int lightUID : shadowUIDs)
 		{
-			// Try cubemap→equirect (point lights) — returns empty for non-cubemaps
+			// Try cubemap→equirect (point lights) �?returns empty for non-cubemaps
 			{
 				const std::string result = ExportShadowDepthEquirect(
 					renderCache, lightUID, "screenshots/shadow_cubemap", cubemapResolution);
@@ -142,7 +143,7 @@ int Screenshot::TakeScreenshotAllAttachments(RenderCache& renderCache,
 					++count;
 				}
 			}
-			// Try 2D depth export (sun lights) — returns empty for cubemaps
+			// Try 2D depth export (sun lights) �?returns empty for cubemaps
 			{
 				const std::string result = ExportShadowDepth(
 					renderCache, lightUID, "screenshots/sun_shadow");
@@ -179,7 +180,7 @@ int Screenshot::TakeScreenshotAllAttachments(RenderCache& renderCache,
 }
 
 // ===========================================================================
-// C2E — Shadow cubemap → Equirectangular export
+// C2E �?Shadow cubemap �?Equirectangular export
 // ===========================================================================
 
 std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
@@ -247,7 +248,7 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 
 	// --- 4. Load compute shader via ShaderLibrary ---
 	auto c2eShader =
-		ShaderLibrary::ParseComputeShader("c2e_export",
+		ShaderLibrary::LoadComputeShader("c2e_export",
 		                                  "res/shaders/convert/c2e.comp");
 	if (!c2eShader)
 	{
@@ -256,10 +257,10 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 
 	auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
 	                                     ShaderType::COMPUTE, "c2e_export");
-	vk::raii::ShaderModule c2eMod(m_device, vk::ShaderModuleCreateInfo({}, c2eSpv));
+	ShaderGPU c2eGPU(m_device, vk::ShaderStageFlagBits::eCompute, c2eSpv);
 
 	PipelineBuilder c2eBuilder;
-	c2eBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *c2eMod, "main"));
+	c2eBuilder.AddShaderStage(c2eGPU.GetStageCreateInfo());
 	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 
@@ -276,12 +277,12 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 		auto& cmd = cmdBufs[0];
 		cmd.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));
 
-		// Transition cubemap → SHADER_READ_ONLY
+		// Transition cubemap �?SHADER_READ_ONLY
 		{
 			Barrier::Transition(*cmd, cubemap, ImageState::ColorShaderRead);
 		}
 
-		// Transition equirect → GENERAL
+		// Transition equirect �?GENERAL
 		{
 			Barrier::Transition(*cmd, equirectImage, ImageState::ShaderWrite);
 		}
@@ -296,7 +297,7 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 		uint32_t gy = (equiHeight + 15) / 16;
 		cmd.dispatch(gx, gy, 1);
 
-		// Transition equirect → TRANSFER_SRC for readback
+		// Transition equirect �?TRANSFER_SRC for readback
 		{
 			Barrier::Transition(*cmd, equirectImage, ImageState::TransferSrc);
 		}
@@ -346,7 +347,7 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 }
 
 // ===========================================================================
-// ExportShadowDepth — 2D sun light shadow depth map → grayscale PNG
+// ExportShadowDepth �?2D sun light shadow depth map �?grayscale PNG
 // ===========================================================================
 
 std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
@@ -374,7 +375,7 @@ std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
 		return {};
 	}
 
-	// Convert D32 float depth → R8 grayscale
+	// Convert D32 float depth �?R8 grayscale
 	const auto& rawPixels = depthData.GetPixelData();
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
 	std::vector<uint8_t> grayPixels(pixelCount);
@@ -394,7 +395,7 @@ std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
 	                   PixelFormat::R8U);
 	const bool saved = grayImg.SavePNG(path);
 
-	// Restore original layout — ReadImageData transitions to TransferSrc.
+	// Restore original layout �?ReadImageData transitions to TransferSrc.
 	if (saved && depthMap.State() != originalState)
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
@@ -462,7 +463,7 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
 		return false;
 	}
 
-	// --- 1. Transition PRESENT_SRC → TRANSFER_SRC ---
+	// --- 1. Transition PRESENT_SRC �?TRANSFER_SRC ---
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
 		                                 queueFamilyIndex);
@@ -581,7 +582,7 @@ bool Screenshot::CaptureSwapchain(const vk::raii::Device& device,
 	std::memcpy(rawData.data(), mapped, static_cast<size_t>(imageSize));
 	stagingMemory.unmapMemory();
 
-	// --- 3. Transition back TRANSFER_SRC → PRESENT_SRC ---
+	// --- 3. Transition back TRANSFER_SRC �?PRESENT_SRC ---
 	{
 		vk::CommandPoolCreateInfo poolCI(vk::CommandPoolCreateFlagBits::eTransient,
 		                                 queueFamilyIndex);
@@ -655,7 +656,7 @@ bool Screenshot::CaptureImageLayer(const vk::raii::Device& device,
 		return false;
 	}
 
-	// Save original layout — ReadImageData transitions the image to
+	// Save original layout �?ReadImageData transitions the image to
 	// TRANSFER_SRC_OPTIMAL for readback and does not restore it.
 	const auto originalState = vulkanImage.State();
 

@@ -36,10 +36,10 @@ QVulkanInstance
   ‚îî‚îÄ‚îÄ VulkanWindow : QVulkanWindow
         ‚îú‚îÄ‚îÄ Qt handles: instance, surface, device, swapchain, command buffer
         ‚îî‚îÄ‚îÄ QVulkanRenderer : QVulkanWindowRenderer
-              ‚îú‚îÄ‚îÄ initResources() ‚Üí create pipeline + shader modules
-              ‚îú‚îÄ‚îÄ startNextFrame() ‚Üí vkCmdBeginRenderPass ‚Üí draw(3) ‚Üí endRenderPass
-              ‚îÇ   ‚Üí frameReady() ‚Üí requestUpdate()
-              ‚îî‚îÄ‚îÄ releaseResources() ‚Üí destroy pipeline, shader modules
+              ‚îú‚îÄ‚îÄ initResources() ‚Ü?create pipeline + shader modules
+              ‚îú‚îÄ‚îÄ startNextFrame() ‚Ü?vkCmdBeginRenderPass ‚Ü?draw(3) ‚Ü?endRenderPass
+              ‚î?  ‚Ü?frameReady() ‚Ü?requestUpdate()
+              ‚îî‚îÄ‚îÄ releaseResources() ‚Ü?destroy pipeline, shader modules
 ```
 
 - `QVulkanWindow` handles ALL infrastructure: instance, surface, device, swapchain (including recreation), command pool, primary command buffer
@@ -51,8 +51,8 @@ QVulkanInstance
 
 ```
 VulkanWidget (QWidget with WA_NativeWindow)
-  ‚Üí vk::Win32SurfaceCreateInfoKHR ‚Üí vk::raii::SurfaceKHR
-  ‚Üí VulkanContext ‚Üí vk::raii::Device ‚Üí Renderer ‚Üí Swapchain ‚Üí ShaderProgram
+  ‚Ü?vk::Win32SurfaceCreateInfoKHR ‚Ü?vk::raii::SurfaceKHR
+  ‚Ü?VulkanContext ‚Ü?vk::raii::Device ‚Ü?Renderer ‚Ü?Swapchain ‚Ü?Shader
 ```
 
 - `VulkanWidget` provides native HWND for Vulkan surface
@@ -83,8 +83,8 @@ mainWindow->createViewportDock(container);
 
 ### Layout Persistence
 
-- **View ‚Üí Save Layout** (`Ctrl+Shift+S`): Serializes dock state to `<appdir>/layout.ads`
-- **View ‚Üí Restore Default Layout**: Deletes non-viewport docks, re-creates default arrangement
+- **View ‚Ü?Save Layout** (`Ctrl+Shift+S`): Serializes dock state to `<appdir>/layout.ads`
+- **View ‚Ü?Restore Default Layout**: Deletes non-viewport docks, re-creates default arrangement
 - **Auto-load**: `LoadLayout()` called in constructor - restores saved state on startup if available
 - Viewport dock is identified by `setObjectName("ViewportDock")` for `restoreState()` matching
 - Viewport created first in `CreateDocks()` (ADS requires central widget as first dock)
@@ -122,17 +122,17 @@ target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 
 All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 - `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig)
-- `virtual void Refresh(const UIContext& ctx)` ‚Äî called per-frame to sync panel UI with application state
+- `virtual void Refresh(const UIContext& ctx)` ‚Ä?called per-frame to sync panel UI with application state
 - `UIContext` carries a `const void* renderConfig` pointer; panels cast to `const RenderConfig*`
 - `UIManager` stores panels in `std::map<PanelType, ads::CDockWidget*> m_panelDocks`
 
 ### RenderConfigPanel
 
 `RenderConfigPanel` provides live-adjustable render settings organized in collapsible `QGroupBox` sections:
-- **Shadows**: Algorithm (None/ShadowMapping/SDFSoftShadow/VSSM), PCF filter mode, bias `ScalarSlider` (0.0‚Äì0.1, derived step 0.0001, 4 decimals)
-- **Ambient Occlusion**: Algorithm (None/SSAO), kernel size spinbox, radius `ScalarSlider` (0.0‚Äì5.0)
-- **Lighting**: IBL toggle, exposure `ScalarSlider` (0.0‚Äì5.0)
-- **Post-Processing**: Anti-aliasing combo, gamma `ScalarSlider` (1.0‚Äì3.0)
+- **Shadows**: Algorithm (None/ShadowMapping/SDFSoftShadow/VSSM), PCF filter mode, bias `ScalarSlider` (0.0‚Ä?.1, derived step 0.0001, 4 decimals)
+- **Ambient Occlusion**: Algorithm (None/SSAO), kernel size spinbox, radius `ScalarSlider` (0.0‚Ä?.0)
+- **Lighting**: IBL toggle, exposure `ScalarSlider` (0.0‚Ä?.0)
+- **Post-Processing**: Anti-aliasing combo, gamma `ScalarSlider` (1.0‚Ä?.0)
 - **Pipeline**: Pipeline type (Forward/Deferred), SSR mode, samples per frame
 
 Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Application` to `Editor::SetRenderConfig(cfg)`.
@@ -148,12 +148,12 @@ redefined. For type-specific property editors built from items, see
 
 `Icons` (`src/ui/Icons.h`) is a fully static class providing lazy-loaded QIcon objects:
 
-- **`Icons::Initialize()`** ‚Äî called once by `UIManager` during construction. Populates the hardcoded path registry (icon name ‚Üí Qt resource path). Safe to call multiple times (idempotent).
-- **`Icons::GetIcon(name)`** ‚Äî returns `const QIcon&` from an internal cache. On first access, loads the SVG from the Qt resource system; subsequent calls return the cached instance.
-- **Naming convention**: `"folder:name"` (e.g. `"scene:mesh"` ‚Üí `:/icons/scene/mesh.svg`). 10 icons registered across `scene:` and `editor:` namespaces.
+- **`Icons::Initialize()`** ‚Ä?called once by `UIManager` during construction. Populates the hardcoded path registry (icon name ‚Ü?Qt resource path). Safe to call multiple times (idempotent).
+- **`Icons::GetIcon(name)`** ‚Ä?returns `const QIcon&` from an internal cache. On first access, loads the SVG from the Qt resource system; subsequent calls return the cached instance.
+- **Naming convention**: `"folder:name"` (e.g. `"scene:mesh"` ‚Ü?`:/icons/scene/mesh.svg`). 10 icons registered across `scene:` and `editor:` namespaces.
 - **Path registry**: hardcoded in `Initialize()`, mapping icon names to `:/icons/...` Qt resource paths.
 - **Cache**: `std::unordered_map<std::string, QIcon>`, populated lazily per icon name.
-- **No instantiation needed** ‚Äî all members are static. Any code in `src/ui/` can call `Icons::GetIcon(name)` directly.
+- **No instantiation needed** ‚Ä?all members are static. Any code in `src/ui/` can call `Icons::GetIcon(name)` directly.
 
 Icons are embedded in the binary via `qt_add_resources(neurus_ui "icons" PREFIX "/icons" ...)` in `src/ui/CMakeLists.txt`. SVGs live under `res/ui/icons/`.
 
@@ -172,7 +172,7 @@ Icons are embedded in the binary via `qt_add_resources(neurus_ui "icons" PREFIX 
 - Three `QDoubleSpinBox` widgets in a horizontal row (X, Y, Z)
 - Configurable range, step, decimals, and suffix
 - Emits `valueChanged(x, y, z)` signal when any spinbox changes
-- `setValue(x, y, z)` with internal dirty-check ‚Äî no-ops if all three values unchanged
+- `setValue(x, y, z)` with internal dirty-check ‚Ä?no-ops if all three values unchanged
 - Uses `QSignalBlocker` internally to prevent feedback loops during programmatic updates
 
 
@@ -193,7 +193,7 @@ QFile file(":/qml/outliner.qss");
 file.open(QIODevice::ReadOnly | QIODevice::Text);
 QString stylesheet = QTextStream(&file).readAll();
 
-// 3. Apply to parent widget ‚Äî ID selectors cascade to children
+// 3. Apply to parent widget ‚Ä?ID selectors cascade to children
 parentWidget->setStyleSheet(stylesheet);
 
 // 4. In C++, set object names matching QSS ID selectors
@@ -229,7 +229,7 @@ m_eyeBtn->setChecked(viewportVisible);
 setEyeBtnColor();
 ```
 
-This applies to any `Refresh()`-based panel ‚Äî cache the previous value of each
+This applies to any `Refresh()`-based panel ‚Ä?cache the previous value of each
 widget-modifying input and gate the write behind an equality check.
 
 ### Prefer QSS Over Inline Stylesheets
@@ -249,7 +249,7 @@ m_nameBtn->style()->polish(m_nameBtn);
 m_nameBtn->setStyleSheet("QPushButton { color: #ff6f00; }");
 ```
 
-The same principle applies to `setIcon()` on toggle buttons ‚Äî use
+The same principle applies to `setIcon()` on toggle buttons ‚Ä?use
 `GetIconPair()` to pre-bake On/Off states into a single `QIcon` instead of
 string-building icon names and calling `GetIcon()` on every toggle.
 
@@ -264,13 +264,13 @@ application-level PascalCase methods (`BuildTransformEditor()`, `PopulateTransfo
 New reusable items in `src/ui/items/` should follow this convention for all
 public setters that participate in the Refresh pipeline.
 
-### ‚úÖ UI MAY:
+### ‚ú?UI MAY:
 - Own QVulkanInstance, VulkanWindow, QMainWindow
 - Emit EventBus signals
 - Handle Qt events (resize, close, menu actions)
 - Manage ADS dock layout
 
-### ‚ùå UI MUST NOT:
+### ‚ù?UI MUST NOT:
 - Directly call Renderer methods (go through EventBus)
 - Create Vulkan objects beyond QVulkanInstance
 - Mutate scene state directly

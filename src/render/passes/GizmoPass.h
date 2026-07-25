@@ -10,7 +10,7 @@
  * Architecture:
  * - Inherits from ComputePass for shared infrastructure (sampler, descriptor
  *   pool/sets, barrier transitions, dispatch logic).
- * - Owns the compute pipeline (no UBOs â€” only image bindings + push constant).
+ * - Owns the compute pipeline (no UBOs â€?only image bindings + push constant).
  * - Borrows RenderCache for IDBuffer and GizmoHighlight image views.
  *
  * @note Simple pass with no per-frame uploads.  The single push constant
@@ -86,7 +86,7 @@ public:
 	 *   0: IDBuffer (combined image sampler, R32_UINT)
 	 *   1: GizmoHighlight (storage image, R8_UNORM)
 	 *
-	 * @param setIndex  Index into p_descriptorSets (0 â€¦ numSets-1).
+	 * @param setIndex  Index into p_descriptorSets (0 â€?numSets-1).
 	 * @param extent    Render extent for attachment lookup.
 	 * @param cache     Render cache for IDBuffer / GizmoHighlight access.
 	 */
@@ -110,7 +110,7 @@ private:
 	                   const std::string& debugName) override;
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 };
 
 } // namespace neurus

@@ -17,6 +17,8 @@
 
 #include "scene/Scene.h"
 
+#include "../resources/ShaderGPU.h"
+
 #include <stdexcept>
 #include <string>
 
@@ -32,15 +34,15 @@ GizmoPass::GizmoPass(const vk::raii::Device& device,
 	: ComputePass(device, physicalDevice,
 	              GizmoPass::CreateDescriptorSetLayout(device), numSets)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, m_shader(
-		ShaderLibrary::ParseComputeShader("gizmo_highlight",
+	, p_shader(
+		ShaderLibrary::LoadComputeShader("gizmo_highlight",
 		                                  "res/shaders/compute/gizmo_highlight.comp"))
 {
 	// --- Create pipeline from self-loaded shader ---
 	BuildPipeline(device, "GizmoPass");
 
 	NEURUS_LOG("[GizmoPass] numSets=" << numSets
-	           << " shader=" << (m_shader ? "OK" : "FAIL"));
+	           << " shader=" << (p_shader ? "OK" : "FAIL"));
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -77,15 +79,15 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
                                const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!m_shader)
+	if (!p_shader)
 	{
 		throw std::runtime_error("GizmoPass: Compute shader not loaded or invalid");
 	}
 
 	// --- Compile and create temporary shader module ---
-	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
 	                                  ShaderType::COMPUTE, debugName);
-	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 	// --- Push constant range (1 uint = 4 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -96,7 +98,7 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+		builder.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
@@ -149,7 +151,7 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
-	// --- 0. No per-frame uploads needed — activeObjectId read directly from ctx ---
+	// --- 0. No per-frame uploads needed �?activeObjectId read directly from ctx ---
 
 	// --- 1. Write descriptor set for this frame slot ---
 	WriteDescriptors(frameIndex, renderExtent, cache);
@@ -194,7 +196,7 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
-	// --- 7. Transition GizmoHighlight output: General → ShaderRead for downstream passes ---
+	// --- 7. Transition GizmoHighlight output: General �?ShaderRead for downstream passes ---
 	{
 		auto& gizmoAtt = cache.GetAttachment(AttachmentName::GizmoHighlight, renderExtent);
 		Barrier::Transition(cmdBuf, gizmoAtt, ImageState::ColorShaderRead);

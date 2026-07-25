@@ -10,10 +10,10 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/VulkanContext.h` - Instance, physical device, logical device, queues
 - `src/render/Swapchain.h` - Swapchain creation, image acquisition, presentation, recreation
 - `src/render/Image.h/cpp` - GPU image with ImageState tracking (including Invalid) and mipmap generation
-- `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState ‚Üí Vulkan layout/stage/access)
+- `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState ‚Ü?Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
 - `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
-- `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
+- `src/render/Shader.h` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 - `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
 - `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
@@ -40,9 +40,9 @@ renders frames. It must remain stateless with respect to application logic.
    - Create image views for each swapchain image
    - Recreate on window resize (old swapchain destroyed, new created)
 
-3. **Shader and Pipeline Management** (`ShaderProgram`)
+3. **Shader and Pipeline Management** (`Shader`)
    - Load SPIR-V from embedded C header arrays (generated at build time)
-   - Create vk::raii::ShaderModule instances
+   - Create vk::raii::ShaderGPU instances
    - Create vk::raii::Pipeline via VK_KHR_dynamic_rendering
    - Pipeline layout (empty for triangle; uniforms added later)
 
@@ -50,13 +50,13 @@ renders frames. It must remain stateless with respect to application logic.
    - Command pool and command buffer creation
    - Semaphore pair: imageAvailable + renderFinished
    - Fence: inFlightFence for CPU-GPU sync
-   - DrawFrame(): acquire ‚Üí begin dynamic rendering ‚Üí bind pipeline ‚Üí draw ‚Üí end ‚Üí present
+   - DrawFrame(): acquire ‚Ü?begin dynamic rendering ‚Ü?bind pipeline ‚Ü?draw ‚Ü?end ‚Ü?present
    - WaitIdle(): DeviceWaitIdle for clean shutdown
 
 ## Data Flow
 
 ```
-UIEvents::newFrame() ‚Üí Renderer::DrawFrame()
+UIEvents::newFrame() ‚Ü?Renderer::DrawFrame()
                                 ‚îú‚îÄ‚îÄ Swapchain::AcquireNextImage()
                                 ‚îú‚îÄ‚îÄ Begin dynamic rendering
                                 ‚îú‚îÄ‚îÄ Bind pipeline
@@ -112,13 +112,13 @@ vk::raii::Device device(physicalDevice, deviceCreateInfo);
 
 ## Architectural Boundaries
 
-### ‚úÖ Renderer MAY:
+### ‚ú?Renderer MAY:
 - Read scene data via const reference
 - Subscribe to UIEvents signals for configuration changes
 - Own GPU resources (device, swapchain, pipeline, command buffers, RenderCache, attachments)
 - Emit performance metrics or warnings via UIEvents
 
-### ‚ùå Renderer MUST NOT:
+### ‚ù?Renderer MUST NOT:
 - Mutate application state
 - Depend on Editor or UI layers (except borrowed VkSurfaceKHR reference)
 - Directly call UI or Editor functions
@@ -139,41 +139,41 @@ The triangle MVP implements a minimal but correct rendering path:
 ## Current Render Pipeline
 
 ```
-ShadowDepthPass (per-light depth ‚Üí RenderCache via GetShadowMap(uid, lightType))
+ShadowDepthPass (per-light depth ‚Ü?RenderCache via GetShadowMap(uid, lightType))
     ‚îú‚îÄ‚îÄ Point light: cubemap geometry pass (6 faces, multiview)
     ‚îî‚îÄ‚îÄ Sun light:   2D orthographic geometry pass (2048√ó2048, single view)
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 GeometryPass (G-Buffer MRT: Position, Normal, Albedo, MetallicRoughness, Depth)
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 SSAOPass (compute: reads G-Buffer, writes AO to R8 attachment)
-    ‚îÇ
-    ‚ñº
-ShadowIntensityPass (compute: per-light shadow eval ‚Üí layered R8_UNORM 2D_ARRAY)
+    ‚î?
+    ‚ñ?
+ShadowIntensityPass (compute: per-light shadow eval ‚Ü?layered R8_UNORM 2D_ARRAY)
     ‚îú‚îÄ‚îÄ Point light: samplerCube depth comparison, PCF via cubemap sampling
     ‚îî‚îÄ‚îÄ Sun light:   sampler2D depth comparison, ortho PCF, NDC Z in [0,1]
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 LightingPass (compute: reads G-Buffer + AO + shadow intensity array,
               reads LightingGPU SSBOs from RenderCache, writes HDRColor)
     ‚îú‚îÄ‚îÄ Binding 5: PointLight SSBO (from RenderCache::GetLightingGPU())
     ‚îî‚îÄ‚îÄ Binding 6: SunLight SSBO   (from RenderCache::GetLightingGPU())
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 GizmoPass (compute: reads IDBuffer, 3√ó3 edge detection for activeObjectId, writes R8 highlight)
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 ComposePass (compute: blends GizmoHighlight onto HDRColor, applies gamma correction, writes ComposedOutput)
-    ‚îÇ
-    ‚ñº
+    ‚î?
+    ‚ñ?
 FXAAPass (compute: reads ComposedOutput, luma-based edge detection + full-iteration edge search, writes FXAAOutput)
-    ‚îÇ  (conditional: only when AA == AAAlg::FXAA)
-    ‚ñº
-Blit (ComposedOutput or FXAAOutput) ‚Üí Swapchain (vkCmdBlitImage)
+    ‚î? (conditional: only when AA == AAAlg::FXAA)
+    ‚ñ?
+Blit (ComposedOutput or FXAAOutput) ‚Ü?Swapchain (vkCmdBlitImage)
 ```
 
 ### ImageState & Barrier Convention
@@ -193,18 +193,18 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - `Barrier::Transition(cmd, image, after)` reads `image.State()` as the "before"
   layout, emits a `vkCmdPipelineBarrier2`, and updates `m_state` to `after`.
 - `Barrier::Transition(cmd, image, after, subresourceRange)` does the same but
-  with an explicit subresource range ‚Äî does **not** update `m_state` (caller
+  with an explicit subresource range ‚Ä?does **not** update `m_state` (caller
   must manage state for partial transitions).
 - Raw `vk::ImageMemoryBarrier2` is acceptable **only** for:
   - Raw `VkImage` handles not wrapped in `Image` (e.g. swapchain images)
-  - Same-layout memory barriers (`eGeneral ‚Üí eGeneral`) within compute passes
+  - Same-layout memory barriers (`eGeneral ‚Ü?eGeneral`) within compute passes
 
 ### ImageState::Invalid Convention
 
 - `ImageState::Invalid` signals an image whose GPU creation failed (e.g.
   missing source data, unsupported format). The image has no valid GPU resources.
-- `Barrier::Transition` maps `Invalid` ‚Üí `Undefined` layout (safe no-op barrier).
-- `Image::FromImageData()` returns `std::shared_ptr<Image>` ‚Äî on failure, returns
+- `Barrier::Transition` maps `Invalid` ‚Ü?`Undefined` layout (safe no-op barrier).
+- `Image::FromImageData()` returns `std::shared_ptr<Image>` ‚Ä?on failure, returns
   a shared_ptr containing an empty Image with `ImageState::Invalid`.
 - Callers should check `image.State() != ImageState::Invalid` before using the image.
 - Default-constructed `Image` is empty (all handles null, `Undefined` state);
@@ -225,7 +225,7 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
   the center pixel's objectId matches `activeObjectId` (push constant).
 - **Output**: `VK_FORMAT_R8_UNORM` attachment (`AttachmentName::GizmoHighlight`) at binding 1.
   Highlighted pixels = 255 (edge of selected object); all others = 0.
-- **Push constant**: `uint32_t activeObjectId` ‚Äî set to the currently selected object ID
+- **Push constant**: `uint32_t activeObjectId` ‚Ä?set to the currently selected object ID
   from `RenderContext::activeObjectId`. When `activeObjectId == 0`, the pass early-outs
   (no highlight written).
 
@@ -253,15 +253,15 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 
 ### FXAA Convention
 - **Algorithm**: NVIDIA FXAA 3.11, ported from cuda-vision full-iteration approach
-- **Pipeline**: Two compute dispatches per frame: edge detection (Sobel gradient, subpixel offset) ‚Üí edge-line iteration (march along edge, check 3 rows per step: center/upper/lower) ‚Üí endpoint interpolation ‚Üí bilinear resample
+- **Pipeline**: Two compute dispatches per frame: edge detection (Sobel gradient, subpixel offset) ‚Ü?edge-line iteration (march along edge, check 3 rows per step: center/upper/lower) ‚Ü?endpoint interpolation ‚Ü?bilinear resample
 - **Direction**: Sobel gradient magnitude determines horizontal (`abs(gy) >= abs(gx)`) vs vertical edge
 - **Offset**: Subpixel offset in `[-0.5, 0.5]` computed as `(neighborLo-center)/(neighborLo-neighborHi) - 0.5`
 - **Edge march**: Iterates along the edge line (left/right for horizontal, up/down for vertical), up to 32 steps per direction. FLIP: center pixel luma differs from starting luma (crossed edge). END: off-axis neighbor has same luma as starting luma (left edge region). BOUND: out of image bounds.
-- **Endpoint interpolation**: Endpoint offsets assigned by stop code (END‚Üí0, FLIP‚Üí¬±0.5, otherwise‚Üíoriginal offset). Final offset = `mix(leftOff, rightOff, leftSteps/(leftSteps+rightSteps))`
+- **Endpoint interpolation**: Endpoint offsets assigned by stop code (END‚Ü?, FLIP‚Üí¬?.5, otherwise‚Üíoriginal offset). Final offset = `mix(leftOff, rightOff, leftSteps/(leftSteps+rightSteps))`
 - **Resample**: Bilinear `texture()` at subpixel coordinate offset by `finalOffset * rcpFrame` along the edge normal
 - **Sampler**: Bilinear (`VK_FILTER_LINEAR`) for sub-pixel accuracy; falls back to nearest if `R16G16B16A16_SFLOAT` format doesn't support `VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT`
 - **Config**: `RenderConfig::r_fxaa_subpix` (strength, default 0.75), `r_fxaa_edge_threshold` (default 0.166), `r_fxaa_edge_threshold_min` (default 0.0833)
-- **Gating**: `RenderConfig::RequiresFXAA()` ‚Äî only records when AA algorithm is set to FXAA in RenderConfigPanel
+- **Gating**: `RenderConfig::RequiresFXAA()` ‚Ä?only records when AA algorithm is set to FXAA in RenderConfigPanel
 
 ### RenderConfig Convention
 
@@ -272,7 +272,7 @@ passed to passes through `RenderContext::config` (opaque `void*`):
 - **Quality parameters**: `r_gamma`, `r_ao_ksize`, `r_ao_radius`, `r_shadow_bias` (0.0005f), `r_sample_pf`
 - **Serialized** via cereal for project save/load
 - **Live-update**: passes cast `static_cast<const RenderConfig*>(ctx.config)` each frame; scalar param changes take effect on next `DrawFrame()`
-- **Shadow bias flow**: `RenderConfigPanel` slider ‚Üí `configValueChanged` ‚Üí `Editor::SetRenderConfig` ‚Üí `Project` ‚Üí `RenderContext::config` ‚Üí `ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
+- **Shadow bias flow**: `RenderConfigPanel` slider ‚Ü?`configValueChanged` ‚Ü?`Editor::SetRenderConfig` ‚Ü?`Project` ‚Ü?`RenderContext::config` ‚Ü?`ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
 
 ### Attachment Formats
 
@@ -280,8 +280,8 @@ All screen-space attachments (Position, Normal, Albedo, MetallicRoughness, Depth
 SSAO, GizmoHighlight, ComposedOutput, FXAAOutput) are created lazily via
 `RenderCache::GetAttachment(name, extent)` on first use.
 Per-light shadow maps are managed via `RenderCache::GetShadowMap(lightUID, lightType)`:
-- `LightType::POINTLIGHT` ‚Üí cubemap (6-layer 2D_ARRAY, D32_SFLOAT, 1024√ó1024 per face)
-- `LightType::SUNLIGHT` ‚Üí 2D orthographic (D32_SFLOAT, 2048√ó2048)
+- `LightType::POINTLIGHT` ‚Ü?cubemap (6-layer 2D_ARRAY, D32_SFLOAT, 1024√ó1024 per face)
+- `LightType::SUNLIGHT` ‚Ü?2D orthographic (D32_SFLOAT, 2048√ó2048)
 The shadow intensity array (R8_UNORM, layered 2D_ARRAY) is created via
 `RenderCache::GetShadowIntensityArray(extent)` with per-light layer indices
 assigned via `RenderCache::GetShadowIntensityLayer(lightUID, extent)`.
@@ -329,12 +329,12 @@ These resources separate GPU ownership from the Vulkan-free scene and asset laye
 - Manages point light and sun light SSBOs (device-local GPUBuffers)
 - Created by `RenderCache` via `InitLightingGPU(queue, qfi)` (separated from constructor
   so queue/qfi don't need to be stored as members)
-- Updated via `RenderCache::UpdateLighting(variantDict)` ‚Äî accepts a map of
+- Updated via `RenderCache::UpdateLighting(variantDict)` ‚Ä?accepts a map of
   `variant<PointLightStruct, SunLightStruct>` keyed by light UID
 - `RenderCache::GetLightingGPU()` returns the LightingGPU for per-frame SSBO binding
   by `LightingPass`
 - Also defines `PointLightStruct`, `SunLightStruct` (std140-compatible, 48 bytes),
-  and `LightingPushConstants` (176 bytes) ‚Äî byte-for-byte matches with GLSL shaders
+  and `LightingPushConstants` (176 bytes) ‚Ä?byte-for-byte matches with GLSL shaders
 
 **MeshPushConstants** (`src/render/resources/MeshGPU.h`)
 - Per-mesh push-constant block sent to the vertex shader (128 bytes total)
