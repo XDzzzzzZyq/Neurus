@@ -1,6 +1,6 @@
 /**
  * @file test_shadow_intensity.cpp
- * @brief GPU test: renders cube+plane scene through GeometryPass â†’ ShadowDepthPass â†’
+ * @brief GPU test: renders cube+plane scene through GeometryPass â†?ShadowDepthPass â†?
  *        ShadowIntensityPass, reads back R8 shadow intensity data, and verifies
  *        against mathematically-computed expected shadow values.
  *
@@ -14,8 +14,8 @@
  *   - Tolerance: Â±2/255 for binary shadow values.
  *
  * Reference image regression:
- *   - First run: generates reference PNG â†’ GTEST_SKIP
- *   - Second run: compares pixel-by-pixel with Â±2 tolerance â†’ PASS
+ *   - First run: generates reference PNG â†?GTEST_SKIP
+ *   - Second run: compares pixel-by-pixel with Â±2 tolerance â†?PASS
  */
 
 #include <gtest/gtest.h>
@@ -24,6 +24,7 @@
 #include "shared/TestSimpleShadow.h"
 
 #include "render/passes/ShadowDepthPass.h"
+#include "render/shaders/ComputeShader.h"
 #include "render/passes/ShadowIntensityPass.h"
 #include "render/passes/GeometryPass.h"
 #include "render/RenderContext.h"

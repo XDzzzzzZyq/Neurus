@@ -30,6 +30,7 @@
 
 // --- Render layer ---
 #include "render/RenderCache.h"
+#include "render/shaders/ComputeShader.h"
 #include "render/RenderContext.h"
 #include "render/passes/ShadowDepthPass.h"
 #include "render/passes/ShadowIntensityPass.h"
@@ -97,7 +98,7 @@ protected:
 };
 
 // ===========================================================================
-// SunMultiShadowIntensity â€” per-light readback + statistical verification
+// SunMultiShadowIntensity â€?per-light readback + statistical verification
 // ===========================================================================
 
 TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
@@ -214,15 +215,15 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 
 		EXPECT_GT(shadowedCount, 50u)
 			<< "Sun light " << li << " (UID=" << lightUID << "): "
-			<< "expected at least 50 shadowed pixels â€” cube should cast a visible shadow on the plane";
+			<< "expected at least 50 shadowed pixels â€?cube should cast a visible shadow on the plane";
 		EXPECT_GT(litCount, 100u)
 			<< "Sun light " << li << " (UID=" << lightUID << "): "
-			<< "expected at least 100 lit pixels â€” plane pixels outside the shadow should be lit";
+			<< "expected at least 100 lit pixels â€?plane pixels outside the shadow should be lit";
 	}
 }
 
 // ===========================================================================
-// SunMultiShadowIntensity_ReferenceImage â€” reference-image regression
+// SunMultiShadowIntensity_ReferenceImage â€?reference-image regression
 // ===========================================================================
 
 /**
