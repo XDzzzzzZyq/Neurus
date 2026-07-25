@@ -1,0 +1,165 @@
+[InitDevice:84] [VulkanContext] NVIDIA GeForce RTX 4060 Laptop GPU | limits.maxPushConstantsSize = 256
+[Swapchain:69] [Swapchain] 234x849 format=B8G8R8A8Srgb present=Mailbox images=3 usage={ TransferDst | ColorAttachment }
+[RenderCache:20] [RenderCache] Created
+[createBuffer:107] [Buffer] size=128 usage={ UniformBuffer } memProps={ HostVisible | HostCoherent } name='CameraUBO'
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/render/gbuffer.vert' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/render/gbuffer.vert'
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/render/gbuffer.frag' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/render/gbuffer.frag'
+[RenderShader:51] [RenderShader] Created 'GeometryPass' vert='D:/Projects/Neurus_cereal-serialization/res/shaders/render/gbuffer.vert' frag='D:/Projects/Neurus_cereal-serialization/res/shaders/render/gbuffer.frag'
+[Compile:61] [RenderShader] Compiling 'GeometryPass'...
+[CompileStage:311] [RenderShader] VERTEX parse complete: D:/Projects/Neurus_cereal-serialization/res/shaders/render/gbuffer.vert
+[~ScopedTimer:44] [Timer] shader parse (VERTEX): 0.8477 ms
+[CompileStage:342] [RenderShader] VERTEX stage compiled: 723 SPIR-V words
+[~ScopedTimer:44] [Timer] shader generate (VERTEX): 67.1175 ms
+[CompileStage:311] [RenderShader] FRAGMENT parse complete: D:/Projects/Neurus_cereal-serialization/res/shaders/render/gbuffer.frag
+[~ScopedTimer:44] [Timer] shader parse (FRAGMENT): 0.6106 ms
+[CompileStage:342] [RenderShader] FRAGMENT stage compiled: 336 SPIR-V words
+[~ScopedTimer:44] [Timer] shader generate (FRAGMENT): 0.5588 ms
+[Compile:102] [RenderShader] 'GeometryPass' compiled successfully (vert SPIR-V: 723 words, frag SPIR-V: 336 words)
+[~ScopedTimer:44] [Timer] shader compile 'GeometryPass': 69.2273 ms
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'GeometryPass'
+[CreateModule:263] [RenderShader] Device set for 'GeometryPass'
+[CreateModule:275] [RenderShader] Modules created for 'GeometryPass'
+[GeometryPass:76] [GeometryPass] shader=OK colorAttachments=5 depthAttachments=1 vertexStride=32
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/compute/pbr_lighting.comp' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/compute/pbr_lighting.comp'
+[ComputeShader:31] [ComputeShader] Created 'pbr_lighting' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/pbr_lighting.comp
+[Compile:72] [ComputeShader] 'pbr_lighting' compiled successfully (4528 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'pbr_lighting'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'pbr_lighting'
+[Image:80] [Image] 1x1 mips=1 type=Cube format=R8G8B8A8Unorm usage={ TransferDst | Sampled } handle=0x1b000000001b name='LightingPass_EmptyCube'
+[LightingPass:66] [LightingPass] numSets=2 shader=OK
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/compute/ssao.comp' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/compute/ssao.comp'
+[ComputeShader:31] [ComputeShader] Created 'ssao' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/ssao.comp
+[Compile:72] [ComputeShader] 'ssao' compiled successfully (2144 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'ssao'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'ssao'
+[SSAOPass:104] [SSAOPass] numSets=2 kernelLength=16 qfi=0 shader=OK
+[GenerateKernel:172] [SSAOPass] Generated 16 hemisphere kernel samples
+[createBuffer:107] [Buffer] size=400 usage={ UniformBuffer } memProps={ HostVisible | HostCoherent } name='SSAOParamsUBO'
+[SSAOPass:120] [SSAOPass] Created params UBO (400 bytes, 16 kernel samples)
+[GenerateNoise:196] [SSAOPass] Generated 256 noise rotation entries
+[createBuffer:107] [Buffer] size=4096 usage={ TransferDst | UniformBuffer } memProps={ DeviceLocal } name='SSAONoiseUBO'
+[createBuffer:107] [Buffer] size=4096 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='SSAONoiseUBO_Staging'
+[GPUBuffer:36] [GPUBuffer::Map] created staging buffer, size=4096
+[SSAOPass:136] [SSAOPass] Created noise UBO (4096 bytes, 256 entries)
+[RenderShader:51] [RenderShader] Created 'ShadowDepthMultiview' vert='D:/Projects/Neurus_cereal-serialization/res/shaders/render/shadow_depth_multiview.vert' frag='D:/Projects/Neurus_cereal-serialization/res/shaders/render/shadow_depth.frag'
+[Compile:61] [RenderShader] Compiling 'ShadowDepthMultiview'...
+[CompileStage:311] [RenderShader] VERTEX parse complete: D:/Projects/Neurus_cereal-serialization/res/shaders/render/shadow_depth_multiview.vert
+[~ScopedTimer:44] [Timer] shader parse (VERTEX): 0.6368 ms
+[CompileStage:342] [RenderShader] VERTEX stage compiled: 557 SPIR-V words
+[~ScopedTimer:44] [Timer] shader generate (VERTEX): 0.5816 ms
+[CompileStage:311] [RenderShader] FRAGMENT parse complete: D:/Projects/Neurus_cereal-serialization/res/shaders/render/shadow_depth.frag
+[~ScopedTimer:44] [Timer] shader parse (FRAGMENT): 0.3464 ms
+[CompileStage:342] [RenderShader] FRAGMENT stage compiled: 239 SPIR-V words
+[~ScopedTimer:44] [Timer] shader generate (FRAGMENT): 0.4543 ms
+[Compile:102] [RenderShader] 'ShadowDepthMultiview' compiled successfully (vert SPIR-V: 557 words, frag SPIR-V: 239 words)
+[~ScopedTimer:44] [Timer] shader compile 'ShadowDepthMultiview': 2.0812 ms
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'ShadowDepthMultiview'
+[RenderShader:51] [RenderShader] Created 'ShadowDepthSun' vert='D:/Projects/Neurus_cereal-serialization/res/shaders/render/sun_shadow_depth.vert' frag='D:/Projects/Neurus_cereal-serialization/res/shaders/render/sun_shadow_depth.frag'
+[Compile:61] [RenderShader] Compiling 'ShadowDepthSun'...
+[CompileStage:311] [RenderShader] VERTEX parse complete: D:/Projects/Neurus_cereal-serialization/res/shaders/render/sun_shadow_depth.vert
+[~ScopedTimer:44] [Timer] shader parse (VERTEX): 0.3515 ms
+[CompileStage:342] [RenderShader] VERTEX stage compiled: 292 SPIR-V words
+[~ScopedTimer:44] [Timer] shader generate (VERTEX): 0.4116 ms
+[CompileStage:311] [RenderShader] FRAGMENT parse complete: D:/Projects/Neurus_cereal-serialization/res/shaders/render/sun_shadow_depth.frag
+[~ScopedTimer:44] [Timer] shader parse (FRAGMENT): 0.2725 ms
+[CompileStage:342] [RenderShader] FRAGMENT stage compiled: 135 SPIR-V words
+[~ScopedTimer:44] [Timer] shader generate (FRAGMENT): 0.351 ms
+[Compile:102] [RenderShader] 'ShadowDepthSun' compiled successfully (vert SPIR-V: 292 words, frag SPIR-V: 135 words)
+[~ScopedTimer:44] [Timer] shader compile 'ShadowDepthSun': 1.4284 ms
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'ShadowDepthSun'
+[CreateModule:263] [RenderShader] Device set for 'ShadowDepthMultiview'
+[CreateModule:275] [RenderShader] Modules created for 'ShadowDepthMultiview'
+[CreateModule:263] [RenderShader] Device set for 'ShadowDepthSun'
+[CreateModule:275] [RenderShader] Modules created for 'ShadowDepthSun'
+[createBuffer:107] [Buffer] size=384 usage={ TransferDst | StorageBuffer } memProps={ DeviceLocal } name='ShadowDepthFaceVPs'
+[createBuffer:107] [Buffer] size=384 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='ShadowDepthFaceVPs_Staging'
+[GPUBuffer:36] [GPUBuffer::Map] created staging buffer, size=384
+[createSSBOResources:168] [ShadowDepthPass] SSBO with 6 faceVP matrices uploaded
+[ShadowDepthPass:132] [ShadowDepthPass] resolution=1024 faceVPSize=384 staticFarPlane=1000 multiviewShader=OK sunShader=OK
+[DeferredRenderer:99] [DeferredRenderer] ShadowDepthPass created
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/compute/shadow_eval.comp' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/compute/shadow_eval.comp'
+[ComputeShader:31] [ComputeShader] Created 'shadow_eval' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/shadow_eval.comp
+[Compile:72] [ComputeShader] 'shadow_eval' compiled successfully (902 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'shadow_eval'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'shadow_eval'
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/compute/sun_shadow_eval.comp' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/compute/sun_shadow_eval.comp'
+[ComputeShader:31] [ComputeShader] Created 'sun_shadow_eval' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/sun_shadow_eval.comp
+[Compile:72] [ComputeShader] 'sun_shadow_eval' compiled successfully (936 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'sun_shadow_eval'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'sun_shadow_eval'
+[ShadowIntensityPass:108] [ShadowIntensityPass] numSets=2 farPlane=10
+[ShadowIntensityPass:125] [ShadowIntensityPass] Sun pipeline created, 4 sun descriptor sets allocated
+[DeferredRenderer:109] [DeferredRenderer] ShadowIntensityPass created
+[ResolveShaderPath:160] [ShaderLibrary] Resolved 'res/shaders/compute/gizmo_highlight.comp' -> 'D:/Projects/Neurus_cereal-serialization/res/shaders/compute/gizmo_highlight.comp'
+[ComputeShader:31] [ComputeShader] Created 'gizmo_highlight' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/gizmo_highlight.comp
+[Compile:72] [ComputeShader] 'gizmo_highlight' compiled successfully (913 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'gizmo_highlight'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'gizmo_highlight'
+[GizmoPass:46] [GizmoPass] numSets=2 shader=OK
+[DeferredRenderer:119] [DeferredRenderer] GizmoPass created
+[ComputeShader:31] [ComputeShader] Created 'compose' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/compose.comp
+[Compile:72] [ComputeShader] 'compose' compiled successfully (934 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'compose'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'compose'
+[ComposePass:45] [ComposePass] numSets=2 shader=OK
+[DeferredRenderer:129] [DeferredRenderer] ComposePass created
+[ComputeShader:31] [ComputeShader] Created 'fxaa' from D:/Projects/Neurus_cereal-serialization/res/shaders/compute/fxaa.comp
+[Compile:72] [ComputeShader] 'fxaa' compiled successfully (3908 SPIR-V words, local_size=16x16x1)
+[GetOrCreate:292] [ShaderLibrary] Compiled and cached shader 'fxaa'
+[CreateModule:104] [ComputeShader] ShaderModule created for 'fxaa'
+[FXAAPass:36] [FXAAPass] numSets=2 shader=OK bilinear=yes
+[DeferredRenderer:139] [DeferredRenderer] FXAAPass created
+[DeferredRenderer:172] [DeferredRenderer] CmdBuf[0] handle=0x24c21ef18d0 name='DeferredRenderer::FrameCmd[0]'
+[DeferredRenderer:172] [DeferredRenderer] CmdBuf[1] handle=0x24c21ef50d0 name='DeferredRenderer::FrameCmd[1]'
+[DeferredRenderer:172] [DeferredRenderer] CmdBuf[2] handle=0x24c21ef88d0 name='DeferredRenderer::FrameCmd[2]'
+[DeferredRenderer:189] [DeferredRenderer] 234x849 swapchainImages=3 transferDst=yes
+[UploadManager:50] [UploadManager] Created with graphics queue family 0, transfer queue family 1
+[LightingGPU:28] [LightingGPU] Created
+[SetLightingGPU:26] [RenderCache] LightingGPU set
+[OnIBLLoad:525] [Editor] No environment in scene — IBL disabled (black background)
+[Initialize:278] [Editor] Initialized
+[InitEditor:272] [Application] Editor initialized, IBL handled by Editor
+[Run:146] [Application] Project file not found, creating default: JSON Parsing failed - provided NVP (cereal_class_version) not found
+[LoadObjFromString:495] [MeshData] parsed 'Icosphere' - 60 verts, 60 indices, center=(-3.97364e-08, -3.97364e-08, -3.97364e-08)
+[LoadObj:346] [MeshData] loaded 'Icosphere' from D:/Projects/Neurus_cereal-serialization/build/Debug/res/obj/sphere.obj - 60 verts, 60 indices
+[~ScopedTimer:44] [Timer] mesh load 'D:/Projects/Neurus_cereal-serialization/build/Debug/res/obj/sphere.obj': 1.8371 ms
+[Save:38] [Project] Saved to D:/Projects/Neurus_cereal-serialization/build/Debug/res/shadow.neurus.json
+[UploadSceneResources:631] [Editor::UploadSceneResources] Registering MeshGPU: mapKey=4 GetObjectID=4
+[createBuffer:107] [Buffer] size=1920 usage={ TransferDst | VertexBuffer } memProps={ DeviceLocal } name='UploadMesh_VBO'
+[createBuffer:107] [Buffer] size=1920 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='UploadMesh_VBO_Staging'
+[GPUBuffer:36] [GPUBuffer::Map] created staging buffer, size=1920
+[VertexBuffer:46] [VertexBuffer] 60 verts, stride=32, size=1920 bytes name='UploadMesh_VBO'
+[createBuffer:107] [Buffer] size=240 usage={ TransferDst | IndexBuffer } memProps={ DeviceLocal } name='UploadMesh_IBO'
+[createBuffer:107] [Buffer] size=240 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='UploadMesh_IBO_Staging'
+[GPUBuffer:36] [GPUBuffer::Map] created staging buffer, size=240
+[IndexBuffer:43] [IndexBuffer] 60 indices, size=240 bytes name='UploadMesh_IBO'
+[UploadMesh:125] [UploadManager] Uploaded mesh: 60 verts, 60 indices
+[UseMeshGPU:203] [RenderCache] Registered MeshGPU for objectId=4
+[Image:80] [Image] 1024x1024 mips=1 type=Cube format=D32Sfloat usage={ TransferSrc | Sampled | DepthStencilAttachment } handle=0x880000000088 name='ShadowDepthCubemap_Light_5'
+[Image:80] [Image] 1024x1024 mips=1 type=Cube format=R32G32B32A32Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0x8c000000008c name='ShadowColorCubemap_Light_5'
+[UploadLight:307] [UploadManager] Created shadow map for light type=0
+[UseLightGPU:265] [RenderCache] Registered LightGPU for lightUID=5
+[UploadLighting:327] [UploadManager] UploadLighting(batch): 1 lights converted
+[createBuffer:107] [Buffer] size=48 usage={ TransferSrc | TransferDst | StorageBuffer } memProps={ DeviceLocal } name='PointLightSSBO'
+[createBuffer:107] [Buffer] size=48 usage={ TransferSrc } memProps={ HostVisible | HostCoherent } name='PointLightSSBO_Staging'
+[GPUBuffer:36] [GPUBuffer::Map] created staging buffer, size=48
+[UpdatePointLights:38] [LightingGPU] Uploaded 1 point lights
+[UpdateSunLights:63] [LightingGPU] Uploaded 0 sun lights
+[UpdateLighting:369] [RenderCache] UpdateLighting: 1 point lights, 0 sun lights, 1 shadow casters
+[UploadSceneResources:648] [Editor] Uploaded scene resources to GPU
+[Run:166] [Application] Entering event loop
+[GetAttachment:60] [RenderCache] Lazily creating attachment "Position" at 234x849
+[Image:80] [Image] 234x849 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0x950000000095 name='Position'
+[GetAttachment:60] [RenderCache] Lazily creating attachment "Normal" at 234x849
+[Image:80] [Image] 234x849 mips=1 type=2D format=R16G16B16A16Sfloat usage={ TransferSrc | Sampled | ColorAttachment } handle=0x980000000098 name='Normal'
+[GetAttachment:60] [RenderCache] Lazily creating attachment "Albedo" at 234x849
+[Image:80] [Image] 234x849 mips=1 type=2D format=R8G8B8A8Srgb usage={ TransferSrc | Sampled | ColorAttachment } handle=0x9b000000009b name='Albedo'
+[GetAttachment:60] [RenderCache] Lazily creating attachment "MetallicRoughness" at 234x849
+[Image:80] [Image] 234x849 mips=1 type=2D format=R8G8B8A8Unorm usage={ TransferSrc | Sampled | ColorAttachment } handle=0x9e000000009e name='MetallicRoughness'
+[GetAttachment:60] [RenderCache] Lazily creating attachment "IDBuffer" at 234x849
+[Image:80] [Image] 234x849 mips=1 type=2D format=R32Uint usage={ TransferSrc | Sampled | ColorAttachment } handle=0xa100000000a1 name='IDBuffer'
+[GetAttachment:60] [RenderCache] Lazily creating attachment "Depth" at 234x849
+[Image:80] [Image] 234x849 mips=1 type=DepthStencil format=D32Sfloat usage={ TransferSrc | Sampled | DepthStencilAttachment } handle=0xa400000000a4 name='Depth'
+[GetShadowIntensityArray:90] [RenderCache] Lazily creating shadow intensity array at 234x849 with 4 layers
+[Image:80] [Image] 234x849 mips=1 type=Unknown format=R8Unorm usage={ TransferSrc | TransferDst | Sampled | Storage } handle=0xa700000000a7 name='ShadowIntensityArray'
+[GetAttachment:60] [RenderCache] L

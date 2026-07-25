@@ -9,12 +9,12 @@ ConfigComponent::ConfigComponent(RenderConfig& config) : m_config(&config) {}
 
 void ConfigComponent::Save(cereal::JSONOutputArchive& ar) const
 {
-    ar(CEREAL_NVP(*m_config));
+    ar(cereal::make_nvp("proj_config", *m_config));
 }
 
 void ConfigComponent::Load(cereal::JSONInputArchive& ar)
 {
-    try { ar(CEREAL_NVP(*m_config)); }
+    try { ar(cereal::make_nvp("proj_config", *m_config)); }
     catch (const cereal::Exception& e)
     {
         NEURUS_ERR("ConfigComponent::Load: " << e.what()

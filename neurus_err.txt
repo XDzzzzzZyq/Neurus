@@ -1,0 +1,4 @@
+[Vulkan Validation] loader_get_json: Failed to open JSON file C:\Users\XDzZyq\AppData\Local\rdc\renderdoc\renderdoc.json
+[Vulkan Validation] Layer VK_LAYER_OBS_HOOK uses API version 1.3 which is older than the application specified API version of 1.4. May cause issues.
+[LoadFromPath:289] ERROR: [ImageData] Failed to load LDR image from path: tex/hdr/room.hdr
+[SetEquirectPath:37] ERROR: [Environment] Failed to load equirect from: tex/hdr/room.hdr

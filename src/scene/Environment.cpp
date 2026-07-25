@@ -4,6 +4,7 @@
  */
 
 #include "scene/Environment.h"
+#include "asset/ImageData.h"
 #include "core/Log.h"
 
 namespace neurus
@@ -28,6 +29,8 @@ Environment::~Environment() = default;
 void Environment::SetEquirectPath(const std::string& path)
 {
 	o_equirectPath = path;
+	if (!path.empty())
+		o_equirectData = ImageData(path);
 }
 
 } // namespace neurus
