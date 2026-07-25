@@ -202,13 +202,13 @@ std::pair<uint32_t, uint32_t> ShaderParser::GetStd140Layout(const std::string& t
 // ParseShaderFile
 // ============================================================================
 
-bool ShaderParser::ParseShaderFile(const std::string& filepath, ShaderType type, ShaderStruct& out)
+ShaderStruct ShaderParser::ParseShaderFile(const std::string& filepath, ShaderType type)
 {
 	std::ifstream file(filepath);
 	if (!file.is_open())
 	{
 		NEURUS_ERR("ShaderParser: cannot open file '" << filepath << "'");
-		return false;
+		return ShaderStruct();
 	}
 
 	std::string source((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
@@ -216,19 +216,19 @@ bool ShaderParser::ParseShaderFile(const std::string& filepath, ShaderType type,
 	if (source.empty())
 	{
 		NEURUS_ERR("ShaderParser: file is empty '" << filepath << "'");
-		return false;
+		return ShaderStruct();
 	}
 
-	return ParseShaderCode(source, type, out);
+	return ParseShaderCode(source, type);
 }
 
 // ============================================================================
 // ParseShaderCode --main line-by-line parser
 // ============================================================================
 
-bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*/, ShaderStruct& out)
+ShaderStruct ShaderParser::ParseShaderCode(const std::string& source, ShaderType type)
 {
-	out.Reset();
+	ShaderStruct result;
 
 	std::istringstream stream(source);
 	std::string line;
@@ -236,7 +236,6 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 	std::string cache;     // Accumulates function body text
 	Args argsCache;        // Accumulates (type, name) pairs for block/struct members
 	bool inBlockComment = false;
-	bool parsed = false; // Set to true when any recognised construct is processed
 
 	int dbgLineCount = 0;
 	while (std::getline(stream, line))
@@ -244,7 +243,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 		if (++dbgLineCount > 500)
 		{
 			NEURUS_ERR("ShaderParser: INFINITE LOOP DETECTED, exceeded 500 lines at: '" << line << "'");
-			return false;
+			return ShaderStruct();
 		}
 		// -- Strip comments and whitespace --
 		line = StripComments(line, inBlockComment);
@@ -267,8 +266,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			int ver = std::atoi(token.c_str());
 			if (ver > 0)
 			{
-				out.SetVersion(ver);
-				parsed = true;
+				result.SetVersion(ver);
 			}
 			continue;
 		}
@@ -282,7 +280,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			std::string token;
 			iss >> token; // "#extension"
 			iss >> token; // extension name (e.g. "GL_EXT_multiview")
-			out.AddExtension(token);
+			result.AddExtension(token);
 			continue;
 		}
 
@@ -291,7 +289,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 		// --------------------------------
 		if (line.compare(0, 7, "#define") == 0)
 		{
-			out.AddDefine(line);
+			result.AddDefine(line);
 			continue;
 		}
 
@@ -309,7 +307,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			if (parenOpen == std::string::npos || parenClose == std::string::npos)
 			{
 				NEURUS_ERR("ShaderParser: malformed layout qualifier on line: " << line);
-				return false;
+				return ShaderStruct();
 			}
 
 			std::string layoutStr = line.substr(parenOpen + 1, parenClose - parenOpen - 1);
@@ -324,7 +322,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 
 				if (lx > 0)
 				{
-					out.SetLocalSize(
+					result.SetLocalSize(
 						static_cast<uint32_t>(lx),
 						static_cast<uint32_t>(ly > 0 ? ly : 1),
 						static_cast<uint32_t>(lz > 0 ? lz : 1));
@@ -367,7 +365,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					if (!std::getline(stream, line))
 					{
 						NEURUS_ERR("ShaderParser: unexpected EOF while parsing storage buffer block");
-						return false;
+						return ShaderStruct();
 					}
 					line = StripComments(line, inBlockComment);
 					line = TrimWhitespace(line);
@@ -381,7 +379,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				if (!std::getline(stream, line))
 				{
 					NEURUS_ERR("ShaderParser: unexpected EOF while parsing storage buffer members");
-					return false;
+					return ShaderStruct();
 				}
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
@@ -419,7 +417,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					binding = 0;
 				}
 
-				out.SetSB(binding, blockName, argsCache);
+				result.SetSB(binding, blockName, argsCache);
 				argsCache.clear();
 				continue;
 			}
@@ -435,7 +433,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				if (!std::getline(stream, line))
 				{
 					NEURUS_ERR("ShaderParser: unexpected EOF while parsing push constant block");
-					return false;
+					return ShaderStruct();
 				}
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
@@ -457,7 +455,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				if (!std::getline(stream, line))
 				{
 					NEURUS_ERR("ShaderParser: unexpected EOF while parsing push constant members");
-					return false;
+					return ShaderStruct();
 				}
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
@@ -528,7 +526,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 						}
 					}
 
-					out.SetPushConstant(word, currentOffset, size, typeName);
+					result.SetPushConstant(word, currentOffset, size, typeName);
 					currentOffset += size;
 				}
 			while (true);
@@ -540,7 +538,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				if (closeBrace != std::string::npos && semi != std::string::npos
 				    && semi > closeBrace + 1)
 				{
-					out.SetPushConstantVar(
+					result.SetPushConstantVar(
 						TrimWhitespace(line.substr(closeBrace + 1, semi - closeBrace - 1)));
 				}
 			}
@@ -571,7 +569,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				if (!std::getline(stream, line))
 				{
 					NEURUS_ERR("ShaderParser: unexpected EOF while parsing uniform block");
-					return false;
+					return ShaderStruct();
 				}
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
@@ -598,7 +596,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			if (!std::getline(stream, line))
 			{
 				NEURUS_ERR("ShaderParser: unexpected EOF while parsing uniform block members");
-				return false;
+				return ShaderStruct();
 			}
 			line = StripComments(line, inBlockComment);
 			line = TrimWhitespace(line);
@@ -642,7 +640,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			}
 		}
 
-		out.SetUB(blockType, ubVarName, argsCache,
+		result.SetUB(blockType, ubVarName, argsCache,
 		          ExtractIntFromLayout(layoutStr, "binding"));
 		argsCache.clear();
 		continue;
@@ -694,7 +692,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			{
 				actualType = typeName;
 			}
-			out.SetUni(pType, 1, word, binding, qualifiers, actualType);
+			result.SetUni(pType, 1, word, binding, qualifiers, actualType);
 			continue;
 			}
 
@@ -730,7 +728,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 
 				ParaType pType = ShaderStruct::ParseType(typeName);
-				out.SetPass(location, pType, word, interp);
+				result.SetPass(location, pType, word, interp);
 				continue;
 			}// -- layout(location=N) in type name; ???vertex attributes / fragment inputs --
 			if (afterLayout.find("in ") != std::string::npos && afterLayout.find("in;") == std::string::npos)
@@ -766,7 +764,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 
 				ParaType pType = ShaderStruct::ParseType(typeName);
-				out.SetAB(location, pType, word, interp);
+				result.SetAB(location, pType, word, interp);
 				continue;
 			}
 
@@ -805,7 +803,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				word.pop_back();
 			}
 
-			out.SetOut(paraType, 1, word);
+			result.SetOut(paraType, 1, word);
 			continue;
 		}
 
@@ -830,7 +828,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				word.pop_back();
 			}
 
-			out.SetInp(paraType, 1, word);
+			result.SetInp(paraType, 1, word);
 			continue;
 		}
 
@@ -867,7 +865,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				word = word.substr(0, bracketPos);
 			}
 
-			out.SetUni(paraType, count, word);
+			result.SetUni(paraType, count, word);
 			continue;
 		}
 
@@ -923,7 +921,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				argsCache.emplace_back(pType, memberName, typeName);
 				}
 			}
-			out.DefStruct(structName, argsCache);
+			result.DefStruct(structName, argsCache);
 			argsCache.clear();
 			continue;
 		}
@@ -937,7 +935,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				if (!std::getline(stream, line))
 				{
 					NEURUS_ERR("ShaderParser: unexpected EOF while parsing struct definition");
-					return false;
+					return ShaderStruct();
 				}
 				line = StripComments(line, inBlockComment);
 				line = TrimWhitespace(line);
@@ -955,7 +953,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			if (!std::getline(stream, line))
 			{
 				NEURUS_ERR("ShaderParser: unexpected EOF while parsing struct members");
-				return false;
+				return ShaderStruct();
 			}
 			line = StripComments(line, inBlockComment);
 			line = TrimWhitespace(line);
@@ -998,7 +996,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 			}
 			while (true);
 
-			out.DefStruct(structName, argsCache);
+			result.DefStruct(structName, argsCache);
 			argsCache.clear();
 			continue;
 		}
@@ -1044,7 +1042,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					{
 						NEURUS_ERR("ShaderParser: unexpected EOF while "
 						           "parsing const initializer");
-						return false;
+						return ShaderStruct();
 					}
 					line = StripComments(line, inBlockComment);
 					if (line.find('}') != std::string::npos
@@ -1059,14 +1057,14 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				}
 				while (true);
 
-				out.SetConst(paraType, name, multiValue);
+				result.SetConst(paraType, name, multiValue);
 				continue;
 			}
 			size_t valEnd = (semiPos != std::string::npos) ? semiPos : fullLine.size();
 			value = TrimWhitespace(fullLine.substr(valStart, valEnd - valStart));
 		}
 
-		out.SetConst(paraType, name, value);
+		result.SetConst(paraType, name, value);
 		continue;
 	}
 
@@ -1087,16 +1085,14 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				std::string body = TrimWhitespace(fullLine.substr(bodyStart, bodyEnd - bodyStart));
 				if (!body.empty())
 				{
-					out.Main = body;
+					result.Main = body;
 				}
-				parsed = true;
 				continue;
 			}
 
 			// - Multi-line body: brace-balanced line-by-line walk -
 			int  braceDepth     = (openBrace != std::string::npos) ? 1 : 0;
 			bool skipFirstBrace = (braceDepth == 0);
-			parsed = true;
 
 			do
 			{
@@ -1104,7 +1100,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				{
 					// EOF without closing brace ???malformed shader
 					NEURUS_ERR("ShaderParser: unexpected EOF while parsing void main() body");
-					return false;
+					return ShaderStruct();
 				}
 				line = StripComments(line, inBlockComment);
 				// Do NOT trim --we need the original indentation for the body
@@ -1128,7 +1124,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 				// Accumulate body lines (exclude closing brace)
 				if (braceDepth != 0)
 				{
-					out.Main += line + "\n";
+					result.Main += line + "\n";
 				}
 			}
 			while (braceDepth != 0);
@@ -1175,7 +1171,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 					if (!std::getline(stream, line))
 					{
 						NEURUS_ERR("ShaderParser: unexpected EOF while parsing function body");
-						return false;
+						return ShaderStruct();
 					}
 					line = StripComments(line, inBlockComment);
 
@@ -1210,7 +1206,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 						cache.pop_back();
 					}
 
-					out.DefFunc(returnType, funcSig, cache, ShaderStruct::ParseArgs(argsStr));
+					result.DefFunc(returnType, funcSig, cache, ShaderStruct::ParseArgs(argsStr));
 					cache.clear();
 					continue;
 				}
@@ -1251,19 +1247,19 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 						{
 							std::string singleVar = varName;
 							singleVar.pop_back(); // remove trailing comma
-							out.SetVar(typeName, singleVar, count);
+							result.SetVar(typeName, singleVar, count);
 						}
 						while (iss >> varName);
 
 						// Remove the last extra entry (SetVar was called once more than needed)
-						if (!out.vari_list.empty())
+						if (!result.vari_list.empty())
 						{
-							out.vari_list.pop_back();
+							result.vari_list.pop_back();
 						}
 					}
 					else if (!varName.empty())
 					{
-						out.SetVar(typeName, varName, count);
+						result.SetVar(typeName, varName, count);
 					}
 				}
 			}
@@ -1275,7 +1271,7 @@ bool ShaderParser::ParseShaderCode(const std::string& source, ShaderType /*type*
 		}
 	} // end main while loop
 
-	return parsed;
+	return result;
 }
 
 } // namespace neurus
