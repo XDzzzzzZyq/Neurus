@@ -84,7 +84,11 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Sets the equirectangular HDR source file path and reloads ImageData.
+	 * @brief Sets the equirectangular HDR source file path.
+	 *
+	 * The ImageData is NOT reloaded eagerly — UploadManager::UploadEnvironment()
+	 * handles lazy loading via GetEquirectData() with GetEquirectPath() fallback.
+	 *
 	 * @param path Path to the .hdr equirectangular map.
 	 */
 	void SetEquirectPath(const std::string& path);

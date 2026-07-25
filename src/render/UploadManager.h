@@ -23,20 +23,29 @@ struct MeshGPU;          // render/resources/MeshGPU.h
 struct EnvironmentGPU;   // render/resources/EnvironmentGPU.h
 struct LightGPU;         // render/resources/LightGPU.h
 
-/**
- * @brief CPU-to-GPU upload service.
- *
- * Owns a separate command pool and IBLPass for asynchronous uploads.
- * Stateless — each Upload*() method performs one-shot construction and
- * returns the GPU resource by value.
- */
-class UploadManager
-{
-public:
-	UploadManager(const vk::raii::Device& device,
-	              const vk::raii::PhysicalDevice& physicalDevice,
-	              vk::Queue transferQueue,
-	              uint32_t transferQueueFamily);
+	/**
+	 * @brief CPU-to-GPU upload service.
+	 *
+	 * Owns a separate command pool and IBLPass for asynchronous uploads.
+	 * Stateless — each Upload*() method performs one-shot construction and
+	 * returns the GPU resource by value.
+	 *
+	 * @param device               Logical device.
+	 * @param physicalDevice       Physical device (for buffer memory queries).
+	 * @param graphicsQueue        Graphics queue (used by IBL compute dispatches).
+	 * @param graphicsQueueFamily  Graphics queue family index.
+	 * @param transferQueue        Transfer queue for staging uploads.
+	 * @param transferQueueFamily  Transfer queue family index.
+	 */
+	class UploadManager
+	{
+	public:
+		UploadManager(const vk::raii::Device& device,
+		              const vk::raii::PhysicalDevice& physicalDevice,
+		              vk::Queue graphicsQueue,
+		              uint32_t graphicsQueueFamily,
+		              vk::Queue transferQueue,
+		              uint32_t transferQueueFamily);
 	~UploadManager();
 
 	// Non-copyable
@@ -104,6 +113,8 @@ private:
 	const vk::raii::Device* um_device = nullptr;
 	const vk::raii::PhysicalDevice* um_physicalDevice = nullptr;
 	vk::raii::CommandPool um_commandPool{ nullptr };
+	vk::Queue um_graphicsQueue = nullptr;
+	uint32_t um_graphicsQueueFamily = 0;
 	vk::Queue um_transferQueue = nullptr;
 	uint32_t um_transferQueueFamily = 0;
 

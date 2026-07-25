@@ -230,7 +230,7 @@ protected:
 		vk::Queue queue,
 		uint32_t qfi)
 	{
-		neurus::UploadManager upload(device, pd, queue, qfi);
+		neurus::UploadManager upload(device, pd, queue, qfi, queue, qfi);
 		for (const auto& [id, mesh] : scene.mesh_list)
 		{
 			if (!mesh || !mesh->o_mesh) continue;
@@ -254,7 +254,7 @@ protected:
 		vk::Queue queue,
 		uint32_t qfi)
 	{
-		neurus::UploadManager upload(device, pd, queue, qfi);
+		neurus::UploadManager upload(device, pd, queue, qfi, queue, qfi);
 		for (const auto& [uid, light] : scene.light_list)
 		{
 			if (!light || !light->use_shadow) continue;

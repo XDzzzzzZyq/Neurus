@@ -114,10 +114,12 @@ int Application::Run()
 		return -1;
 	}
 
-	// --- Create UploadManager (uses transfer queue for async GPU uploads) ---
+	// --- Create UploadManager (needs graphics queue for IBL compute + transfer queue for staging) ---
 	app_uploadManager = std::make_unique<neurus::UploadManager>(
 		app_vkContext->device(),
 		app_vkContext->physicalDevice(),
+		app_vkContext->graphicsQueue(),
+		app_vkContext->graphicsQueueFamily(),
 		app_vkContext->transferQueue(),
 		app_vkContext->transferQueueFamily());
 
