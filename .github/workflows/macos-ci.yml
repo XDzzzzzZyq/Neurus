@@ -41,4 +41,4 @@ jobs:
 
       - name: Run Non-GPU Tests
         working-directory: build
-        run: ctest -C ${{ matrix.configuration }} --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"
+        run: ctest -C ${{ matrix.configuration }} --output-on-failure

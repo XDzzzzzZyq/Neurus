@@ -48,4 +48,4 @@ jobs:
       - name: Run Non-GPU Tests
         run: |
           cd ../Neurus_VS2022
-          ctest -C ${{ matrix.configuration }} --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"
+          ctest -C ${{ matrix.configuration }} --output-on-failure
