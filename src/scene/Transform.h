@@ -103,7 +103,7 @@ public:
 	 *       and dirty flag are computed values, not persisted.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(cereal::make_nvp("m_position", o_position),
 		   cereal::make_nvp("m_rotation", o_rotation),
@@ -209,3 +209,5 @@ private:
 };
 
 } // namespa
+
+CEREAL_CLASS_VERSION(neurus::Transform3D, 0)

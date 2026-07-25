@@ -90,7 +90,7 @@ public:
 	 * @param ar Archive to serialize to/from.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
@@ -183,3 +183,5 @@ private:
 };
 
 } // namespace neurus
+
+CEREAL_CLASS_VERSION(neurus::DebugPoints, 0)

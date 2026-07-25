@@ -142,7 +142,7 @@ public:
 	 *       m_status (runtime state) is not serialized.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(CEREAL_NVP(cam_list), CEREAL_NVP(mesh_list), CEREAL_NVP(light_list),
 		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list),
@@ -351,3 +351,5 @@ private:
 };
 
 } // namespace neurus
+
+CEREAL_CLASS_VERSION(neurus::Scene, 0)

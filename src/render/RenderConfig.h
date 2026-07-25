@@ -129,7 +129,7 @@ public:
 	// --- Cereal serialization ---
 
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(CEREAL_NVP(r_pipeline), CEREAL_NVP(r_aa), CEREAL_NVP(r_ao),
 		   CEREAL_NVP(r_shadow), CEREAL_NVP(r_ssr),
@@ -161,3 +161,5 @@ public:
 };
 
 } // namespace neurus
+
+CEREAL_CLASS_VERSION(neurus::RenderConfig, 0)

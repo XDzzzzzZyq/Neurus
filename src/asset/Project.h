@@ -169,14 +169,14 @@ public:
 	 *       RenderConfig (old file format) defaults to initialized values.
 	 */
 	template<class Archive>
-	void save(Archive& ar) const
+	void save(Archive& ar, const uint32_t /*version*/) const
 	{
 		ar(cereal::make_nvp("m_scene", *proj_scene),
 		   CEREAL_NVP(proj_config));
 	}
 
 	template<class Archive>
-	void load(Archive& ar)
+	void load(Archive& ar, const uint32_t /*version*/)
 	{
 		// Scene — selections field added later, backward-compat
 		try
@@ -229,3 +229,5 @@ private:
 };
 
 } // namespace neurus::project
+
+CEREAL_CLASS_VERSION(neurus::project::Project, 0)

@@ -122,7 +122,7 @@ public:
 	 *       NOT serialized. It must be re-resolved after deserialization.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   CEREAL_NVP(spr_opacity), CEREAL_NVP(spr_type));
@@ -142,3 +142,5 @@ public:
 };
 
 } // namespace neurus
+
+CEREAL_CLASS_VERSION(neurus::Sprite, 0)

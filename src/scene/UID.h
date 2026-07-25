@@ -99,7 +99,7 @@ public:
 	 * @param ar Archive to serialize to/from.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(CEREAL_NVP(o_id));
 		if constexpr (Archive::is_loading::value)
@@ -210,7 +210,7 @@ public:
 	 * @param ar Archive to serialize to/from.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar)
+	void serialize(Archive& ar, const uint32_t /*version*/)
 	{
 		ar(cereal::base_class<UID>(this), CEREAL_NVP(o_name), CEREAL_NVP(o_type),
 		   CEREAL_NVP(is_viewport), CEREAL_NVP(is_rendered));
@@ -218,3 +218,6 @@ public:
 };
 
 } // namespace neurus
+
+CEREAL_CLASS_VERSION(neurus::UID, 0)
+CEREAL_CLASS_VERSION(neurus::ObjectID, 0)
