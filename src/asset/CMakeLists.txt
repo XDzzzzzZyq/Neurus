@@ -1,6 +1,8 @@
 # src/asset/CMakeLists.txt - Asset Layer (CPU-side data + project persistence)
 
 add_library(neurus_asset STATIC
+	ConfigComponent.h
+	ConfigComponent.cpp
 	ImageData.h
 	ImageData.cpp
 	MeshData.h
