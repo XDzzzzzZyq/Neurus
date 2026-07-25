@@ -176,6 +176,12 @@ void VulkanTestShared::EndSubmitWait(vk::raii::CommandBuffer& cmd)
 
 std::string VulkanTestShared::ResolveAssetPath(const char* assetRelative)
 {
+	// Try: relative from build/ (Ninja Multi-Config ctest CWD)
+	std::string path0 = std::string("../") + assetRelative;
+	{
+		std::ifstream f(path0);
+		if (f.good()) return path0;
+	}
 	// Try: relative from build/debug/Debug/ (MSVC multi-config layout)
 	std::string path1 = std::string("../../../") + assetRelative;
 	{

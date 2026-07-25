@@ -35,8 +35,8 @@ namespace {
 /**
  * @brief Resolve a shader file path relative to the project root.
  *
- * CTest runs from build/debug/test/ (single-config) or
- * build/debug/Debug/ (MSVC multi-config). Tries multiple relative
+ * CTest runs from build/ (Ninja Multi-Config), build/debug/test/ (single-config),
+ * or build/debug/Debug/ (MSVC multi-config). Tries multiple relative
  * prefixes, returns the first one that exists on disk.
  *
  * @param relativePath Path relative to project root (e.g. "res/shaders/render/gbuffer.vert")
@@ -45,9 +45,9 @@ namespace {
 std::string ResolveShaderPath(const char* relativePath)
 {
     const char* prefixes[] = {
-        "../../../",  // build/debug/test/ - project root (single-config)
-        "../../",     // build/debug/Debug/ - project root (MSVC multi-config)
-        "../",        // fallback: build/debug/ - build
+        "../",         // build/ - project root (Ninja Multi-Config)
+        "../../../",   // build/debug/test/ - project root (single-config)
+        "../../",      // build/debug/Debug/ - project root (MSVC multi-config)
     };
 
     for (const char* prefix : prefixes)
