@@ -34,7 +34,8 @@
 #include "render/shaders/ShaderLibrary.h"
 #include "render/shaders/ShaderCompiler.h"
 #include "render/shaders/ShaderStruct.h"
-#include "render/shaders/ShaderModule.h"
+// ShaderModule was refactored away; vk::raii::ShaderModule is used directly
+#include <vulkan/vulkan_raii.hpp>
 #include "render/shaders/Shader.h"
 
 #include <thread>

@@ -23,8 +23,6 @@
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/Image.h"
-#include "render/shaders/ShaderModule.h"
-
 #include "render/shaders/ShaderLibrary.h"
 #include "render/shaders/ComputeShader.h"
 
