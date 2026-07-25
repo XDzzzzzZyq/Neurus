@@ -46,6 +46,8 @@ add_library(neurus_render STATIC
 	resources/LightGPU.h
 	resources/LightingGPU.h
 	resources/LightingGPU.cpp
+	resources/PipelineCache.h
+	resources/PipelineCache.cpp
 	Texture.h
 	Texture.cpp
 	PipelineBuilder.h
