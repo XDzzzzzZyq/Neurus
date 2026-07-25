@@ -36,7 +36,7 @@ isolation. Use this file as the high-level reference; detailed rules live in
                       ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ Editor Layer                                                │
-│  owns: Project, UploadManager, Controllers                   │
+│  owns: Scene, RenderConfig, UploadManager, Controllers        │
 │  Application logic, scene mutation, event orchestration     │
 └─────────────────────┬────────────────────────────────────────┘
                       │
@@ -76,9 +76,9 @@ UI Layer (Qt6) → UIEvents (Qt Signals) → Editor → EventQueue (typed events
 - **Renderer**: pure rendering service; owns GPU resources; owns `MeshGPU` and
   `EnvironmentGPU` via `RenderCache`; consumes read-only scene data; must not
   mutate application-level state.
-- **Editor**: application logic and scene mutation; owns Controllers;
-  communicates via Context, UIEvents (Qt signals), and EventQueue (typed events).
-  Owns `RenderConfig` via `Project`; exposes `SetRenderConfig()` for UI→project sync.
+- **Editor**: application logic and scene mutation; owns Scene, RenderConfig,
+  and Controllers; communicates via Context, UIEvents (Qt signals), and
+  EventQueue (typed events). Exposes `SetRenderConfig()` for UI→editor sync.
 - **UI**: Qt6 Widgets presentation only; owns surface; emits signals.
 - **Asset** (`src/asset/`): Vulkan-free CPU-side asset loading (MeshData,
   ImageData, PixelFormat enum). No GPU resources.
@@ -212,9 +212,13 @@ Neurus/
 │   │   │   └── RenderConfigPanel.h/cpp  # Live render setting controls
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
-│   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
+│   │   ├── ConfigComponent.h/cpp  # RenderConfig serialization adapter
 │   │   ├── ImageData.h/cpp # CPU-side image pixels (no Vulkan)
-│   │   └── PixelFormat.h   # Vulkan-free format enum + helpers
+│   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
+│   │   ├── PixelFormat.h   # Vulkan-free format enum + helpers
+│   │   ├── Project.h/cpp            # Pure registration-based serializer
+│   │   ├── SceneComponent.h/cpp     # Scene serialization adapter
+│   │   └── Serializable.h           # Abstract base class: Key/Save/Load
 │   ├── scene/              # Scene layer (Vulkan-free)
 │   │   ├── Camera.h        # Camera object
 │   │   ├── Light.h         # Light objects (PointLight, SunLight)

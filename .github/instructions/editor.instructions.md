@@ -9,7 +9,7 @@ changes through the event system.
 ## Location
 
 - `src/editor/Input.h` - InputState struct + GetInputState() / UpdateState()
-- `src/editor/Editor.h` - Editor orchestrator (owns Project, Context, Controllers)
+- `src/editor/Editor.h` - Editor orchestrator (owns Scene, RenderConfig, Context, Controllers)
 - `src/editor/EditorContext.h` - Editor + scene state container
 - `src/editor/controllers/Controllers.h` - Base class for all controllers
 - `src/editor/controllers/CameraController.h` - Event-driven camera manipulation (orbit/zoom/dolly/pan)

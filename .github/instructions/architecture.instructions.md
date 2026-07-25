@@ -113,8 +113,9 @@ template forwarding pattern).
 - `UIContext` - Per-frame UI snapshot carrying `RenderConfig` pointer
 - Read-only access to scene data for Renderer
 - Data flows: Editor mutates, Renderer consumes
-- `RenderConfig` owned by Project; per-frame snapshots via `RenderContext::config` (`void*`)
-- `Editor::SetRenderConfig()` writes UI config changes → Project → RenderContext
+- `RenderConfig` owned by Editor directly (no longer via Project);
+  per-frame snapshots via `RenderContext::config` (`void*`)
+- `Editor::SetRenderConfig()` writes UI config changes directly to Editor-owned RenderConfig → RenderContext
 
 ### Vulkan Ownership Graph (Critical)
 
