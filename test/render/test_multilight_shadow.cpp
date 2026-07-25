@@ -3,14 +3,14 @@
  * @brief TDD reference-image regression test for multi-light shadow rendering.
  *
  * Renders a cube-on-plane scene with 2 shadow-casting point lights through
- * the full deferred pipeline (ShadowDepthPass ‚Ü?GeometryPass ‚Ü?ShadowIntensityPass
- * ‚Ü?LightingPass) and validates HDRColor output via reference image regression.
+ * the full deferred pipeline (ShadowDepthPass Èà´?GeometryPass Èà´?ShadowIntensityPass
+ * Èà´?LightingPass) and validates HDRColor output via reference image regression.
  *
  * Reference image pattern:
- *   - First run: generates reference PNG ‚Ü?GTEST_SKIP
- *   - Second run: compares pixel-by-pixel with ¬±2 tolerance ‚Ü?PASS/FAIL
+ *   - First run: generates reference PNG Èà´?GTEST_SKIP
+ *   - Second run: compares pixel-by-pixel with Âç§2 tolerance Èà´?PASS/FAIL
  *
- * This is the RED phase of TDD ‚Ä?the test compiles and runs but the shadow
+ * This is the RED phase of TDD Èà•?the test compiles and runs but the shadow
  * passes initially only handle a single light.  The reference generated on first run will reflect
  * single-shadow behaviour.  When shadow pass loops are implemented
  * (Wave 2-3), the reference must be regenerated.
@@ -21,9 +21,9 @@
 #include <gtest/gtest.h>
 
 #include "shared/TestVulkanShared.h"
+#include "shared/TestMultiShadow.h"
 #include "render/shaders/ComputeShader.h"
 #include "render/shaders/RenderShader.h"
-#include "shared/TestMultiShadow.h"
 
 // --- Render layer ---
 #include "render/RenderCache.h"
@@ -102,7 +102,7 @@ protected:
 		m_lightingPass = std::make_unique<LightingPass>(
 			*m_device, pd, 2u);
 
-		// --- Upload manager for CPU‚ÜíGPU struct conversion ---
+		// --- Upload manager for CPUÈà´ÊâúPU struct conversion ---
 	}
 
 	void TearDown() override
@@ -119,7 +119,7 @@ protected:
 };
 
 // ===========================================================================
-// TwoShadowLights_HDRColorReference ‚Ä?reference image regression
+// TwoShadowLights_HDRColorReference Èà•?reference image regression
 // ===========================================================================
 
 TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
@@ -159,7 +159,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
-	// renderItems removed ‚Ä?ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed Èà•?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -178,9 +178,9 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	// -------------------------------------------------------------------
 	// Step 5: Record all passes in a single command buffer
-	//         Order: ShadowDepth (independent) ‚Ü?Geometry (writes G-Buffer)
-	//                ‚Ü?ShadowIntensity (reads Position + cubemap)
-	//                ‚Ü?Lighting (reads G-Buffer + shadow intensity)
+	//         Order: ShadowDepth (independent) Èà´?Geometry (writes G-Buffer)
+	//                Èà´?ShadowIntensity (reads Position + cubemap)
+	//                Èà´?Lighting (reads G-Buffer + shadow intensity)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
@@ -214,7 +214,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	if (refResult < 0)
 	{
-		// First run ‚Ä?reference generated (return -1) or load failure (-2)
+		// First run Èà•?reference generated (return -1) or load failure (-2)
 		if (refResult == -1)
 			GTEST_SKIP() << "Reference images generated.  Re-run the test to compare.";
 		else
@@ -222,13 +222,13 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	}
 	else
 	{
-		// Second run ‚Ä?compare against reference
-		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=¬±2)";
+		// Second run Èà•?compare against reference
+		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=Âç§2)";
 	}
 }
 
 // ===========================================================================
-// TwoLights_NoVUID ‚Ä?smoke test (pipeline runs without crash)
+// TwoLights_NoVUID Èà•?smoke test (pipeline runs without crash)
 // ===========================================================================
 
 TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
@@ -253,7 +253,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	// renderItems removed ‚Ä?ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed Èà•?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -283,7 +283,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 }
 
 // ===========================================================================
-// ShadowIntensityReadback ‚Ä?verify per-light shadow intensity data
+// ShadowIntensityReadback Èà•?verify per-light shadow intensity data
 // ===========================================================================
 
 /**
@@ -291,7 +291,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
  *
  * Uses the same manual staging-buffer readback pattern established in
  * test_shadow_intensity.cpp.  Validates that shadow intensity images
- * contain both shadowed (==1.0) and lit (==0.0) pixels ‚Ä?an all-zero
+ * contain both shadowed (==1.0) and lit (==0.0) pixels Èà•?an all-zero
  * or all-one result indicates a broken shadow evaluation path.
  */
 TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
@@ -320,7 +320,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	// renderItems removed ‚Ä?ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed Èà•?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -330,7 +330,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 		*m_renderCache, renderExtent, *this);
 
 	// -------------------------------------------------------------------
-	// Run ONLY ShadowDepth ‚Ü?Geometry ‚Ü?ShadowIntensity (NO LightingPass)
+	// Run ONLY ShadowDepth Èà´?Geometry Èà´?ShadowIntensity (NO LightingPass)
 	// to isolate whether LightingPass corrupts shadow intensity data.
 	// -------------------------------------------------------------------
 	{
@@ -338,7 +338,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
-		// NO LightingPass here ‚Ä?pure isolation test
+		// NO LightingPass here Èà•?pure isolation test
 		EndSubmitWait(cmd);
 	}
 
@@ -399,10 +399,10 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 		// on the plane) and some to be lit (the plane outside the shadow).
 		// The exact counts depend on geometry but zero shadowed pixels is always wrong.
 		EXPECT_GT(shadowed, 0)
-			<< "Light " << lightUID << " shadow intensity is ALL ZERO ‚Ä?"
+			<< "Light " << lightUID << " shadow intensity is ALL ZERO Èà•?"
 			<< "shadow evaluation pass may be broken (G-Buffer Position, cubemap depth, or dispatch)";
 		EXPECT_GT(lit, 0)
-			<< "Light " << lightUID << " shadow intensity is ALL ONE ‚Ä?"
+			<< "Light " << lightUID << " shadow intensity is ALL ONE Èà•?"
 			<< "unlikely, check bias/farPlane parameters";
 	}
 
@@ -410,15 +410,15 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 }
 
 // ===========================================================================
-// ShadowIntensityPerLight_ReferenceImage ‚Ä?per-light shadow intensity regression
+// ShadowIntensityPerLight_ReferenceImage Èà•?per-light shadow intensity regression
 // ===========================================================================
 
 /**
  * @brief Captures per-light ShadowIntensity images as PNGs and verifies
  *        they are not all-black nor all-white.
  *
- * Runs the full deferred+PBR pipeline (ShadowDepth ‚Ü?Geometry ‚Ü?
- * ShadowIntensity ‚Ü?Lighting) with 2 lights, then reads back each
+ * Runs the full deferred+PBR pipeline (ShadowDepth Èà´?Geometry Èà´?
+ * ShadowIntensity Èà´?Lighting) with 2 lights, then reads back each
  * light's ShadowIntensity (R8_UNORM) attachment through a staging
  * buffer.  Saves the captured data as a reference PNG and uses the
  * first-run-generates / second-run-compares pattern.  Additionally
@@ -451,7 +451,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	// renderItems removed ‚Ä?ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed Èà•?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -469,7 +469,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	}
 
 	// -------------------------------------------------------------------
-	// Run full pipeline (ShadowDepth ‚Ü?Geometry ‚Ü?ShadowIntensity ‚Ü?Lighting)
+	// Run full pipeline (ShadowDepth Èà´?Geometry Èà´?ShadowIntensity Èà´?Lighting)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
@@ -536,7 +536,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 
 		if (refResult < 0)
 		{
-			// First run ‚Ä?reference generated
+			// First run Èà•?reference generated
 			if (refResult == -1)
 				anyGenerated = true;
 			else
@@ -549,7 +549,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 		{
 			allValid = false;
 			ADD_FAILURE() << refResult
-				<< " pixel(s) differ from reference for light " << li << " (tol=¬±2)";
+				<< " pixel(s) differ from reference for light " << li << " (tol=Âç§2)";
 		}
 
 		// --- Verify content is not all-black nor all-white ---
@@ -583,7 +583,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 }
 
 // ===========================================================================
-// SunLights_HDRColorReference ‚Ä?full deferred pipeline with sun shadows
+// SunLights_HDRColorReference Èà•?full deferred pipeline with sun shadows
 // ===========================================================================
 
 /**
@@ -593,7 +593,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
  *
  * Uses TestMultiShadow with LightType::SUNLIGHT to generate a ring of
  * directional sun lights pointing toward the cube centre.  The full pipeline
- * (ShadowDepth ‚Ü?Geometry ‚Ü?ShadowIntensity ‚Ü?Lighting) runs and the final
+ * (ShadowDepth Èà´?Geometry Èà´?ShadowIntensity Èà´?Lighting) runs and the final
  * HDRColor attachment is captured for regression testing.
  */
 TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
@@ -644,7 +644,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
-	// renderItems removed ‚Ä?ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed Èà•?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -715,6 +715,6 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	}
 	else
 	{
-		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=¬±2)";
+		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=Âç§2)";
 	}
 }

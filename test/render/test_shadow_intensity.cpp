@@ -1,6 +1,6 @@
 /**
  * @file test_shadow_intensity.cpp
- * @brief GPU test: renders cube+plane scene through GeometryPass �?ShadowDepthPass �?
+ * @brief GPU test: renders cube+plane scene through GeometryPass 鈫?ShadowDepthPass 鈫?
  *        ShadowIntensityPass, reads back R8 shadow intensity data, and verifies
  *        against mathematically-computed expected shadow values.
  *
@@ -8,14 +8,14 @@
  *   - Cube at [-0.5, 0.5] x [-0.5, 0.5] x [2.5, 3.5] (centre at (0,0,3))
  *   - Plane at z=0, spanning [-10, 10] in XY
  *   - Point light at (0, 0, 6), farPlane = Light::point_shadow_far = 10.0
- *   - Camera at (0, 0.001, 2) looking at (0, 0, 0), FOV=75°, 256×256
+ *   - Camera at (0, 0.001, 2) looking at (0, 0, 0), FOV=75掳, 256脳256
  *   - Unproject each pixel to world-space; intersect with plane; ray-AABB
  *     test to determine shadow = 1.0 (occluded) or 0.0 (lit).
- *   - Tolerance: ±2/255 for binary shadow values.
+ *   - Tolerance: 卤2/255 for binary shadow values.
  *
  * Reference image regression:
- *   - First run: generates reference PNG �?GTEST_SKIP
- *   - Second run: compares pixel-by-pixel with ±2 tolerance �?PASS
+ *   - First run: generates reference PNG 鈫?GTEST_SKIP
+ *   - Second run: compares pixel-by-pixel with 卤2 tolerance 鈫?PASS
  */
 
 #include <gtest/gtest.h>

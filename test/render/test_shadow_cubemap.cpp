@@ -121,7 +121,7 @@ protected:
 			hitsPlane = (std::abs(hp.x) <= 10.0f && std::abs(hp.y) <= 10.0f);
 		}
 
-		// Cube AABB slab test (cube centered at cubePos, extent ±0.5)
+		// Cube AABB slab test (cube centered at cubePos, extent 卤0.5)
 		const float eps = 0.001f;
 		float tMin = eps, tMax = 1e10f;
 		bool parallelMiss = false;
@@ -201,7 +201,7 @@ protected:
 				hitsPlaneInBounds = true;
 		}
 
-		// --- Cube AABB slab test (cube centered at cubePos, extent ±0.5) ---
+		// --- Cube AABB slab test (cube centered at cubePos, extent 卤0.5) ---
 		const float eps = 0.001f;
 		float t_min_cube = eps;
 		float t_max_cube = 1e10f;

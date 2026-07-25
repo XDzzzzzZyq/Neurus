@@ -9,7 +9,7 @@
  *   - Plane: large quad at z=0 spanning [-10,10] in XY
  *   - 3 sun lights: placed on a ring (z=2, radius=2), direction pointing
  *     toward the cube centre (origin), all shadow-casting
- *   - Camera: at (0, 1, 3) looking at origin, FOV=75Â°, 256x256
+ *   - Camera: at (0, 1, 3) looking at origin, FOV=75æŽ³, 256x256
  *
  * Expected shadow pattern per light:
  *   - Pixels behind the cube on the plane: shadowed (intensity > 0)
@@ -99,7 +99,7 @@ protected:
 };
 
 // ===========================================================================
-// SunMultiShadowIntensity â€?per-light readback + statistical verification
+// SunMultiShadowIntensity éˆ¥?per-light readback + statistical verification
 // ===========================================================================
 
 TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
@@ -216,15 +216,15 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 
 		EXPECT_GT(shadowedCount, 50u)
 			<< "Sun light " << li << " (UID=" << lightUID << "): "
-			<< "expected at least 50 shadowed pixels â€?cube should cast a visible shadow on the plane";
+			<< "expected at least 50 shadowed pixels éˆ¥?cube should cast a visible shadow on the plane";
 		EXPECT_GT(litCount, 100u)
 			<< "Sun light " << li << " (UID=" << lightUID << "): "
-			<< "expected at least 100 lit pixels â€?plane pixels outside the shadow should be lit";
+			<< "expected at least 100 lit pixels éˆ¥?plane pixels outside the shadow should be lit";
 	}
 }
 
 // ===========================================================================
-// SunMultiShadowIntensity_ReferenceImage â€?reference-image regression
+// SunMultiShadowIntensity_ReferenceImage éˆ¥?reference-image regression
 // ===========================================================================
 
 /**
