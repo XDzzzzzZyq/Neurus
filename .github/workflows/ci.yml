@@ -38,17 +38,9 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Fetch pre-compiled dependencies
-        run: python scripts/setup_dependencies.py
-        continue-on-error: true
-
-      - name: Sync shaderc dependencies (fallback)
-        run: |
-          cd dep/shaderc
-          python utils/git-sync-deps
-
-      - name: Configure CMake
-        run: cmake --preset vs2022
+      - name: Update dependencies and configure
+        shell: bash
+        run: make update PRESET=vs2022
 
       - name: Build
         run: cmake --build ../Neurus_VS2022 --config ${{ matrix.configuration }} --parallel

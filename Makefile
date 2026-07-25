@@ -12,9 +12,11 @@ UNAME := $(shell uname -s)
 ifeq ($(UNAME),Darwin)
   PRESET        := macos
   PRESET_REL    := macos-release
+  PYTHON        := python3
 else
   PRESET        := default
   PRESET_REL    := release
+  PYTHON        := python
 endif
 
 .PHONY: configure build test clean nobuild release help app check update
@@ -70,7 +72,7 @@ help:
 	@echo "Neurus Build System"
 	@echo "==================="
 	@echo ""
-	@echo "  make update         - Download pre-compiled dependency libraries"
+	@echo "  make update         - Init submodules, download pre-compiled deps, configure CMake"
 	@echo "  make configure      - Configure Debug build (VS 2022)"
 	@echo "  make build          - Build everything (Debug)"
 	@echo "  make build app      - Build Neurus.exe only"
@@ -86,6 +88,7 @@ help:
 # --- Dependency Setup ---
 
 update:
-	python3 scripts/setup_dependencies.py
+	git submodule update --init --recursive
+	$(PYTHON) scripts/setup_dependencies.py
 	cmake --preset $(PRESET)
 	@echo ""

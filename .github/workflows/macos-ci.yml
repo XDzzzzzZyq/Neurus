@@ -33,17 +33,8 @@ jobs:
           vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, Glslang
           vulkan-use-cache: true
 
-      - name: Fetch pre-compiled dependencies
-        run: python scripts/setup_dependencies.py
-        continue-on-error: true
-
-      - name: Sync shaderc dependencies (fallback)
-        run: |
-          cd dep/shaderc
-          python3 utils/git-sync-deps
-
-      - name: Configure CMake
-        run: cmake --preset macos -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+      - name: Update dependencies and configure
+        run: make update
 
       - name: Build
         run: cmake --build build --config ${{ matrix.configuration }} --parallel
