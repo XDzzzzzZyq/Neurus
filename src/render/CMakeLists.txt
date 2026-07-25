@@ -31,8 +31,6 @@ add_library(neurus_render STATIC
 	shaders/ComputeShader.cpp
 	shaders/ShaderModule.h
 	shaders/ShaderModule.cpp
-	shaders/ShaderLib.h
-	shaders/ShaderLib.cpp
 	shaders/ShaderStruct.h
 	shaders/ShaderStruct.cpp
 	shaders/ShaderGenerator.h
