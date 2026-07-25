@@ -1,8 +1,9 @@
-#define VK_USE_PLATFORM_WIN32_KHR
+
 
 #include <gtest/gtest.h>
 
 #include "app/VulkanContext.h"
+#include "platform/PlatformSurface.h"
 #include "render/PipelineBuilder.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/shaders/ShaderModule.h"
@@ -24,7 +25,7 @@ protected:
 	{
 		try
 		{
-			m_instance = VulkanContext::CreateInstance();
+			auto platform = CreatePlatformSurface(); m_instance = VulkanContext::CreateInstance(*platform);
 			m_physicalDevices = vk::raii::PhysicalDevices(m_instance);
 			m_hasVulkan = !m_physicalDevices.empty();
 

@@ -13,6 +13,7 @@ target_include_directories(neurus_app PRIVATE
 )
 
 target_link_libraries(neurus_app PRIVATE
+	neurus_platform
 	neurus_render
 	neurus_editor
 	neurus_ui

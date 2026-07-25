@@ -8,7 +8,7 @@
  *   3. VulkanContext (Phase 1) - VkInstance creation
  *   4. UIManager + Viewport - Qt window with dockable Viewport
  *   5. Show main window - apply layout so widget has final size
- *   6. VkSurfaceKHR - created from Viewport's native HWND
+ *   6. VkSurfaceKHR - created from Viewport's native window handle via PlatformSurface
  *   7. VulkanContext (Phase 2) - logical device + queue selection
  *   8. Project::Open/Project::CreateDefault - load or create project scene + load BAKED.png texture
  *   9. DeferredRenderer - swapchain, G-Buffer, geometry pass, lighting pass, composite
@@ -19,7 +19,7 @@
  */
 
 // Must define platform before including any Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
+// (Platform defines removed — PlatformSurface handles this)
 
 #include "app/Application.h"
 
@@ -50,7 +50,6 @@
 #include <QTimer>
 
 #include <cmath>
-#include <windows.h>
 
 #include <iostream>
 #include <memory>
@@ -160,18 +159,19 @@ bool Application::InitVulkan()
 
 	try
 	{
-		// Step 1: Create VkInstance
-		auto vkInstance = neurus::VulkanContext::CreateInstance();
+		// Step 1: Create VkInstance with platform extensions
+		app_platform = CreatePlatformSurface();
+		auto vkInstance = neurus::VulkanContext::CreateInstance(*app_platform);
 		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
 		// Step 2: Create Qt window with Viewport
 		app_mainWindow = std::make_unique<neurus::UIManager>();
-		// Viewport is created internally by UIManager constructor
+		app_mainWindow->show();  // Must show before surface creation on macOS
 
-		// Step 3: Create VkSurfaceKHR from Viewport's native HWND
-		HINSTANCE hinstance = GetModuleHandle(nullptr);
-		vk::Win32SurfaceCreateInfoKHR surfaceCreateInfo({}, hinstance, app_mainWindow->getViewportHwnd());
-		app_surface = std::make_unique<vk::raii::SurfaceKHR>(app_vkContext->instance(), surfaceCreateInfo);
+		// Step 3: Create VkSurfaceKHR via platform abstraction
+		NativeWindowHandle hwnd = app_mainWindow->getViewportHwnd();
+		app_surface = std::make_unique<vk::raii::SurfaceKHR>(
+			app_platform->createSurface(app_vkContext->instance(), hwnd));
 
 		// Step 4: Create logical device
 		app_vkContext->InitDevice();
@@ -269,6 +269,9 @@ bool Application::InitRenderer(const project::Project& project)
 
 void Application::ResizeViewport(int width, int height)
 {
+	app_platform->onResize(
+		app_mainWindow->getViewportHwnd(),
+		static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 	app_renderer->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 	app_editor->HandleResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
@@ -424,12 +427,12 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 }
 
 // =========================================================================
-// RecreateSignals – Viewport recreation (new HWND → new surface → new swapchain)
+// RecreateSignals – Viewport recreation (new window handle → new surface → new swapchain)
 // =========================================================================
 
 void Application::RecreateSignals(neurus::UIEvents& uiEvents)
 {
-	// Handle UI recreation (new native HWND → new surface → new swapchain, rebind the signals)
+	// Handle UI recreation (new native window handle → new surface → new swapchain, rebind the signals)
 	QObject::connect(&uiEvents, &neurus::UIEvents::uiRecreated,
 	                 [this](quintptr newHwnd) {
 	                     // Reconnect panel signals (Viewport resize) to the new widget
@@ -439,11 +442,10 @@ void Application::RecreateSignals(neurus::UIEvents& uiEvents)
 	                         return;
 	                     try
 	                     {
-	                         HINSTANCE hinstance = GetModuleHandle(nullptr);
-	                         vk::Win32SurfaceCreateInfoKHR surfaceCI({}, hinstance,
-	                             reinterpret_cast<HWND>(newHwnd));
 	                         auto new_surface = std::make_unique<vk::raii::SurfaceKHR>(
-	                             app_vkContext->instance(), surfaceCI);
+	                             app_platform->createSurface(
+	                                 app_vkContext->instance(),
+	                                 reinterpret_cast<NativeWindowHandle>(newHwnd)));
 	                         app_renderer->HandleSurfaceChange(*new_surface);
 	                         app_surface = std::move(new_surface);  // Old surface destroyed AFTER swapchain drops its ref
 	                         NEURUS_LOG("[Application] Viewport recreated — new surface + swapchain");

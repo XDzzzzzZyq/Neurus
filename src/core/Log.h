@@ -16,7 +16,14 @@
 #pragma once
 
 #include <iostream>
+
+#ifdef _WIN32
 #include <io.h>
+#define NEURUS_ISATTY(fd) _isatty(_fileno(fd))
+#else
+#include <unistd.h>
+#define NEURUS_ISATTY(fd) isatty(fileno(fd))
+#endif
 
 /**
  * @brief Debug-only info log.
@@ -27,7 +34,7 @@
 #ifdef _DEBUG
 #define NEURUS_LOG(msg) \
 	do { \
-		if (_isatty(_fileno(stdout))) { \
+		if (NEURUS_ISATTY(stdout)) { \
 			std::cout << "\033[36m[" << __func__ << ":" << __LINE__ << "]\033[0m " << msg << "\n"; \
 		} else { \
 			std::cout << "[" << __func__ << ":" << __LINE__ << "] " << msg << "\n"; \
@@ -45,7 +52,7 @@
  */
 #define NEURUS_ERR(msg) \
 	do { \
-		if (_isatty(_fileno(stderr))) { \
+		if (NEURUS_ISATTY(stderr)) { \
 			std::cerr << "\033[1;31m[" << __func__ << ":" << __LINE__ << "] ERROR:\033[0m " << msg << "\n"; \
 		} else { \
 			std::cerr << "[" << __func__ << ":" << __LINE__ << "] ERROR: " << msg << "\n"; \

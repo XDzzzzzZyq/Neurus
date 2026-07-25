@@ -22,8 +22,9 @@ namespace test {
 /// @brief Encapsulates the reference image base directory and path construction.
 struct ReferencePath
 {
-	/// @brief Path to reference images, relative from build/debug/test/
-	static constexpr const char* kReferenceDir = "../../../test/render/reference/";
+	/// @brief Base directory for reference images, relative from CTest CWD (CMAKE_BINARY_DIR).
+	/// Computed at CMake configure time via file(RELATIVE_PATH ...).
+	static constexpr const char* kReferenceDir = TEST_RELATIVE_PROJECT_DIR "/test/render/reference/";
 
 	/// @brief Build a full reference path by concatenating the base dir with a relative suffix.
 	static std::string Make(const std::string& relative)

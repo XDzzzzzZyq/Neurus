@@ -9,11 +9,13 @@ on:
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
+        os: [windows-2022, macos-latest]
         configuration: [Debug, Release]
         platform: [x64]
 
-    runs-on: windows-2022
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -21,13 +23,22 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Qt
+      # --- Platform-specific Qt setup ---
+      - name: Setup Qt (Windows)
+        if: runner.os == 'Windows'
         uses: jurplel/install-qt-action@v4
         with:
           version: 6.11.1
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git'
           cache: true
-        
+
+      - name: Setup Qt + Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install qt ninja
+          echo "CMAKE_PREFIX_PATH=$(brew --prefix qt)" >> $GITHUB_ENV
+
+      # --- Common ---
       - name: Setup Vulkan SDK
         uses: humbletim/setup-vulkan-sdk@v1.2.1
         with:
@@ -35,25 +46,18 @@ jobs:
           vulkan-components: Vulkan-Headers, Vulkan-Loader, SPIRV-Tools, Glslang
           vulkan-use-cache: true
 
-      - name: Setup MSVC
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Fetch pre-compiled dependencies
-        run: python scripts/setup_dependencies.py
-        continue-on-error: true
-
-      - name: Sync shaderc dependencies (fallback)
-        run: |
-          cd dep/shaderc
-          python utils/git-sync-deps
-
-      - name: Configure CMake
-        run: cmake --preset vs2022
+      - name: Update dependencies and configure
+        run: make update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build
-        run: cmake --build ../Neurus_VS2022 --config ${{ matrix.configuration }} --parallel
+        run: cmake --build build --config ${{ matrix.configuration }} --parallel
 
       - name: Run Non-GPU Tests
-        run: |
-          cd ../Neurus_VS2022
-          ctest -C ${{ matrix.configuration }} --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"
+        working-directory: build
+        run: ctest -C ${{ matrix.configuration }} --output-on-failure

@@ -29,12 +29,21 @@ void VulkanTestShared::SetUp()
 		                            VK_API_VERSION_1_4);
 		std::vector<const char*> instanceExts = {
 			VK_KHR_SURFACE_EXTENSION_NAME,
-			VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
 #ifdef _DEBUG
 			VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif
 		};
-		vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
+
+		// Add platform-specific extensions via PlatformSurface
+		m_platform = neurus::CreatePlatformSurface();
+		auto platformExts = m_platform->requiredInstanceExtensions();
+		for (const auto* ext : platformExts) {
+			// Skip VK_KHR_SURFACE (already added above)
+			if (std::strcmp(ext, VK_KHR_SURFACE_EXTENSION_NAME) != 0)
+				instanceExts.push_back(ext);
+		}
+
+		vk::InstanceCreateInfo instanceCI(m_platform->instanceCreateFlags(), &appInfo, {}, instanceExts);
 		m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
 
 		// --- Physical device ---
@@ -167,20 +176,11 @@ void VulkanTestShared::EndSubmitWait(vk::raii::CommandBuffer& cmd)
 
 std::string VulkanTestShared::ResolveAssetPath(const char* assetRelative)
 {
-	// Try: relative from build/debug/Debug/ (MSVC multi-config layout)
-	std::string path1 = std::string("../../../") + assetRelative;
-	{
-		std::ifstream f(path1);
-		if (f.good()) return path1;
-	}
-	// Try: relative from build/debug/ (single-config layout)
-	std::string path2 = std::string("../../") + assetRelative;
-	{
-		std::ifstream f(path2);
-		if (f.good()) return path2;
-	}
-	// Fallback: return the primary path and let the caller handle failure
-	return path1;
+	// res/ is copied to CMAKE_BINARY_DIR/res by a POST_BUILD step on neurus_test.
+	// CTest runs from CMAKE_BINARY_DIR, so assets resolve directly.
+	std::ifstream f(assetRelative);
+	if (f.good()) return assetRelative;
+	return assetRelative;  // return the path; caller handles missing files
 }
 
 // ===========================================================================

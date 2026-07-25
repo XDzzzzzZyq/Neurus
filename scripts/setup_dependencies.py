@@ -9,7 +9,7 @@ Usage:
     python scripts/setup_dependencies.py [--version VERSION]
 
 The script:
-    1. Detects the current platform (windows / linux)
+    1. Detects the current platform (windows / linux / macos)
     2. Determines the tag version (from --version, pinned file, or latest release)
     3. Downloads the matching archive from GitHub Releases
     4. Verifies SHA256 checksum if available
@@ -62,6 +62,8 @@ def detect_platform():
         return "windows"
     elif sysname == "Linux":
         return "linux"
+    elif sysname == "Darwin":
+        return "macos"
     else:
         raise RuntimeError(f"Unsupported platform: {sysname}")
 
@@ -136,8 +138,12 @@ def verify_checksum(filepath: Path, expected_sha256: str):
 
 def get_archive_name(platform_name: str) -> str:
     """Return the archive filename for the given platform."""
-    ext = "zip" if platform_name == "windows" else "tar.gz"
-    return f"{platform_name}-x64.{ext}"
+    if platform_name == "windows":
+        return "windows-x64.zip"
+    elif platform_name == "macos":
+        return "macos-arm64.tar.gz"
+    else:
+        return f"{platform_name}-x64.tar.gz"
 
 
 # ---------------------------------------------------------------------------

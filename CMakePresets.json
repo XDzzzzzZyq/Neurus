@@ -2,11 +2,11 @@
 	"version": 6,
 	"configurePresets": [
 		{
-			"name": "default",
-			"displayName": "Windows x64 Debug (MSVC)",
-			"description": "Debug build with validation layers and tests - uses VS 2022 + MSVC",
+			"name": "win",
+			"displayName": "Windows x64 (MSVC)",
+			"description": "Multi-config build for Windows - Debug + Release via --config",
 			"generator": "Visual Studio 17 2022",
-			"binaryDir": "${sourceDir}/build/debug",
+			"binaryDir": "${sourceDir}/build",
 			"architecture": {
 				"value": "x64",
 				"strategy": "external"
@@ -18,25 +18,6 @@
 				"CMAKE_PREFIX_PATH": "D:/Qt/6.11.1/msvc2022_64",
 				"NEURUS_BUILD_TESTS": "ON",
 				"NEURUS_ENABLE_VALIDATION": "ON"
-			}
-		},
-		{
-			"name": "release",
-			"displayName": "Windows x64 Release (MSVC)",
-			"description": "Optimized release build - uses VS 2022 + MSVC",
-			"generator": "Visual Studio 17 2022",
-			"binaryDir": "${sourceDir}/build/release",
-			"architecture": {
-				"value": "x64",
-				"strategy": "external"
-			},
-			"environment": {
-				"VULKAN_SDK_VERSION": "D:/VulkanSDK/1.4.341.0"
-			},
-			"cacheVariables": {
-				"CMAKE_PREFIX_PATH": "D:/Qt/6.11.1/msvc2022_64",
-				"NEURUS_BUILD_TESTS": "OFF",
-				"NEURUS_ENABLE_VALIDATION": "OFF"
 			}
 		},
 		{
@@ -57,16 +38,40 @@
 				"NEURUS_BUILD_TESTS": "ON",
 				"NEURUS_ENABLE_VALIDATION": "ON"
 			}
+		},
+		{
+			"name": "macos",
+			"displayName": "macOS arm64 (Ninja Multi-Config)",
+			"description": "Multi-config build for Apple Silicon - Debug + Release in one tree",
+			"generator": "Ninja Multi-Config",
+			"binaryDir": "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_OSX_ARCHITECTURES": "arm64",
+				"NEURUS_BUILD_TESTS": "ON",
+				"NEURUS_ENABLE_VALIDATION": "ON"
+			}
 		}
 	],
 	"buildPresets": [
 		{
-			"name": "default",
-			"configurePreset": "default"
+			"name": "win-debug",
+			"configurePreset": "win",
+			"configuration": "Debug"
 		},
 		{
-			"name": "release",
-			"configurePreset": "release"
+			"name": "win-release",
+			"configurePreset": "win",
+			"configuration": "Release"
+		},
+		{
+			"name": "macos",
+			"configurePreset": "macos",
+			"configuration": "Debug"
+		},
+		{
+			"name": "macos-release",
+			"configurePreset": "macos",
+			"configuration": "Release"
 		}
 	]
 }

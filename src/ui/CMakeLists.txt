@@ -48,7 +48,7 @@ target_link_libraries(neurus_ui PRIVATE
 # ADS_STATIC: tell Qt-Advanced-Docking-System headers to use static linkage
 target_compile_definitions(neurus_ui PUBLIC ADS_STATIC)
 
-target_include_directories(neurus_ui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(neurus_ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
 
 # Qt resource file (QML)
 qt_add_resources(neurus_ui "resources"

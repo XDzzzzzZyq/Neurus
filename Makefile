@@ -2,15 +2,29 @@
 # Neurus - Convenience Build Wrapper
 #
 # This Makefile provides quick-build shortcuts. All real logic is in CMake.
-# Requires: cmake >= 3.27, Visual Studio 2022 with C++20 toolchain
+# Requires: cmake >= 3.27
+#   Windows: Visual Studio 2022 with C++20 toolchain
+#   macOS:   Ninja, AppleClang, Homebrew Qt6 + Vulkan SDK
 # ---------------------------------------------------------------------------
+
+# --- Platform detection ---
+UNAME := $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+  PRESET        := macos
+  PRESET_REL    := macos
+  PYTHON        := python3
+else
+  PRESET        := win
+  PRESET_REL    := win
+  PYTHON        := python
+endif
 
 .PHONY: configure build test clean nobuild release help app check update
 
 # --- Debug (default) ---
 
 configure:
-	cmake --preset default
+	cmake --preset $(PRESET)
 
 # Full build only when no sub-target (app/test) is specified.
 #   make build       → full build
@@ -18,30 +32,30 @@ configure:
 #   make build test  → neurus_test only
 build:
 ifeq ($(filter app test,$(MAKECMDGOALS)),)
-	cmake --build build/debug --config Debug
+	cmake --build build --config Debug
 endif
 
 # Build Neurus.exe only (make app  or  make build app)
 app:
-	cmake --build build/debug --target Neurus --config Debug
+	cmake --build build --target Neurus --config Debug
 
 # Build neurus_test only (make test  or  make build test)
 test:
-	cmake --build build/debug --target neurus_test --config Debug
+	cmake --build build --target neurus_test --config Debug
 
 # Run tests. Pass FILTER for specific tests.
 #   make check                          → all tests
 #   make check FILTER="-R DeferredShading" → filtered
 check:
-	cd build/debug && ctest -C Debug --output-on-failure $(FILTER)
+	cd build && ctest -C Debug --output-on-failure $(FILTER)
 
 clean:
-	cmake --build build/debug --target clean
+	cmake --build build --target clean
 
 # --- Release ---
 
 release:
-	cmake --preset release && cmake --build build/release --config Release
+	cmake --preset $(PRESET_REL) && cmake --build build --config Release
 
 # --- Visual Studio 2022 (outside source tree) ---
 
@@ -58,7 +72,7 @@ help:
 	@echo "Neurus Build System"
 	@echo "==================="
 	@echo ""
-	@echo "  make update         - Download pre-compiled dependency libraries"
+	@echo "  make update         - Init submodules, download pre-compiled deps, configure CMake"
 	@echo "  make configure      - Configure Debug build (VS 2022)"
 	@echo "  make build          - Build everything (Debug)"
 	@echo "  make build app      - Build Neurus.exe only"
@@ -74,6 +88,7 @@ help:
 # --- Dependency Setup ---
 
 update:
-	python scripts/setup_dependencies.py
-	cmake --preset default
+	git submodule update --init --recursive
+	$(PYTHON) scripts/setup_dependencies.py
+	cmake --preset $(PRESET) $(if $(BINARY_DIR),-B $(BINARY_DIR),)
 	@echo ""

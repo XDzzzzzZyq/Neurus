@@ -14,6 +14,7 @@
 #include "render/Screenshot.h"
 #include "render/UploadManager.h"
 #include "ui/UIManager.h"
+#include "platform/PlatformSurface.h"
 
 namespace neurus {
 
@@ -26,7 +27,7 @@ class UIEvents;
  * Editor subsystems, wires signals, and enters the event loop.  The
  * destructor relies on C++ reverse-order member destruction to tear
  * down GPU resources in the required order:
- *   renderer → editor → screenshot → surface → mainWindow → vkContext
+ *   renderer → editor → screenshot → surface → mainWindow → vkContext → platform
  *
  * Usage:
  * @code
@@ -83,6 +84,9 @@ private:
 			}
 		);
 	}
+
+	// --- Platform abstraction (destroyed after everything else) ---
+	std::unique_ptr<PlatformSurface>      app_platform;
 
 	// --- Qt infrastructure (destroyed after GPU stack) ---
 	std::unique_ptr<QApplication>         app_qtApp;

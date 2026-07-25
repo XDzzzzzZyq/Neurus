@@ -33,32 +33,18 @@ using namespace neurus;
 namespace {
 
 /**
- * @brief Resolve a shader file path relative to the project root.
+ * @brief Resolve a shader file path relative to the build directory CWD.
  *
- * CTest runs from build/debug/test/ (single-config) or
- * build/debug/Debug/ (MSVC multi-config). Tries multiple relative
- * prefixes, returns the first one that exists on disk.
+ * res/ is copied to the build directory by a POST_BUILD step on neurus_test.
+ * CTest runs from CMAKE_BINARY_DIR, so assets resolve directly.
  *
  * @param relativePath Path relative to project root (e.g. "res/shaders/render/gbuffer.vert")
  * @return Resolved path string, or empty if not found.
  */
 std::string ResolveShaderPath(const char* relativePath)
 {
-    const char* prefixes[] = {
-        "../../../",  // build/debug/test/ - project root (single-config)
-        "../../",     // build/debug/Debug/ - project root (MSVC multi-config)
-        "../",        // fallback: build/debug/ - build
-    };
-
-    for (const char* prefix : prefixes)
-    {
-        std::string full = std::string(prefix) + relativePath;
-        std::ifstream f(full);
-        if (f.good())
-        {
-            return full;
-        }
-    }
+    std::ifstream f(relativePath);
+    if (f.good()) return relativePath;
     return {};
 }
 

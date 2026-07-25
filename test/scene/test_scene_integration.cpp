@@ -197,7 +197,9 @@ TEST(SceneIntegrationTest, GetActiveCameraWithMixedObjects)
 
 	Camera* active = scene.GetActiveCamera();
 	ASSERT_NE(active, nullptr);
-	EXPECT_EQ(active->GetObjectID(), cam1->GetObjectID());
+	// GetActiveCamera returns one of the registered cameras (order is unspecified for unordered_map)
+	EXPECT_TRUE(active->GetObjectID() == cam1->GetObjectID() ||
+	            active->GetObjectID() == cam2->GetObjectID());
 }
 
 // -----------------------------------------------------------------------
@@ -490,8 +492,10 @@ TEST(SceneIntegrationTest, MultipleInstancesOfSameType)
 	EXPECT_NE(scene.obj_list.find(light2->GetObjectID()), scene.obj_list.end());
 	EXPECT_NE(scene.obj_list.find(mesh1->GetObjectID()),  scene.obj_list.end());
 
-	// GetActiveCamera returns first
+	// GetActiveCamera returns one of the registered cameras (order is unspecified for unordered_map)
 	Camera* active = scene.GetActiveCamera();
 	ASSERT_NE(active, nullptr);
-	EXPECT_EQ(active->GetObjectID(), cam1->GetObjectID());
+	EXPECT_TRUE(active->GetObjectID() == cam1->GetObjectID() ||
+	            active->GetObjectID() == cam2->GetObjectID() ||
+	            active->GetObjectID() == cam3->GetObjectID());
 }

@@ -7,8 +7,8 @@
  *   - DrawFrame with camera but no meshes does not crash
  *   - DrawFrame with camera + mesh completes a full frame
  *
- * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
- * @note Creates a hidden Win32 window for the presentation surface.
+ * @note Requires a Vulkan 1.4-capable GPU with presentation support.
+ *       Skipped in CI without GPU or on platforms without window surface support.
  */
 
 #include <gtest/gtest.h>
@@ -24,8 +24,14 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include "platform/PlatformSurface.h"
+
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  include <windows.h>
+#endif
 
 #include <memory>
 #include <string>
@@ -56,12 +62,10 @@ static const char* kTriangleObj =
 /**
  * @brief GPU test fixture for Scene-driven DeferredRenderer rendering.
  *
- * Creates a headless Vulkan device, a hidden Win32 window + surface,
- * and the shader SPIR-V is embedded via generated headers.
- *
- * Uses VulkanTestShared for member variables (m_instance, m_physicalDevices,
- * m_device, m_queue, etc.) but overrides SetUp/TearDown entirely because
- * this test needs a device with VK_KHR_swapchain enabled and a Win32 surface.
+ * Creates a headless Vulkan device and uses the PlatformSurface abstraction
+ * for surface creation. On Windows, a hidden Win32 window is created for
+ * the presentation surface. On macOS, headless surface creation is not
+ * possible without a Cocoa event loop — those tests are skipped.
  */
 class SceneWiringTest : public VulkanTestShared
 {
@@ -70,20 +74,22 @@ protected:
 	{
 		try
 		{
-			// --- Instance (via base class pattern) ---
+			// --- Platform surface abstraction ---
+			m_platform = CreatePlatformSurface();
+
+			// --- Instance ---
 			vk::ApplicationInfo appInfo("NeurusTest_SceneWiring",
 			                            VK_MAKE_VERSION(0, 4, 5),
 			                            "NeurusTest_SceneWiring",
 			                            VK_MAKE_VERSION(0, 4, 5),
 			                            VK_API_VERSION_1_4);
-			std::vector<const char*> instanceExts = {
-				VK_KHR_SURFACE_EXTENSION_NAME,
-				VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+
+			std::vector<const char*> instanceExts = m_platform->requiredInstanceExtensions();
 #ifdef _DEBUG
-				VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+			instanceExts.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
-			};
-			vk::InstanceCreateInfo instanceCI({}, &appInfo, {}, instanceExts);
+
+			vk::InstanceCreateInfo instanceCI(m_platform->instanceCreateFlags(), &appInfo, {}, instanceExts);
 			m_instance = std::make_unique<vk::raii::Instance>(m_context, instanceCI);
 
 			// --- Physical device ---
@@ -145,7 +151,8 @@ protected:
 			m_device = std::make_unique<vk::raii::Device>(pd, devCI);
 			m_queue = m_device->getQueue(m_graphicsQueueFamily, 0);
 
-			// --- Hidden window + surface ---
+			// --- Native window + surface ---
+#ifdef _WIN32
 			HINSTANCE hInst = GetModuleHandle(nullptr);
 			WNDCLASSEX wc = {};
 			wc.cbSize = sizeof(WNDCLASSEX);
@@ -165,8 +172,15 @@ protected:
 				return;
 			}
 
-			vk::Win32SurfaceCreateInfoKHR surfaceCI({}, hInst, m_hwnd);
-			m_surface = std::make_unique<vk::raii::SurfaceKHR>(*m_instance, surfaceCI);
+			m_surface = std::make_unique<vk::raii::SurfaceKHR>(
+				m_platform->createSurface(*m_instance, m_hwnd));
+#else
+			// macOS: headless surface creation requires a Cocoa event loop.
+			// Without Qt / NSApplication running, we cannot create a hidden
+			// NSWindow+NSView for the presentation surface.
+			m_hasVulkan = false;
+			GTEST_SKIP() << "SceneWiringTest requires a window surface (not available headless on this platform).";
+#endif
 
 			m_hasVulkan = true;
 		}
@@ -181,17 +195,19 @@ protected:
 		// Destroy DeferredRenderer before device
 		m_renderer.reset();
 		m_surface.reset();
+
+#ifdef _WIN32
 		if (m_hwnd)
 		{
 			DestroyWindow(m_hwnd);
 			m_hwnd = nullptr;
 		}
+#endif
+
+		m_platform.reset();
 		VulkanTestShared::TearDown();
 	}
 
-	/**
-	 * @brief Creates the DeferredRenderer with embedded SPIR-V shaders.
-	 */
 	void CreateRenderer(uint32_t width, uint32_t height)
 	{
 		m_renderer = std::make_unique<DeferredRenderer>(
@@ -203,9 +219,6 @@ protected:
 			width, height);
 	}
 
-	/**
-	 * @brief Creates a triangle Mesh (GPU upload is lazy via RenderCache).
-	 */
 	std::shared_ptr<Mesh> CreateAndUploadTriangleMesh()
 	{
 		auto md = std::make_shared<MeshData>();
@@ -216,9 +229,6 @@ protected:
 		return mesh;
 	}
 
-	/**
-	 * @brief Creates a Camera positioned at (0, -5, 2) looking at origin. (Z-up)
-	 */
 	std::shared_ptr<Camera> CreateDefaultCamera()
 	{
 		auto cam = std::make_shared<Camera>();
@@ -231,20 +241,19 @@ protected:
 	static constexpr uint32_t kRenderWidth = 800;
 	static constexpr uint32_t kRenderHeight = 600;
 
-	HWND m_hwnd = nullptr;
+	std::unique_ptr<PlatformSurface> m_platform;
 	std::unique_ptr<vk::raii::SurfaceKHR> m_surface;
-
 	std::unique_ptr<DeferredRenderer> m_renderer;
+
+#ifdef _WIN32
+	HWND m_hwnd = nullptr;
+#endif
 };
 
 // ---------------------------------------------------------------------------
 // 1. DrawFrame with scene containing only a camera — no crash
 // ---------------------------------------------------------------------------
 
-/**
- * @test Constructing DeferredRenderer and calling DrawFrame with a scene
- * that has a camera but no meshes/lights does not crash.
- */
 TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 {
 	if (!m_hasVulkan)
@@ -259,10 +268,7 @@ TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 	auto cam = CreateDefaultCamera();
 	scene.UseCamera(cam);
 
-	// DrawFrame must not throw or cause a fatal failure
 	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
-
-	// Ensure GPU is idle before teardown
 	m_renderer->WaitIdle();
 }
 
@@ -270,9 +276,6 @@ TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 // 2. DrawFrame with camera but no meshes — no crash
 // ---------------------------------------------------------------------------
 
-/**
- * @test DrawFrame with a scene containing only a camera does not crash.
- */
 TEST_F(SceneWiringTest, DrawFrame_SceneWithOnlyCamera_NoCrash)
 {
 	if (!m_hasVulkan)
@@ -286,11 +289,9 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithOnlyCamera_NoCrash)
 	auto cam = CreateDefaultCamera();
 	scene.UseCamera(cam);
 
-	// Verify active camera is set
 	ASSERT_NE(scene.GetActiveCamera(), nullptr);
 
 	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
-
 	m_renderer->WaitIdle();
 }
 
@@ -298,9 +299,6 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithOnlyCamera_NoCrash)
 // 3. DrawFrame with camera + mesh — frame completes
 // ---------------------------------------------------------------------------
 
-/**
- * @test DrawFrame with a scene containing a camera and a mesh completes without crash.
- */
 TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 {
 	if (!m_hasVulkan)
@@ -312,24 +310,18 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 
 	Scene scene;
 
-	// Camera
 	auto cam = CreateDefaultCamera();
 	scene.UseCamera(cam);
 
-	// Mesh (upload to cache, then register in scene)
 	auto mesh = CreateAndUploadTriangleMesh();
 	ASSERT_NE(mesh, nullptr);
 	scene.UseMesh(mesh);
 
-	// Light (so lighting pass has something to compute)
 	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 30.0f, glm::vec3(1.0f));
 	light->SetPosition(glm::vec3(2.0f, 2.0f, 5.0f));
 	scene.UseLight(light);
 
-	// Draw a frame
 	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
-
-	// Draw a second frame to exercise fence-guarded in-flight cycling
 	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
 
 	m_renderer->WaitIdle();

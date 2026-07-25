@@ -255,14 +255,14 @@ Run the test executable and verify zero `VUID-` violations in output:
 
 ```bash
 # Run the affected test suite
-./build/debug/Debug/neurus_test.exe --gtest_filter="SunShadow*:DeferredShading*" 2>&1 > test_output.txt
+./build/Debug/neurus_test.exe --gtest_filter="SunShadow*:DeferredShading*" 2>&1 > test_output.txt
 
 # Verify zero VUID violations
 grep -c "VUID-" test_output.txt
 # Expected: 0
 
 # Also check the main application
-$output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3
+$output = & "build/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3
 if ($output -match "VUID-") { Write-Host "VALIDATION ERROR DETECTED" }
 ```
 
@@ -352,7 +352,7 @@ Key things to check:
 
 ```bash
 # Build tests
-cmake --build build/debug
+cmake --build build --config Debug
 
 # Run all tests
 make check
@@ -367,7 +367,7 @@ make check FILTER="-R DeferredShadingTest.GbufferAttachments"
 make check FILTER="-E DeferredShading|Lighting|Screenshot|ModelRender|Texture"
 
 # Run the test executable directly with GTest filters
-build/debug/Debug/neurus_test --gtest_filter="DeferredShadingTest.*"
+build/Debug/neurus_test --gtest_filter="DeferredShadingTest.*"
 ```
 
 ### Filtering Test Output
@@ -376,29 +376,30 @@ Coupled test output can be hard to parse. Use these patterns to pinpoint failure
 
 ```bash
 # PowerShell: Get only passed/failed summary
-cd build/debug; ctest --output-on-failure 2>&1 | Select-String -Pattern "tests passed|tests failed"
+cd build; ctest -C Debug --output-on-failure 2>&1 | Select-String -Pattern "tests passed|tests failed"
 
 # PowerShell: Get ALL failing test names (***Failed marker)
-cd build/debug; ctest --output-on-failure 2>&1 | Select-String -Pattern "\*\*\*Failed"
+cd build; ctest -C Debug --output-on-failure 2>&1 | Select-String -Pattern "\*\*\*Failed"
 
 # PowerShell: Filter to a specific subsystem
-cd build/debug; ctest -R "SceneWiring|SSAO|Lighting" --output-on-failure 2>&1 | Select-String -Pattern "FAIL|pass|fail"
+cd build; ctest -C Debug -R "SceneWiring|SSAO|Lighting" --output-on-failure 2>&1 | Select-String -Pattern "FAIL|pass|fail"
 
 # PowerShell: Run test binary directly for cleaner output
-./build/debug/Debug/neurus_test.exe --gtest_filter="SceneWiring*" 2>&1 | Select-String -Pattern "FAILED|Running|OK|PASSED"
+./build/Debug/neurus_test.exe --gtest_filter="SceneWiring*" 2>&1 | Select-String -Pattern "FAILED|Running|OK|PASSED"
 
 # PowerShell: List failing tests only (gtest summary line)
-./build/debug/Debug/neurus_test.exe --gtest_filter="SceneWiring*" 2>&1 | Select-String -Pattern "FAILED.*test"
+./build/Debug/neurus_test.exe --gtest_filter="SceneWiring*" 2>&1 | Select-String -Pattern "FAILED.*test"
 
 # Bash/Git Bash: Same patterns but use grep instead of Select-String
-cd build/debug && ctest --output-on-failure 2>&1 | grep -E "tests (passed|failed)|FAILED"
+cd build && ctest -C Debug --output-on-failure 2>&1 | grep -E "tests (passed|failed)|FAILED"
 ```
 
 ### Test Working Directory
 
-CTest runs the test exe with `WorkingDirectory = build/debug/test/`. The
-`ResolveAssetPath()` helper tries multiple relative paths (`../../../res/obj/`)
-to find asset files.
+CTest runs the test exe with `WorkingDirectory = CMAKE_BINARY_DIR` (e.g. `build/`).
+The `res/` folder is copied to `CMAKE_BINARY_DIR/res/` by a POST_BUILD step on
+`neurus_test`. `ResolveAssetPath()` reads assets directly from CWD
+(e.g. `res/obj/sphere.obj`) without relative-path probing.
 
 ## Debugging GPU Test Failures
 
@@ -487,7 +488,7 @@ depending on how the callback is implemented.
 1. **Use `2>&1` always** — this merges stdout and stderr, capturing both
    `std::cout` and `std::cerr` from any debug callback:
    ```
-   $output = & "build/debug/Debug/Neurus.exe" 2>&1
+   $output = & "build/Debug/Neurus.exe" 2>&1
    ```
    Then grep for `VUID-` to detect any validation violations.
 
@@ -508,7 +509,7 @@ depending on how the callback is implemented.
 3. **Explicitly verify after fixing** suspected validation issues by running
    the application and checking for remaining VUIDs:
    ```
-   $output = & "build/debug/Debug/Neurus.exe" 2>&1
+   $output = & "build/Debug/Neurus.exe" 2>&1
    if ($output -match "VUID-") { Write-Host "VALIDATION ERROR STILL PRESENT" }
    ```
 
@@ -589,7 +590,7 @@ These patterns were established during deferred PBR development and apply to all
 | Duplicated `TestVertex` struct | `struct TestVertex { ... }` defined locally in test file | Use `TestVertex` from `TestVulkanShared.h` |
 | Duplicated helper functions | `HalfToFloat`, `TransitionGbufferToColorAttachment`, `FindMemoryType` repeated across files | Use static helpers from `VulkanTestShared` |
 | Placeholder/stub test file | File with single `GTEST_SKIP` test | Delete from CMakeLists.txt; do NOT write new test logic unless planned |
-| **Stale reference from wrong cwd** | Reference images appear at `D:\Projects\test\render\reference\` instead of `test/render/reference/` | Running test binary directly from `build/debug/` instead of `build/debug/test/` causes `../../../res/` to resolve differently | Always use `ctest` from `build/debug/`; if running the test binary directly, `cd build/debug/test` first. Clean stale directories with `Remove-Item -Recurse -Force test/` at the project root. |
+| **Stale reference from wrong cwd** | Reference images appear at `D:\Projects\test\render\reference\` instead of `test/render/reference/` | Running test binary directly from outside the CTest working directory causes resource path resolution to differ (resources are copied to `CMAKE_BINARY_DIR/res/`) | Always use `ctest -C Debug` from `build/`; if running the test binary directly, `cd build` first. Clean stale directories with `Remove-Item -Recurse -Force test/` at the project root. |
 
 ## Complete Development Cycle Checklist
 
@@ -599,14 +600,14 @@ is NOT acceptable -- skip none of these steps.
 
 1. **Build → 0 errors**
    ```bash
-   cmake --build build/debug
+   cmake --build build --config Debug
    ```
    No compilation errors, no linker errors.  Warnings should be addressed
    or justified.
 
 2. **Run `Neurus.exe` → check terminal output**
    ```powershell
-   $output = & "build/debug/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
+   $output = & "build/Debug/Neurus.exe" 2>&1; Start-Sleep -Seconds 3; Write-Host $output
    ```
    Scan for:
    - `VUID-` validation violations

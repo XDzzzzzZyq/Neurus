@@ -1,9 +1,9 @@
 // Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
 
 #include <gtest/gtest.h>
 
 #include "app/VulkanContext.h"
+#include "platform/PlatformSurface.h"
 
 using namespace neurus;
 
@@ -21,7 +21,8 @@ protected:
 		// Check Vulkan availability
 		try
 		{
-			auto instance = VulkanContext::CreateInstance();
+			m_platform = CreatePlatformSurface();
+			auto instance = VulkanContext::CreateInstance(*m_platform);
 			auto physicalDevices = vk::raii::PhysicalDevices(instance);
 			m_hasVulkan = !physicalDevices.empty();
 		}
@@ -35,6 +36,7 @@ protected:
 	{
 	}
 
+	std::unique_ptr<PlatformSurface> m_platform;
 	bool m_hasVulkan = false;
 };
 
@@ -46,7 +48,7 @@ TEST_F(VulkanContextTest, CreateInstance_Succeeds)
 	}
 
 	ASSERT_NO_THROW({
-		auto instance = VulkanContext::CreateInstance();
+		auto instance = VulkanContext::CreateInstance(*m_platform);
 		ASSERT_TRUE(*instance);
 	});
 }
@@ -58,12 +60,14 @@ TEST_F(VulkanContextTest, CreateInstance_HasRequiredExtensions)
 		GTEST_SKIP() << "No Vulkan-capable GPU found.";
 	}
 
-	auto instance = VulkanContext::CreateInstance();
+	auto instance = VulkanContext::CreateInstance(*m_platform);
 
 	// Verify required extensions are available
 	auto extensions = vk::enumerateInstanceExtensionProperties();
 	bool hasSurface = false;
-	bool hasWin32Surface = false;
+	bool hasPlatformSurface = false;
+
+	auto requiredExts = m_platform->requiredInstanceExtensions();
 
 	for (const auto& ext : extensions)
 	{
@@ -71,14 +75,15 @@ TEST_F(VulkanContextTest, CreateInstance_HasRequiredExtensions)
 		{
 			hasSurface = true;
 		}
-		if (strcmp(ext.extensionName, VK_KHR_WIN32_SURFACE_EXTENSION_NAME) == 0)
+		// Check the platform-specific surface extension (second in the list)
+		if (requiredExts.size() > 1 && strcmp(ext.extensionName, requiredExts[1]) == 0)
 		{
-			hasWin32Surface = true;
+			hasPlatformSurface = true;
 		}
 	}
 
 	EXPECT_TRUE(hasSurface) << "VK_KHR_surface not supported";
-	EXPECT_TRUE(hasWin32Surface) << "VK_KHR_win32_surface not supported";
+	EXPECT_TRUE(hasPlatformSurface) << "Platform surface extension not supported";
 }
 
 TEST_F(VulkanContextTest, InstanceCleanup_NoCrash)
@@ -90,7 +95,7 @@ TEST_F(VulkanContextTest, InstanceCleanup_NoCrash)
 
 	// Instance should clean up on destruction without errors
 	{
-		auto instance = VulkanContext::CreateInstance();
+		auto instance = VulkanContext::CreateInstance(*m_platform);
 	}
 	// If we get here without crash, cleanup worked
 	SUCCEED();

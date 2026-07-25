@@ -63,6 +63,7 @@ add_executable(neurus_test
 target_link_libraries(neurus_test PRIVATE
 	neurus_scene
 	neurus_app
+	neurus_platform
 	neurus_render
 	neurus_editor
 	neurus_ui
@@ -80,8 +81,13 @@ target_include_directories(neurus_test PRIVATE
 	${CMAKE_SOURCE_DIR}/test
 )
 
+# Compute relative path from CMAKE_BINARY_DIR to source root for
+# reference image resolution at CTest CWD (WORKING_DIRECTORY below).
+file(RELATIVE_PATH TEST_RELATIVE_PROJECT_DIR "${CMAKE_BINARY_DIR}" "${CMAKE_SOURCE_DIR}")
+
 target_compile_definitions(neurus_test PRIVATE
 	TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+	TEST_RELATIVE_PROJECT_DIR="${TEST_RELATIVE_PROJECT_DIR}"
 	GLM_FORCE_DEPTH_ZERO_TO_ONE
 )
 
@@ -122,9 +128,21 @@ if(TARGET shaderc_shared)
 	)
 endif()
 
-# Register tests with CTest
+# Copy res/ to the build directory so tests can access assets from CWD
+# (ctest runs from CMAKE_BINARY_DIR; no relative path probing needed)
+add_custom_command(TARGET neurus_test POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+		"${CMAKE_SOURCE_DIR}/res"
+		"${CMAKE_BINARY_DIR}/res"
+	COMMENT "Copying res/ to build directory for test access"
+)
+
+# Register tests with CTest.
+# WORKING_DIRECTORY pinned to CMAKE_BINARY_DIR so res/ (copied there by
+# POST_BUILD) is always resolvable relative to CWD.
 include(GoogleTest)
 gtest_discover_tests(neurus_test
 	TEST_PREFIX "Neurus."
 	DISCOVERY_TIMEOUT 30
+	WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
 )

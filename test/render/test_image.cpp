@@ -1,5 +1,5 @@
 // Must define platform before including Vulkan headers
-#define VK_USE_PLATFORM_WIN32_KHR
+
 
 #include "shared/TestVulkanShared.h"
 

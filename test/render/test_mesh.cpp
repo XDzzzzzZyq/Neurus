@@ -10,7 +10,7 @@
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
  */
 
-#define VK_USE_PLATFORM_WIN32_KHR
+
 
 #include <gtest/gtest.h>
 

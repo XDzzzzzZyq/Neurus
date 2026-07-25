@@ -1,5 +1,6 @@
 #pragma once
 
+#include "platform/PlatformSurface.h"
 #include "UIPanel.h"
 
 #include <glm/glm.hpp>
@@ -13,8 +14,8 @@ class QWheelEvent;
 namespace neurus {
 
 /**
- * @brief A QWidget subclass that exposes a native Win32 window handle (HWND)
- *        for Vulkan surface creation via VK_KHR_win32_surface.
+ * @brief A QWidget subclass that exposes a native window handle
+ *        for Vulkan surface creation.
  *
  * Sets WA_NativeWindow and WA_OpaquePaintEvent attributes to ensure the widget
  * has a dedicated native window handle and Qt does not draw a background behind
@@ -30,8 +31,8 @@ namespace neurus {
  * its own button state and mouse position internally; it no longer calls
  * Input::Record*().
  *
- * @note This class owns no Vulkan resources. It provides the HWND only;
- *       surface creation is the Renderer's responsibility.
+ * @note This class owns no Vulkan resources. It provides the native window
+ *       handle only; surface creation is the Renderer's responsibility.
  */
 class Viewport : public UIPanel
 {
@@ -63,14 +64,14 @@ public:
 	Viewport& operator=(const Viewport&) = delete;
 
 	/**
-	 * @brief Returns the native Win32 window handle (HWND).
-	 * @return HWND of the underlying native window.
+	 * @brief Returns the native window handle.
+	 * @return NativeWindowHandle of the underlying native window.
 	 *
 	 * The handle is obtained via winId() and is valid once the widget is
-	 * shown or realize()d. Pass this to the Renderer for surface creation
-	 * via vk::Win32SurfaceCreateInfoKHR.
+	 * shown or realize()d. Pass this to the PlatformSurface for surface
+	 * creation.
 	 */
-	HWND hwnd() const { return reinterpret_cast<HWND>(winId()); }
+	NativeWindowHandle hwnd() const { return reinterpret_cast<NativeWindowHandle>(winId()); }
 
 signals:
 	/**
