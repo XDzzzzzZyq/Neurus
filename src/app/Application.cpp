@@ -30,13 +30,12 @@
 #include "editor/events/UIEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/InputEvents.h"
+#include "scene/Scene.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
 #include "render/Screenshot.h"
 #include "render/Texture.h"
 #include "render/shaders/ShaderLibrary.h"
-#include "asset/Project.h"
-#include "scene/Scene.h"
 #include "ui/UIManager.h"
 #include "ui/UIContext.h"
 #include "ui/panels/Outliner.h"
@@ -110,10 +109,7 @@ int Application::Run()
 		return -1;
 	}
 
-	auto project = LoadProject();
-	auto& scene = project->GetScene();
-
-	if (!InitRenderer(*project))
+	if (!InitRenderer())
 	{
 		return -1;
 	}
@@ -131,7 +127,29 @@ int Application::Run()
 			app_vkContext->device(),
 			app_vkContext->physicalDevice()));
 
-	InitEditor(std::move(project));
+	// Now renderer + uploadManager exist — safe to create Editor
+	InitEditor();
+
+	const auto projectPath = resolveResourcePath("shadow.neurus.json").toStdString();
+	const auto assetDir = resolveResourcePath("").toStdString();
+	const auto objPath = resolveResourcePath("obj/sphere.obj").toStdString();
+
+	try
+	{
+		app_editor->LoadProject(projectPath, assetDir);
+		NEURUS_LOG("[Application] Loaded project: " << projectPath);
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
+		app_editor->CreateDefaultScene(objPath);
+		// Store relative paths in the project file for portability
+		for (auto& [id, mesh] : app_editor->GetScene().mesh_list)
+			mesh->o_meshPath = "obj/sphere.obj";
+		// Save for future runs
+		try { app_editor->SaveProject(projectPath); }
+		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
+	}
 
 	app_mainWindow->show();
 	ResizeViewport(app_mainWindow->getViewportWidth(), app_mainWindow->getViewportHeight());
@@ -199,45 +217,10 @@ bool Application::InitVulkan()
 }
 
 // =========================================================================
-// LoadProject – load existing or create default, upload meshes
-// =========================================================================
-
-std::unique_ptr<project::Project> Application::LoadProject()
-{
-	const QString projectFilePath = resolveResourcePath("shadow.neurus.json"); // Temporarily used for Rendering development and test.
-	const QString objFilePath = resolveResourcePath("obj/sphere.obj");
-	auto project = std::make_unique<neurus::project::Project>(neurus::project::Project::New());
-
-	try
-	{
-		*project = neurus::project::Project::Open(projectFilePath.toStdString(),
-		                                          resolveResourcePath("").toStdString());
-		NEURUS_LOG("[Application] Loaded project: " << projectFilePath.toStdString());
-	}
-	catch (const std::exception& e)
-	{
-		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
-		project = std::make_unique<neurus::project::Project>(
-			neurus::project::Project::CreateDefault(objFilePath.toStdString()));
-		// Store relative paths in the project file for portability
-		for (auto& [id, mesh] : project->GetScene().mesh_list)
-		{
-			mesh->o_meshPath = "obj/sphere.obj";
-		}
-		// Save for future runs
-		try { project->Save(projectFilePath.toStdString()); }
-		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
-	}
-
-	// GPU resources created lazily by RenderCache on first use
-	return project;
-}
-
-// =========================================================================
 // InitRenderer – deferred renderer + light upload
 // =========================================================================
 
-bool Application::InitRenderer(const project::Project& project)
+bool Application::InitRenderer()
 {
 	try
 	{
@@ -280,12 +263,10 @@ void Application::ResizeViewport(int width, int height)
 // InitEditor – editor with project ownership transfer
 // =========================================================================
 
-void Application::InitEditor(std::unique_ptr<project::Project> project)
+void Application::InitEditor()
 {
-	auto& scene = project->GetScene();  // Grab reference before ownership transfer
 	app_editor = std::make_unique<neurus::Editor>(app_renderer.get(), app_uploadManager.get());
-	app_editor->SetProject(std::move(project));
-	app_editor->Initialize(scene);
+	app_editor->Initialize();
 	NEURUS_LOG("[Application] Editor initialized, IBL handled by Editor");
 }
 

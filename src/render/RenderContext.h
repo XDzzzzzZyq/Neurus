@@ -51,8 +51,8 @@ struct RenderContext
 	const UID* scene = nullptr;
 
 	/// @brief Opaque pointer to RenderConfig (lifetime managed by Editor/UI layer).
-	/// Passes cast to RenderConfig* to read quality/feature flags set by the user.
-	void* config = nullptr;
+	/// Passes cast to const RenderConfig* to read quality/feature flags set by the user.
+	const void* config = nullptr;
 };
 
 } // namespace neurus

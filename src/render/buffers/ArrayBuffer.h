@@ -143,7 +143,7 @@ public:
 		// --- Copy old content into new buffer (if any) ---
 		if (m_buffer && m_size > 0)
 		{
-			const uint32_t copyElements = std::min(m_size, newSize);
+			const uint32_t copyElements = (std::min)(m_size, newSize);
 			const vk::DeviceSize copyBytes = static_cast<vk::DeviceSize>(copyElements) * sizeof(T);
 
 			if (copyBytes > 0)
