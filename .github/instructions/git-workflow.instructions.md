@@ -20,9 +20,10 @@
 ## Lessons Learned
 
 **CRITICAL: Work exclusively in the worktree.**
-- The main workspace (`D:\Projects\Neurus`) stays on `master` and must remain clean.
+- The main workspace stays on `master` and must remain clean.
 - All file edits, commits, and builds for feature work happen inside the worktree directory.
 - Do NOT switch branches in the main workspace - use the worktree for isolation.
+- Do NOT create worktree in `~/.config/opencode/*`, create the worktree adjacent to the main workspace. (e.g. `../Neurus_feature_name`)
 
 **Merge conflicts are expected.**
 - When `master` has progressed (new features added after your branch point), merge conflicts will occur.

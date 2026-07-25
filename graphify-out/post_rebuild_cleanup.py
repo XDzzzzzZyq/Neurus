@@ -8,7 +8,7 @@ Called by git hooks after _rebuild_code() completes. Transforms the raw
 Usage:
     python graphify-out/post_rebuild_cleanup.py
 
-Must be run from the project root (D:\\Projects\\Neurus).
+Must be run from the project root.
 """
 
 import json
