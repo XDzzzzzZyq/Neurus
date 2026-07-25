@@ -31,23 +31,18 @@ namespace neurus {
 
 UploadManager::UploadManager(const vk::raii::Device& device,
                              const vk::raii::PhysicalDevice& physicalDevice,
-                             vk::Queue graphicsQueue,
-                             uint32_t graphicsQueueFamily,
                              vk::Queue transferQueue,
                              uint32_t transferQueueFamily)
 	: um_device(&device)
 	, um_physicalDevice(&physicalDevice)
-	, um_graphicsQueue(graphicsQueue)
-	, um_graphicsQueueFamily(graphicsQueueFamily)
 	, um_transferQueue(transferQueue)
 	, um_transferQueueFamily(transferQueueFamily)
 {
-	vk::CommandPoolCreateInfo poolInfo({}, graphicsQueueFamily);
+	vk::CommandPoolCreateInfo poolInfo({}, transferQueueFamily);
 	poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
 	um_commandPool = vk::raii::CommandPool(device, poolInfo);
 
-	NEURUS_LOG("[UploadManager] Created with graphics queue family "
-	           << graphicsQueueFamily << ", transfer queue family " << transferQueueFamily);
+	NEURUS_LOG("[UploadManager] Created with transfer queue family " << transferQueueFamily);
 }
 
 UploadManager::~UploadManager()
@@ -128,7 +123,9 @@ MeshGPU UploadManager::UploadMesh(const Mesh& mesh)
 	               static_cast<uint32_t>(vertexCount), static_cast<uint32_t>(indexCount)};
 }
 
-EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
+EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env,
+                                                 vk::Queue graphicsQueue,
+                                                 uint32_t graphicsQueueFamily)
 {
 	// --- 0. Lazy-init IBLPass ---
 	if (!um_iblPass)
@@ -231,7 +228,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	auto specularSampler = vk::raii::Sampler(*um_device, samplerCI);
 
 	// --- 5. Run IBL convolution (needs graphics queue for compute dispatches) ---
-	um_iblPass->Generate(um_graphicsQueue, um_graphicsQueueFamily, equirectImage, *diffuseImage, *specularImage);
+	um_iblPass->Generate(graphicsQueue, graphicsQueueFamily, equirectImage, *diffuseImage, *specularImage);
 
 	// --- 6. Wrap in Textures and return ---
 	EnvironmentGPU gpu;

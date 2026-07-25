@@ -32,8 +32,6 @@ struct LightGPU;         // render/resources/LightGPU.h
 	 *
 	 * @param device               Logical device.
 	 * @param physicalDevice       Physical device (for buffer memory queries).
-	 * @param graphicsQueue        Graphics queue (used by IBL compute dispatches).
-	 * @param graphicsQueueFamily  Graphics queue family index.
 	 * @param transferQueue        Transfer queue for staging uploads.
 	 * @param transferQueueFamily  Transfer queue family index.
 	 */
@@ -42,8 +40,6 @@ struct LightGPU;         // render/resources/LightGPU.h
 	public:
 		UploadManager(const vk::raii::Device& device,
 		              const vk::raii::PhysicalDevice& physicalDevice,
-		              vk::Queue graphicsQueue,
-		              uint32_t graphicsQueueFamily,
 		              vk::Queue transferQueue,
 		              uint32_t transferQueueFamily);
 	~UploadManager();
@@ -60,7 +56,9 @@ struct LightGPU;         // render/resources/LightGPU.h
 	MeshGPU UploadMesh(const Mesh& mesh);
 
 	/** @brief Upload environment map to GPU. Generates diffuse + specular cubemaps. */
-	EnvironmentGPU UploadEnvironment(const Environment& env);
+	EnvironmentGPU UploadEnvironment(const Environment& env,
+	                                 vk::Queue graphicsQueue,
+	                                 uint32_t graphicsQueueFamily);
 
 	/** @brief Upload light shadow resources to GPU. Creates shadow depth map. */
 	LightGPU UploadLight(const Light& light);
@@ -113,8 +111,6 @@ private:
 	const vk::raii::Device* um_device = nullptr;
 	const vk::raii::PhysicalDevice* um_physicalDevice = nullptr;
 	vk::raii::CommandPool um_commandPool{ nullptr };
-	vk::Queue um_graphicsQueue = nullptr;
-	uint32_t um_graphicsQueueFamily = 0;
 	vk::Queue um_transferQueue = nullptr;
 	uint32_t um_transferQueueFamily = 0;
 

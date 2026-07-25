@@ -553,7 +553,9 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 		return;
 	}
 
-	auto envGPU = ed_uploadManager->UploadEnvironment(*env);
+	auto envGPU = ed_uploadManager->UploadEnvironment(*env,
+	    ed_renderer->GetGraphicsQueue(),
+	    ed_renderer->GetGraphicsQueueFamily());
 	ed_renderer->GetRenderCache().UseEnvironmentGPU(env->GetObjectID(), std::move(envGPU));
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
