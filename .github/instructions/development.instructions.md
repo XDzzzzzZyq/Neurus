@@ -111,9 +111,9 @@ Wire everything into the render loop and editor:
 ## Phase 3: Verify (PER WAVE, non-negotiable)
 
 ```powershell
-cmake --build build/debug                       # 0 errors
+cmake --build build --config Debug                # 0 errors
 make check                                       # ALL pass, including regression
-$output = & "build/debug/Debug/Neurus.exe" 2>&1 # capture output
+$output = & "build/Debug/Neurus.exe" 2>&1        # capture output
 $output | Select-String "VUID-"                  # ZERO matches
 ```
 
@@ -145,7 +145,7 @@ Bugs encountered during Sun Light implementation and their fixes:
 | Build race condition | EXE locked by another process | Two agents building simultaneously; one holds file lock while other tries to write | Only one agent runs build + tests; all others compile-check only via `lsp_diagnostics` |
 | Depth range wrong | Shadow map depth values off by 2x | `glm::ortho()` defaults to OpenGL depth range [-1,1] | Define `GLM_FORCE_DEPTH_ZERO_TO_ONE` before any GLM include |
 | Shadow intensity all zero | No shadow on any pixel | `sampler2DShadow` comparison mode not enabled on sampler | Set `VK_COMPARE_OP_LESS_OR_EQUAL` in sampler create info |
-| Stale reference from wrong cwd | Reference images created at `D:\Projects\test\render\reference\` instead of `test/render/reference/` | Running test binary from `build/debug/` instead of `build/debug/test/` changes `../../../res/` path resolution | Always use `ctest` from `build/debug/`, or cd to `build/debug/test/` before running the test binary directly |
+| Stale reference from wrong cwd | Reference images created at `D:\Projects\test\render\reference\` instead of `test/render/reference/` | Running test binary from outside the CTest working directory causes resource path resolution to differ (resources are copied to `CMAKE_BINARY_DIR/res/`) | Always use `ctest -C Debug` from `build/`, or cd to `build/` before running the test binary directly |
 
 ## Phase 5: Commit
 

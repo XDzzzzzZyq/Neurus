@@ -15,15 +15,14 @@
 git clone --recurse-submodules https://github.com/XDzzzzzZyq/Neurus.git
 cd Neurus
 
-# Download pre-compiled dependency libraries + configure
+# Init submodules, download pre-compiled deps, configure CMake
 make update
 
 # Build debug
-cmake --build build/debug
+cmake --build build --config Debug
 
 # Build release
-cmake --preset release
-cmake --build build/release
+cmake --preset win && cmake --build build --config Release
 
 # Generate VS 2022 solution (outside source tree)
 make nobuild
@@ -63,7 +62,7 @@ python utils/git-sync-deps
 ## CI
 
 - See `.github/workflows/ci.yml` for the exact matrix and steps.
-- CI runs Windows x64 only. GPU tests are excluded from CI.
+- CI runs Windows x64 and macOS arm64. GPU tests are excluded from CI.
 - CI attempts to fetch pre-compiled dependencies first; falls back to source build on failure.
 
 ## Testing
@@ -71,7 +70,7 @@ python utils/git-sync-deps
 - Framework: Google Test
 - Non-GPU tests run in CI (UIEvents, EventQueue, EditorContext)
 - GPU tests require a Vulkan 1.4-capable device
-- Run all tests: `make check` (or `cd build/debug && ctest --output-on-failure`)
+- Run all tests: `make check` (or `cd build && ctest -C Debug --output-on-failure`)
 - Run specific tests: `make check FILTER="-R DeferredShading"`
 - Build only the test binary: `make build test` (or `make test`)
 - On local machine, launch `Neurus.exe` to check terminal output and runtime errors.
