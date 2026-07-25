@@ -89,6 +89,6 @@ help:
 
 update:
 	git submodule update --init --recursive
-	$(PYTHON) scripts/setup_dependencies.py
+	-$(PYTHON) scripts/setup_dependencies.py
 	cmake --preset $(PRESET) $(if $(BINARY_DIR),-B $(BINARY_DIR),)
 	@echo ""
