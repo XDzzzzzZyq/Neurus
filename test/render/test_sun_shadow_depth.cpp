@@ -6,7 +6,7 @@
  * Z-up convention: +Y=forward, +Z=up. Sun dir=(0,1,0)=+Y, light at origin,
  * ortho field=2.5, near=-10, far=10.
  * Camera: eye = center - sunDir * farPlane = (0,-10,0), looks at center=(0,0,0).
- * GLM_FORCE_DEPTH_ZERO_TO_ONE â†’ left-handed view (Vz = +y + 10).
+ * GLM_FORCE_DEPTH_ZERO_TO_ONE â†?left-handed view (Vz = +y + 10).
  * Quad at y=-5 (5 units from eye toward center), Vz = 5.
  * NDC Z = (Vz - near) / (far - near) = (5 - (-10)) / 20 = 15/20 = 0.75
  * Quad spans full field to fill shadow map.
@@ -15,6 +15,7 @@
 
 #include <gtest/gtest.h>
 #include "shared/TestVulkanShared.h"
+#include "render/shaders/RenderShader.h"
 #include "render/passes/ShadowDepthPass.h"
 #include "render/RenderContext.h"
 #include "render/RenderCache.h"
@@ -45,7 +46,7 @@ protected:
 	static constexpr float    kField = Light::sun_shadow_field;   // 2.5
 	static constexpr float    kNear  = Light::sun_shadow_near;    // -10
 	static constexpr float    kFar   = Light::sun_shadow_far;     // 10
-	static constexpr float    kQuadY = -5.f;   // world-space y (quad at Y=-5, 5 units forward from eye â€” Z-up)
+	static constexpr float    kQuadY = -5.f;   // world-space y (quad at Y=-5, 5 units forward from eye â€?Z-up)
 	static constexpr float    kQSize = 2.5f;   // half-width (quad = 5x5, fills full field)
 	static constexpr float    kTol   = 3.f / 255.f;
 
@@ -59,7 +60,7 @@ protected:
 
 	static float ExpectedDepth() {
 		// Z-up: camera at Y=-10 looking +Y, quad at Y=-5.
-		// GLM_FORCE_DEPTH_ZERO_TO_ONE â†’ left-handed view: +Z = forward.
+		// GLM_FORCE_DEPTH_ZERO_TO_ONE â†?left-handed view: +Z = forward.
 		// Vz = world_y - eye_y = -5 - (-10) = 5 (in view-space)
 		// ndc = (Vz - near) / (far - near) = (5 - (-10)) / 20 = 15/20 = 0.75
 		float Vz = kQuadY + kFar;  // -5 + 10 = 5

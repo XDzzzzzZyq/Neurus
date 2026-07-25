@@ -26,6 +26,7 @@
 #include <gtest/gtest.h>
 
 #include "shared/TestVulkanShared.h"
+#include "render/shaders/RenderShader.h"
 #include "shared/TestMultiShadow.h"
 
 // --- Render layer ---

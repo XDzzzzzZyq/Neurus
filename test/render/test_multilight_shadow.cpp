@@ -3,14 +3,14 @@
  * @brief TDD reference-image regression test for multi-light shadow rendering.
  *
  * Renders a cube-on-plane scene with 2 shadow-casting point lights through
- * the full deferred pipeline (ShadowDepthPass â†’ GeometryPass â†’ ShadowIntensityPass
- * â†’ LightingPass) and validates HDRColor output via reference image regression.
+ * the full deferred pipeline (ShadowDepthPass â†?GeometryPass â†?ShadowIntensityPass
+ * â†?LightingPass) and validates HDRColor output via reference image regression.
  *
  * Reference image pattern:
- *   - First run: generates reference PNG â†’ GTEST_SKIP
- *   - Second run: compares pixel-by-pixel with Â±2 tolerance â†’ PASS/FAIL
+ *   - First run: generates reference PNG â†?GTEST_SKIP
+ *   - Second run: compares pixel-by-pixel with Â±2 tolerance â†?PASS/FAIL
  *
- * This is the RED phase of TDD â€” the test compiles and runs but the shadow
+ * This is the RED phase of TDD â€?the test compiles and runs but the shadow
  * passes initially only handle a single light.  The reference generated on first run will reflect
  * single-shadow behaviour.  When shadow pass loops are implemented
  * (Wave 2-3), the reference must be regenerated.
@@ -21,6 +21,8 @@
 #include <gtest/gtest.h>
 
 #include "shared/TestVulkanShared.h"
+#include "render/shaders/ComputeShader.h"
+#include "render/shaders/RenderShader.h"
 #include "shared/TestMultiShadow.h"
 
 // --- Render layer ---
@@ -117,7 +119,7 @@ protected:
 };
 
 // ===========================================================================
-// TwoShadowLights_HDRColorReference â€” reference image regression
+// TwoShadowLights_HDRColorReference â€?reference image regression
 // ===========================================================================
 
 TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
@@ -157,7 +159,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
-	// renderItems removed â€” ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed â€?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -176,9 +178,9 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	// -------------------------------------------------------------------
 	// Step 5: Record all passes in a single command buffer
-	//         Order: ShadowDepth (independent) â†’ Geometry (writes G-Buffer)
-	//                â†’ ShadowIntensity (reads Position + cubemap)
-	//                â†’ Lighting (reads G-Buffer + shadow intensity)
+	//         Order: ShadowDepth (independent) â†?Geometry (writes G-Buffer)
+	//                â†?ShadowIntensity (reads Position + cubemap)
+	//                â†?Lighting (reads G-Buffer + shadow intensity)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
@@ -212,7 +214,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	if (refResult < 0)
 	{
-		// First run â€” reference generated (return -1) or load failure (-2)
+		// First run â€?reference generated (return -1) or load failure (-2)
 		if (refResult == -1)
 			GTEST_SKIP() << "Reference images generated.  Re-run the test to compare.";
 		else
@@ -220,13 +222,13 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	}
 	else
 	{
-		// Second run â€” compare against reference
+		// Second run â€?compare against reference
 		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=Â±2)";
 	}
 }
 
 // ===========================================================================
-// TwoLights_NoVUID â€” smoke test (pipeline runs without crash)
+// TwoLights_NoVUID â€?smoke test (pipeline runs without crash)
 // ===========================================================================
 
 TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
@@ -251,7 +253,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	// renderItems removed â€” ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed â€?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -281,7 +283,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 }
 
 // ===========================================================================
-// ShadowIntensityReadback â€” verify per-light shadow intensity data
+// ShadowIntensityReadback â€?verify per-light shadow intensity data
 // ===========================================================================
 
 /**
@@ -289,7 +291,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
  *
  * Uses the same manual staging-buffer readback pattern established in
  * test_shadow_intensity.cpp.  Validates that shadow intensity images
- * contain both shadowed (==1.0) and lit (==0.0) pixels â€” an all-zero
+ * contain both shadowed (==1.0) and lit (==0.0) pixels â€?an all-zero
  * or all-one result indicates a broken shadow evaluation path.
  */
 TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
@@ -318,7 +320,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	// renderItems removed â€” ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed â€?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -328,7 +330,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 		*m_renderCache, renderExtent, *this);
 
 	// -------------------------------------------------------------------
-	// Run ONLY ShadowDepth â†’ Geometry â†’ ShadowIntensity (NO LightingPass)
+	// Run ONLY ShadowDepth â†?Geometry â†?ShadowIntensity (NO LightingPass)
 	// to isolate whether LightingPass corrupts shadow intensity data.
 	// -------------------------------------------------------------------
 	{
@@ -336,7 +338,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 		m_geometryPass->Record(*cmd, *m_renderCache, ctx);
 		m_shadowIntensityPass->Record(*cmd, *m_renderCache, ctx);
-		// NO LightingPass here â€” pure isolation test
+		// NO LightingPass here â€?pure isolation test
 		EndSubmitWait(cmd);
 	}
 
@@ -397,10 +399,10 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 		// on the plane) and some to be lit (the plane outside the shadow).
 		// The exact counts depend on geometry but zero shadowed pixels is always wrong.
 		EXPECT_GT(shadowed, 0)
-			<< "Light " << lightUID << " shadow intensity is ALL ZERO â€” "
+			<< "Light " << lightUID << " shadow intensity is ALL ZERO â€?"
 			<< "shadow evaluation pass may be broken (G-Buffer Position, cubemap depth, or dispatch)";
 		EXPECT_GT(lit, 0)
-			<< "Light " << lightUID << " shadow intensity is ALL ONE â€” "
+			<< "Light " << lightUID << " shadow intensity is ALL ONE â€?"
 			<< "unlikely, check bias/farPlane parameters";
 	}
 
@@ -408,15 +410,15 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 }
 
 // ===========================================================================
-// ShadowIntensityPerLight_ReferenceImage â€” per-light shadow intensity regression
+// ShadowIntensityPerLight_ReferenceImage â€?per-light shadow intensity regression
 // ===========================================================================
 
 /**
  * @brief Captures per-light ShadowIntensity images as PNGs and verifies
  *        they are not all-black nor all-white.
  *
- * Runs the full deferred+PBR pipeline (ShadowDepth â†’ Geometry â†’
- * ShadowIntensity â†’ Lighting) with 2 lights, then reads back each
+ * Runs the full deferred+PBR pipeline (ShadowDepth â†?Geometry â†?
+ * ShadowIntensity â†?Lighting) with 2 lights, then reads back each
  * light's ShadowIntensity (R8_UNORM) attachment through a staging
  * buffer.  Saves the captured data as a reference PNG and uses the
  * first-run-generates / second-run-compares pattern.  Additionally
@@ -449,7 +451,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	// renderItems removed â€” ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed â€?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
@@ -467,7 +469,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	}
 
 	// -------------------------------------------------------------------
-	// Run full pipeline (ShadowDepth â†’ Geometry â†’ ShadowIntensity â†’ Lighting)
+	// Run full pipeline (ShadowDepth â†?Geometry â†?ShadowIntensity â†?Lighting)
 	// -------------------------------------------------------------------
 	{
 		auto& cmd = BeginCmd();
@@ -534,7 +536,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 
 		if (refResult < 0)
 		{
-			// First run â€” reference generated
+			// First run â€?reference generated
 			if (refResult == -1)
 				anyGenerated = true;
 			else
@@ -581,7 +583,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 }
 
 // ===========================================================================
-// SunLights_HDRColorReference â€” full deferred pipeline with sun shadows
+// SunLights_HDRColorReference â€?full deferred pipeline with sun shadows
 // ===========================================================================
 
 /**
@@ -591,7 +593,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
  *
  * Uses TestMultiShadow with LightType::SUNLIGHT to generate a ring of
  * directional sun lights pointing toward the cube centre.  The full pipeline
- * (ShadowDepth â†’ Geometry â†’ ShadowIntensity â†’ Lighting) runs and the final
+ * (ShadowDepth â†?Geometry â†?ShadowIntensity â†?Lighting) runs and the final
  * HDRColor attachment is captured for regression testing.
  */
 TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
@@ -642,7 +644,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
-	// renderItems removed â€” ShadowDepthPass iterates scene.mesh_list directly
+	// renderItems removed â€?ShadowDepthPass iterates scene.mesh_list directly
 	ctx.scene        = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
