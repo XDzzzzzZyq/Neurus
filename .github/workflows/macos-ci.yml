@@ -42,19 +42,12 @@ jobs:
           cd dep/shaderc
           python3 utils/git-sync-deps
 
-      - name: Set build directory
-        run: |
-          BUILD_SUBDIR=${{ matrix.configuration == 'Debug' && 'debug' || 'release' }}
-          CMAKE_PRESET=${{ matrix.configuration == 'Debug' && 'macos' || 'macos-release' }}
-          echo "BUILD_DIR=build/${BUILD_SUBDIR}" >> $GITHUB_ENV
-          echo "CMAKE_PRESET=${CMAKE_PRESET}" >> $GITHUB_ENV
-
       - name: Configure CMake
-        run: cmake --preset ${{ env.CMAKE_PRESET }} -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
+        run: cmake --preset macos -DCMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH"
 
       - name: Build
-        run: cmake --build ${{ env.BUILD_DIR }} --parallel
+        run: cmake --build build --config ${{ matrix.configuration }} --parallel
 
       - name: Run Non-GPU Tests
-        working-directory: ${{ env.BUILD_DIR }}
-        run: ctest --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"
+        working-directory: build
+        run: ctest -C ${{ matrix.configuration }} --output-on-failure -E "Vulkan|Shader|Swapchain|Renderer"
