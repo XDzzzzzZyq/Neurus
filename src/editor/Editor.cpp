@@ -169,6 +169,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
 	});
 
