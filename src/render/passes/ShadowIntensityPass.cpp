@@ -597,7 +597,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.jitterX       = ctx.jitter.x;
 			pc.jitterY       = ctx.jitter.y;
 			pc.jitterZ       = ctx.jitter.z;
-			pc.lightRadius   = light->light_radius;
+			pc.lightRadius   = light->light_radius / (2.0f * Light::sun_shadow_field);
 			pc.alpha         = ComputeShadowAlpha(alphaMode, ctx.iteration);
 			pc.frameCount    = static_cast<int32_t>(ctx.iteration);
 
