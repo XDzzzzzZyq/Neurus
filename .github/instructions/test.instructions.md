@@ -571,6 +571,11 @@ These patterns were established during deferred PBR development and apply to all
   `TestVulkanShared.h` as a static method. Do **not** duplicate vertex structs,
   half-float converters, G-Buffer transition logic, or camera UBO computation
   — they are already centralized.
+- **Temporal shadow tests** (`test_temporal_shadow.cpp`): Pure-logic tests that do NOT
+  require a GPU. Test Halton sequence generation (Halton2/3/5 produce values in [0,1),
+  jitter maps to [-0.5,0.5], and results are deterministic). Test `ComputeShadowAlpha`
+  for both FixedEMA (alpha=1/8) and MovingAvg (alpha=1/(frameCount+1)) modes, verifying
+  frame 0 always returns alpha=1 (overwrite). Run in CI.
 
 ## Common Pitfalls Summary
 

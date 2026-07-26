@@ -251,6 +251,26 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.02) via `ctx.config`.
 - **Shadow mode**: Supports `HARD`, `SOFT_PCF_16`, `SOFT_PCF_64` modes matching point light shadow pipeline
 
+### Temporal Shadow Accumulation Convention
+
+- **Jitter**: Per-frame 3D random direction (unit-ball vector from Halton(2,3,5)) applied
+  as `pos_jittered = pos + light.radius * jitter` for point lights, and as UV-space
+  offset `shadowUV + vec2(jitter.x, jitter.y) * uvRadius` for sun lights.
+- **Accumulation**: In-place read-modify-write on the ShadowIntensity layered array.
+  The compute shader reads the previous accumulated value via `imageLoad`, evaluates
+  a single jittered shadow sample, and blends via EMA (exponential moving average)
+  using `mix(prevAccum, sample, alpha)`, writing back via `imageStore`.
+- **Alpha modes**: Two blend modes controlled by `RenderConfig::r_sampling_mode`:
+  - Fixed EMA (0): `alpha = 1/8` — fast convergence
+  - Moving Average (1): `alpha = 1/(iteration + 1)` — true averaging, resets on scene change
+- **Iteration**: Global frame counter `m_iteration` in `DeferredRenderer`, exposed
+  via `RenderContext::iteration`. Editor resets it through the event system when
+  the scene changes — see `RenderResetEvent` in `events.instructions.md`.
+- **Reset**: Any scene-changing event (camera move, light change, object transform,
+  visibility toggle, config change, project load, asset import) enqueues
+  `RenderResetEvent`. The Editor subscribes and calls
+  `DeferredRenderer::ResetShadowAccumulation()` → sets `m_iteration = 0`.
+
 ### FXAA Convention
 - **Algorithm**: NVIDIA FXAA 3.11, ported from cuda-vision full-iteration approach
 - **Pipeline**: Two compute dispatches per frame: edge detection (Sobel gradient, subpixel offset) → edge-line iteration (march along edge, check 3 rows per step: center/upper/lower) → endpoint interpolation → bilinear resample
