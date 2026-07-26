@@ -29,7 +29,7 @@ CodeEditor::CodeEditor(QWidget* parent)
     updateLineNumberAreaWidth();
     setLineNumbersVisible(true);
 
-    QFont font("Consolas", 11);
+    QFont font("Consolas", 10);
     font.setStyleHint(QFont::Monospace);
     setFont(font);
     setTabStopDistance(fontMetrics().horizontalAdvance(' ') * 4);
