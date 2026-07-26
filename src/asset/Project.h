@@ -2,230 +2,112 @@
 
 /**
  * @file Project.h
- * @brief Project layer - the DNA/persistence layer for scene serialization.
+ * @brief Pure registration-based serializer for project persistence.
  *
- * Provides the Project class which encapsulates a Scene and its serialization
- * to/from .neurus.json files via cereal JSON archives. The Project is the
- * top-level serialization unit: it owns the Scene.
+ * Project is a simple component-based serializer. It owns NO data itself —
+ * instead, callers register Serializable components (e.g. SceneComponent,
+ * ConfigComponent) that wrap external objects. Save/Load iterates all
+ * registered components and calls their virtual Save/Load methods.
  *
  * Architecture:
- * - Project owns Scene via unique_ptr (enables move semantics for factory pattern)
- * - New() creates an empty project with default-constructed Scene
- * - Open(path) deserializes from a .neurus.json file
- * - Save(path) / Save() serializes to .neurus.json
- * - IsDirty() tracks unsaved modifications
+ * - Project knows NOTHING about Scene, RenderConfig, or any concrete type.
+ * - Components are registered via Register<T>(args...) and stored as
+ *   unique_ptr<Serializable>.
+ * - Save(path) / Load(path) iterate m_components for serialization.
+ * - Clear() destroys all components.
  *
- * Dependencies: cereal, scene types only (no Qt, Vulkan, or renderer).
+ * Dependencies: cereal, Serializable.h only (no scene/render headers).
  */
 
 #include <memory>
 #include <string>
+#include <vector>
 
-#include <cereal/cereal.hpp>
+#include <cereal/archives/json.hpp>
 
-#include "core/Log.h"
-
-#include "scene/Scene.h"
-#include "render/RenderConfig.h"
+#include "asset/Serializable.h"
 
 namespace neurus::project
 {
 
 /**
- * @brief Top-level project container - owns Scene and handles persistence.
+ * @brief Pure registration-based serializer.
  *
- * Project is the serialization root. It owns the Scene (all scene objects)
- * and tracks file path and dirty state. Factory methods New() and Open()
- * are the only ways to construct a Project; the default constructor is private.
- *
- * Serialization format (cereal JSON):
- * @code
- * {
- *   "project": {
- *     "proj_scene": {
- *       "cam_list": [],
- *       "mesh_list": [],
- *       "light_list": [],
- *       "sprite_list": [],
- *       "dLine_list": [],
- *       "dPoints_list": []
- *     },
- *     "proj_config": {
- *       "r_pipeline": "Deferred",
- *       "r_aa": "None",
- *       ...
- *     }
- *   }
- * }
- * @endcode
+ * Project owns no data. Callers register Serializable components that
+ * wrap external data (Scene, RenderConfig, etc.). Save/Load iterates
+ * all components and calls their virtual methods.
  */
 class Project
 {
 public:
-	// --- Factory methods ---
+	Project() = default;
+
+	// --- Component registration ---
 
 	/**
-	 * @brief Creates a new empty project with a default-constructed Scene.
-	 * @return Project with empty scene pools, no file path, and dirty = false.
+	 * @brief Registers a new Serializable component.
+	 * @tparam T The concrete component type (must inherit Serializable).
+	 * @tparam Args Constructor argument types for T.
+	 * @param args Forwarded to T's constructor.
+	 * @return Reference to the newly created component.
 	 */
-	static Project New();
+	template<typename T, typename... Args>
+	T& Register(Args&&... args)
+	{
+		auto comp = std::make_unique<T>(std::forward<Args>(args)...);
+		T& ref = *comp;
+		m_components.push_back(std::move(comp));
+		return ref;
+	}
+
+	// --- Lifecycle ---
 
 	/**
-	 * @brief Opens an existing project from a .neurus.json file.
-	 * @param path Filesystem path to the .neurus.json file.
-	 * @param assetDir Optional base directory for resolving OBJ mesh paths.
-	 *                 After deserialization, all meshes have ReloadMeshData(assetDir) called
-	 *                 to reload vertex/index buffers from disk. If empty, o_meshPath is used as-is.
-	 * @return Project deserialized from the file with mesh geometry reloaded.
-	 * @throws std::runtime_error if the file cannot be opened.
+	 * @brief Removes all registered components.
 	 */
-	static Project Open(const std::string& path, const std::string& assetDir = "");
-
-	/**
-	 * @brief Creates a default project with camera, sphere mesh, and point light.
-	 *
-	 * Constructs a pre-configured project matching the DefaultScene factory:
-	 *   - Camera: pos(0,2,5), target(0,0,0), FOV 60°, near 0.1, far 100
-	 *   - Mesh:   Loaded from the given OBJ path, default PBR material
-	 *   - Light:  Point light, pos(3,3,3), white, power 10, radius 0.05
-	 *
-	 * @param objPath Path to the sphere.obj file.
-	 * @return Project with a populated default scene.
-	 */
-	static Project CreateDefault(const std::string& objPath);
+	void Clear() { m_components.clear(); }
 
 	// --- Persistence ---
 
 	/**
-	 * @brief Saves the project to the given path as .neurus.json.
+	 * @brief Saves all components to a .neurus.json file.
 	 * @param path Filesystem path for the output file.
 	 * @throws std::runtime_error if the file cannot be created.
-	 * @note Updates proj_filePath and clears the dirty flag on success.
 	 */
-	void Save(const std::string& path);
+	void Save(const std::string& path) const;
 
 	/**
-	 * @brief Saves the project, overwriting the current file.
-	 * @throws std::runtime_error if no file path has been set (call Save(path) first).
+	 * @brief Loads all components from a .neurus.json file.
+	 * @param path Filesystem path to the .neurus.json file.
+	 * @throws std::runtime_error if the file cannot be opened.
 	 */
-	void Save();
+	void Load(const std::string& path);
 
-	// --- Dirty tracking ---
+private:
+	friend class cereal::access;
 
-	/**
-	 * @brief Returns whether the project has unsaved modifications.
-	 * @return true if the scene has been modified since the last save.
-	 */
-	bool IsDirty() const { return proj_dirty; }
+	// NOTE: save/load cast to JSONArchive because Serializable's virtual
+	// interface is typed to JSON archives. This is compatible with the
+	// .neurus.json format and is safe because cereal calls these methods
+	// with the actual archive type used in Save()/Load().
 
-	/**
-	 * @brief Marks the project as modified (called by editor controllers).
-	 */
-	void MarkDirty() { proj_dirty = true; }
-
-	// --- Scene access ---
-
-	/**
-	 * @brief Returns a mutable reference to the scene.
-	 * @return Reference to the owned Scene.
-	 */
-	Scene& GetScene() { return *proj_scene; }
-
-	/**
-	 * @brief Returns a const reference to the scene.
-	 * @return Const reference to the owned Scene.
-	 */
-	const Scene& GetScene() const { return *proj_scene; }
-
-	// --- Render config access ---
-
-	/**
-	 * @brief Returns a mutable reference to the render configuration.
-	 * @return Reference to the owned RenderConfig.
-	 */
-	RenderConfig& GetRenderConfig() { return proj_config; }
-
-	/**
-	 * @brief Returns a const reference to the render configuration.
-	 * @return Const reference to the owned RenderConfig.
-	 */
-	const RenderConfig& GetRenderConfig() const { return proj_config; }
-
-	// --- File path ---
-
-	/**
-	 * @brief Returns the current project file path.
-	 * @return The path last used for Open() or Save(), or empty string if never saved.
-	 */
-	const std::string& GetFilePath() const { return proj_filePath; }
-
-	// --- Cereal serialization ---
-
-	/**
-	 * @brief Cereal serialization entry point.
-	 * @tparam Archive Cereal archive type (input or output).
-	 * @param ar Archive to serialize to/from.
-	 * @note Serializes scene data and RenderConfig. On input, missing
-	 *       RenderConfig (old file format) defaults to initialized values.
-	 */
 	template<class Archive>
 	void save(Archive& ar) const
 	{
-		ar(cereal::make_nvp("m_scene", *proj_scene),
-		   CEREAL_NVP(proj_config));
+		for (auto& comp : m_components)
+			comp->Save(static_cast<cereal::JSONOutputArchive&>(ar));
 	}
 
 	template<class Archive>
 	void load(Archive& ar)
 	{
-		// Scene — selections field added later, backward-compat
-		try
-		{
-			ar(cereal::make_nvp("m_scene", *proj_scene));
-		}
-		catch (const cereal::Exception& e)
-		{
-			NEURUS_ERR("Project::load: " << e.what()
-				<< " - selections defaulted (old project format).");
-		}
-
-		// If no camera was deserialized, add a default one
-		if (proj_scene->cam_list.empty())
-		{
-			NEURUS_ERR("[Project] No camera in scene, adding default camera.");
-			auto defaultCam = std::make_shared<Camera>();
-			defaultCam->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
-			defaultCam->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-			proj_scene->UseCamera(defaultCam);
-		}
-
-		// Config is optional — old files won't have it
-		try
-		{
-			ar(CEREAL_NVP(proj_config));
-		}
-		catch (const cereal::Exception& e)
-		{
-			NEURUS_ERR("Project::load: " << e.what()
-				<< " - proj_config defaulted (old project format).");
-			proj_config = RenderConfig{};
-		}
+		for (auto& comp : m_components)
+			comp->Load(static_cast<cereal::JSONInputArchive&>(ar));
 	}
 
-private:
-	/**
-	 * @brief Default constructor - private; use New() or Open().
-	 *
-	 * Allocates the owned Scene via unique_ptr to enable move semantics,
-	 * which is required for the factory pattern (New/Open) since UID
-	 * deletes both copy and move on Scene types.
-	 */
-	Project();
-
-	std::unique_ptr<Scene> proj_scene;   ///< Owned scene container (all scene objects)
-	RenderConfig proj_config;           ///< Rendering configuration (persisted alongside scene)
-	std::string proj_filePath;          ///< Path to the .neurus.json file (empty if never saved)
-	bool proj_dirty = false;            ///< Unsaved modifications flag
+	std::vector<std::unique_ptr<Serializable>> m_components;
 };
 
 } // namespace neurus::project
+
+

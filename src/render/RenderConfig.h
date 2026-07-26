@@ -112,7 +112,7 @@ public:
 	// --- Quality parameters ---
 
 	float   r_gamma       = 1.0f;     ///< Gamma correction factor
-	float   r_shadow_bias = 0.0005f;  ///< Depth bias for shadow acne prevention
+	float   r_shadow_bias = 0.02f;  ///< Depth bias for shadow acne prevention
 	int32_t r_ao_ksize    = 16;       ///< AO kernel size (number of samples)
 	float   r_ao_radius   = 0.5f;     ///< AO sample radius in world-space
 	int32_t r_sample_pf   = 128;      ///< Samples per frame for progressive rendering
@@ -161,3 +161,4 @@ public:
 };
 
 } // namespace neurus
+

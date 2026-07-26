@@ -3,10 +3,13 @@
  * @brief Tests loading and validating the default project from res/default.neurus.json.
  *
  * Verifies that the shipped default project file can be loaded without errors
- * and contains the expected scene objects (camera, mesh, light).
+ * and contains the expected scene objects (camera, mesh, light, environment).
  *
- * TDD: RED (test written first) → GREEN (implementation verified).
- * All tests are pure CPU — no GPU required.
+ * Tests use the new component-based Project API: create bare Scene+RenderConfig
+ * objects, register SceneComponent and ConfigComponent, then call Project::Load().
+ *
+ * TDD: RED (test written first) -> GREEN (implementation verified).
+ * All tests are pure CPU -- no GPU required.
  */
 
 #include <gtest/gtest.h>
@@ -14,10 +17,14 @@
 #include <string>
 
 #include "asset/Project.h"
+#include "asset/SceneComponent.h"
+#include "asset/ConfigComponent.h"
+#include "render/RenderConfig.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
+#include "scene/Scene.h"
 
 using namespace neurus;
 
@@ -39,6 +46,25 @@ static std::string DefaultProjectPath()
 }
 
 // -----------------------------------------------------------------------
+// Helper
+// -----------------------------------------------------------------------
+
+/**
+ * @brief Creates a Project serializer with SceneComponent + ConfigComponent bound.
+ *
+ * @param scene   Scene object to deserialize into.
+ * @param config  RenderConfig object to deserialize into.
+ * @return Initialised project::Project ready for Load().
+ */
+static project::Project MakeProject(Scene& scene, RenderConfig& config)
+{
+	project::Project p;
+	p.Register<project::SceneComponent>(scene);
+	p.Register<project::ConfigComponent>(config);
+	return p;
+}
+
+// -----------------------------------------------------------------------
 // DefaultProject: Loads without exception
 // -----------------------------------------------------------------------
 
@@ -47,8 +73,11 @@ static std::string DefaultProjectPath()
  */
 TEST(DefaultProject, LoadsWithoutException)
 {
+	Scene scene;
+	RenderConfig config;
 	EXPECT_NO_THROW({
-		auto project = project::Project::Open(DefaultProjectPath());
+		auto p = MakeProject(scene, config);
+		p.Load(DefaultProjectPath());
 	});
 }
 
@@ -62,12 +91,13 @@ TEST(DefaultProject, LoadsWithoutException)
  */
 TEST(DefaultProject, HasCamera)
 {
-	auto project = project::Project::Open(DefaultProjectPath());
-	auto& scene = project.GetScene();
-
+	Scene scene;
+	RenderConfig config;
+	{
+		auto p = MakeProject(scene, config);
+		p.Load(DefaultProjectPath());
+	}
 	EXPECT_GE(scene.cam_list.size(), 1u);
-
-	// Verify the first camera has correct type and sensible parameters
 	auto* cam = scene.cam_list.begin()->second.get();
 	ASSERT_NE(cam, nullptr);
 	EXPECT_EQ(cam->o_type, ObjectID::GOType::GO_CAM);
@@ -86,11 +116,13 @@ TEST(DefaultProject, HasCamera)
  */
 TEST(DefaultProject, HasMesh)
 {
-	auto project = project::Project::Open(DefaultProjectPath());
-	auto& scene = project.GetScene();
-
+	Scene scene;
+	RenderConfig config;
+	{
+		auto p = MakeProject(scene, config);
+		p.Load(DefaultProjectPath());
+	}
 	EXPECT_GE(scene.mesh_list.size(), 1u);
-
 	auto* mesh = scene.mesh_list.begin()->second.get();
 	ASSERT_NE(mesh, nullptr);
 	EXPECT_EQ(mesh->o_type, ObjectID::GOType::GO_MESH);
@@ -107,11 +139,13 @@ TEST(DefaultProject, HasMesh)
  */
 TEST(DefaultProject, HasLight)
 {
-	auto project = project::Project::Open(DefaultProjectPath());
-	auto& scene = project.GetScene();
-
+	Scene scene;
+	RenderConfig config;
+	{
+		auto p = MakeProject(scene, config);
+		p.Load(DefaultProjectPath());
+	}
 	EXPECT_GE(scene.light_list.size(), 1u);
-
 	auto* light = scene.light_list.begin()->second.get();
 	ASSERT_NE(light, nullptr);
 	EXPECT_EQ(light->o_type, ObjectID::GOType::GO_LIGHT);
@@ -128,35 +162,14 @@ TEST(DefaultProject, HasLight)
  */
 TEST(DefaultProject, HasEnvironment)
 {
-	auto project = project::Project::Open(DefaultProjectPath());
-	auto& scene = project.GetScene();
+	Scene scene;
+	RenderConfig config;
+	{
+		auto p = MakeProject(scene, config);
+		p.Load(DefaultProjectPath());
+	}
 	EXPECT_FALSE(scene.env_list.empty());
 	auto env = scene.env_list.begin()->second;
 	ASSERT_NE(env, nullptr);
 	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/room.hdr");
-}
-
-// -----------------------------------------------------------------------
-// DefaultProject: Environment roundtrip via CreateDefault
-// -----------------------------------------------------------------------
-
-/**
- * @test CreateDefault adds an Environment to env_list with the default
- *       equirect path, and the path can be updated via SetEquirectPath().
- */
-TEST(DefaultProject, EnvironmentRoundtrip)
-{
-	auto project = project::Project::CreateDefault("fake.obj");
-	auto& scene = project.GetScene();
-	EXPECT_FALSE(scene.env_list.empty());
-	auto env = scene.env_list.begin()->second;
-	ASSERT_NE(env, nullptr);
-	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/room.hdr");
-
-	env->SetEquirectPath("tex/hdr/sunset.hdr");
-	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/sunset.hdr");
-
-	// Empty path should be allowed (procedural fallback)
-	env->SetEquirectPath("");
-	EXPECT_TRUE(env->GetEquirectPath().empty());
 }

@@ -26,20 +26,25 @@ struct EnvironmentGPU;   // render/resources/EnvironmentGPU.h
 struct LightGPU;         // render/resources/LightGPU.h
 struct Pipeline;         // render/Pipeline.h
 
-/**
- * @brief CPU-to-GPU upload service.
- *
- * Owns a separate command pool and IBLPass for asynchronous uploads.
- * Stateless — each Upload*() method performs one-shot construction and
- * returns the GPU resource by value.
- */
-class UploadManager
-{
-public:
-	UploadManager(const vk::raii::Device& device,
-	              const vk::raii::PhysicalDevice& physicalDevice,
-	              vk::Queue transferQueue,
-	              uint32_t transferQueueFamily);
+	/**
+	 * @brief CPU-to-GPU upload service.
+	 *
+	 * Owns a separate command pool and IBLPass for asynchronous uploads.
+	 * Stateless — each Upload*() method performs one-shot construction and
+	 * returns the GPU resource by value.
+	 *
+	 * @param device               Logical device.
+	 * @param physicalDevice       Physical device (for buffer memory queries).
+	 * @param transferQueue        Transfer queue for staging uploads.
+	 * @param transferQueueFamily  Transfer queue family index.
+	 */
+	class UploadManager
+	{
+	public:
+		UploadManager(const vk::raii::Device& device,
+		              const vk::raii::PhysicalDevice& physicalDevice,
+		              vk::Queue transferQueue,
+		              uint32_t transferQueueFamily);
 	~UploadManager();
 
 	// Non-copyable
@@ -54,7 +59,9 @@ public:
 	MeshGPU UploadMesh(const Mesh& mesh);
 
 	/** @brief Upload environment map to GPU. Generates diffuse + specular cubemaps. */
-	EnvironmentGPU UploadEnvironment(const Environment& env);
+	EnvironmentGPU UploadEnvironment(const Environment& env,
+	                                 vk::Queue graphicsQueue,
+	                                 uint32_t graphicsQueueFamily);
 
 	/** @brief Upload light shadow resources to GPU. Creates shadow depth map. */
 	LightGPU UploadLight(const Light& light);

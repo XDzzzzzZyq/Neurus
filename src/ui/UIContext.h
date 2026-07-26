@@ -33,7 +33,7 @@ class ObjectID;
 struct UIContext
 {
 	/** @brief Opaque pointer to Project::proj_config (const RenderConfig*). */
-	void* renderConfig = nullptr;
+	const void* renderConfig = nullptr;
 
 	/** @brief Opaque pointer to Scene*. Cast to const Scene* in cpp. */
 	void* scene = nullptr;

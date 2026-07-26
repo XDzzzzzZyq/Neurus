@@ -127,7 +127,9 @@ MeshGPU UploadManager::UploadMesh(const Mesh& mesh)
 	               static_cast<uint32_t>(vertexCount), static_cast<uint32_t>(indexCount)};
 }
 
-EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
+EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env,
+                                                 vk::Queue graphicsQueue,
+                                                 uint32_t graphicsQueueFamily)
 {
 	// --- 0. Lazy-init IBLPass ---
 	if (!um_iblPass)
@@ -229,8 +231,8 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env)
 	samplerCI.setMaxLod(static_cast<float>(kSpecularMips));
 	auto specularSampler = vk::raii::Sampler(*um_device, samplerCI);
 
-	// --- 5. Run IBL convolution ---
-	um_iblPass->Generate(um_transferQueue, um_transferQueueFamily, equirectImage, *diffuseImage, *specularImage);
+	// --- 5. Run IBL convolution (needs graphics queue for compute dispatches) ---
+	um_iblPass->Generate(graphicsQueue, graphicsQueueFamily, equirectImage, *diffuseImage, *specularImage);
 
 	// --- 6. Wrap in Textures and return ---
 	EnvironmentGPU gpu;

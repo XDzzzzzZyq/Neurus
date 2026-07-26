@@ -10,6 +10,8 @@
 #include "editor/controllers/CameraController.h"
 #include "editor/events/EventBus.h"
 #include "asset/Project.h"
+#include "asset/SceneComponent.h"
+#include "asset/ConfigComponent.h"
 
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
@@ -58,23 +60,16 @@ namespace neurus {
 Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
 	: ed_renderer(renderer)
 	, ed_uploadManager(uploadManager)
+	, m_scene(std::make_unique<Scene>())
 {}
-
-void Editor::SetProject(std::unique_ptr<neurus::project::Project> project)
-{
-	ed_project = std::move(project);
-}
 
 Editor::~Editor()
 {
-	ed_project.reset();
+	// m_scene and m_config will be destroyed by unique_ptr automatically.
 }
 
-void Editor::Initialize(Scene& scene)
+void Editor::Initialize()
 {
-	// Store the scene reference for OnIBLLoad and other operations
-	ed_ownerScene = &scene;
-
 	// Note: Mesh/light GPU upload happens AFTER window is shown and surface
 	// is ready — see UploadSceneResources() called from Application::Run()
 	// and from OnProjectOpen() / OnProjectNew().
@@ -93,17 +88,17 @@ void Editor::Initialize(Scene& scene)
 	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) { OnSunLightAdd(); });
 
 	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
-		ed_project->GetRenderConfig() = e.config;
+		m_config = e.config;
 	});
 
 	ed_eventBus.subscribe<PositionChanged>([this](const PositionChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
 		void* transformPtr = it->second->GetTransform();
 		if (!transformPtr) return;
 		static_cast<Transform3D*>(transformPtr)->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
-		ed_project->MarkDirty();
+		m_dirty = true;
 
 		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
 			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
@@ -113,13 +108,13 @@ void Editor::Initialize(Scene& scene)
 	});
 
 	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
 		void* transformPtr = it->second->GetTransform();
 		if (!transformPtr) return;
 		static_cast<Transform3D*>(transformPtr)->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
-		ed_project->MarkDirty();
+		m_dirty = true;
 
 		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
 			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
@@ -129,13 +124,13 @@ void Editor::Initialize(Scene& scene)
 	});
 
 	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
 		void* transformPtr = it->second->GetTransform();
 		if (!transformPtr) return;
 		static_cast<Transform3D*>(transformPtr)->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
-		ed_project->MarkDirty();
+		m_dirty = true;
 
 		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
 			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
@@ -156,86 +151,86 @@ void Editor::Initialize(Scene& scene)
 	// --- Camera property events ---
 
 	ed_eventBus.subscribe<CameraTargetChanged>([this](const CameraTargetChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
 		it->second->SetTarPos(glm::vec3(e.targetX, e.targetY, e.targetZ));
-		ed_project->MarkDirty();
+		m_dirty = true;
 	});
 
 	ed_eventBus.subscribe<CameraFovChanged>([this](const CameraFovChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
 		it->second->ChangeCamPersp(e.fov);
-		ed_project->MarkDirty();
+		m_dirty = true;
 	});
 
 	// --- Mesh property events ---
 
 	ed_eventBus.subscribe<MeshShadowChanged>([this](const MeshShadowChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
 		it->second->EnableShadow(e.enabled);
-		ed_project->MarkDirty();
+		m_dirty = true;
 	});
 
 	ed_eventBus.subscribe<MeshMaterialChanged>([this](const MeshMaterialChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
 		it->second->EnableMaterial(e.enabled);
-		ed_project->MarkDirty();
+		m_dirty = true;
 	});
 
 	// --- Light property events ---
 
 	ed_eventBus.subscribe<LightPowerChanged>([this](const LightPowerChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
 		it->second->SetPower(e.power);
-		ed_project->MarkDirty();
+		m_dirty = true;
 		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
 		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
 	});
 
 	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
 		it->second->SetRadius(e.radius);
-		ed_project->MarkDirty();
+		m_dirty = true;
 		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
 		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
 	});
 
 	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
 		it->second->SetShadow(e.enabled);
-		ed_project->MarkDirty();
+		m_dirty = true;
 		UploadLighting();
 	});
 
 	// --- Environment property events ---
 
 	ed_eventBus.subscribe<EnvironmentIntensityChanged>([this](const EnvironmentIntensityChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
 		it->second->SetIntensity(e.intensity);
-		ed_project->MarkDirty();
+		m_dirty = true;
 	});
 
 	ed_eventBus.subscribe<EnvironmentRotationChanged>([this](const EnvironmentRotationChanged& e) {
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
 		it->second->SetRotation(e.rotation);
-		ed_project->MarkDirty();
+		m_dirty = true;
 	});
 
 	// Load IBL environment now that the scene is available
@@ -285,32 +280,96 @@ void Editor::Initialize(Scene& scene)
 
 Scene& Editor::GetScene()
 {
-	return ed_project->GetScene();
+	return *m_scene;
 }
 
 RenderContext Editor::GetRenderContext() const
 {
 	RenderContext ctx;
-	ctx.scene = &ed_project->GetScene();
-	ctx.config = &ed_project->GetRenderConfig();
+	ctx.scene = m_scene.get();
+	ctx.config = &m_config;
 	return ctx;
 }
 
-neurus::project::Project& Editor::GetProject()
-{
-	return *ed_project;
-}
-
 // =========================================================================
-// GetUIContext – build UI context from Editor/Project state
+// GetUIContext – build UI context from Editor state
 // =========================================================================
 
 UIContext Editor::GetUIContext() const
 {
 	UIContext ctx;
-	ctx.renderConfig = &ed_project->GetRenderConfig();
-	ctx.scene = &ed_project->GetScene();
+	ctx.renderConfig = &m_config;
+	ctx.scene = m_scene.get();
 	return ctx;
+}
+
+// =========================================================================
+// Project lifecycle
+// =========================================================================
+
+void Editor::CreateDefaultScene(const std::string& objPath)
+{
+	m_scene = std::make_unique<Scene>();
+	m_config = RenderConfig{};
+
+	auto camera = std::make_shared<Camera>();
+	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
+	camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+	m_scene->UseCamera(camera);
+
+	auto mesh = std::make_shared<Mesh>(objPath);
+	m_scene->UseMesh(mesh);
+
+	auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
+	light->SetRadius(0.05f);
+	m_scene->UseLight(light);
+
+	auto env = std::make_shared<Environment>();
+	env->SetEquirectPath("tex/hdr/room.hdr");
+	m_scene->UseEnvironment(env);
+
+	m_projectPath.clear();
+	m_dirty = true;
+}
+
+void Editor::LoadProject(const std::string& path, const std::string& assetDir)
+{
+	if (ed_renderer)
+		ed_renderer->WaitIdle();
+
+	m_scene = std::make_unique<Scene>();
+	m_config = RenderConfig{};
+
+	neurus::project::Project serializer;
+	serializer.Register<neurus::project::SceneComponent>(*m_scene);
+	serializer.Register<neurus::project::ConfigComponent>(m_config);
+	serializer.Load(path);
+
+	for (auto& [id, mesh] : m_scene->mesh_list)
+		mesh->ReloadMeshData(assetDir);
+
+	m_projectPath = path;
+	m_dirty = false;
+	UploadSceneResources();
+	OnIBLLoad();
+}
+
+void Editor::SaveProject(const std::string& path)
+{
+	neurus::project::Project serializer;
+	serializer.Register<neurus::project::SceneComponent>(*m_scene);
+	serializer.Register<neurus::project::ConfigComponent>(m_config);
+	serializer.Save(path);
+	m_projectPath = path;
+	m_dirty = false;
+}
+
+void Editor::SaveProject()
+{
+	if (m_projectPath.empty())
+		throw std::runtime_error("No file path set. Use SaveProject(path) first.");
+	SaveProject(m_projectPath);
 }
 
 // --- Project signal handlers ---
@@ -319,19 +378,17 @@ void Editor::OnProjectNew()
 {
 	try
 	{
-		// Drain GPU work before destroying the old project's GPU resources.
+		// Drain GPU work before destroying the old scene's GPU resources.
 		if (ed_renderer)
 		{
 			ed_renderer->WaitIdle();
 		}
 
-		ed_project = std::make_unique<neurus::project::Project>(
-			neurus::project::Project::New());
+		m_scene = std::make_unique<Scene>();
+		m_config = RenderConfig{};
+		m_projectPath.clear();
+		m_dirty = false;
 		NEURUS_LOG("[Editor] Created new project.");
-
-		// Update owner scene pointer
-		auto& projectScene = ed_project->GetScene();
-		ed_ownerScene = &projectScene;
 
 		UploadSceneResources();
 
@@ -346,45 +403,20 @@ void Editor::OnProjectNew()
 
 void Editor::OnProjectOpen(const std::string& path)
 {
-	try
-	{
-		// Drain any GPU work referencing the old project's resources.
-		if (ed_renderer)
-		{
-			ed_renderer->WaitIdle();
-		}
-
-		ed_project = std::make_unique<neurus::project::Project>(
-			neurus::project::Project::Open(path,
-			                               resolveResourcePath("").toStdString()));
-		NEURUS_LOG("[Editor] Opened project: " << path);
-
-		// Update owner scene pointer to the new project's scene
-		auto& projectScene = ed_project->GetScene();
-		ed_ownerScene = &projectScene;
-
-		UploadSceneResources();
-
-		// Regenerate IBL for the new environment (BuildIBLTextures, load HDR,
-		// run IBLPass convolution).
-		OnIBLLoad();
-	}
-	catch (const std::exception& e)
-	{
-		NEURUS_ERR("Failed to open project: " << e.what());
-	}
+	try { LoadProject(path, m_assetDir); }
+	catch (const std::exception& e) { NEURUS_ERR("Failed to open project: " << e.what()); }
 }
 
 void Editor::OnProjectSave()
 {
-	try { ed_project->Save(); }
+	try { SaveProject(); }
 	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
 }
 
 void Editor::OnProjectSaveAs(const std::string& path)
 {
-	try { ed_project->Save(path); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
+	try { SaveProject(path); }
+	catch (const std::exception& e) { NEURUS_ERR("Failed to save project as: " << e.what()); }
 }
 
 // --- Mesh, Camera, Light signal handlers ---
@@ -393,7 +425,7 @@ void Editor::OnMeshImport(const std::string& path)
 {
 	try {
 		auto mesh = std::make_shared<neurus::Mesh>(path);
-		ed_project->GetScene().UseMesh(mesh);
+		m_scene->UseMesh(mesh);
 
 		// Upload to GPU immediately via UploadManager
 		if (ed_uploadManager && ed_renderer)
@@ -402,7 +434,7 @@ void Editor::OnMeshImport(const std::string& path)
 			ed_renderer->GetRenderCache().UseMeshGPU(mesh->GetObjectID(), std::move(meshGPU));
 		}
 
-		ed_project->MarkDirty();
+		m_dirty = true;
 		NEURUS_LOG("[Editor] Imported mesh: " << path);
 	}
 	catch (const std::exception& e) {
@@ -416,8 +448,8 @@ void Editor::OnCameraAdd()
 		auto camera = std::make_shared<neurus::Camera>();
 		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-		ed_project->GetScene().UseCamera(camera);
-		ed_project->MarkDirty();
+		m_scene->UseCamera(camera);
+		m_dirty = true;
 		NEURUS_LOG("[Editor] Added camera at (0, -5, 2)");
 	}
 	catch (const std::exception& e) {
@@ -432,7 +464,7 @@ void Editor::OnLightAdd()
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.05f);
-		ed_project->GetScene().UseLight(light);
+		m_scene->UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
 		UploadLighting();
 		// Upload shadow map for this light
@@ -441,7 +473,7 @@ void Editor::OnLightAdd()
 			auto lightGPU = ed_uploadManager->UploadLight(*light);
 			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
 		}
-		ed_project->MarkDirty();
+		m_dirty = true;
 		NEURUS_LOG("[Editor] Added point light at (3, 3, 3)");
 	}
 	catch (const std::exception& e) {
@@ -457,7 +489,7 @@ void Editor::OnSunLightAdd()
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->use_shadow = true;
-		ed_project->GetScene().UseLight(light);
+		m_scene->UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
 		UploadLighting();
 		// Upload shadow map for this sun light
@@ -466,7 +498,7 @@ void Editor::OnSunLightAdd()
 			auto lightGPU = ed_uploadManager->UploadLight(*light);
 			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
 		}
-		ed_project->MarkDirty();
+		m_dirty = true;
 		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
 	}
 	catch (const std::exception& e) {
@@ -480,7 +512,7 @@ void Editor::OnScreenshotAllRequested() { NEURUS_LOG("[Editor] OnScreenshotAllRe
 
 void Editor::OnIBLLoad()
 {
-	Scene* scene = ed_ownerScene;
+	Scene* scene = m_scene.get();
 	if (!scene)
 	{
 		NEURUS_ERR("[Editor] OnIBLLoad: no scene available");
@@ -521,7 +553,9 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 		return;
 	}
 
-	auto envGPU = ed_uploadManager->UploadEnvironment(*env);
+	auto envGPU = ed_uploadManager->UploadEnvironment(*env,
+	    ed_renderer->GetGraphicsQueue(),
+	    ed_renderer->GetGraphicsQueueFamily());
 	ed_renderer->GetRenderCache().UseEnvironmentGPU(env->GetObjectID(), std::move(envGPU));
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
@@ -533,7 +567,7 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 
 void Editor::SelectObject(int objectId, bool increment)
 {
-	auto& scene = ed_project->GetScene();
+	auto& scene = *m_scene;
 
 	// id=0 means background click — clear everything
 	if (objectId == 0)
@@ -563,7 +597,7 @@ void Editor::SelectObject(int objectId, bool increment)
 
 void Editor::ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible)
 {
-	auto& scene = ed_project->GetScene();
+	auto& scene = *m_scene;
 
 	auto it = scene.obj_list.find(objectId);
 	if (it == scene.obj_list.end())
@@ -573,7 +607,7 @@ void Editor::ChangeObjectVisibility(int objectId, bool viewportVisible, bool ren
 	}
 
 	it->second->SetVisible(viewportVisible, renderVisible);
-	ed_project->MarkDirty();
+	m_dirty = true;
 
 	// Light visibility change → re-upload lighting SSBO to reflect new state.
 	// Shader variants (point/sun) are filtered by UploadLighting based on
@@ -590,7 +624,7 @@ void Editor::UploadSceneResources()
 {
 	if (!ed_uploadManager || !ed_renderer) return;
 
-	auto& scene = ed_project->GetScene();
+	auto& scene = *m_scene;
 
 	for (const auto& [id, mesh] : scene.mesh_list)
 	{
@@ -620,7 +654,7 @@ void Editor::UploadLighting()
 {
 	if (ed_uploadManager && ed_renderer)
 	{
-		auto& scene = ed_project->GetScene();
+		auto& scene = *m_scene;
 		auto lightDict = ed_uploadManager->UploadLighting(scene.light_list);
 		ed_renderer->GetRenderCache().UpdateLighting(lightDict);
 	}

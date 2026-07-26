@@ -112,6 +112,12 @@ public:
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
 
+	/** @brief Returns the graphics queue. */
+	vk::Queue GetGraphicsQueue() const { return r_graphicsQueue; }
+
+	/** @brief Returns the graphics queue family index. */
+	uint32_t GetGraphicsQueueFamily() const { return r_queueFamilyIndex; }
+
 	/** @brief Returns the current swapchain extent. */
 	vk::Extent2D GetExtent() const { return r_swapchain ? r_swapchain->extent() : vk::Extent2D{800, 600}; }
 

@@ -9,7 +9,6 @@
 
 #include "app/VulkanContext.h"
 #include "editor/Editor.h"
-#include "asset/Project.h"
 #include "render/DeferredRenderer.h"
 #include "render/Screenshot.h"
 #include "render/UploadManager.h"
@@ -60,9 +59,8 @@ public:
 private:
 	// --- Initialisation helpers (called in order by Run()) ---
 	bool InitVulkan();
-	std::unique_ptr<project::Project> LoadProject();
-	bool InitRenderer(const project::Project& project);
-	void InitEditor(std::unique_ptr<project::Project> project);
+	bool InitRenderer();
+	void InitEditor();
 	void ResizeViewport(int width, int height);
 	void WireSignals();
 	void NewFrameSignals(UIEvents& uiEvents);

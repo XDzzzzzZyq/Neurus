@@ -118,7 +118,7 @@ void VulkanTestShared::SetUp()
 			*m_commandPool, vk::CommandBufferLevel::ePrimary, 1);
 		m_commandBuffers = vk::raii::CommandBuffers(*m_device, allocInfo);
 
-		// --- Reusable upload manager for tests ---
+		// --- Reusable upload manager for tests (graphics + transfer share the same queue) ---
 		m_uploadManager = std::make_unique<UploadManager>(
 			*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
 

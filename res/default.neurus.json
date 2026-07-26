@@ -1,28 +1,28 @@
 {
-    "project": {
-        "m_scene": {
+    "project": {        
+        "m_scene": {            
             "cam_list": [
                 {
-                    "key": 7,
+                    "key": 1,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483649,
-                            "data": {
-                                "value0": {
-                                    "value0": {
-                                        "o_id": 7
+                            "data": {                                
+                                "value0": {                                    
+                                    "value0": {                                        
+                                        "o_id": 1
                                     },
                                     "o_name": "",
                                     "o_type": 0,
                                     "is_viewport": true,
                                     "is_rendered": true
                                 },
-                                "transform": {
+                                "transform": {                                    
                                     "m_position": {
-                                        "x": 26.16297721862793,
-                                        "y": -35.95450210571289,
-                                        "z": 1.353067398071289
+                                        "x": 26.0,
+                                        "y": -35.0,
+                                        "z": 1.35
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -53,15 +53,15 @@
             ],
             "mesh_list": [
                 {
-                    "key": 8,
+                    "key": 2,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483650,
-                            "data": {
+                            "data": {                                
                                 "value0": {
                                     "value0": {
-                                        "o_id": 8
+                                        "o_id": 2
                                     },
                                     "o_name": "Mesh",
                                     "o_type": 1,
@@ -97,15 +97,15 @@
             ],
             "light_list": [
                 {
-                    "key": 9,
+                    "key": 3,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483651,
-                            "data": {
+                            "data": {                                
                                 "value0": {
                                     "value0": {
-                                        "o_id": 9
+                                        "o_id": 3
                                     },
                                     "o_name": "",
                                     "o_type": 2,
@@ -151,15 +151,15 @@
             "dPoints_list": [],
             "env_list": [
                 {
-                    "key": 10,
+                    "key": 4,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483652,
-                            "data": {
+                            "data": {                                
                                 "value0": {
                                     "value0": {
-                                        "o_id": 10
+                                        "o_id": 4
                                     },
                                     "o_name": "Environment",
                                     "o_type": 4,
@@ -192,17 +192,21 @@
                 }
             ]
         },
-        "proj_config": {
+        "proj_config": {            
             "r_pipeline": 1,
             "r_aa": 0,
             "r_ao": 1,
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.002,
+            "r_shadow_bias": 0.0002,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
-            "r_sample_pf": 128
+            "r_sample_pf": 128,
+            "r_transparent": false,
+            "r_fxaa_subpix": 0.75,
+            "r_fxaa_edge_threshold": 0.16599999368190766,
+            "r_fxaa_edge_threshold_min": 0.08330000191926956
         }
     }
 }

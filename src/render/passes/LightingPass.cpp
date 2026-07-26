@@ -287,6 +287,10 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		DescriptorSet& dstSet = p_descriptorSets[frameIndex];
 		const bool hasEnv = !scene->env_list.empty();
 
+		// Try to write real environment cubemap descriptors
+		bool wroteIrradiance = false;
+		bool wroteSpecular = false;
+
 		if (hasEnv)
 		{
 			auto& env = scene->env_list.begin()->second;
@@ -299,6 +303,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					*envGPU->diffuseTexture->GetImage()->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
 				dstSet.WriteImage(8, irrInfo, vk::DescriptorType::eCombinedImageSampler);
+				wroteIrradiance = true;
 			}
 
 			if (envGPU && envGPU->specularTexture && envGPU->specularTexture->GetImage())
@@ -308,11 +313,14 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					*envGPU->specularTexture->GetImage()->ImageViewHandle(),
 					vk::ImageLayout::eShaderReadOnlyOptimal);
 				dstSet.WriteImage(9, specInfo, vk::DescriptorType::eCombinedImageSampler);
+				wroteSpecular = true;
 			}
-		}else
+		}
+
+		// If either IBL binding was NOT written (no env, or env GPU data unavailable),
+		// initialize empty cube placeholder and write it to the missing bindings.
+		if (!wroteIrradiance || !wroteSpecular)
 		{
-			// When no env exists, write empty cubemap descriptors to satisfy Vulkan validation
-			// (shader won't access bindings 8-9 since iblEnabled=0)
 			if (!p_emptyInitialized)
 			{
 				Barrier::Transition(cmdBuf, *p_emptyCube->GetImage(), ImageState::TransferDst);
@@ -327,8 +335,10 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 
 			vk::DescriptorImageInfo dummyInfo(*p_emptyCube->GetSampler(), *p_emptyCube->GetImage()->ImageViewHandle(),
 			                                   vk::ImageLayout::eShaderReadOnlyOptimal);
-			dstSet.WriteImage(8, dummyInfo, vk::DescriptorType::eCombinedImageSampler);
-			dstSet.WriteImage(9, dummyInfo, vk::DescriptorType::eCombinedImageSampler);
+			if (!wroteIrradiance)
+				dstSet.WriteImage(8, dummyInfo, vk::DescriptorType::eCombinedImageSampler);
+			if (!wroteSpecular)
+				dstSet.WriteImage(9, dummyInfo, vk::DescriptorType::eCombinedImageSampler);
 		}
 	}
 
