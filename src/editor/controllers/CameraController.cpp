@@ -208,26 +208,25 @@ namespace neurus {
 
 void CameraController::Init(EventQueue& bus)
 {
-	m_bus = &bus;
-	bus.subscribe<CameraZoomEvent>([this](const CameraZoomEvent& e) {
+	bus.subscribe<CameraZoomEvent>([&bus](const CameraZoomEvent& e) {
 		OnCameraZoom(e);
-		m_bus->enqueue(RenderResetEvent{});
+		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraRotateEvent>([this](const CameraRotateEvent& e) {
+	bus.subscribe<CameraRotateEvent>([&bus](const CameraRotateEvent& e) {
 		OnCameraRotate(e);
-		m_bus->enqueue(RenderResetEvent{});
+		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraPushEvent>([this](const CameraPushEvent& e) {
+	bus.subscribe<CameraPushEvent>([&bus](const CameraPushEvent& e) {
 		OnCameraPush(e);
-		m_bus->enqueue(RenderResetEvent{});
+		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraSlideEvent>([this](const CameraSlideEvent& e) {
+	bus.subscribe<CameraSlideEvent>([&bus](const CameraSlideEvent& e) {
 		OnCameraSlide(e);
-		m_bus->enqueue(RenderResetEvent{});
+		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraResizeEvent>([this](const CameraResizeEvent& e) {
+	bus.subscribe<CameraResizeEvent>([&bus](const CameraResizeEvent& e) {
 		OnCameraResize(e);
-		m_bus->enqueue(RenderResetEvent{});
+		bus.enqueue(RenderResetEvent{});
 	});
 }
 

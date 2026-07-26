@@ -70,8 +70,6 @@ public:
 	 */
 	void Init(EventQueue& bus) override;
 
-private:
-	EventQueue* m_bus = nullptr;
 };
 
 } // namespace neurus
