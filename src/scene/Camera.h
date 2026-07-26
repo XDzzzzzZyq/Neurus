@@ -199,4 +199,3 @@ private:
 
 } // namespace neurus
 
-CEREAL_CLASS_VERSION(neurus::Camera, 0)

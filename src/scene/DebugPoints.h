@@ -184,4 +184,3 @@ private:
 
 } // namespace neurus
 
-CEREAL_CLASS_VERSION(neurus::DebugPoints, 0)

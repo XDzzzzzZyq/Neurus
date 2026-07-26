@@ -219,5 +219,3 @@ public:
 
 } // namespace neurus
 
-CEREAL_CLASS_VERSION(neurus::UID, 0)
-CEREAL_CLASS_VERSION(neurus::ObjectID, 0)

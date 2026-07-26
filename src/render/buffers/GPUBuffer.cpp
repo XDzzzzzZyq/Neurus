@@ -90,7 +90,8 @@ void GPUBuffer::Unmap()
 			vk::AccessFlagBits2::eNone,
 			0, 0,
 			this->buffer(), 0, b_size);
-		vk::DependencyInfo depInfo({}, {}, {}, barrier);
+		vk::DependencyInfo depInfo;
+		depInfo.setBufferMemoryBarriers(barrier);
 		cmd.pipelineBarrier2(depInfo);
 	}
 	b_state = BufferState::General;

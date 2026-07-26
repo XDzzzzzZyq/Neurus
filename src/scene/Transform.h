@@ -210,4 +210,3 @@ private:
 
 } // namespa
 
-CEREAL_CLASS_VERSION(neurus::Transform3D, 0)

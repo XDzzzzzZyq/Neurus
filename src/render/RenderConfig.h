@@ -162,4 +162,3 @@ public:
 
 } // namespace neurus
 
-CEREAL_CLASS_VERSION(neurus::RenderConfig, 0)

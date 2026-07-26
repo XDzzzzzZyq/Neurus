@@ -110,4 +110,4 @@ private:
 
 } // namespace neurus::project
 
-CEREAL_CLASS_VERSION(neurus::project::Project, 0)
+

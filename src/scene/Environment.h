@@ -197,4 +197,3 @@ private:
 
 } // namespace neurus
 
-CEREAL_CLASS_VERSION(neurus::Environment, 0)
