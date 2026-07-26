@@ -16,6 +16,9 @@
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
+#include "render/TemporalAccumulator.h"
+#include "render/HaltonSequence.h"
+
 #include "shaders/ComputeShader.h"
 #include "shaders/ShaderLibrary.h"
 #include "resources/ShaderGPU.h"
@@ -33,29 +36,52 @@ namespace neurus {
 
 namespace {
 
-// Sun shadow eval push constants (matches sun_shadow_eval.comp layout).
-// GLSL layout:  mat4(64B) + float(4B) + int(4B) = 72B
-// C++ sizeof:   80B (16-byte alignment padding from glm::mat4).
-// Pipeline range must be ≥ sizeof(C++ struct) to avoid VUID-00369.
+// Point light shadow eval push constants (40 bytes).
+// Must match shadow_eval.comp layout exactly.
+struct ShadowEvalPushConstants
+{
+    float lightPosX, lightPosY, lightPosZ;  // 12 bytes
+    float farPlane;                          //  4 bytes
+    float bias;                              //  4 bytes
+    int32_t layerIndex;                      //  4 bytes
+    float jitterX;                           //  4 bytes
+    float jitterY;                           //  4 bytes
+    float alpha;                             //  4 bytes
+    int32_t frameCount;                      //  4 bytes
+};  // Total: 40 bytes
+static_assert(sizeof(ShadowEvalPushConstants) == 40,
+              "ShadowEvalPushConstants must be 40 bytes");
+
+// Sun shadow eval push constants (96 bytes C++ sizeof).
+// GLSL layout: mat4(64B) + float(4B) + int(4B) + float(4B) + float(4B) + float(4B) + int(4B) = 88B
+// C++ sizeof: 96B due to glm::mat4 16-byte alignment.
 struct SunShadowEvalPushConstants
 {
-	glm::mat4 lightViewProj;
-	float     bias;
-	int32_t   layerIndex;
-};
+    glm::mat4 lightViewProj;   // offset 0,  64 bytes
+    float     bias;            // offset 64, 4 bytes
+    int32_t   layerIndex;      // offset 68, 4 bytes
+    float     jitterX;         // offset 72, 4 bytes
+    float     jitterY;         // offset 76, 4 bytes
+    float     alpha;           // offset 80, 4 bytes
+    int32_t   frameCount;      // offset 84, 4 bytes
+};  // Total: 96 bytes (80 + 16 alignment padding)
 
-static_assert(sizeof(SunShadowEvalPushConstants) >= 72,
-              "SunShadowEvalPushConstants must be at least 72 bytes to match GLSL layout");
-static_assert(
-
-	sizeof(SunShadowEvalPushConstants::lightViewProj) == 64,
-	"glm::mat4 size mismatch");
-static_assert(
-	offsetof(SunShadowEvalPushConstants, bias) == 64,
-	"bias offset mismatch — must match sun_shadow_eval.comp push constant layout");
-static_assert(
-	offsetof(SunShadowEvalPushConstants, layerIndex) == 68,
-	"layerIndex offset mismatch — must match sun_shadow_eval.comp push constant layout");
+static_assert(sizeof(SunShadowEvalPushConstants) == 96,
+              "SunShadowEvalPushConstants must be 96 bytes");
+static_assert(sizeof(SunShadowEvalPushConstants::lightViewProj) == 64,
+              "glm::mat4 size mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, bias) == 64,
+              "bias offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, layerIndex) == 68,
+              "layerIndex offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, jitterX) == 72,
+              "jitterX offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, jitterY) == 76,
+              "jitterY offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, alpha) == 80,
+              "alpha offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, frameCount) == 84,
+              "frameCount offset mismatch");
 
 } // anon
 
@@ -192,7 +218,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
 			0,
-			6 * sizeof(float));   // 24 bytes
+			sizeof(ShadowEvalPushConstants));   // 40 bytes (was 24)
 
 		PipelineBuilder builder;
 		p_pipelines.push_back(
@@ -217,7 +243,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
 			0,
-			20 * sizeof(float));   // 80 bytes
+			sizeof(SunShadowEvalPushConstants));   // 96 bytes (was 80)
 
 		PipelineBuilder sunBuilder;
 		p_pipelines.push_back(
@@ -451,14 +477,6 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 		// --- Push constants ---
 		{
-			struct ShadowEvalPushConstants
-			{
-				float lightPosX, lightPosY, lightPosZ;
-				float farPlane;
-				float bias;
-				int32_t layerIndex;
-			};
-
 			const auto& pos = light->GetPosition();
 			const uint32_t layer = cache.GetShadowIntensityLayer(uid, renderExtent);
 
@@ -469,6 +487,12 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.farPlane   = Light::point_shadow_far;
 			pc.bias       = shadowBias;
 			pc.layerIndex = static_cast<int32_t>(layer);
+			pc.jitterX    = ctx.jitterX;
+			pc.jitterY    = ctx.jitterY;
+			pc.alpha      = ComputeShadowAlpha(
+				static_cast<ShadowAlphaMode>(ctx.shadowAlphaMode),
+				cache.GetShadowFrameCount(uid));
+			pc.frameCount = static_cast<int32_t>(cache.GetShadowFrameCount(uid));
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
 				*p_pipelines[0].pipelineLayout,
@@ -481,6 +505,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
+
+		// Advance temporal accumulation frame count AFTER dispatch
+		cache.AdvanceShadowFrame(uid);
 
 		++lightIndex;
 	}
@@ -519,9 +546,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		                          {p_sunDescSets[setIdx].handle()},
 		                          {});
 
-		// --- Sun push constants (mat4 lightViewProj + bias + layerIndex) ---
+		// --- Sun push constants (mat4 lightViewProj + bias + layerIndex + jitter + alpha + frameCount) ---
 		{
-
 			const glm::vec3 lightDir = glm::normalize(light->GetDirection());
 			const float field = Light::sun_shadow_field;
 			const float nearPlane = Light::sun_shadow_near;
@@ -530,9 +556,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			// Orthographic projection covering ±field around the origin
 			const glm::mat4 lightProj = glm::ortho(-field, field, -field, field, nearPlane, farPlane);
 
-		// View matrix: match ShadowDepthPass sun-path convention.
-		// World-up = (0,0,1); alternate-up = (1,0,0) for overhead/sun straight-down.
-		constexpr glm::vec3 kWorldUp(0.0f, 0.0f, 1.0f);
+			// View matrix: match ShadowDepthPass sun-path convention.
+			constexpr glm::vec3 kWorldUp(0.0f, 0.0f, 1.0f);
 			constexpr glm::vec3 kAltUp(1.0f, 0.0f, 0.0f);
 			const glm::vec3 up = (glm::abs(glm::dot(lightDir, kWorldUp)) > 0.999f)
 				? kAltUp : kWorldUp;
@@ -550,6 +575,12 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.lightViewProj = lightViewProj;
 			pc.bias          = shadowBias;
 			pc.layerIndex    = static_cast<int32_t>(layer);
+			pc.jitterX       = ctx.jitterX;
+			pc.jitterY       = ctx.jitterY;
+			pc.alpha         = ComputeShadowAlpha(
+				static_cast<ShadowAlphaMode>(ctx.shadowAlphaMode),
+				cache.GetShadowFrameCount(uid));
+			pc.frameCount    = static_cast<int32_t>(cache.GetShadowFrameCount(uid));
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(
 				*p_pipelines[1].pipelineLayout,
@@ -562,6 +593,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
+
+		// Advance temporal accumulation frame count AFTER dispatch
+		cache.AdvanceShadowFrame(uid);
 
 		++sunLightIndex;
 	}
