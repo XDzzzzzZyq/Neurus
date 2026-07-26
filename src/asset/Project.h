@@ -92,14 +92,14 @@ private:
 	// with the actual archive type used in Save()/Load().
 
 	template<class Archive>
-	void save(Archive& ar, const uint32_t /*version*/) const
+	void save(Archive& ar) const
 	{
 		for (auto& comp : m_components)
 			comp->Save(static_cast<cereal::JSONOutputArchive&>(ar));
 	}
 
 	template<class Archive>
-	void load(Archive& ar, const uint32_t /*version*/)
+	void load(Archive& ar)
 	{
 		for (auto& comp : m_components)
 			comp->Load(static_cast<cereal::JSONInputArchive&>(ar));

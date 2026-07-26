@@ -129,7 +129,7 @@ public:
 	// --- Cereal serialization ---
 
 	template<class Archive>
-	void serialize(Archive& ar, const uint32_t /*version*/)
+	void serialize(Archive& ar)
 	{
 		ar(CEREAL_NVP(r_pipeline), CEREAL_NVP(r_aa), CEREAL_NVP(r_ao),
 		   CEREAL_NVP(r_shadow), CEREAL_NVP(r_ssr),

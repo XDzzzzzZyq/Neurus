@@ -140,7 +140,7 @@ public:
 	 *       and are not serialized.
 	 */
 	template<class Archive>
-	void serialize(Archive& ar, const uint32_t /*version*/)
+	void serialize(Archive& ar)
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
