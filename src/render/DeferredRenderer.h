@@ -25,7 +25,9 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <glm/glm.hpp>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 namespace neurus {
@@ -255,6 +257,12 @@ private:
 
 	// --- Last acquired swapchain image index ---
 	uint32_t r_lastImageIndex = 0;
+
+	// --- Temporal shadow accumulation state ---
+	glm::mat4  m_lastViewMatrix{1.0f};
+	std::unordered_map<int, glm::vec3> m_lastLightPositions;
+	std::unordered_map<int, glm::vec3> m_lastLightDirections;
+	uint32_t   m_haltonIndex = 0;
 
 };
 
