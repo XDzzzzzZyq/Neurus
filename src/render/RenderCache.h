@@ -185,6 +185,42 @@ public:
 	Image* GetShadowIntensityArray() const;
 
 	/**
+	 * @brief Returns the accumulation frame count for a shadow-casting light.
+	 *
+	 * Returns 0 for lights that have no accumulator entry (first frame).
+	 *
+	 * @param lightUID Unique light identifier.
+	 * @return Frame count (0 = no history yet).
+	 */
+	uint32_t GetShadowFrameCount(int lightUID) const;
+
+	/**
+	 * @brief Advances the accumulation frame count for a light by 1.
+	 *
+	 * Called once per frame per shadow-casting light after the shadow
+	 * intensity evaluation dispatch.
+	 *
+	 * @param lightUID Unique light identifier.
+	 */
+	void AdvanceShadowFrame(int lightUID);
+
+	/**
+	 * @brief Resets the accumulation frame count for a single light to 0.
+	 *
+	 * Next frame's dispatch will use alpha = 1 (overwrite).
+	 *
+	 * @param lightUID Unique light identifier.
+	 */
+	void ResetShadowAccumulation(int lightUID);
+
+	/**
+	 * @brief Resets accumulation frame counts for ALL shadow-casting lights.
+	 *
+	 * Called on camera movement or scene-wide changes.
+	 */
+	void ResetAllShadowAccumulation();
+
+	/**
 	 * @brief Removes all per-light shadow resources for the given light.
 	 *
 	 * Recycles the intensity layer index and clears shadow maps
@@ -437,6 +473,9 @@ private:
 	// --- Light UID → SSBO index / shadow index maps (populated by UpdateLighting) ---
 	std::unordered_map<int, uint32_t> rc_uidToSSBOIdx;     ///< uid → SSBO element index
 	std::unordered_map<int, uint32_t> rc_uidToShadowLayer; ///< uid → shadow intensity layer
+
+	/// @brief Per-light shadow accumulation frame counter (key = light UID).
+	std::unordered_map<int, uint32_t> m_shadowFrameCount;
 };
 
 /**

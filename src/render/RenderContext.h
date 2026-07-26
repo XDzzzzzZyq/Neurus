@@ -53,6 +53,18 @@ struct RenderContext
 	/// @brief Opaque pointer to RenderConfig (lifetime managed by Editor/UI layer).
 	/// Passes cast to const RenderConfig* to read quality/feature flags set by the user.
 	const void* config = nullptr;
+
+	/// @brief Halton(2) sub-pixel jitter X offset in [-0.5, 0.5].
+	float jitterX = 0.0f;
+
+	/// @brief Halton(3) sub-pixel jitter Y offset in [-0.5, 0.5].
+	float jitterY = 0.0f;
+
+	/// @brief Shadow accumulation alpha mode (0 = FixedEMA/8, 1 = MovingAvg).
+	uint32_t shadowAlphaMode = 0;
+
+	/// @brief World-space scale applied to jitter offsets (e.g. 0.01 for point lights).
+	float jitterScale = 0.01f;
 };
 
 } // namespace neurus
