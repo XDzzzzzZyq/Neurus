@@ -18,10 +18,13 @@ class Mesh;              // scene/Mesh.h
 class Environment;       // scene/Environment.h
 class Light;             // scene/Light.h
 class Scene;             // scene/Scene.h
+class Shader;             // render/shaders/Shader.h
+class BufferLayout;      // render/buffers/BufferLayout.h
 class RenderCache;       // render/RenderCache.h
 struct MeshGPU;          // render/resources/MeshGPU.h
 struct EnvironmentGPU;   // render/resources/EnvironmentGPU.h
 struct LightGPU;         // render/resources/LightGPU.h
+struct Pipeline;         // render/Pipeline.h
 
 /**
  * @brief CPU-to-GPU upload service.
@@ -99,6 +102,35 @@ public:
 	 */
 	std::unique_ptr<LightingGPU> CreateLightingGPU(const vk::raii::Device& device,
 	                                               const vk::raii::PhysicalDevice& physicalDevice);
+
+	/**
+	 * @brief Compile a shader's generated GLSL and build a GPU pipeline.
+	 *
+	 * Calls ShaderLibrary::CompileAll() to produce SPIR-V for each shader
+	 * stage, creates temporary vk::raii::ShaderModules, and builds a
+	 * graphics or compute pipeline via PipelineBuilder.
+	 *
+	 * For render shaders (GetType() != COMPUTE):
+	 *   - If viewMask != 0: single depth-only pipeline (D32_SFLOAT) with
+	 *     multiview enabled — suitable for shadow depth passes.
+	 *   - If viewMask == 0: 5 color attachments + D32_SFLOAT depth —
+	 *     suitable for the standard G-Buffer geometry pass.
+	 *   - If vertexLayout is set, vertex input state is configured from it.
+	 *
+	 * For compute shaders (GetType() == COMPUTE):
+	 *   - Single-stage compute pipeline with descriptor/push-constant layout
+	 *     as declared in the generated GLSL.
+	 *
+	 * @param device         Logical device (Vulkan-HPP RAII).
+	 * @param shader         The CPU-side Shader (RenderShader or ComputeShader).
+	 * @param viewMask       Multiview view mask (0 = single view).
+	 * @param vertexLayout   Optional vertex input layout for graphics pipelines.
+	 * @return Fully constructed Pipeline, or an empty Pipeline on failure.
+	 */
+	Pipeline UploadShader(const vk::raii::Device& device,
+	                      const Shader& shader,
+	                      uint32_t viewMask = 0,
+	                      const BufferLayout* vertexLayout = nullptr);
 
 private:
 	const vk::raii::Device* um_device = nullptr;

@@ -1,18 +1,12 @@
 #pragma once
 
+#include "ShaderUnit.h"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-// Forward-declare Vulkan device type for CreateModule() parameter.
-// Must be outside namespace neurus to match the global ::vk namespace.
-namespace vk { namespace raii { class Device; } }
-
 namespace neurus {
-
-// Forward declarations - no heavy includes in this header
-class ShaderCompiler;
-class ShaderModule;
 
 /**
  * @brief Shader stage types supported by the renderer.
@@ -28,31 +22,29 @@ enum class ShaderType
 /**
  * @brief Abstract base class for all shader types in the dynamic shader system.
  *
- * Shader defines the common interface for compilation and module access.
- * Subclasses (RenderShader, ComputeShader) implement stage-specific compilation
- * and linking logic.
+ * Shader defines the common CPU-only interface for parsing, generating source,
+ * and accessing per-stage IR data. Subclasses (RenderShader, ComputeShader)
+ * implement stage-specific parsing and generation logic.
  *
  * Lifecycle:
- * 1. Construct shader with name and source
- * 2. Call Compile(compiler) to produce ShaderModule objects
- * 3. Access modules via GetShaderModule() for pipeline creation
- * 4. Destroy shader (shared_ptr-managed via ShaderLibrary)
+ * 1. Construct shader with name
+ * 2. Call ParseAndGenerate() to populate ShaderUnits from source files
+ * 3. Access stage data via GetStage() / GetParsedStruct() / GetGeneratedCode()
  *
- * @note Non-copyable (owns GPU resources indirectly via ShaderModule).
+ * @note Non-copyable (owns stage data by unique map entries).
  * @note Thread-safety: Not thread-safe. Must be used from the main thread.
  */
 class Shader
 {
 public:
 	/**
-	 * @brief Constructs a shader with a name and GLSL source code.
+	 * @brief Constructs a shader with a human-readable name.
 	 * @param name Human-readable shader name (for logging and debugging).
-	 * @param source GLSL source code string.
 	 */
-	Shader(std::string name, std::string source);
+	Shader(std::string name);
 	virtual ~Shader() = default;
 
-	// Non-copyable - shader modules are owned by derived classes
+	// Non-copyable
 	Shader(const Shader&) = delete;
 	Shader& operator=(const Shader&) = delete;
 
@@ -61,33 +53,15 @@ public:
 	Shader& operator=(Shader&&) noexcept = default;
 
 	/**
-	 * @brief Compiles all shader stages using the provided compiler.
+	 * @brief Parses shader source files and generates GLSL code.
 	 *
-	 * Derived classes implement stage-specific compilation (vertex, fragment,
-	 * compute, etc.) and populate the m_modules map with resulting ShaderModule
-	 * objects.
+	 * Derived classes implement stage-specific parsing and code generation.
+	 * Populates m_stages with ShaderUnit entries containing parsed IR and
+	 * generated GLSL source.
 	 *
-	 * @param compiler ShaderCompiler instance for GLSL->SPIR-V compilation.
-	 * @return true if all stages compiled successfully, false otherwise.
+	 * @return true if all stages were parsed and generated successfully.
 	 */
-	virtual bool Compile(ShaderCompiler& compiler) = 0;
-
-	/**
-	 * @brief Creates ShaderModule(s) from compiled SPIR-V using the given device.
-	 *
-	 * Must be called after Compile() and before GetShaderModule().
-	 * Derived classes implement stage-specific module creation.
-	 *
-	 * @param device Logical device for shader module creation.
-	 * @return true if all modules were created successfully.
-	 */
-	virtual bool CreateModule(const vk::raii::Device& device) = 0;
-
-	/**
-	 * @brief Checks whether the shader is in a valid, compiled state.
-	 * @return true if all required stages are compiled and valid.
-	 */
-	virtual bool IsValid() const = 0;
+	virtual bool ParseAndGenerate() = 0;
 
 	/**
 	 * @brief Returns the primary shader type.
@@ -96,11 +70,31 @@ public:
 	virtual ShaderType GetType() const = 0;
 
 	/**
-	 * @brief Retrieves a compiled ShaderModule for a specific stage.
+	 * @brief Returns a mutable reference to the ShaderUnit for a stage.
 	 * @param type The shader stage to look up.
-	 * @return Shared pointer to the ShaderModule, or nullptr if not found.
+	 * @return Reference to the ShaderUnit. Default-inserts if not present.
 	 */
-	std::shared_ptr<ShaderModule> GetShaderModule(ShaderType type) const;
+	ShaderUnit& GetStage(ShaderType type);
+
+	/** @brief Const overload of GetStage. Throws if type not found. */
+	const ShaderUnit& GetStage(ShaderType type) const;
+
+	/**
+	 * @brief Returns a mutable reference to the ShaderStruct IR for a stage.
+	 * @param type The shader stage to look up.
+	 * @return Reference to the ShaderStruct IR.
+	 */
+	ShaderStruct& GetParsedStruct(ShaderType type);
+
+	/** @brief Const overload of GetParsedStruct. Throws if type not found. */
+	const ShaderStruct& GetParsedStruct(ShaderType type) const;
+
+	/**
+	 * @brief Returns the generated GLSL code for a stage.
+	 * @param type The shader stage to look up.
+	 * @return Reference to the generated code string.
+	 */
+	const std::string& GetGeneratedCode(ShaderType type) const;
 
 	/**
 	 * @brief Converts a ShaderType to its string representation.
@@ -112,19 +106,15 @@ public:
 	/** @brief Returns the shader name. */
 	const std::string& GetName() const { return m_name; }
 
-	/** @brief Returns the GLSL source code. */
-	const std::string& GetSource() const { return m_source; }
-
-	/** @brief Returns the last compilation error message, if any. */
+	/** @brief Returns the last error message, if any. */
 	const std::string& GetErrorMessage() const { return m_errorMessage; }
 
 protected:
 	std::string m_name;          ///< Human-readable shader name
-	std::string m_source;        ///< GLSL source code
-	std::string m_errorMessage;  ///< Last compilation error message
+	std::string m_errorMessage;  ///< Last error message
 
-	/** Map of compiled ShaderModules, keyed by ShaderType. */
-	std::unordered_map<ShaderType, std::shared_ptr<ShaderModule>> m_modules;
+	/** @brief Map of ShaderUnits, keyed by ShaderType. */
+	std::unordered_map<ShaderType, ShaderUnit> m_stages;
 };
 
 } // namespace neurus

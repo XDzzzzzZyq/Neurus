@@ -90,13 +90,11 @@ Application::Application(int argc, char* argv[])
 
 Application::~Application()
 {
-	// ShaderLibrary is a Meyer's singleton (function-local static cache) that
-	// outlives main(). Its cached Shader objects own vk::raii::ShaderModule
-	// handles which must be destroyed BEFORE the VkDevice. Clear the cache here
-	// while app_vkContext (and thus the device) is still alive; subsequent
-	// reverse-order member destruction then releases the passes' shared_ptrs,
-	// destroying the ShaderModules while the device still exists.
-	ShaderLibrary::Clear();
+	// ShaderLibrary no longer caches shaders — no explicit cleanup needed.
+	// vk::raii::ShaderModule objects created during pipeline building are
+	// temporary and destroyed before BuildPipeline returns.
+	// The unique_ptr<Shader> members in each pass are cleaned up during
+	// normal member destruction.
 }
 
 // =========================================================================

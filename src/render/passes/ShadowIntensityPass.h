@@ -172,8 +172,8 @@ private:
 	std::vector<DescriptorSet> p_sunDescSets;                     ///< Sun descriptor sets (numSets * kSetsPerFrameSlot)
 
 	/// Compute shaders loaded via ShaderLibrary.
-	std::shared_ptr<ComputeShader> p_pointLightShader;  ///< Point-light cubemap eval (shadow_eval.comp)
-	std::shared_ptr<ComputeShader> p_sunLightShader;    ///< Sun-light 2D eval (sun_shadow_eval.comp)
+	std::unique_ptr<ComputeShader> p_pointLightShader;  ///< Point-light cubemap eval (shadow_eval.comp)
+	std::unique_ptr<ComputeShader> p_sunLightShader;    ///< Sun-light 2D eval (sun_shadow_eval.comp)
 
 	/// Two descriptor sets per in-flight frame slot so the per-light loop
 	/// can alternate between them without updating a currently-bound set.

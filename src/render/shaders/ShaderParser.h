@@ -44,11 +44,10 @@ public:
 	 *
 	 * @param filepath Path to the GLSL source file (.vert, .frag, .comp, .geom).
 	 * @param type     Expected shader stage (VERTEX / FRAGMENT / COMPUTE / GEOMETRY).
-	 * @param out      [out] ShaderStruct to populate.  Reset() is called first.
-	 * @return true on successful parse, false if the file could not be opened
-	 *         or if the source is unrecoverably malformed.
+	 * @return Populated ShaderStruct.  Returns an empty ShaderStruct on error
+	 *         (use IsEmpty() to check).
 	 */
-	static bool ParseShaderFile(const std::string& filepath, ShaderType type, ShaderStruct& out);
+	static ShaderStruct ParseShaderFile(const std::string& filepath, ShaderType type);
 
 	/**
 	 * @brief Parses a GLSL source string into a ShaderStruct IR.
@@ -56,15 +55,30 @@ public:
 	 * Reads the source line-by-line, classifying each line by keyword
 	 * (#version, #extension, layout, in/out, uniform, struct, const,
 	 * function definitions, bare variables) and calling the appropriate
-	 * setter on `out`.
+	 * setter on the result.
 	 *
 	 * @param source GLSL source text (null-terminated or newline-delimited).
 	 * @param type   Shader stage - used to disambiguate layout(input) vs layout(output) semantics.
-	 * @param out    [out] ShaderStruct to populate.  Reset() is called first.
-	 * @return true on successful parse (even if some lines were skipped),
-	 *         false if a structural parse error was encountered.
+	 * @return Populated ShaderStruct.  Returns an empty ShaderStruct on error
+	 *         (use IsEmpty() to check).
 	 */
-	static bool ParseShaderCode(const std::string& source, ShaderType type, ShaderStruct& out);
+	static ShaderStruct ParseShaderCode(const std::string& source, ShaderType type);
+
+	// -- DEPRECATED compatibility overloads (remove in Task 2) --
+
+	/** @deprecated Use ParseShaderFile(path, type) which returns ShaderStruct by value. */
+	inline static bool ParseShaderFile(const std::string& filepath, ShaderType type, ShaderStruct& out)
+	{
+		out = ParseShaderFile(filepath, type);
+		return !out.IsEmpty();
+	}
+
+	/** @deprecated Use ParseShaderCode(source, type) which returns ShaderStruct by value. */
+	inline static bool ParseShaderCode(const std::string& source, ShaderType type, ShaderStruct& out)
+	{
+		out = ParseShaderCode(source, type);
+		return !out.IsEmpty();
+	}
 
 private:
 	// -- Internal helpers (defined in .cpp) --

@@ -1,31 +1,48 @@
 /**
  * @file Shader.cpp
- * @brief Base-class implementations for Shader (constructor, GetShaderModule, TypeToString).
+ * @brief Base-class implementations for Shader (constructor, stage accessors, TypeToString).
  */
 
 #include "Shader.h"
-#include "ShaderModule.h"
 
 namespace neurus {
 
 // --------------------------------------
-// Constructor - initialises name and source; m_modules starts empty
+// Constructor - initialises name only; m_stages starts empty
 // --------------------------------------
 
-Shader::Shader(std::string name, std::string source)
+Shader::Shader(std::string name)
 	: m_name(std::move(name))
-	, m_source(std::move(source))
 {
 }
 
 // --------------------------------------
-// Module lookup
+// Stage accessors
 // --------------------------------------
 
-std::shared_ptr<ShaderModule> Shader::GetShaderModule(ShaderType type) const
+ShaderUnit& Shader::GetStage(ShaderType type)
 {
-	auto it = m_modules.find(type);
-	return (it != m_modules.end()) ? it->second : nullptr;
+	return m_stages[type];
+}
+
+const ShaderUnit& Shader::GetStage(ShaderType type) const
+{
+	return m_stages.at(type);
+}
+
+ShaderStruct& Shader::GetParsedStruct(ShaderType type)
+{
+	return m_stages[type].parsed;
+}
+
+const ShaderStruct& Shader::GetParsedStruct(ShaderType type) const
+{
+	return m_stages.at(type).parsed;
+}
+
+const std::string& Shader::GetGeneratedCode(ShaderType type) const
+{
+	return m_stages.at(type).code;
 }
 
 // --------------------------------------

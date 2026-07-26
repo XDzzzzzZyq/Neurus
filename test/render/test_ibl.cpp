@@ -23,10 +23,9 @@
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/Image.h"
-#include "render/shaders/ShaderModule.h"
-
 #include "render/shaders/ShaderLibrary.h"
 #include "render/shaders/ComputeShader.h"
+#include "render/resources/ShaderGPU.h"
 
 #include <algorithm>
 #include <array>
@@ -136,10 +135,11 @@ protected:
 		auto e2cShader =
 			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
 		ASSERT_NE(e2cShader, nullptr);
-		e2cShader->CreateModule(dev);
-		auto compModule = e2cShader->GetShaderModule(ShaderType::COMPUTE);
+		auto e2cSpv = ShaderLibrary::Compile(e2cShader->GetStage(ShaderType::COMPUTE),
+		                                     ShaderType::COMPUTE, "e2c_test");
+		ShaderGPU e2cGPU(dev, vk::ShaderStageFlagBits::eCompute, e2cSpv);
 		PipelineBuilder e2cBuilder;
-		m_e2cPipeline = e2cBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		m_e2cPipeline = e2cBuilder.AddShaderStage(e2cGPU.GetStageCreateInfo())
 			.AddDescriptorSetLayout(*m_e2cSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}
@@ -161,10 +161,11 @@ protected:
 		auto c2eShader =
 			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
 		ASSERT_NE(c2eShader, nullptr);
-		c2eShader->CreateModule(dev);
-		auto compModule = c2eShader->GetShaderModule(ShaderType::COMPUTE);
+		auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
+		                                     ShaderType::COMPUTE, "c2e_test");
+		ShaderGPU c2eGPU(dev, vk::ShaderStageFlagBits::eCompute, c2eSpv);
 		PipelineBuilder c2eBuilder;
-		m_c2ePipeline = c2eBuilder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		m_c2ePipeline = c2eBuilder.AddShaderStage(c2eGPU.GetStageCreateInfo())
 			.AddDescriptorSetLayout(*m_c2eSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}

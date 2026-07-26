@@ -7,6 +7,7 @@
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 #include "core/Log.h"
 #include <stdexcept>
 
@@ -25,14 +26,13 @@ FXAAPass::FXAAPass(const vk::raii::Device& device,
 
 	if (linearOk)
 	{
-		m_bilinearSampler = CreateBilinearSampler(device);
-		m_hasBilinear = true;
+		p_bilinearSampler = CreateBilinearSampler(device);
+		p_hasBilinear = true;
 	}
 
-	if (p_shader) p_shader->CreateModule(device);
 	BuildPipeline(device, "FXAAPass");
 	NEURUS_LOG("[FXAAPass] numSets=" << numSets
-	           << " shader=" << (p_shader && p_shader->IsValid() ? "OK" : "FAIL")
+	           << " shader=" << (p_shader ? "OK" : "FAIL")
 	           << " bilinear=" << (linearOk ? "yes" : "NO (fallback to nearest)"));
 }
 
@@ -64,13 +64,15 @@ DescriptorSetLayout FXAAPass::CreateLayout(const vk::raii::Device& d)
 
 void FXAAPass::BuildPipeline(const vk::raii::Device& device, const std::string& debugName)
 {
-	if (!p_shader || !p_shader->IsValid())
+	if (!p_shader)
 		throw std::runtime_error("FXAAPass: shader invalid");
-	auto mod = p_shader->GetShaderModule(ShaderType::COMPUTE);
+	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
+	                                  ShaderType::COMPUTE, debugName);
+	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 	vk::PushConstantRange pc(vk::ShaderStageFlagBits::eCompute, 0, sizeof(FXAAPushConstants));
 	p_pipelines.push_back(
 		PipelineBuilder()
-			.AddShaderStage(*mod, vk::ShaderStageFlagBits::eCompute, "main")
+			.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pc)
@@ -84,7 +86,7 @@ void FXAAPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 	// Use bilinear sampler for sub-pixel texture() resample (fallback to nearest if unsupported)
 	const auto& in = cache.GetAttachment(AttachmentName::ComposedOutput, extent);
 	vk::DescriptorImageInfo ii(
-		m_hasBilinear ? *m_bilinearSampler : *p_sampler,
+		p_hasBilinear ? *p_bilinearSampler : *p_sampler,
 		*in.ImageViewHandle(),
 		vk::ImageLayout::eShaderReadOnlyOptimal);
 	ds.WriteImage(0, ii, vk::DescriptorType::eCombinedImageSampler);

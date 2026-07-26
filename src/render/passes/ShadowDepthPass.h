@@ -82,8 +82,8 @@ private:
 
 	// --- Parameters ---
 	uint32_t p_resolution;
-	vk::Queue m_queue = nullptr;          ///< Graphics queue (for MeshGPU staging uploads)
-	uint32_t m_queueFamilyIndex = 0;      ///< Queue family index (for MeshGPU staging uploads)
+	vk::Queue p_queue = nullptr;          ///< Graphics queue (for MeshGPU staging uploads)
+	uint32_t p_queueFamilyIndex = 0;      ///< Queue family index (for MeshGPU staging uploads)
 
 	// --- GPU resources ---
 	// Static SSBO with 6 face VP matrices (computed once from origin; never changes)
@@ -94,8 +94,8 @@ private:
 	BufferLayout p_vtxLayout;
 
 	// --- Shaders (self-loaded via ShaderLibrary) ---
-	std::shared_ptr<RenderShader> m_multiviewShader;  ///< Point-light cubemap depth+colour (multiview)
-	std::shared_ptr<RenderShader> m_sunShader;         ///< Sun-light orthographic depth-only
+	std::unique_ptr<RenderShader> p_multiviewShader;  ///< Point-light cubemap depth+colour (multiview)
+	std::unique_ptr<RenderShader> p_sunShader;         ///< Sun-light orthographic depth-only
 	// (Pipelines inherited from Pass — p_pipelines[0]=multiview, p_pipelines[1]=sun)
 
 };

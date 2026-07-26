@@ -28,6 +28,9 @@
 #include "shared/TestVulkanShared.h"
 #include "shared/TestMultiShadow.h"
 
+#include "render/shaders/ComputeShader.h"
+#include "render/shaders/RenderShader.h"
+
 // --- Render layer ---
 #include "render/RenderCache.h"
 #include "render/RenderContext.h"

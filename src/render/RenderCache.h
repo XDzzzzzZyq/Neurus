@@ -5,6 +5,7 @@
 #include "resources/EnvironmentGPU.h"
 #include "resources/LightGPU.h"
 #include "resources/LightingGPU.h"
+#include "resources/PipelineCache.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -302,6 +303,46 @@ public:
 	 */
 	void RemoveEnvironmentGPU(int envId);
 
+	// --- Pipeline cache ---
+
+	/**
+	 * @brief Returns the cross-frame pipeline cache.
+	 *
+	 * Pipelines are keyed by shader UID (int) — created lazily via
+	 * UsePipeline and queried via GetPipeline.
+	 *
+	 * @return Reference to the internal PipelineCache.
+	 */
+	PipelineCache& GetPipelineCache();
+
+	/**
+	 * @brief Returns a cached pipeline by shader UID, or nullptr.
+	 *
+	 * Read-only lookup — does NOT create.
+	 *
+	 * @param uid Unique shader/object identifier for the pipeline.
+	 * @return Non-owning pointer, or nullptr if not found.
+	 */
+	Pipeline* GetPipeline(int uid);
+
+	/**
+	 * @brief Register a previously-constructed Pipeline into the cache.
+	 *
+	 * Takes ownership via move semantics.  Overwrites any existing
+	 * entry for the same uid.
+	 *
+	 * @param uid      Unique shader/object identifier.
+	 * @param pipeline Fully constructed Pipeline to cache (moved in).
+	 */
+	void UsePipeline(int uid, Pipeline pipeline);
+
+	/**
+	 * @brief Removes the cached Pipeline for a given UID.
+	 * Safe to call for UIDs with no pipeline yet.
+	 * @param uid Shader/object UID to remove.
+	 */
+	void RemovePipeline(int uid);
+
 	// --- Lighting GPU resources (SSBO owner) ---
 
 	/**
@@ -386,6 +427,9 @@ private:
 
 	// --- Per-light GPU resources (key = light UID as int) ---
 	std::unordered_map<int, LightGPU> rc_lightGPUs;
+
+	// --- Pipeline cache (keyed by shader UID string) ---
+	PipelineCache rc_pipelineCache;
 
 	// --- Lighting SSBO storage (owned) ---
 	std::unique_ptr<LightingGPU> rc_lightingGPU;

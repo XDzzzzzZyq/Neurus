@@ -29,12 +29,9 @@ add_library(neurus_render STATIC
 	shaders/RenderShader.cpp
 	shaders/ComputeShader.h
 	shaders/ComputeShader.cpp
-	shaders/ShaderModule.h
-	shaders/ShaderModule.cpp
-	shaders/ShaderLib.h
-	shaders/ShaderLib.cpp
 	shaders/ShaderStruct.h
 	shaders/ShaderStruct.cpp
+	shaders/ShaderUnit.h
 	shaders/ShaderGenerator.h
 	shaders/ShaderGenerator.cpp
 	shaders/ShaderParser.h
@@ -48,6 +45,8 @@ add_library(neurus_render STATIC
 	resources/LightGPU.h
 	resources/LightingGPU.h
 	resources/LightingGPU.cpp
+	resources/PipelineCache.h
+	resources/PipelineCache.cpp
 	Texture.h
 	Texture.cpp
 	PipelineBuilder.h

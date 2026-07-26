@@ -216,6 +216,7 @@ void RenderCache::Clean()
 	rc_lightGPUs.clear();
 	rc_uidToShadowLayer.clear();
 	rc_lightingGPU.reset();
+	rc_pipelineCache.Clear();
 }
 
 void RenderCache::CleanScreenSpace()
@@ -280,6 +281,30 @@ const LightGPU* RenderCache::GetLightGPU(const int lightUID) const
 void RenderCache::RemoveLightGPU(const int lightUID)
 {
 	rc_lightGPUs.erase(lightUID);
+}
+
+// ---------------------------------------------------------------------------
+// Pipeline cache
+// ---------------------------------------------------------------------------
+
+PipelineCache& RenderCache::GetPipelineCache()
+{
+	return rc_pipelineCache;
+}
+
+Pipeline* RenderCache::GetPipeline(const int uid)
+{
+	return rc_pipelineCache.Get(uid);
+}
+
+void RenderCache::UsePipeline(const int uid, Pipeline pipeline)
+{
+	rc_pipelineCache.Store(uid, std::move(pipeline));
+}
+
+void RenderCache::RemovePipeline(const int uid)
+{
+	rc_pipelineCache.Remove(uid);
 }
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,6 @@
 namespace neurus {
 
 class BufferLayout;
-class ShaderModule;
 
 // ---------------------------------------------------------------------------
 // PipelineBuilder - Fluent API for constructing graphics AND compute pipelines
@@ -56,20 +55,6 @@ public:
 	// -----------------------------------------------------------------------
 	// Shader stages
 	// -----------------------------------------------------------------------
-
-	/**
-	 * @brief Adds a shader stage from ShaderModule + stage flag.
-	 *
-	 * Convenience overload that calls ShaderModule::GetStageInfo().
-	 *
-	 * @param module      Shader module providing the SPIR-V.
-	 * @param stage       Vulkan shader stage (e.g. eVertex, eFragment).
-	 * @param entryPoint  Entry-point name (default "main").
-	 * @return *this for chaining.
-	 */
-	PipelineBuilder& AddShaderStage(const ShaderModule& module,
-	                                vk::ShaderStageFlagBits stage,
-	                                const char* entryPoint = "main");
 
 	/**
 	 * @brief Adds a pre-built shader stage create-info.

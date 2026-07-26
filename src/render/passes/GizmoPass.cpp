@@ -12,6 +12,7 @@
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 
 #include "core/Log.h"
 
@@ -32,18 +33,15 @@ GizmoPass::GizmoPass(const vk::raii::Device& device,
 	: ComputePass(device, physicalDevice,
 	              GizmoPass::CreateDescriptorSetLayout(device), numSets)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, p_computeShader(
+	, p_shader(
 		ShaderLibrary::LoadComputeShader("gizmo_highlight",
-		                                "res/shaders/compute/gizmo_highlight.comp"))
+		                                  "res/shaders/compute/gizmo_highlight.comp"))
 {
-	// --- Create module from self-loaded shader ---
-	if (p_computeShader) { p_computeShader->CreateModule(device); }
-
 	// --- Create pipeline from self-loaded shader ---
 	BuildPipeline(device, "GizmoPass");
 
 	NEURUS_LOG("[GizmoPass] numSets=" << numSets
-	           << " shader=" << (p_computeShader ? "OK" : "FAIL"));
+	           << " shader=" << (p_shader ? "OK" : "FAIL"));
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -80,13 +78,15 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
                                const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!p_computeShader || !p_computeShader->IsValid())
+	if (!p_shader)
 	{
 		throw std::runtime_error("GizmoPass: Compute shader not loaded or invalid");
 	}
 
-	// --- Use self-loaded compute shader module ---
-	auto compModule = p_computeShader->GetShaderModule(ShaderType::COMPUTE);
+	// --- Compile and create temporary shader module ---
+	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
+	                                  ShaderType::COMPUTE, debugName);
+	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 	// --- Push constant range (1 uint = 4 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -97,7 +97,7 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		builder.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)

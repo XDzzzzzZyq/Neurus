@@ -10,6 +10,7 @@
 #include "render/Barrier.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 
 #include "core/Log.h"
 
@@ -42,15 +43,11 @@ IBLPass::IBLPass(const vk::raii::Device& device,
 	// --- Self-load compute shaders via ShaderLibrary ---
 	, p_irradianceShader(
 		ShaderLibrary::LoadComputeShader("irradiance",
-		                                 "res/shaders/compute/irradiance_conv.comp"))
+		                                  "res/shaders/compute/irradiance_conv.comp"))
 	, p_specularShader(
 		ShaderLibrary::LoadComputeShader("importance_samp",
-		                                 "res/shaders/compute/importance_samp.comp"))
+		                                  "res/shaders/compute/importance_samp.comp"))
 {
-	// --- Create modules from self-loaded shaders ---
-	if (p_irradianceShader) { p_irradianceShader->CreateModule(device); }
-	if (p_specularShader)   { p_specularShader->CreateModule(device); }
-
 	// --- Create pipelines from self-loaded shaders ---
 	BuildPipeline(device, "IBLPass");
 
@@ -295,15 +292,17 @@ vk::raii::Sampler IBLPass::CreateEquirectSampler(const vk::raii::Device& device)
 void IBLPass::BuildPipeline(const vk::raii::Device& device,
                              const std::string& debugName)
 {
-	auto buildOne = [&](std::shared_ptr<ComputeShader> computeShader,
+	auto buildOne = [&](std::unique_ptr<ComputeShader>& computeShader,
 	                    const char* subName) -> Pipeline
 	{
-		if (!computeShader || !computeShader->IsValid())
+		if (!computeShader)
 		{
 			throw std::runtime_error(std::string("IBLPass: ") + subName + " shader not loaded or invalid");
 		}
 
-		auto compModule = computeShader->GetShaderModule(ShaderType::COMPUTE);
+		auto spv = ShaderLibrary::Compile(computeShader->GetStage(ShaderType::COMPUTE),
+		                                  ShaderType::COMPUTE, subName);
+		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 		PipelineBuilder builder;
 
@@ -312,7 +311,7 @@ void IBLPass::BuildPipeline(const vk::raii::Device& device,
 			0,
 			sizeof(IBLPushConstants));
 
-		return builder.AddShaderStage(*compModule, vk::ShaderStageFlagBits::eCompute, "main")
+		return builder.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(subName)
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
