@@ -75,6 +75,12 @@ void ShaderController::OnCreateShader(const ShaderCreateRequested& e)
 
 		mesh->o_shader = std::move(shader);
 
+		// Bump version so the ShaderEditor UI detects the change
+		if (mesh->o_shader->HasStage(ShaderType::VERTEX))
+			mesh->o_shader->GetStage(ShaderType::VERTEX).BumpVersion();
+		if (mesh->o_shader->HasStage(ShaderType::FRAGMENT))
+			mesh->o_shader->GetStage(ShaderType::FRAGMENT).BumpVersion();
+
 		// Mark scene as changed so renderer knows to rebuild pipelines
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
 

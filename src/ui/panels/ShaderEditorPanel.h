@@ -88,10 +88,11 @@ private:
 	QPushButton*  m_createBtn     = nullptr;
 
 	// --- State ---
-	int  m_activeObjectId   = -1;
-	int  m_cachedStageType  = 0;   // 0=VERTEX, 1=FRAGMENT
-	bool m_showingCreateButton = false;
-	bool m_showingEmptyState   = false;
+	int  m_activeObjectId       = -1;
+	int  m_cachedStageType      = 0;   // 0=VERTEX, 1=FRAGMENT
+	int  m_cachedShaderVersion  = -1;  // ShaderUnit::m_version; -1 = no shader
+	bool m_showingCreateButton  = false;
+	bool m_showingEmptyState    = false;
 };
 
 } // namespace neurus

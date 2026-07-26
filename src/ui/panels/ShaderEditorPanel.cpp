@@ -203,7 +203,6 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 		return;
 	}
 
-	// Get the active selected object
 	const auto* activeObj = scene->selections.GetActiveObject();
 	if (!activeObj)
 	{
@@ -214,37 +213,47 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	}
 
 	int objectId = activeObj->GetObjectID();
-	if (objectId == m_activeObjectId)
-		return;  // No change, nothing to update
-
-	m_activeObjectId = objectId;
 
 	// Only handle GO_MESH objects
 	if (activeObj->o_type != ObjectID::GOType::GO_MESH)
 	{
-		setShowEmptyState(false);
+		setShowEmptyState(true);
 		setShowCreateButton(false);
-		// Show sections empty
-		m_abSection->setFields({});
-		m_passSection->setFields({});
-		m_inputSection->setFields({});
-		m_outputSection->setFields({});
-		m_uniformSection->setFields({});
-		m_structSection->setFields({});
-		m_funcSection->setFields({});
 		return;
 	}
 
-	// Check if mesh has a shader with the selected stage
+	// Get shader unit and its version (-1 if no shader)
+	int unitVersion = -1;
 	void* unitPtr = activeObj->GetShaderUnit(m_cachedStageType);
+	if (unitPtr)
+		unitVersion = static_cast<const ShaderUnit*>(unitPtr)->GetVersion();
+
+	// Dirty-check: same object AND same version = nothing changed
+	if (objectId == m_activeObjectId && unitVersion == m_cachedShaderVersion)
+		return;
+
+	m_activeObjectId = objectId;
+	m_cachedShaderVersion = unitVersion;
+
 	if (!unitPtr)
 	{
-		setShowEmptyState(false);
+		// No shader assigned — show create button, hide everything else
+		m_emptyLabel->setVisible(false);
+		m_showingEmptyState = false;
 		setShowCreateButton(true);
+		m_abSection->setVisible(false);
+		m_passSection->setVisible(false);
+		m_inputSection->setVisible(false);
+		m_outputSection->setVisible(false);
+		m_uniformSection->setVisible(false);
+		m_structSection->setVisible(false);
+		m_funcSection->setVisible(false);
 		return;
 	}
 
-	setShowEmptyState(false);
+	// Has shader — show sections, hide create button and empty label
+	m_emptyLabel->setVisible(false);
+	m_showingEmptyState = false;
 	setShowCreateButton(false);
 	populateSections(unitPtr);
 }
