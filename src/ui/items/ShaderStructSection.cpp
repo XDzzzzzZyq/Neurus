@@ -63,16 +63,7 @@ void ShaderStructSection::setFields(const std::vector<FieldData>& fields)
 		auto* row = m_rowPool[i];
 		row->setVisible(true);
 
-		if (fields[i].location >= 0)
-		{
-			row->setShowLocation(true);
-			row->setField(fields[i].location, fields[i].type, fields[i].name);
-		}
-		else
-		{
-			row->setShowLocation(false);
-			row->setField(fields[i].type, fields[i].name);
-		}
+		row->setField(fields[i].type, fields[i].name);
 	}
 
 	// Hide remaining rows (never destroy)
