@@ -18,6 +18,7 @@
 
 #include "shaders/ComputeShader.h"
 #include "shaders/ShaderLibrary.h"
+#include "resources/ShaderGPU.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -75,19 +76,19 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
 	, p_sunDescSetLayout(CreateSunDescriptorSetLayout(device))
 {
 	// --- Load point-light cubemap eval shader via ShaderLibrary ---
-	m_pointLightShader = ShaderLibrary::ParseComputeShader(
+	p_pointLightShader = ShaderLibrary::LoadComputeShader(
 		"shadow_eval", "res/shaders/compute/shadow_eval.comp");
 
-	if (!m_pointLightShader)
+	if (!p_pointLightShader)
 	{
 		throw std::runtime_error("[ShadowIntensityPass] Failed to load 'shadow_eval' compute shader");
 	}
 
 	// --- Load sun-light 2D eval shader via ShaderLibrary ---
-	m_sunLightShader = ShaderLibrary::ParseComputeShader(
+	p_sunLightShader = ShaderLibrary::LoadComputeShader(
 		"sun_shadow_eval", "res/shaders/compute/sun_shadow_eval.comp");
 
-	if (!m_sunLightShader)
+	if (!p_sunLightShader)
 	{
 		throw std::runtime_error("[ShadowIntensityPass] Failed to load 'sun_shadow_eval' compute shader");
 	}
@@ -179,14 +180,14 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 {
 	// --- Point-light cubemap pipeline ---
 	{
-		if (!m_pointLightShader)
+		if (!p_pointLightShader)
 		{
 			throw std::runtime_error("ShadowIntensityPass: Point-light shader not loaded or invalid");
 		}
 
-		auto spv = ShaderLibrary::Compile(m_pointLightShader->GetStage(ShaderType::COMPUTE),
+		auto spv = ShaderLibrary::Compile(p_pointLightShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, debugName);
-		vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
@@ -195,7 +196,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		PipelineBuilder builder;
 		p_pipelines.push_back(
-			builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+			builder.AddShaderStage(gpu.GetStageCreateInfo())
 				.SetDebugName(debugName.c_str())
 				.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 				.AddPushConstantRange(pushRange)
@@ -204,14 +205,14 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 	// --- Sun-light 2D pipeline ---
 	{
-		if (!m_sunLightShader)
+		if (!p_sunLightShader)
 		{
 			throw std::runtime_error("ShadowIntensityPass: Sun-light shader not loaded or invalid");
 		}
 
-		auto spv = ShaderLibrary::Compile(m_sunLightShader->GetStage(ShaderType::COMPUTE),
+		auto spv = ShaderLibrary::Compile(p_sunLightShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, debugName + "_Sun");
-		vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+		ShaderGPU gpu2(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
@@ -220,7 +221,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		PipelineBuilder sunBuilder;
 		p_pipelines.push_back(
-			sunBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+			sunBuilder.AddShaderStage(gpu2.GetStageCreateInfo())
 				.SetDebugName((debugName + "_Sun").c_str())
 				.AddDescriptorSetLayout(*p_sunDescSetLayout.layout())
 				.AddPushConstantRange(pushRange)

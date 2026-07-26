@@ -11,6 +11,7 @@
 #include "DescriptorManager.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 
 #include <algorithm>
 #include <chrono>
@@ -247,7 +248,7 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 
 	// --- 4. Load compute shader via ShaderLibrary ---
 	auto c2eShader =
-		ShaderLibrary::ParseComputeShader("c2e_export",
+		ShaderLibrary::LoadComputeShader("c2e_export",
 		                                  "res/shaders/convert/c2e.comp");
 	if (!c2eShader)
 	{
@@ -256,10 +257,10 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 
 	auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
 	                                     ShaderType::COMPUTE, "c2e_export");
-	vk::raii::ShaderModule c2eMod(m_device, vk::ShaderModuleCreateInfo({}, c2eSpv));
+	ShaderGPU c2eGPU(m_device, vk::ShaderStageFlagBits::eCompute, c2eSpv);
 
 	PipelineBuilder c2eBuilder;
-	c2eBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *c2eMod, "main"));
+	c2eBuilder.AddShaderStage(c2eGPU.GetStageCreateInfo());
 	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 

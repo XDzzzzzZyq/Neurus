@@ -199,7 +199,7 @@ private:
 	// (Pipelines inherited from Pass — p_pipelines[0])
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 
 	// --- Owned UBOs ---
 	std::unique_ptr<UniformBuffer<SSAOParamsGpu>> p_paramsUBO;   ///< SSAO params (camera + kernel), host-visible

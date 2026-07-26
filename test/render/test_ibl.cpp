@@ -23,10 +23,9 @@
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"
 #include "render/Image.h"
-#include "render/shaders/ShaderModule.h"
-
 #include "render/shaders/ShaderLibrary.h"
 #include "render/shaders/ComputeShader.h"
+#include "render/resources/ShaderGPU.h"
 
 #include <algorithm>
 #include <array>
@@ -134,13 +133,13 @@ protected:
 		m_e2cSets = m_e2cPool->Allocate(*m_e2cSetLayout, 1);
 
 		auto e2cShader =
-			ShaderLibrary::ParseComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
+			ShaderLibrary::LoadComputeShader("e2c_test", "res/shaders/convert/e2c.comp");
 		ASSERT_NE(e2cShader, nullptr);
 		auto e2cSpv = ShaderLibrary::Compile(e2cShader->GetStage(ShaderType::COMPUTE),
 		                                     ShaderType::COMPUTE, "e2c_test");
-		vk::raii::ShaderModule e2cMod(dev, vk::ShaderModuleCreateInfo({}, e2cSpv));
+		ShaderGPU e2cGPU(dev, vk::ShaderStageFlagBits::eCompute, e2cSpv);
 		PipelineBuilder e2cBuilder;
-		m_e2cPipeline = e2cBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *e2cMod, "main"))
+		m_e2cPipeline = e2cBuilder.AddShaderStage(e2cGPU.GetStageCreateInfo())
 			.AddDescriptorSetLayout(*m_e2cSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}
@@ -160,13 +159,13 @@ protected:
 		m_c2eSets = m_c2ePool->Allocate(*m_c2eSetLayout, 1);
 
 		auto c2eShader =
-			ShaderLibrary::ParseComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
+			ShaderLibrary::LoadComputeShader("c2e_test", "res/shaders/convert/c2e.comp");
 		ASSERT_NE(c2eShader, nullptr);
 		auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
 		                                     ShaderType::COMPUTE, "c2e_test");
-		vk::raii::ShaderModule c2eMod(dev, vk::ShaderModuleCreateInfo({}, c2eSpv));
+		ShaderGPU c2eGPU(dev, vk::ShaderStageFlagBits::eCompute, c2eSpv);
 		PipelineBuilder c2eBuilder;
-		m_c2ePipeline = c2eBuilder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *c2eMod, "main"))
+		m_c2ePipeline = c2eBuilder.AddShaderStage(c2eGPU.GetStageCreateInfo())
 			.AddDescriptorSetLayout(*m_c2eSetLayout->layout())
 			.BuildComputePipeline(dev);
 	}

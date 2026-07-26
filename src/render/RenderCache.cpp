@@ -294,17 +294,17 @@ PipelineCache& RenderCache::GetPipelineCache()
 
 Pipeline* RenderCache::GetPipeline(const int uid)
 {
-	return rc_pipelineCache.Get(std::to_string(uid));
+	return rc_pipelineCache.Get(uid);
 }
 
 void RenderCache::UsePipeline(const int uid, Pipeline pipeline)
 {
-	rc_pipelineCache.Store(std::to_string(uid), std::move(pipeline));
+	rc_pipelineCache.Store(uid, std::move(pipeline));
 }
 
 void RenderCache::RemovePipeline(const int uid)
 {
-	rc_pipelineCache.Remove(std::to_string(uid));
+	rc_pipelineCache.Remove(uid);
 }
 
 // ---------------------------------------------------------------------------

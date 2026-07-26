@@ -21,6 +21,8 @@
 #include "shared/TestVulkanShared.h"
 #include "shared/TestSimpleShadow.h"
 
+#include "render/shaders/RenderShader.h"
+
 #include "render/passes/ShadowDepthPass.h"
 #include "render/passes/GeometryPass.h"
 #include "render/RenderContext.h"

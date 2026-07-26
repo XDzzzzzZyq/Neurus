@@ -12,6 +12,7 @@
 #include "PipelineBuilder.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/RenderShader.h"
+#include "resources/ShaderGPU.h"
 
 #include "core/Log.h"
 
@@ -43,8 +44,8 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	, p_cameraDescriptorSet(std::move(
 	      p_descriptorPool.Allocate(p_cameraLayout, 1).front()))
 	// --- Self-load shaders via ShaderLibrary ---
-	, m_shader(
-		ShaderLibrary::ParseRenderShader("GeometryPass",
+	, p_shader(
+		ShaderLibrary::LoadRenderShader("GeometryPass",
 		                                 "res/shaders/render/gbuffer.vert",
 		                                 "res/shaders/render/gbuffer.frag"))
 {
@@ -67,7 +68,7 @@ GeometryPass::GeometryPass(const vk::raii::Device& device,
 	// --- Create graphics pipeline from self-loaded shader ---
 	BuildPipeline(device, "GeometryPass");
 
-	NEURUS_LOG("[GeometryPass] shader=" << (m_shader ? "OK" : "FAIL")
+	NEURUS_LOG("[GeometryPass] shader=" << (p_shader ? "OK" : "FAIL")
 	          << " colorAttachments=5"
 	          << " depthAttachments=1"
 	          << " vertexStride=" << p_vertexLayout.GetStride());
@@ -94,18 +95,18 @@ void GeometryPass::BuildPipeline(const vk::raii::Device& device,
                                   const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!m_shader)
+	if (!p_shader)
 	{
 		throw std::runtime_error("GeometryPass: Render shader not loaded or invalid");
 	}
 
 	// --- Compile and create temporary shader modules ---
-	auto vertSpv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::VERTEX),
+	auto vertSpv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::VERTEX),
 	                                      ShaderType::VERTEX, debugName + "_vert");
-	auto fragSpv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::FRAGMENT),
+	auto fragSpv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::FRAGMENT),
 	                                      ShaderType::FRAGMENT, debugName + "_frag");
-	vk::raii::ShaderModule vertMod(device, vk::ShaderModuleCreateInfo({}, vertSpv));
-	vk::raii::ShaderModule fragMod(device, vk::ShaderModuleCreateInfo({}, fragSpv));
+	ShaderGPU vertGPU(device, vk::ShaderStageFlagBits::eVertex, vertSpv);
+	ShaderGPU fragGPU(device, vk::ShaderStageFlagBits::eFragment, fragSpv);
 
 	// --- G-Buffer colour attachment formats ---
 	std::vector<vk::Format> colorFormats = {
@@ -142,8 +143,8 @@ void GeometryPass::BuildPipeline(const vk::raii::Device& device,
 	p_pipelines.push_back(
 		builder
 			.SetDebugName(debugName.c_str())
-			.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eVertex, *vertMod, "main"))
-			.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eFragment, *fragMod, "main"))
+			.AddShaderStage(vertGPU.GetStageCreateInfo())
+			.AddShaderStage(fragGPU.GetStageCreateInfo())
 			.SetVertexInput(p_vertexLayout)
 			.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 			.SetRasterization(vk::PolygonMode::eFill,

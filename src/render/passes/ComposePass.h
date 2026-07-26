@@ -117,7 +117,7 @@ private:
 	// (Pipelines inherited from Pass — p_pipelines[0])
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 };
 
 } // namespace neurus

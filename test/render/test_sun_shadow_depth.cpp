@@ -15,6 +15,8 @@
 
 #include <gtest/gtest.h>
 #include "shared/TestVulkanShared.h"
+
+#include "render/shaders/RenderShader.h"
 #include "render/passes/ShadowDepthPass.h"
 #include "render/RenderContext.h"
 #include "render/RenderCache.h"

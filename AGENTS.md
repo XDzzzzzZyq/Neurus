@@ -166,7 +166,7 @@ Neurus/
 │   │   ├── RenderCache.h/cpp        # Cross-frame mutable resource pool
 │   │   ├── RenderConfig.h           # User-settable pipeline options
 │   │   ├── RenderContext.h          # Per-frame immutable scene snapshot
-│   │   ├── ShaderProgram.h/cpp
+│   │   ├── shaders/ShaderGPU.h, shaders/Shader.h/cpp
 │   │   ├── Swapchain.h/cpp
 │   │   ├── UploadManager.h/cpp      # CPU-to-GPU upload service
 │   │   ├── VulkanContext.h/cpp

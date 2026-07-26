@@ -13,7 +13,7 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
 - `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
-- `src/render/ShaderProgram.h` - SPIR-V loading, pipeline creation
+- `src/render/shaders/ShaderGPU.h, src/render/shaders/Shader.h/cpp` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 - `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
 - `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
@@ -40,9 +40,9 @@ renders frames. It must remain stateless with respect to application logic.
    - Create image views for each swapchain image
    - Recreate on window resize (old swapchain destroyed, new created)
 
-3. **Shader and Pipeline Management** (`ShaderProgram`)
+3. **Shader and Pipeline Management** (`Shader`)
    - Load SPIR-V from embedded C header arrays (generated at build time)
-   - Create vk::raii::ShaderModule instances
+   - Create ShaderGPU instances
    - Create vk::raii::Pipeline via VK_KHR_dynamic_rendering
    - Pipeline layout (empty for triangle; uniforms added later)
 

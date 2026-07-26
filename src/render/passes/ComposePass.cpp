@@ -13,6 +13,7 @@
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 
 #include "core/Log.h"
 
@@ -31,15 +32,15 @@ ComposePass::ComposePass(const vk::raii::Device& device,
 	: ComputePass(device, physicalDevice,
 	              ComposePass::CreateDescriptorSetLayout(device), numSets)
 	// --- Self-load compute shader via ShaderLibrary ---
-	, m_shader(
-		ShaderLibrary::ParseComputeShader("compose",
+	, p_shader(
+		ShaderLibrary::LoadComputeShader("compose",
 		                                  NEURUS_SHADER_DIR "compute/compose.comp"))
 {
 	// --- Create pipeline from self-loaded shader ---
 	BuildPipeline(device, "ComposePass");
 
 	NEURUS_LOG("[ComposePass] numSets=" << numSets
-	           << " shader=" << (m_shader ? "OK" : "FAIL"));
+	           << " shader=" << (p_shader ? "OK" : "FAIL"));
 
 #ifdef _DEBUG
 	for (uint32_t i = 0; i < numSets; ++i)
@@ -80,15 +81,15 @@ void ComposePass::BuildPipeline(const vk::raii::Device& device,
                                 const std::string& debugName)
 {
 	// --- Guard: shader must be valid ---
-	if (!m_shader)
+	if (!p_shader)
 	{
 		throw std::runtime_error("ComposePass: Compute shader not loaded or invalid");
 	}
 
 	// --- Compile and create temporary shader module ---
-	auto spv = ShaderLibrary::Compile(m_shader->GetStage(ShaderType::COMPUTE),
+	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
 	                                  ShaderType::COMPUTE, debugName);
-	vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 	// --- Push constant range (1 float = 4 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -99,7 +100,7 @@ void ComposePass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+		builder.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)

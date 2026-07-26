@@ -52,7 +52,7 @@ QVulkanInstance
 ```
 VulkanWidget (QWidget with WA_NativeWindow)
   → vk::Win32SurfaceCreateInfoKHR → vk::raii::SurfaceKHR
-  → VulkanContext → vk::raii::Device → Renderer → Swapchain → ShaderProgram
+  → VulkanContext → vk::raii::Device → Renderer → Swapchain → Shader
 ```
 
 - `VulkanWidget` provides native HWND for Vulkan surface

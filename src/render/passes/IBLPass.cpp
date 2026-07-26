@@ -10,6 +10,7 @@
 #include "render/Barrier.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
+#include "resources/ShaderGPU.h"
 
 #include "core/Log.h"
 
@@ -40,18 +41,18 @@ IBLPass::IBLPass(const vk::raii::Device& device,
                  const vk::raii::PhysicalDevice& physicalDevice)
 	: ComputePass(device, physicalDevice, IBLPass::CreateDescriptorSetLayout(device), 1)
 	// --- Self-load compute shaders via ShaderLibrary ---
-	, m_irradianceShader(
-		ShaderLibrary::ParseComputeShader("irradiance",
+	, p_irradianceShader(
+		ShaderLibrary::LoadComputeShader("irradiance",
 		                                  "res/shaders/compute/irradiance_conv.comp"))
-	, m_specularShader(
-		ShaderLibrary::ParseComputeShader("importance_samp",
+	, p_specularShader(
+		ShaderLibrary::LoadComputeShader("importance_samp",
 		                                  "res/shaders/compute/importance_samp.comp"))
 {
 	// --- Create pipelines from self-loaded shaders ---
 	BuildPipeline(device, "IBLPass");
 
-	NEURUS_LOG("[IBLPass] irradiance=" << (m_irradianceShader ? "OK" : "FAIL")
-	           << " specular=" << (m_specularShader ? "OK" : "FAIL"));
+	NEURUS_LOG("[IBLPass] irradiance=" << (p_irradianceShader ? "OK" : "FAIL")
+	           << " specular=" << (p_specularShader ? "OK" : "FAIL"));
 }
 
 IBLPass::~IBLPass() = default;
@@ -301,7 +302,7 @@ void IBLPass::BuildPipeline(const vk::raii::Device& device,
 
 		auto spv = ShaderLibrary::Compile(computeShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, subName);
-		vk::raii::ShaderModule mod(device, vk::ShaderModuleCreateInfo({}, spv));
+		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
 
 		PipelineBuilder builder;
 
@@ -310,15 +311,15 @@ void IBLPass::BuildPipeline(const vk::raii::Device& device,
 			0,
 			sizeof(IBLPushConstants));
 
-		return builder.AddShaderStage(vk::PipelineShaderStageCreateInfo({}, vk::ShaderStageFlagBits::eCompute, *mod, "main"))
+		return builder.AddShaderStage(gpu.GetStageCreateInfo())
 			.SetDebugName(subName)
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
 			.BuildComputePipeline(device);
 	};
 
-	p_pipelines.push_back(buildOne(m_irradianceShader, (debugName + "::Irradiance").c_str()));
-	p_pipelines.push_back(buildOne(m_specularShader,   (debugName + "::Specular").c_str()));
+	p_pipelines.push_back(buildOne(p_irradianceShader, (debugName + "::Irradiance").c_str()));
+	p_pipelines.push_back(buildOne(p_specularShader,   (debugName + "::Specular").c_str()));
 }
 
 // ---------------------------------------------------------------------------

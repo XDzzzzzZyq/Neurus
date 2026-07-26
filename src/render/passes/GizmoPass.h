@@ -110,7 +110,7 @@ private:
 	                   const std::string& debugName) override;
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 };
 
 } // namespace neurus

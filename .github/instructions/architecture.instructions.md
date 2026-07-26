@@ -160,7 +160,7 @@ been removed.
 
 ### Naming Conventions
 
-- Classes: PascalCase (e.g., `VulkanContext`, `ShaderProgram`)
+- Classes: PascalCase (e.g., `VulkanContext`, `Shader`)
 - Functions: PascalCase for public API; camelCase for internals
 - Members: `m_` prefix for member variables
 - Constants: UPPER_SNAKE_CASE

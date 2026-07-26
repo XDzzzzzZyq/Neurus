@@ -140,7 +140,7 @@ private:
 	// (Pipelines inherited from Pass — p_pipelines[0])
 
 	// --- Self-loaded compute shader (via ShaderLibrary) ---
-	std::unique_ptr<ComputeShader> m_shader;
+	std::unique_ptr<ComputeShader> p_shader;
 
 	// --- Empty cubemap placeholder for IBL bindings when no env exists (1x1x6, black) ---
 	std::unique_ptr<Texture> p_emptyCube;

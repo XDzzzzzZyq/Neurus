@@ -144,7 +144,7 @@ std::string ResolveShaderPathImpl(const std::string& path)
 // Public API
 // =========================================================================
 
-std::unique_ptr<RenderShader> ShaderLibrary::ParseRenderShader(
+std::unique_ptr<RenderShader> ShaderLibrary::LoadRenderShader(
 	const std::string& name,
 	const std::string& vertPath,
 	const std::string& fragPath)
@@ -162,7 +162,7 @@ std::unique_ptr<RenderShader> ShaderLibrary::ParseRenderShader(
 	return shader;
 }
 
-std::unique_ptr<ComputeShader> ShaderLibrary::ParseComputeShader(
+std::unique_ptr<ComputeShader> ShaderLibrary::LoadComputeShader(
 	const std::string& name,
 	const std::string& compPath)
 {

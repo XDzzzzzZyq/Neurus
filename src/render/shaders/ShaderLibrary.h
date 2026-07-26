@@ -25,12 +25,12 @@ public:
 	ShaderLibrary& operator=(const ShaderLibrary&) = delete;
 
 	// --- Parse (CPU side, no caching) ---
-	static std::unique_ptr<RenderShader> ParseRenderShader(
+	static std::unique_ptr<RenderShader> LoadRenderShader(
 		const std::string& name,
 		const std::string& vertPath,
 		const std::string& fragPath);
 
-	static std::unique_ptr<ComputeShader> ParseComputeShader(
+	static std::unique_ptr<ComputeShader> LoadComputeShader(
 		const std::string& name,
 		const std::string& compPath);
 
