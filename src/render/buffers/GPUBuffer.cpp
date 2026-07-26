@@ -94,7 +94,11 @@ void GPUBuffer::Unmap()
 		depInfo.setBufferMemoryBarriers(barrier);
 		cmd.pipelineBarrier2(depInfo);
 	}
-	b_state = BufferState::General;
+	// Mark buffer as available after transfer — Avoid BufferState::General
+	// (ALL_COMMANDS) which is invalid for transfer-only command pools
+	// per VUID-vkCmdPipelineBarrier2-dstStageMask-09676.
+	// The graphics queue will transition this to ShaderRead etc. on first use.
+	b_state = BufferState::TransferDst;
 
 	b_staging->EndStaging(b_queue);
 }
