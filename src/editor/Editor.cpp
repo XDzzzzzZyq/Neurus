@@ -367,7 +367,7 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 
 	auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-	light->SetRadius(0.05f);
+	light->SetRadius(0.01f);
 	m_scene->UseLight(light);
 
 	auto env = std::make_shared<Environment>();
@@ -508,7 +508,7 @@ void Editor::OnLightAdd()
 		auto light = std::make_shared<neurus::Light>(
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-		light->SetRadius(0.05f);
+		light->SetRadius(0.01f);
 		m_scene->UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
 		UploadLighting();
