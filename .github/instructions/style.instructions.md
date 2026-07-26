@@ -83,6 +83,30 @@
 - Non-trivial sections get `// --- Section Name ---` separators
 - Use a normal hyphen (`-`) instead of an em dash (`–` or `—`).
 
+## Non-ASCII Hygiene
+
+- Never use PowerShell `Set-Content -Force` on source files. On Windows
+  PowerShell 5.1 it defaults to UTF-16, corrupting em dashes (`–`),
+  arrows (`→`), and other non-ASCII characters into replacement characters
+  (`�`).
+- Use the `write` or `edit` tools (OpenCode native tools) for all file
+  modifications — they preserve UTF-8 encoding correctly.
+- If a PowerShell file write is unavoidable, use:
+  ```powershell
+  [System.IO.File]::WriteAllText($path, $content, [System.Text.UTF8Encoding]::new($false))
+  ```
+- Before committing, scan staged changes for corruption:
+  ```powershell
+  git diff --cached --name-only | ForEach-Object {
+    $bytes = [System.IO.File]::ReadAllBytes($_)
+    for ($i = 0; $i -lt $bytes.Length - 2; $i++) {
+      if ($bytes[$i] -eq 0xEF -and $bytes[$i+1] -eq 0xBF -and $bytes[$i+2] -eq 0xBD) {
+        throw "REPLACEMENT CHARACTER in $_ at byte $i"
+      }
+    }
+  }
+  ```
+
 ## Shader Conventions
 
 - GLSL source: `res/shaders/`
