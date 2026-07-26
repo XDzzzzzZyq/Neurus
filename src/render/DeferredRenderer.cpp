@@ -299,7 +299,7 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 
 void DeferredRenderer::ResetShadowAccumulation()
 {
-	m_shadowFrameCount = 0;
+	m_iteration = 0;
 }
 
 void DeferredRenderer::WaitIdle()
@@ -448,9 +448,9 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 		ctx.jitter = (len > 1e-6f) ? glm::vec3(x / len, y / len, z / len) : glm::vec3(0.0f, 0.0f, 1.0f);
 	}
 
-	// Set global shadow frame count from DeferredRenderer's counter
-	ctx.shadowFrameCount = m_shadowFrameCount;
-	m_shadowFrameCount++;
+	// Set global iteration counter from DeferredRenderer's counter
+	ctx.iteration = m_iteration;
+	m_iteration++;
 
 	// Advance Halton index (cycles through all Halton(2,3,5) triples)
 	m_haltonIndex++;

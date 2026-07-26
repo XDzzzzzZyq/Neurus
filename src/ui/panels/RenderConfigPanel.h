@@ -81,6 +81,7 @@ private:
 	QComboBox*  m_shadowAlgCombo    = nullptr;
 	QComboBox*  m_shadowPCFCombo    = nullptr;  ///< PCF filter mode (Hard/Soft16/Soft64)
 	ScalarSlider* m_shadowBiasSlider = nullptr;
+	QComboBox*  m_samplingModeCombo  = nullptr;  ///< Temporal sampling mode (Fixed EMA / Moving Avg)
 
 	// --- Ambient Occlusion ---
 	QGroupBox*  m_aoGroup           = nullptr;

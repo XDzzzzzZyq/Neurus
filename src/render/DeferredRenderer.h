@@ -266,7 +266,7 @@ private:
 
 	// --- Temporal shadow accumulation state ---
 	uint32_t m_haltonIndex = 0;
-	uint32_t m_shadowFrameCount = 0;
+	uint32_t m_iteration = 0;
 
 };
 

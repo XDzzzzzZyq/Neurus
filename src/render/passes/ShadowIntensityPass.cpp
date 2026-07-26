@@ -491,7 +491,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			if (ctx.config)
 			{
 				const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
-				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_shadow_alpha_mode);
+				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_sampling_mode);
 			}
 
 			ShadowEvalPushConstants pc = {};
@@ -505,8 +505,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.jitterY     = ctx.jitter.y;
 			pc.jitterZ     = ctx.jitter.z;
 			pc.lightRadius = light->light_radius;
-			pc.alpha       = ComputeShadowAlpha(alphaMode, ctx.shadowFrameCount);
-			pc.frameCount  = static_cast<int32_t>(ctx.shadowFrameCount);
+			pc.alpha       = ComputeShadowAlpha(alphaMode, ctx.iteration);
+			pc.frameCount  = static_cast<int32_t>(ctx.iteration);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
 				*p_pipelines[0].pipelineLayout,
@@ -587,7 +587,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			if (ctx.config)
 			{
 				const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
-				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_shadow_alpha_mode);
+				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_sampling_mode);
 			}
 
 			SunShadowEvalPushConstants pc = {};
@@ -598,8 +598,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.jitterY       = ctx.jitter.y;
 			pc.jitterZ       = ctx.jitter.z;
 			pc.lightRadius   = light->light_radius;
-			pc.alpha         = ComputeShadowAlpha(alphaMode, ctx.shadowFrameCount);
-			pc.frameCount    = static_cast<int32_t>(ctx.shadowFrameCount);
+			pc.alpha         = ComputeShadowAlpha(alphaMode, ctx.iteration);
+			pc.frameCount    = static_cast<int32_t>(ctx.iteration);
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(
 				*p_pipelines[1].pipelineLayout,

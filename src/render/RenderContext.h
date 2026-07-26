@@ -61,8 +61,8 @@ struct RenderContext
 	/// Sun lights use: dir_jittered = normalize(lightDir + jitter * smallScale)
 	glm::vec3 jitter{0.0f, 0.0f, 0.0f};
 
-	/// @brief Global shadow accumulation frame count (incremented each frame, reset by Editor).
-	uint32_t shadowFrameCount{0};
+	/// @brief Per-frame iteration counter (incremented each frame, reset by Editor on scene changes).
+	uint32_t iteration{0};
 };
 
 } // namespace neurus
