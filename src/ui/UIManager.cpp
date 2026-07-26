@@ -3,6 +3,7 @@
 #include "panels/Outliner.h"
 #include "panels/PropertyPanel.h"
 #include "panels/RenderConfigPanel.h"
+#include "panels/ShaderEditorPanel.h"
 #include "panels/Viewport.h"
 #include "UIContext.h"
 
@@ -232,12 +233,15 @@ void UIManager::CreateDocks()
 	m_panels[PanelType::Viewport] = viewport.release();
 	m_docks[PanelType::Viewport] = viewportDock;
 
-	// --- Left: Shader Editor (placeholder, not a UIPanel) ---
-	auto* shaderDock = new ads::CDockWidget(win_dockManager, "Shader Editor");
-	shaderDock->setWidget(makePlaceholder("Shader Editor"));
+	// --- Left: Shader Editor ---
+	auto shaderEditor = std::make_unique<ShaderEditorPanel>();
+	auto* shaderDock = new ads::CDockWidget(win_dockManager, shaderEditor->PanelName());
+	shaderDock->setWidget(shaderEditor.get(), ads::CDockWidget::ForceNoScrollArea);
 	shaderDock->resize(280, 300);
 	shaderDock->setMinimumSize(200, 200);
 	win_dockManager->addDockWidget(ads::LeftDockWidgetArea, shaderDock);
+	m_panels[PanelType::ShaderEditor] = shaderEditor.release();
+	m_docks[PanelType::ShaderEditor] = shaderDock;
 
 	// --- Left: Outliner ---
 	auto outliner = std::make_unique<Outliner>();

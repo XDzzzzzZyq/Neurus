@@ -33,6 +33,7 @@ enum class PanelType : uint8_t
 	Outliner,
 	PropertyPanel,
 	RenderConfig,
+	ShaderEditor,
 	Count
 };
 
@@ -83,6 +84,7 @@ private:
 		case PanelType::Outliner:       return "Outliner";
 		case PanelType::PropertyPanel: return "Property Panel";
 		case PanelType::RenderConfig:   return "Render Config";
+		case PanelType::ShaderEditor:   return "Shader Editor";
 		default:                        return "Unknown";
 		}
 	}

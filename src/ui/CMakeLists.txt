@@ -13,6 +13,10 @@ add_library(neurus_ui STATIC
 	items/OutlinerRow.cpp
 	items/Vec3Spin.h
 	items/Vec3Spin.cpp
+	items/ShaderFieldRow.h
+	items/ShaderFieldRow.cpp
+	items/ShaderStructSection.h
+	items/ShaderStructSection.cpp
 	presets/CameraProperties.h
 	presets/CameraProperties.cpp
 	presets/MeshProperties.h
@@ -30,6 +34,8 @@ add_library(neurus_ui STATIC
 	panels/RenderConfigPanel.cpp
 	panels/Viewport.h
 	panels/Viewport.cpp
+	panels/ShaderEditorPanel.h
+	panels/ShaderEditorPanel.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC

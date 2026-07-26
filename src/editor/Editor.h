@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "controllers/Controllers.h"
@@ -16,6 +17,7 @@ class DeferredRenderer;
 class Scene;
 class Environment;
 class UploadManager;
+class ShaderController;
 }
 
 namespace neurus {
@@ -56,10 +58,10 @@ public:
 	RenderContext GetRenderContext() const;
 	UIContext GetUIContext() const;
 
-	template<typename T>
-	void RegisterController()
+	template<typename T, typename... Args>
+	void RegisterController(Args&&... args)
 	{
-		auto ctrl = std::make_unique<T>();
+		auto ctrl = std::make_unique<T>(std::forward<Args>(args)...);
 		ctrl->Init(ed_eventBus);
 		ed_controllers.push_back(std::move(ctrl));
 	}

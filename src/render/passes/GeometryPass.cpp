@@ -221,17 +221,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const vk::Rect2D scissor({0, 0}, renderExtent);
 	cmdBuf.setScissor(0, scissor);
 
-	// --- 5. Bind pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[0].pipeline);
-
-	// --- 6. Bind camera descriptor set (set 0) ---
-	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-	                          *p_pipelines[0].pipelineLayout,
-	                          0,
-	                          {p_cameraDescriptorSet.handle()},
-	                          {});
-
-	// --- 7. Draw each mesh from scene.mesh_list ---
+	// --- 5. Draw each mesh with optional per-mesh shader pipeline ---
 	if (scene)
 	{
 		for (const auto& [id, mesh] : scene->mesh_list)
@@ -246,15 +236,51 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 				continue;
 			}
 
+			// --- Per-mesh shader override ---
+			bool usingCustomPipeline = false;
+			if (mesh->o_shader)
+			{
+				Pipeline* customPipeline = cache.GetPipeline(mesh->GetObjectID());
+				if (customPipeline && customPipeline->pipeline)
+				{
+					cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics,
+					                    *customPipeline->pipeline);
+					// Bind camera descriptor set with the custom pipeline's layout
+					cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+					    *customPipeline->pipelineLayout,
+					    0,
+					    {p_cameraDescriptorSet.handle()},
+					    {});
+					usingCustomPipeline = true;
+				}
+			}
+
+			// Fall back to default pipeline if no custom shader or pipeline not cached
+			if (!usingCustomPipeline)
+			{
+				cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[0].pipeline);
+				cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+				                          *p_pipelines[0].pipelineLayout,
+				                          0,
+				                          {p_cameraDescriptorSet.handle()},
+				                          {});
+			}
+
+			// --- Push constants ---
 			const glm::mat4 model = mesh->GetModelMatrix();
 			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
 
 			MeshPushConstants pushConstants{model, normalMat,
 			                               static_cast<uint32_t>(mesh->GetObjectID())};
-			cmdBuf.pushConstants<MeshPushConstants>(*p_pipelines[0].pipelineLayout,
-			                                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-			                                    0, pushConstants);
 
+			// Custom shaders share the same push constant layout (MeshPushConstants)
+			const auto& pipelineLayout = p_pipelines[0].pipelineLayout;
+
+			cmdBuf.pushConstants<MeshPushConstants>(*pipelineLayout,
+			    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+			    0, pushConstants);
+
+			// --- Draw ---
 			const vk::DeviceSize vbOffset = 0;
 			cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), vbOffset);
 			cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
@@ -262,7 +288,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 	}
 
-	// --- 8. End dynamic rendering pass ---
+	// --- 6. End dynamic rendering pass ---
 	EndPass(cmdBuf);
 }
 
