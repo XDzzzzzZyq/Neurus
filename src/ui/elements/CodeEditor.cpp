@@ -24,12 +24,17 @@ CodeEditor::CodeEditor(QWidget* parent)
     });
     connect(this, &CodeEditor::textChanged, this, [this]() {
         emit codeChanged(getCode());
+        updateAlternatingRows();
+    });
+
+    connect(this, &CodeEditor::blockCountChanged, this, [this](int) {
+        updateAlternatingRows();
     });
 
     updateLineNumberAreaWidth();
     setLineNumbersVisible(true);
 
-    QFont font("Consolas", 10);
+	QFont font("Consolas", 8);
     font.setStyleHint(QFont::Monospace);
     setFont(font);
     setTabStopDistance(fontMetrics().horizontalAdvance(' ') * 4);
@@ -88,27 +93,59 @@ void CodeEditor::updateLineNumberAreaWidth()
 
 void CodeEditor::lineNumberAreaPaintEvent(QPaintEvent* event)
 {
-    QPainter painter(m_lineNumberArea);
-    painter.fillRect(event->rect(), QColor(240, 240, 240));
+	QPainter painter(m_lineNumberArea);
 
-    QTextBlock block = firstVisibleBlock();
-    int blockNumber = block.blockNumber();
-    int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
-    int bottom = top + qRound(blockBoundingRect(block).height());
+	QTextBlock block = firstVisibleBlock();
+	int blockNumber = block.blockNumber();
+	int top = qRound(blockBoundingGeometry(block).translated(contentOffset()).top());
+	int bottom = top + qRound(blockBoundingRect(block).height());
 
-    painter.setPen(QColor(160, 160, 160));
+	while (block.isValid() && top <= event->rect().bottom())
+	{
+		if (block.isVisible() && bottom >= event->rect().top())
+		{
+			// Alternating stripe background (white / light grey)
+			QRect r(0, top, m_lineNumberArea->width(), bottom - top);
+			if (blockNumber % 2 == 0)
+				painter.fillRect(r, QColor(245, 245, 245));  // white
+			else
+				painter.fillRect(r, QColor(235, 235, 235));  // light grey
 
-    while (block.isValid() && top <= event->rect().bottom()) {
-        if (block.isVisible() && bottom >= event->rect().top()) {
-            QString number = QString::number(blockNumber + 1);
-            painter.drawText(0, top, m_lineNumberArea->width() - 3, fontMetrics().height(),
-                             Qt::AlignRight, number);
-        }
-        block = block.next();
-        top = bottom;
-        bottom = top + qRound(blockBoundingRect(block).height());
-        ++blockNumber;
-    }
+			// Line number text — light grey
+			QString number = QString::number(blockNumber + 1);
+			painter.setPen(QColor(180, 180, 180));
+			painter.drawText(0, top, m_lineNumberArea->width() - 3, fontMetrics().height(),
+			                 Qt::AlignRight, number);
+		}
+
+		block = block.next();
+		top = bottom;
+		bottom = top + qRound(blockBoundingRect(block).height());
+		++blockNumber;
+	}
+}
+
+void CodeEditor::updateAlternatingRows()
+{
+	QList<QTextEdit::ExtraSelection> selections;
+	QTextBlock block = document()->firstBlock();
+
+	while (block.isValid())
+	{
+		if (block.blockNumber() % 2 != 0)
+		{
+			QTextEdit::ExtraSelection sel;
+			sel.format.setBackground(QColor(245, 245, 245));
+			sel.format.setProperty(QTextFormat::FullWidthSelection, true);
+			sel.cursor = QTextCursor(block);
+			sel.cursor.movePosition(QTextCursor::StartOfBlock);
+			sel.cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+			selections.append(sel);
+		}
+		block = block.next();
+	}
+
+	setExtraSelections(selections);
 }
 
 } // namespace neurus

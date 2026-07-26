@@ -50,6 +50,7 @@ private:
     };
     friend class LineNumberArea;
     void lineNumberAreaPaintEvent(QPaintEvent* event);
+    void updateAlternatingRows();
 
     LineNumberArea*              m_lineNumberArea      = nullptr;
     std::unique_ptr<ShaderHighlighter> m_highlighter;
