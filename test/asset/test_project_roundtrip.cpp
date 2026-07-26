@@ -189,7 +189,7 @@ TEST(ProjectRoundtrip, LightPoint)
 		RenderConfig config;
 		auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f, 0.8f, 0.6f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-		light->SetRadius(0.05f);
+		light->SetRadius(0.01f);
 		scene.UseLight(light);
 		auto p = MakeProject(scene, config);
 		p.Save(tmp.path);
@@ -206,7 +206,7 @@ TEST(ProjectRoundtrip, LightPoint)
 	EXPECT_EQ(loadedLight->light_type, POINTLIGHT);
 	EXPECT_FLOAT_EQ(loadedLight->light_power, 10.0f);
 	EXPECT_EQ(loadedLight->light_color, glm::vec3(1.0f, 0.8f, 0.6f));
-	EXPECT_FLOAT_EQ(loadedLight->light_radius, 0.05f);
+	EXPECT_FLOAT_EQ(loadedLight->light_radius, 0.01f);
 	EXPECT_EQ(loadedLight->GetPosition(), glm::vec3(3.0f, 3.0f, 3.0f));
 	EXPECT_EQ(loadedLight->o_type, ObjectID::GOType::GO_LIGHT);
 }
