@@ -437,6 +437,7 @@ private:
 	// --- Light UID → SSBO index / shadow index maps (populated by UpdateLighting) ---
 	std::unordered_map<int, uint32_t> rc_uidToSSBOIdx;     ///< uid → SSBO element index
 	std::unordered_map<int, uint32_t> rc_uidToShadowLayer; ///< uid → shadow intensity layer
+
 };
 
 /**

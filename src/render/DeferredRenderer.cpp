@@ -22,6 +22,8 @@
 #include "passes/ComposePass.h"
 #include "passes/FXAAPass.h"
 
+#include "render/HaltonSequence.h"
+
 #include "scene/Light.h"
 #include "scene/Scene.h"
 
@@ -295,6 +297,11 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
 }
 
+void DeferredRenderer::ResetShadowAccumulation()
+{
+	m_iteration = 0;
+}
+
 void DeferredRenderer::WaitIdle()
 {
 	r_device.waitIdle();
@@ -431,6 +438,22 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	ctx.width = extent.width;
 	ctx.height = extent.height;
 	ctx.frameIndex = r_currentFrame;
+
+	// --- Temporal shadow accumulation: compute 3D random jitter direction ---
+	{
+		float x = 2.0f * HaltonSequence::Halton2(m_haltonIndex) - 1.0f;
+		float y = 2.0f * HaltonSequence::Halton3(m_haltonIndex) - 1.0f;
+		float z = 2.0f * HaltonSequence::Halton5(m_haltonIndex) - 1.0f;
+		float len = std::sqrt(x * x + y * y + z * z);
+		ctx.jitter = (len > 1e-6f) ? glm::vec3(x / len, y / len, z / len) : glm::vec3(0.0f, 0.0f, 1.0f);
+	}
+
+	// Set global iteration counter from DeferredRenderer's counter
+	ctx.iteration = m_iteration;
+	m_iteration++;
+
+	// Advance Halton index (cycles through all Halton(2,3,5) triples)
+	m_haltonIndex++;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---
 	r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);

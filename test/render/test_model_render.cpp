@@ -215,7 +215,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		glm::vec3(1.0f, 1.0f, 1.0f));
 
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-	light->light_radius = 0.05f;
+	light->light_radius = 0.0f;
 
 	// -----------------------------------------------------------------------
 	// Step 6: Create Mesh from loaded data, assign material

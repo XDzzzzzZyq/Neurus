@@ -78,7 +78,7 @@ public:
 
 	// Point light parameters
 	/** @brief Physical radius for soft shadows (point lights only). */
-	float light_radius{ 0.05f };
+	float light_radius{ 0.01f };
 
 	// Spot light parameters
 	/** @brief Inner cone cosine (full brightness). */

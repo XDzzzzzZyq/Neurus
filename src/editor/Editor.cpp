@@ -77,21 +77,41 @@ void Editor::Initialize()
 	// --- Wire project file signal handlers ---
 	// (events are enqueued by Editor::OnUIEvent from UIEvents Qt signals)
 
-	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) { OnProjectNew(); });
-	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) { OnProjectOpen(e.path); });
+	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnProjectNew();
+	});
+	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnProjectOpen(e.path);
+	});
 	ed_eventBus.subscribe<ProjectSaveEvent>([this](const ProjectSaveEvent&) { OnProjectSave(); });
 	ed_eventBus.subscribe<ProjectSaveAsEvent>([this](const ProjectSaveAsEvent& e) { OnProjectSaveAs(e.path); });
 
-	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) { OnMeshImport(e.path); });
-	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) { OnCameraAdd(); });
-	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) { OnLightAdd(); });
-	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) { OnSunLightAdd(); });
+	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnMeshImport(e.path);
+	});
+	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnCameraAdd();
+	});
+	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnLightAdd();
+	});
+	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnSunLightAdd();
+	});
 
 	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		m_config = e.config;
 	});
 
 	ed_eventBus.subscribe<PositionChanged>([this](const PositionChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -108,6 +128,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -124,6 +145,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -145,12 +167,14 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
 	});
 
 	// --- Camera property events ---
 
 	ed_eventBus.subscribe<CameraTargetChanged>([this](const CameraTargetChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
@@ -159,6 +183,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<CameraFovChanged>([this](const CameraFovChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
@@ -169,6 +194,7 @@ void Editor::Initialize()
 	// --- Mesh property events ---
 
 	ed_eventBus.subscribe<MeshShadowChanged>([this](const MeshShadowChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
@@ -177,6 +203,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<MeshMaterialChanged>([this](const MeshMaterialChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
@@ -187,6 +214,7 @@ void Editor::Initialize()
 	// --- Light property events ---
 
 	ed_eventBus.subscribe<LightPowerChanged>([this](const LightPowerChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -197,6 +225,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -207,6 +236,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -218,6 +248,7 @@ void Editor::Initialize()
 	// --- Environment property events ---
 
 	ed_eventBus.subscribe<EnvironmentIntensityChanged>([this](const EnvironmentIntensityChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
@@ -226,6 +257,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<EnvironmentRotationChanged>([this](const EnvironmentRotationChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
@@ -241,6 +273,7 @@ void Editor::Initialize()
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto it = GetScene().env_list.find(e.envId);
 		if (it != GetScene().env_list.end())
 		{
@@ -273,6 +306,12 @@ void Editor::Initialize()
 
 		if (std::abs(e.delta) > 0.001f)
 			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
+	});
+
+	// --- Subscribe to RenderResetEvent to reset temporal accumulation ---
+	ed_eventBus.subscribe<RenderResetEvent>([this](const RenderResetEvent&) {
+		if (ed_renderer)
+			ed_renderer->ResetShadowAccumulation();
 	});
 
 	NEURUS_LOG("[Editor] Initialized");
@@ -322,7 +361,7 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 
 	auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-	light->SetRadius(0.05f);
+	light->SetRadius(0.01f);
 	m_scene->UseLight(light);
 
 	auto env = std::make_shared<Environment>();
@@ -463,7 +502,7 @@ void Editor::OnLightAdd()
 		auto light = std::make_shared<neurus::Light>(
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-		light->SetRadius(0.05f);
+		light->SetRadius(0.01f);
 		m_scene->UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
 		UploadLighting();

@@ -112,7 +112,7 @@ TEST(Light, TypedConstructor_CustomPowerAndColor)
 TEST(Light, PointRadiusDefault)
 {
 	Light light(LightType::POINTLIGHT);
-	EXPECT_FLOAT_EQ(light.light_radius, 0.05f);
+	EXPECT_FLOAT_EQ(light.light_radius, 0.01f);
 }
 
 /**

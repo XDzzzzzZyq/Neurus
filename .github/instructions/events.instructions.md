@@ -203,3 +203,22 @@ Editor subscriber                ← business logic
 4. **Subscribe in Editor** with one `eventBus.subscribe<T>()` call.
 
 That's it — four changes, all in different layers, no cross-layer includes needed.
+
+### RenderResetEvent
+
+```cpp
+struct RenderResetEvent
+{
+};
+```
+
+An empty marker event emitted whenever the scene state changes in a way that
+invalidates temporal accumulation (camera movement, light/object transform,
+visibility toggle, config change, project load, asset import, environment change).
+Camera movement events are enqueued by `CameraController` after each frame handler
+(Zoom, Rotate, Push, Slide, Resize). Other scene mutations enqueue it directly
+from `Editor` event handlers.
+
+**Subscribers** listen for this event to reset per-frame history:
+- `DeferredRenderer::ResetShadowAccumulation()` — zeros the shadow accumulation iteration counter.
+- Future: SSAO temporal accumulation, SSR temporal accumulation, TAA jitter reset.

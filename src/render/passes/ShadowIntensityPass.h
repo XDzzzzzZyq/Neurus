@@ -23,6 +23,7 @@
 #pragma once
 
 #include "passes/ComputePass.h"
+#include "render/TemporalAccumulator.h"
 
 #include <vulkan/vulkan_raii.hpp>
 

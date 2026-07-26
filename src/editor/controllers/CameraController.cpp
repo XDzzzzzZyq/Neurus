@@ -10,6 +10,7 @@
 
 #include "editor/controllers/CameraController.h"
 #include "editor/events/CameraEvents.h"
+#include "editor/events/EditorEvents.h"
 #include "editor/events/EventBus.h"
 #include "scene/Camera.h"
 
@@ -207,11 +208,26 @@ namespace neurus {
 
 void CameraController::Init(EventQueue& bus)
 {
-	bus.subscribe<CameraZoomEvent>([](const CameraZoomEvent& e) { OnCameraZoom(e); });
-	bus.subscribe<CameraRotateEvent>([](const CameraRotateEvent& e) { OnCameraRotate(e); });
-	bus.subscribe<CameraPushEvent>([](const CameraPushEvent& e) { OnCameraPush(e); });
-	bus.subscribe<CameraSlideEvent>([](const CameraSlideEvent& e) { OnCameraSlide(e); });
-	bus.subscribe<CameraResizeEvent>([](const CameraResizeEvent& e) { OnCameraResize(e); });
+	bus.subscribe<CameraZoomEvent>([&bus](const CameraZoomEvent& e) {
+		OnCameraZoom(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+	bus.subscribe<CameraRotateEvent>([&bus](const CameraRotateEvent& e) {
+		OnCameraRotate(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+	bus.subscribe<CameraPushEvent>([&bus](const CameraPushEvent& e) {
+		OnCameraPush(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+	bus.subscribe<CameraSlideEvent>([&bus](const CameraSlideEvent& e) {
+		OnCameraSlide(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+	bus.subscribe<CameraResizeEvent>([&bus](const CameraResizeEvent& e) {
+		OnCameraResize(e);
+		bus.enqueue(RenderResetEvent{});
+	});
 }
 
 } // namespace neurus

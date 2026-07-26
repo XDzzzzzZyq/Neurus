@@ -202,10 +202,19 @@ void ShaderStruct::SetUB(std::string type, std::string name, const Args& args, i
 }
 
 void ShaderStruct::SetUni(ParaType type, int count, const std::string& name, int binding,
-                          const std::string& qualifiers, const std::string& actualType)
+                          const std::string& qualifiers, const std::string& actualType,
+                          const std::string& imageFormat)
 {
 	is_struct_changed = true;
-	uniform_list.push_back({name, type, count, binding, qualifiers, actualType});
+	S_Uniform uni;
+	uni.name = name;
+	uni.type = type;
+	uni.count = count;
+	uni.binding = binding;
+	uni.qualifiers = qualifiers;
+	uni.actualType = actualType;
+	uni.imageFormat = imageFormat;
+	uniform_list.push_back(uni);
 }
 
 void ShaderStruct::SetInp(ParaType type, int count, const std::string& name)
