@@ -133,6 +133,7 @@ int Application::Run()
 	const auto projectPath = resolveResourcePath("shadow.neurus.json").toStdString();
 	const auto assetDir = resolveResourcePath("").toStdString();
 	const auto objPath = resolveResourcePath("obj/sphere.obj").toStdString();
+	app_editor->SetAssetDir(assetDir);
 
 	try
 	{

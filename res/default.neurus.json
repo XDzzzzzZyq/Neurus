@@ -1,8 +1,6 @@
 {
-    "project": {
-        "cereal_class_version": 0,
-        "m_scene": {
-            "cereal_class_version": 0,
+    "project": {        
+        "m_scene": {            
             "cam_list": [
                 {
                     "key": 1,
@@ -10,12 +8,9 @@
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483649,
-                            "data": {
-                                "cereal_class_version": 0,
-                                "value0": {
-                                    "cereal_class_version": 0,
-                                    "value0": {
-                                        "cereal_class_version": 0,
+                            "data": {                                
+                                "value0": {                                    
+                                    "value0": {                                        
                                         "o_id": 1
                                     },
                                     "o_name": "",
@@ -23,8 +18,7 @@
                                     "is_viewport": true,
                                     "is_rendered": true
                                 },
-                                "transform": {
-                                    "cereal_class_version": 0,
+                                "transform": {                                    
                                     "m_position": {
                                         "x": 26.0,
                                         "y": -35.0,
@@ -64,8 +58,7 @@
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483650,
-                            "data": {
-                                "cereal_class_version": 0,
+                            "data": {                                
                                 "value0": {
                                     "value0": {
                                         "o_id": 2
@@ -109,8 +102,7 @@
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483651,
-                            "data": {
-                                "cereal_class_version": 0,
+                            "data": {                                
                                 "value0": {
                                     "value0": {
                                         "o_id": 3
@@ -164,8 +156,7 @@
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
                             "id": 2147483652,
-                            "data": {
-                                "cereal_class_version": 0,
+                            "data": {                                
                                 "value0": {
                                     "value0": {
                                         "o_id": 4
@@ -201,15 +192,14 @@
                 }
             ]
         },
-        "proj_config": {
-            "cereal_class_version": 0,
+        "proj_config": {            
             "r_pipeline": 1,
             "r_aa": 0,
             "r_ao": 1,
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.02,
+            "r_shadow_bias": 0.0002,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,

@@ -403,7 +403,7 @@ void Editor::OnProjectNew()
 
 void Editor::OnProjectOpen(const std::string& path)
 {
-	try { LoadProject(path); }
+	try { LoadProject(path, m_assetDir); }
 	catch (const std::exception& e) { NEURUS_ERR("Failed to open project: " << e.what()); }
 }
 

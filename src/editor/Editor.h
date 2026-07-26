@@ -51,6 +51,7 @@ public:
 	const std::string& GetProjectPath() const { return m_projectPath; }
 	bool IsDirty() const { return m_dirty; }
 	void MarkDirty() { m_dirty = true; }
+	void SetAssetDir(const std::string& dir) { m_assetDir = dir; }
 
 	RenderContext GetRenderContext() const;
 	UIContext GetUIContext() const;
@@ -95,6 +96,7 @@ private:
 	std::unique_ptr<Scene> m_scene;
 	RenderConfig          m_config;
 	std::string           m_projectPath;
+	std::string           m_assetDir;
 	bool                  m_dirty = false;
 
 	// --- Editor infrastructure ---
