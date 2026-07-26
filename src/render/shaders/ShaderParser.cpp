@@ -660,6 +660,31 @@ ShaderStruct ShaderParser::ParseShaderCode(const std::string& source, ShaderType
 				qualifiers = "readonly";
 			}
 
+			// Extract bare image format qualifier from layout (e.g., "r8", "rgba16f")
+			// layoutStr is like "r8, binding = 2" — tokens without '=' are format qualifiers
+			{
+				std::string lc = layoutStr;
+				size_t pos = 0;
+				while (pos < lc.size())
+				{
+					size_t comma = lc.find(',', pos);
+					std::string token = TrimWhitespace(lc.substr(pos,
+						(comma == std::string::npos) ? std::string::npos : comma - pos));
+					// A bare token without '=' is a format qualifier
+					if (!token.empty() && token.find('=') == std::string::npos)
+					{
+						// Prepend to qualifiers (so it becomes "r8 readonly" or "r8")
+						if (qualifiers.empty())
+							qualifiers = token;
+						else
+							qualifiers = token + " " + qualifiers;
+						break;
+					}
+					if (comma == std::string::npos) break;
+					pos = comma + 1;
+				}
+			}
+
 			// Strip qualifiers like "writeonly", "readonly", "uniform"
 			std::string decl = afterLayout;
 			for (const auto& qualifier : {"writeonly", "readonly", "uniform"})
