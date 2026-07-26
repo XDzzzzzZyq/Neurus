@@ -241,7 +241,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			if (mesh->o_shader)
 			{
 				Pipeline* customPipeline = cache.GetPipeline(mesh->GetObjectID());
-				if (customPipeline && customPipeline->pipeline)
+				if (customPipeline)
 				{
 					cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics,
 					                    *customPipeline->pipeline);
