@@ -660,24 +660,26 @@ ShaderStruct ShaderParser::ParseShaderCode(const std::string& source, ShaderType
 				qualifiers = "readonly";
 			}
 
-			// Extract bare image format qualifier from layout (e.g., "r8", "rgba16f")
-			// layoutStr is like "r8, binding = 2" — tokens without '=' are format qualifiers
+			// Extract bare image format qualifier from layout (e.g., "r8")
+			// A format qualifier is a comma-separated token that does NOT contain '='
+			std::string imageFormat;
 			{
 				std::string lc = layoutStr;
+				{
+					size_t op = lc.find('(');
+					size_t cp = lc.find(')');
+					if (op != std::string::npos && cp != std::string::npos && cp > op)
+						lc = lc.substr(op + 1, cp - op - 1);
+				}
 				size_t pos = 0;
 				while (pos < lc.size())
 				{
 					size_t comma = lc.find(',', pos);
 					std::string token = TrimWhitespace(lc.substr(pos,
 						(comma == std::string::npos) ? std::string::npos : comma - pos));
-					// A bare token without '=' is a format qualifier
 					if (!token.empty() && token.find('=') == std::string::npos)
 					{
-						// Prepend to qualifiers (so it becomes "r8 readonly" or "r8")
-						if (qualifiers.empty())
-							qualifiers = token;
-						else
-							qualifiers = token + " " + qualifiers;
+						imageFormat = token;
 						break;
 					}
 					if (comma == std::string::npos) break;
@@ -717,7 +719,7 @@ ShaderStruct ShaderParser::ParseShaderCode(const std::string& source, ShaderType
 			{
 				actualType = typeName;
 			}
-			result.SetUni(pType, 1, word, binding, qualifiers, actualType);
+			result.SetUni(pType, 1, word, binding, qualifiers, actualType, imageFormat);
 			continue;
 			}
 

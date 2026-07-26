@@ -8,7 +8,6 @@
 #include "ShaderStruct.h"
 
 #include <sstream>
-#include <vector>
 
 namespace neurus {
 
@@ -181,41 +180,17 @@ std::string ShaderGenerator::Generate(ShaderStruct& s)
 	{
 		for (const auto& u : s.uniform_list)
 		{
-			// Check for embedded image format qualifier in the qualifiers string
-			// (e.g., "r8", "rgba16f") that was extracted by ShaderParser.
-			std::string layoutFmt;
-			std::string outQuals = u.qualifiers;
-			static const std::vector<std::string> kImgFormats = {
-				"r8", "r8ui", "r8i", "r16", "r16f", "r16i", "r16ui",
-				"rg8", "rg8ui", "rg8i", "rg16", "rg16f", "rg16i", "rg16ui",
-				"rgba8", "rgba8ui", "rgba8i", "rgba16f", "rgba16i", "rgba16ui",
-				"r32f", "r32i", "r32ui", "rg32f", "rg32i", "rg32ui",
-				"rgba32f", "rgba32i", "rgba32ui",
-				"r11fg11fb10f", "r10r10g10b10a2"
-			};
-			for (const auto& fmt : kImgFormats)
-			{
-				if (outQuals.rfind(fmt, 0) == 0)
-				{
-					layoutFmt = fmt;
-					outQuals = outQuals.substr(fmt.size());
-					while (!outQuals.empty() && outQuals[0] == ' ')
-						outQuals = outQuals.substr(1);
-					break;
-				}
-			}
-
 			if (u.binding >= 0)
 			{
-				if (!layoutFmt.empty())
-					result << "layout(" << layoutFmt << ", binding = " << u.binding << ") ";
+				if (!u.imageFormat.empty())
+					result << "layout(" << u.imageFormat << ", binding = " << u.binding << ") ";
 				else
 					result << "layout(binding = " << u.binding << ") ";
 			}
 			result << "uniform ";
-			if (!outQuals.empty())
+			if (!u.qualifiers.empty())
 			{
-				result << outQuals << " ";
+				result << u.qualifiers << " ";
 			}
 			if (!u.actualType.empty())
 			{
