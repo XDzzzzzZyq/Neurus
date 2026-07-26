@@ -112,13 +112,24 @@ void ShaderController::OnCompileShader(const ShaderCompileRequested& e)
 	try
 	{
 		auto& shader = *mesh->o_shader;
+		auto type = static_cast<ShaderType>(e.shaderType);
+
+		// Write the edited code back to the ShaderUnit
+		if (!e.code.empty() && shader.HasStage(type))
+		{
+			auto& unit = shader.GetStage(type);
+			unit.code = e.code;
+			unit.BumpVersion();
+
+			NEURUS_LOG("[ShaderController] Updated shader code for mesh " << e.objectId
+			           << " (" << unit.code.size() << " bytes)");
+		}
 
 		// Compile all stages to SPIR-V
 		auto spvMap = ShaderLibrary::CompileAll(shader);
 
-		// The compiled SPIR-V is now stored in the shader units.
 		// Mark scene as ShaderChanged so the renderer picks it up on the
-		// next frame and builds pipelines via UploadManager::UploadShader().
+		// next frame and rebuilds pipelines via UploadManager::UploadShader().
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
 
 		NEURUS_LOG("[ShaderController] Compiled shader for mesh " << e.objectId

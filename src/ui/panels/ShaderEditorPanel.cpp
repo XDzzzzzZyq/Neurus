@@ -145,11 +145,11 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	QObject::connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 	                 m_contentStack, &QStackedWidget::setCurrentIndex);
 
-	// --- Compile button -> event signal ---
+	// --- Compile button -> write code back + emit event ---
 	QObject::connect(m_compileBtn, &QPushButton::clicked, [this]()
 	{
-		if (m_activeObjectId > 0)
-			emit compileRequested({m_activeObjectId});
+		if (m_activeObjectId > 0 && m_codeEditor)
+			emit compileRequested({m_activeObjectId, m_cachedStageType, m_codeEditor->getCode()});
 	});
 
 	// --- Create Shader button -> event signal ---

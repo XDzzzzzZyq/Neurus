@@ -13,6 +13,8 @@ struct ShaderCreateRequested
 struct ShaderCompileRequested
 {
 	int objectId;
+	int shaderType;
+	std::string code;
 };
 
 struct ShaderModified
