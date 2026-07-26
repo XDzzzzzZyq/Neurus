@@ -63,6 +63,10 @@ struct RenderContext
 
 	/// @brief Per-frame iteration counter (incremented each frame, reset by Editor on scene changes).
 	uint32_t iteration{0};
+
+	/// @brief True when the scene has changed and accumulation history should be discarded.
+	/// Set by Editor, consumed by DeferredRenderer each frame.
+	bool iterationReset{false};
 };
 
 } // namespace neurus

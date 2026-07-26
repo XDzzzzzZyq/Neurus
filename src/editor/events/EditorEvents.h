@@ -199,4 +199,15 @@ struct EnvironmentRotationChanged
 	float rotation = 0.0f;
 };
 
+// ---------------------------------------------------------------------------
+// Render events
+// ---------------------------------------------------------------------------
+
+/** @brief Emitted when the scene state changes in a way that invalidates
+ *  temporal accumulation. Subscribe to this to reset any per-frame history
+ *  (shadow accumulation, SSAO temporal, SSR temporal, etc.). */
+struct RenderResetEvent
+{
+};
+
 } // namespace neurus

@@ -69,6 +69,9 @@ public:
 	 * @param bus EventQueue to subscribe to.
 	 */
 	void Init(EventQueue& bus) override;
+
+private:
+	EventQueue* m_bus = nullptr;
 };
 
 } // namespace neurus

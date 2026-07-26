@@ -92,6 +92,8 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<PositionChanged>([this](const PositionChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		m_iterationNeedsReset = true;
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -108,6 +110,8 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		m_iterationNeedsReset = true;
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -124,6 +128,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -151,6 +156,8 @@ void Editor::Initialize()
 	// --- Camera property events ---
 
 	ed_eventBus.subscribe<CameraTargetChanged>([this](const CameraTargetChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		m_iterationNeedsReset = true;
 		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
@@ -159,6 +166,8 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<CameraFovChanged>([this](const CameraFovChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		m_iterationNeedsReset = true;
 		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
@@ -169,6 +178,7 @@ void Editor::Initialize()
 	// --- Mesh property events ---
 
 	ed_eventBus.subscribe<MeshShadowChanged>([this](const MeshShadowChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
@@ -177,6 +187,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<MeshMaterialChanged>([this](const MeshMaterialChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
@@ -187,6 +198,7 @@ void Editor::Initialize()
 	// --- Light property events ---
 
 	ed_eventBus.subscribe<LightPowerChanged>([this](const LightPowerChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -197,6 +209,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -207,6 +220,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -253,6 +267,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<MouseMoveEvent>([this](const MouseMoveEvent& e) {
+		m_iterationNeedsReset = true;
 		auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
 		if (!cam) return;
 
@@ -268,11 +283,18 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<MouseScrollEvent>([this](const MouseScrollEvent& e) {
+		m_iterationNeedsReset = true;
 		auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
 		if (!cam) return;
 
 		if (std::abs(e.delta) > 0.001f)
 			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
+	});
+
+	// --- Subscribe to RenderResetEvent to reset temporal accumulation ---
+	ed_eventBus.subscribe<RenderResetEvent>([this](const RenderResetEvent&) {
+		if (ed_renderer)
+			ed_renderer->ResetShadowAccumulation();
 	});
 
 	NEURUS_LOG("[Editor] Initialized");

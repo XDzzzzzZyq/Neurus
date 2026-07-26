@@ -28,13 +28,7 @@ inline float ComputeShadowAlpha(ShadowAlphaMode mode, uint32_t frameCount)
     switch (mode)
     {
     case ShadowAlphaMode::FixedEMA:     return 1.0f / 8.0f;
-    case ShadowAlphaMode::MovingAvg:    {
-        // Cap iteration so alpha never drops below 1/9 — prevents
-        // accumulation from becoming visually frozen after many frames.
-        static constexpr uint32_t kMaxFrames = 8;
-        const uint32_t capped = (frameCount > kMaxFrames) ? kMaxFrames : frameCount;
-        return 1.0f / static_cast<float>(capped + 1);
-    }
+    case ShadowAlphaMode::MovingAvg:    return 1.0f / static_cast<float>(frameCount + 1);
     }
 
     return 1.0f;
