@@ -1,5 +1,6 @@
 #include "ShaderEditorPanel.h"
 
+#include "elements/CodeEditor.h"
 #include "items/ShaderStructSection.h"
 #include "UIContext.h"
 #include "scene/Scene.h"
@@ -9,7 +10,6 @@
 #include <QComboBox>
 #include <QGroupBox>
 #include <QLabel>
-#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QScrollArea>
 #include <QStackedWidget>
@@ -65,14 +65,13 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	// --- Content stack ---
 	m_contentStack = new QStackedWidget(this);
 
-	// Page 0: Code Editor placeholder
+	// Page 0: Code Editor
 	auto* codePage = new QWidget();
 	auto* codeLayout = new QVBoxLayout(codePage);
 	codeLayout->setContentsMargins(0, 0, 0, 0);
-	m_codePlaceholder = new QPlainTextEdit(this);
-	m_codePlaceholder->setReadOnly(true);
-	m_codePlaceholder->setPlaceholderText("Code Editor -- coming soon");
-	codeLayout->addWidget(m_codePlaceholder);
+	m_codeEditor = new CodeEditor(this);
+	m_codeEditor->setLanguage(CodeEditor::Language::GLSL);
+	codeLayout->addWidget(m_codeEditor);
 	m_contentStack->addWidget(codePage);
 
 	// Page 1: Struct Editor
@@ -241,6 +240,7 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 		m_emptyLabel->setVisible(false);
 		m_showingEmptyState = false;
 		setShowCreateButton(true);
+		if (m_codeEditor) m_codeEditor->setVisible(false);
 		m_abSection->setVisible(false);
 		m_passSection->setVisible(false);
 		m_inputSection->setVisible(false);
@@ -251,10 +251,11 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 		return;
 	}
 
-	// Has shader — show sections, hide create button and empty label
+	// Has shader — show sections and code editor, hide create button and empty label
 	m_emptyLabel->setVisible(false);
 	m_showingEmptyState = false;
 	setShowCreateButton(false);
+	if (m_codeEditor) m_codeEditor->setVisible(true);
 	populateSections(unitPtr);
 }
 
@@ -266,6 +267,9 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr)
 {
 	auto* unit = static_cast<const ShaderUnit*>(shaderUnitPtr);
 	const auto& parsed = unit->parsed;
+
+	// Populate code editor with generated source
+	m_codeEditor->setCode(unit->code);
 
 	using F = ShaderStructSection::FieldData;
 
@@ -407,7 +411,8 @@ void ShaderEditorPanel::setShowEmptyState(bool show)
 	m_showingEmptyState = show;
 	m_emptyLabel->setVisible(show);
 
-	// Hide all sections when showing empty state
+	// Hide all sections and code editor when showing empty state
+	if (m_codeEditor) m_codeEditor->setVisible(!show);
 	m_abSection->setVisible(!show);
 	m_passSection->setVisible(!show);
 	m_inputSection->setVisible(!show);

@@ -18,6 +18,8 @@ class QComboBox;
 class QLabel;
 class QPlainTextEdit;
 class QPushButton;
+
+namespace neurus { class CodeEditor; }
 class QScrollArea;
 class QStackedWidget;
 class QVBoxLayout;
@@ -66,8 +68,8 @@ private:
 	// --- Content stack ---
 	QStackedWidget* m_contentStack = nullptr;
 
-	// --- Code Editor placeholder (Page 0) ---
-	QPlainTextEdit* m_codePlaceholder = nullptr;
+	// --- Code Editor (Page 0) ---
+	CodeEditor* m_codeEditor = nullptr;
 
 	// --- Struct Editor (Page 1) ---
 	QScrollArea*     m_structScroll  = nullptr;

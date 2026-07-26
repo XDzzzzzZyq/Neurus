@@ -17,6 +17,10 @@ add_library(neurus_ui STATIC
 	items/ShaderFieldRow.cpp
 	items/ShaderStructSection.h
 	items/ShaderStructSection.cpp
+	elements/ShaderHighlighter.h
+	elements/ShaderHighlighter.cpp
+	elements/CodeEditor.h
+	elements/CodeEditor.cpp
 	presets/CameraProperties.h
 	presets/CameraProperties.cpp
 	presets/MeshProperties.h
