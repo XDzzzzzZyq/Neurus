@@ -98,7 +98,6 @@ private:
 	std::string           m_projectPath;
 	std::string           m_assetDir;
 	bool                  m_dirty = false;
-	mutable bool          m_iterationNeedsReset = false;
 
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
