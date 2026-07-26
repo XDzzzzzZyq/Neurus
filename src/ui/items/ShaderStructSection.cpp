@@ -64,6 +64,14 @@ void ShaderStructSection::setFields(const std::vector<FieldData>& fields)
 		row->setVisible(true);
 
 		row->setField(fields[i].type, fields[i].name);
+
+		// Disconnect old fieldChanged connection, reconnect to emit fieldEdited
+		QObject::disconnect(row, &ShaderFieldRow::fieldChanged, nullptr, nullptr);
+		int rowIndex = static_cast<int>(i);
+		QObject::connect(row, &ShaderFieldRow::fieldChanged,
+		                 [this, rowIndex](const QString& /*type*/, const QString& /*name*/) {
+			emit fieldEdited(rowIndex);
+		});
 	}
 
 	// Hide remaining rows (never destroy)

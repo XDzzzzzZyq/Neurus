@@ -385,10 +385,9 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	// --- Shader Editor signals → Editor ---
 	if (auto* shaderPanel = app_mainWindow->GetPanel<neurus::ShaderEditorPanel>())
 	{
-		QObject::connect(shaderPanel, &neurus::ShaderEditorPanel::compileRequested,
-			[this](int objectId) {
-				app_editor->OnUIEvent(neurus::ShaderCompileRequested{objectId});
-			});
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::compileRequested);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::createShaderRequested);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::structModified);
 	}
 
 	// Handle Transform changes from Property Panel → Editor

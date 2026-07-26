@@ -35,6 +35,10 @@ public:
 	/** @brief Reset all cached values to sentinel. Call when field identity changes. */
 	void resetCaches();
 
+signals:
+	/** @brief Emitted when type or name changes (user edit). */
+	void fieldChanged(const QString& type, const QString& name);
+
 private:
 	/** @brief Populate the type combo with GLSL types from ShaderStruct::type_table. */
 	void populateTypeCombo();

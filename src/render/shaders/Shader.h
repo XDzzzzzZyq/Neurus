@@ -69,6 +69,9 @@ public:
 	 */
 	virtual ShaderType GetType() const = 0;
 
+	/** Returns true if the shader has the given stage. */
+	bool HasStage(ShaderType type) const;
+
 	/**
 	 * @brief Returns a mutable reference to the ShaderUnit for a stage.
 	 * @param type The shader stage to look up.

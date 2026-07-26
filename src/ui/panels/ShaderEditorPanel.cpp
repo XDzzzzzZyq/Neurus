@@ -2,8 +2,9 @@
 
 #include "items/ShaderStructSection.h"
 #include "UIContext.h"
-#include "scene/Mesh.h"
 #include "scene/Scene.h"
+#include "render/shaders/ShaderUnit.h"
+#include "render/shaders/ShaderStruct.h"
 
 #include <QComboBox>
 #include <QGroupBox>
@@ -145,12 +146,43 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	QObject::connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 	                 m_contentStack, &QStackedWidget::setCurrentIndex);
 
-	// --- Compile button -> signal ---
+	// --- Compile button -> event signal ---
 	QObject::connect(m_compileBtn, &QPushButton::clicked, [this]()
 	{
 		if (m_activeObjectId > 0)
-			emit compileRequested(m_activeObjectId);
+			emit compileRequested({m_activeObjectId});
 	});
+
+	// --- Create Shader button -> event signal ---
+	QObject::connect(m_createBtn, &QPushButton::clicked, [this]()
+	{
+		if (m_activeObjectId > 0)
+			emit createShaderRequested({m_activeObjectId});
+	});
+
+	// --- Stage combo change -> invalidate cache ---
+	QObject::connect(m_stageCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+	                 [this](int index) {
+		m_cachedStageType = index;
+		m_activeObjectId = -1;  // Re-read on next Refresh
+	});
+
+	// --- Section field edits -> structModified event ---
+	auto connectFieldEdited = [this](ShaderStructSection* section)
+	{
+		QObject::connect(section, &ShaderStructSection::fieldEdited,
+		                 [this](int /*row*/) {
+			if (m_activeObjectId > 0)
+				emit structModified({m_activeObjectId, m_cachedStageType});
+		});
+	};
+	connectFieldEdited(m_abSection);
+	connectFieldEdited(m_passSection);
+	connectFieldEdited(m_inputSection);
+	connectFieldEdited(m_outputSection);
+	connectFieldEdited(m_uniformSection);
+	connectFieldEdited(m_structSection);
+	connectFieldEdited(m_funcSection);
 
 	// Start with empty state
 	setShowEmptyState(true);
@@ -165,7 +197,9 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	const auto* scene = static_cast<const Scene*>(ctx.scene);
 	if (!scene)
 	{
-		setActiveObject(0);
+		setShowEmptyState(true);
+		setShowCreateButton(false);
+		m_activeObjectId = -1;
 		return;
 	}
 
@@ -173,36 +207,185 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	const auto* activeObj = scene->selections.GetActiveObject();
 	if (!activeObj)
 	{
-		setActiveObject(0);
+		setShowEmptyState(true);
+		setShowCreateButton(false);
+		m_activeObjectId = -1;
 		return;
 	}
 
-	setActiveObject(activeObj->GetObjectID());
-}
+	int objectId = activeObj->GetObjectID();
+	if (objectId == m_activeObjectId)
+		return;  // No change, nothing to update
 
-// =========================================================================
-// setActiveObject
-// =========================================================================
-
-void ShaderEditorPanel::setActiveObject(int objectId)
-{
-	if (m_activeObjectId == objectId) return;
 	m_activeObjectId = objectId;
 
-	if (objectId <= 0)
+	// Only handle GO_MESH objects
+	if (activeObj->o_type != ObjectID::GOType::GO_MESH)
 	{
-		setShowEmptyState(true);
+		setShowEmptyState(false);
 		setShowCreateButton(false);
-		// Don't clear sections -- just hide them (setShowEmptyState already does this)
+		// Show sections empty
+		m_abSection->setFields({});
+		m_passSection->setFields({});
+		m_inputSection->setFields({});
+		m_outputSection->setFields({});
+		m_uniformSection->setFields({});
+		m_structSection->setFields({});
+		m_funcSection->setFields({});
+		return;
+	}
+
+	// Check if mesh has a shader with the selected stage
+	void* unitPtr = activeObj->GetShaderUnit(m_cachedStageType);
+	if (!unitPtr)
+	{
+		setShowEmptyState(false);
+		setShowCreateButton(true);
 		return;
 	}
 
 	setShowEmptyState(false);
-
-	// In this hardcoded prototype, always show the struct tree
-	// with example data. Real wiring will check mesh->o_shader.
 	setShowCreateButton(false);
-	rebuildStructTree();
+	populateSections(unitPtr);
+}
+
+// =========================================================================
+// populateSections
+// =========================================================================
+
+void ShaderEditorPanel::populateSections(const void* shaderUnitPtr)
+{
+	auto* unit = static_cast<const ShaderUnit*>(shaderUnitPtr);
+	const auto& parsed = unit->parsed;
+
+	using F = ShaderStructSection::FieldData;
+
+	// Attributes (AB_list)
+	if (!parsed.AB_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.AB_list.size());
+		for (const auto& io : parsed.AB_list)
+			fields.push_back({ShaderStruct::ParseType(io.type), io.name, io.location});
+		m_abSection->setFields(fields);
+		m_abSection->setVisible(true);
+	}
+	else
+	{
+		m_abSection->setFields({});
+		m_abSection->setVisible(false);
+	}
+
+	// Pass Outputs (pass_list)
+	if (!parsed.pass_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.pass_list.size());
+		for (const auto& io : parsed.pass_list)
+			fields.push_back({ShaderStruct::ParseType(io.type), io.name, io.location});
+		m_passSection->setFields(fields);
+		m_passSection->setVisible(true);
+	}
+	else
+	{
+		m_passSection->setFields({});
+		m_passSection->setVisible(false);
+	}
+
+	// Inputs (input_list)
+	if (!parsed.input_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.input_list.size());
+		for (const auto& u : parsed.input_list)
+		{
+			std::string typeName = u.actualType.empty()
+				? ShaderStruct::ParseType(u.type)
+				: u.actualType;
+			fields.push_back({typeName, u.name});
+		}
+		m_inputSection->setFields(fields);
+		m_inputSection->setVisible(true);
+	}
+	else
+	{
+		m_inputSection->setFields({});
+		m_inputSection->setVisible(false);
+	}
+
+	// Outputs (output_list)
+	if (!parsed.output_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.output_list.size());
+		for (const auto& u : parsed.output_list)
+		{
+			std::string typeName = u.actualType.empty()
+				? ShaderStruct::ParseType(u.type)
+				: u.actualType;
+			fields.push_back({typeName, u.name});
+		}
+		m_outputSection->setFields(fields);
+		m_outputSection->setVisible(true);
+	}
+	else
+	{
+		m_outputSection->setFields({});
+		m_outputSection->setVisible(false);
+	}
+
+	// Uniforms (uniform_list)
+	if (!parsed.uniform_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.uniform_list.size());
+		for (const auto& u : parsed.uniform_list)
+		{
+			std::string typeName = u.actualType.empty()
+				? ShaderStruct::ParseType(u.type)
+				: u.actualType;
+			fields.push_back({typeName, u.name});
+		}
+		m_uniformSection->setFields(fields);
+		m_uniformSection->setVisible(true);
+	}
+	else
+	{
+		m_uniformSection->setFields({});
+		m_uniformSection->setVisible(false);
+	}
+
+	// Struct Definitions (struct_def_list)
+	if (!parsed.struct_def_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.struct_def_list.size());
+		for (const auto& sd : parsed.struct_def_list)
+			fields.push_back({sd.name, sd.varName});
+		m_structSection->setFields(fields);
+		m_structSection->setVisible(true);
+	}
+	else
+	{
+		m_structSection->setFields({});
+		m_structSection->setVisible(false);
+	}
+
+	// Functions (func_list)
+	if (!parsed.func_list.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.func_list.size());
+		for (const auto& fn : parsed.func_list)
+			fields.push_back({ShaderStruct::ParseType(fn.returnType), fn.name});
+		m_funcSection->setFields(fields);
+		m_funcSection->setVisible(true);
+	}
+	else
+	{
+		m_funcSection->setFields({});
+		m_funcSection->setVisible(false);
+	}
 }
 
 // =========================================================================
@@ -230,52 +413,6 @@ void ShaderEditorPanel::setShowCreateButton(bool show)
 	if (m_showingCreateButton == show) return;
 	m_showingCreateButton = show;
 	m_createBtn->setVisible(show);
-}
-
-// =========================================================================
-// Struct tree
-// =========================================================================
-
-void ShaderEditorPanel::rebuildStructTree()
-{
-	using F = ShaderStructSection::FieldData;
-
-	m_abSection->setFields({
-		F{"vec3", "aPos", 0},
-		F{"vec3", "aNormal", 1},
-		F{"vec2", "aTexCoord", 2}
-	});
-
-	m_passSection->setFields({
-		F{"vec4", "fragAlbedo", 0},
-		F{"vec4", "fragNormal", 1},
-		F{"vec4", "fragPosition", 2}
-	});
-
-	m_inputSection->setFields({
-		F{"vec3", "vNormal"},
-		F{"vec2", "vTexCoord"},
-		F{"vec3", "vWorldPos"}
-	});
-
-	m_outputSection->setFields({
-		F{"vec4", "fragColor"}
-	});
-
-	m_uniformSection->setFields({
-		F{"CameraUBO", "camera"},
-		F{"sampler2D", "diffuseTex"}
-	});
-
-	m_structSection->setFields({
-		F{"Light", ""}
-	});
-
-	m_funcSection->setFields({
-		F{"void", "calculateLighting"}
-	});
-
-	m_cachedShaderUID = -1;
 }
 
 } // namespace neurus

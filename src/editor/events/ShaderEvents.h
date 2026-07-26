@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 namespace neurus
 {
 
@@ -16,11 +18,22 @@ struct ShaderCompileRequested
 struct ShaderModified
 {
 	int objectId;
+	int shaderType;
 };
 
 struct ShaderSaveRequested
 {
 	int objectId;
+};
+
+struct ShaderFieldEdited
+{
+	int objectId;
+	int shaderType;
+	int sectionType;
+	int row;
+	std::string field;
+	std::string value;
 };
 
 } // namespace neurus

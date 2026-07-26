@@ -26,6 +26,16 @@ ShaderFieldRow::ShaderFieldRow(QWidget* parent)
 	m_nameField = new QLineEdit(this);
 	m_nameField->setPlaceholderText("name");
 	layout->addWidget(m_nameField, 1);
+
+	// Connect signals
+	QObject::connect(m_typeCombo, &QComboBox::currentTextChanged,
+	                 this, [this](const QString& text) {
+		emit fieldChanged(text, m_nameField->text());
+	});
+	QObject::connect(m_nameField, &QLineEdit::textChanged,
+	                 this, [this](const QString& text) {
+		emit fieldChanged(m_typeCombo->currentText(), text);
+	});
 }
 
 void ShaderFieldRow::populateTypeCombo()

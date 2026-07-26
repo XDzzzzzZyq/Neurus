@@ -9,6 +9,7 @@
 #pragma once
 
 #include "UIPanel.h"
+#include "editor/events/ShaderEvents.h"
 
 #include <string>
 #include <vector>
@@ -42,15 +43,13 @@ public:
 	void Refresh(const UIContext& ctx) override;
 
 signals:
-	/** @brief Emitted when user clicks Compile for the active object's shader. */
-	void compileRequested(int objectId);
+	void createShaderRequested(const ShaderCreateRequested& e);
+	void compileRequested(const ShaderCompileRequested& e);
+	void structModified(const ShaderModified& e);
 
 private:
-	/** @brief Sets the active scene object. Resets caches on ID change. */
-	void setActiveObject(int objectId);
-
-	/** @brief Rebuilds the Struct Editor tree from the active shader's ShaderStruct. */
-	void rebuildStructTree();
+	/** @brief Populates struct sections from a parsed ShaderUnit. */
+	void populateSections(const void* shaderUnitPtr);
 
 	/** @brief Shows the "Create Shader" button for objects without a shader. */
 	void setShowCreateButton(bool show);
@@ -89,9 +88,8 @@ private:
 	QPushButton*  m_createBtn     = nullptr;
 
 	// --- State ---
-	int  m_activeObjectId    = -1;
-	int  m_cachedShaderUID   = -1;
-	int  m_cachedStageCount  = 0;
+	int  m_activeObjectId   = -1;
+	int  m_cachedStageType  = 0;   // 0=VERTEX, 1=FRAGMENT
 	bool m_showingCreateButton = false;
 	bool m_showingEmptyState   = false;
 };

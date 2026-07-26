@@ -103,6 +103,7 @@ public:
 	void EnableMaterial(bool _enable) { using_material = _enable; }
 	void EnableSDF(bool _enable) { using_sdf = _enable; }
 	void* GetShader() override { return o_shader.get(); }
+	void* GetShaderUnit(int shaderType) const override;
 	void* GetMaterial() override { return o_material.get(); }
 	void* GetTransform() override { return static_cast<Transform*>(this); }
 
