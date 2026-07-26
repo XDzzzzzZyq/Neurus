@@ -552,29 +552,4 @@ const char* AttachmentNameToString(const AttachmentName name)
 	return "Unknown";
 }
 
-// ---------------------------------------------------------------------------
-// Temporal shadow accumulation frame counters
-// ---------------------------------------------------------------------------
-
-uint32_t RenderCache::GetShadowFrameCount(int lightUID) const
-{
-	auto it = m_shadowFrameCount.find(lightUID);
-	return (it != m_shadowFrameCount.end()) ? it->second : 0;
-}
-
-void RenderCache::AdvanceShadowFrame(int lightUID)
-{
-	m_shadowFrameCount[lightUID]++;
-}
-
-void RenderCache::ResetShadowAccumulation(int lightUID)
-{
-	m_shadowFrameCount[lightUID] = 0;
-}
-
-void RenderCache::ResetAllShadowAccumulation()
-{
-	m_shadowFrameCount.clear();
-}
-
 } // namespace neurus

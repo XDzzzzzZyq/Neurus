@@ -50,6 +50,26 @@ struct HaltonSequence
         }
         return result;
     }
+
+    /**
+     * @brief Halton sequence base-5 value at the given index.
+     * @param index Zero-based index into the sequence.
+     * @return Value in [0, 1).
+     */
+    static float Halton5(uint32_t index)
+    {
+        float result = 0.0f;
+        constexpr float invBase = 1.0f / 5.0f;
+        float f = invBase;
+        uint32_t i = index;
+        while (i > 0)
+        {
+            result += (i % 5) * f;
+            i /= 5;
+            f *= invBase;
+        }
+        return result;
+    }
 };
 
 } // namespace neurus

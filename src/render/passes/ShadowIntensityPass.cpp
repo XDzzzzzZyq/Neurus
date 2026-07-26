@@ -36,7 +36,7 @@ namespace neurus {
 
 namespace {
 
-// Point light shadow eval push constants (40 bytes).
+// Point light shadow eval push constants (48 bytes).
 // Must match shadow_eval.comp layout exactly.
 struct ShadowEvalPushConstants
 {
@@ -44,16 +44,16 @@ struct ShadowEvalPushConstants
     float farPlane;                          //  4 bytes
     float bias;                              //  4 bytes
     int32_t layerIndex;                      //  4 bytes
-    float jitterX;                           //  4 bytes
-    float jitterY;                           //  4 bytes
+    float jitterX, jitterY, jitterZ;        // 12 bytes
+    float lightRadius;                       //  4 bytes
     float alpha;                             //  4 bytes
     int32_t frameCount;                      //  4 bytes
-};  // Total: 40 bytes
-static_assert(sizeof(ShadowEvalPushConstants) == 40,
-              "ShadowEvalPushConstants must be 40 bytes");
+};  // Total: 48 bytes
+static_assert(sizeof(ShadowEvalPushConstants) >= 44,
+              "ShadowEvalPushConstants must be at least 44 bytes");
 
 // Sun shadow eval push constants (96 bytes C++ sizeof).
-// GLSL layout: mat4(64B) + float(4B) + int(4B) + float(4B) + float(4B) + float(4B) + int(4B) = 88B
+// GLSL layout: mat4(64B) + float(4B) + int(4B) + float(4B)*3 + float(4B) + float(4B) + int(4B) = 96B
 // C++ sizeof: 96B due to glm::mat4 16-byte alignment.
 struct SunShadowEvalPushConstants
 {
@@ -62,12 +62,14 @@ struct SunShadowEvalPushConstants
     int32_t   layerIndex;      // offset 68, 4 bytes
     float     jitterX;         // offset 72, 4 bytes
     float     jitterY;         // offset 76, 4 bytes
-    float     alpha;           // offset 80, 4 bytes
-    int32_t   frameCount;      // offset 84, 4 bytes
-};  // Total: 96 bytes (80 + 16 alignment padding)
+    float     jitterZ;         // offset 80, 4 bytes
+    float     lightRadius;     // offset 84, 4 bytes
+    float     alpha;           // offset 88, 4 bytes
+    int32_t   frameCount;      // offset 92, 4 bytes
+};  // Total: 96 bytes
 
-static_assert(sizeof(SunShadowEvalPushConstants) == 96,
-              "SunShadowEvalPushConstants must be 96 bytes");
+static_assert(sizeof(SunShadowEvalPushConstants) >= 96,
+              "SunShadowEvalPushConstants must be at least 96 bytes");
 static_assert(sizeof(SunShadowEvalPushConstants::lightViewProj) == 64,
               "glm::mat4 size mismatch");
 static_assert(offsetof(SunShadowEvalPushConstants, bias) == 64,
@@ -78,9 +80,13 @@ static_assert(offsetof(SunShadowEvalPushConstants, jitterX) == 72,
               "jitterX offset mismatch");
 static_assert(offsetof(SunShadowEvalPushConstants, jitterY) == 76,
               "jitterY offset mismatch");
-static_assert(offsetof(SunShadowEvalPushConstants, alpha) == 80,
+static_assert(offsetof(SunShadowEvalPushConstants, jitterZ) == 80,
+              "jitterZ offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, lightRadius) == 84,
+              "lightRadius offset mismatch");
+static_assert(offsetof(SunShadowEvalPushConstants, alpha) == 88,
               "alpha offset mismatch");
-static_assert(offsetof(SunShadowEvalPushConstants, frameCount) == 84,
+static_assert(offsetof(SunShadowEvalPushConstants, frameCount) == 92,
               "frameCount offset mismatch");
 
 } // anon
@@ -480,19 +486,27 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			const auto& pos = light->GetPosition();
 			const uint32_t layer = cache.GetShadowIntensityLayer(uid, renderExtent);
 
+			// Read alpha mode from config
+			ShadowAlphaMode alphaMode = ShadowAlphaMode::MovingAvg;
+			if (ctx.config)
+			{
+				const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_shadow_alpha_mode);
+			}
+
 			ShadowEvalPushConstants pc = {};
-			pc.lightPosX  = pos.x;
-			pc.lightPosY  = pos.y;
-			pc.lightPosZ  = pos.z;
-			pc.farPlane   = Light::point_shadow_far;
-			pc.bias       = shadowBias;
-			pc.layerIndex = static_cast<int32_t>(layer);
-			pc.jitterX    = ctx.jitterX;
-			pc.jitterY    = ctx.jitterY;
-			pc.alpha      = ComputeShadowAlpha(
-				static_cast<ShadowAlphaMode>(ctx.shadowAlphaMode),
-				cache.GetShadowFrameCount(uid));
-			pc.frameCount = static_cast<int32_t>(cache.GetShadowFrameCount(uid));
+			pc.lightPosX   = pos.x;
+			pc.lightPosY   = pos.y;
+			pc.lightPosZ   = pos.z;
+			pc.farPlane    = Light::point_shadow_far;
+			pc.bias        = shadowBias;
+			pc.layerIndex  = static_cast<int32_t>(layer);
+			pc.jitterX     = ctx.jitter.x;
+			pc.jitterY     = ctx.jitter.y;
+			pc.jitterZ     = ctx.jitter.z;
+			pc.lightRadius = light->light_radius;
+			pc.alpha       = ComputeShadowAlpha(alphaMode, ctx.shadowFrameCount);
+			pc.frameCount  = static_cast<int32_t>(ctx.shadowFrameCount);
 
 			cmdBuf.pushConstants<ShadowEvalPushConstants>(
 				*p_pipelines[0].pipelineLayout,
@@ -505,9 +519,6 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
-
-		// Advance temporal accumulation frame count AFTER dispatch
-		cache.AdvanceShadowFrame(uid);
 
 		++lightIndex;
 	}
@@ -571,16 +582,24 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 			const uint32_t layer = cache.GetShadowIntensityLayer(uid, renderExtent);
 
+			// Read alpha mode from config
+			ShadowAlphaMode alphaMode = ShadowAlphaMode::MovingAvg;
+			if (ctx.config)
+			{
+				const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_shadow_alpha_mode);
+			}
+
 			SunShadowEvalPushConstants pc = {};
 			pc.lightViewProj = lightViewProj;
 			pc.bias          = shadowBias;
 			pc.layerIndex    = static_cast<int32_t>(layer);
-			pc.jitterX       = ctx.jitterX;
-			pc.jitterY       = ctx.jitterY;
-			pc.alpha         = ComputeShadowAlpha(
-				static_cast<ShadowAlphaMode>(ctx.shadowAlphaMode),
-				cache.GetShadowFrameCount(uid));
-			pc.frameCount    = static_cast<int32_t>(cache.GetShadowFrameCount(uid));
+			pc.jitterX       = ctx.jitter.x;
+			pc.jitterY       = ctx.jitter.y;
+			pc.jitterZ       = ctx.jitter.z;
+			pc.lightRadius   = light->light_radius;
+			pc.alpha         = ComputeShadowAlpha(alphaMode, ctx.shadowFrameCount);
+			pc.frameCount    = static_cast<int32_t>(ctx.shadowFrameCount);
 
 			cmdBuf.pushConstants<SunShadowEvalPushConstants>(
 				*p_pipelines[1].pipelineLayout,
@@ -593,9 +612,6 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
-
-		// Advance temporal accumulation frame count AFTER dispatch
-		cache.AdvanceShadowFrame(uid);
 
 		++sunLightIndex;
 	}

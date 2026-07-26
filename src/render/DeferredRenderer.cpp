@@ -297,6 +297,11 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
 }
 
+void DeferredRenderer::ResetShadowAccumulation()
+{
+	m_shadowFrameCount = 0;
+}
+
 void DeferredRenderer::WaitIdle()
 {
 	r_device.waitIdle();
@@ -434,80 +439,20 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	ctx.height = extent.height;
 	ctx.frameIndex = r_currentFrame;
 
-	// --- Temporal shadow accumulation: compute jitter offsets ---
-	ctx.jitterX = (HaltonSequence::Halton2(m_haltonIndex) - 0.5f);
-	ctx.jitterY = (HaltonSequence::Halton3(m_haltonIndex) - 0.5f);
-
-	// Read alpha mode from config (defaults to FixedEMA = 0)
-	ctx.shadowAlphaMode = 0;
-	if (ctx.config)
+	// --- Temporal shadow accumulation: compute 3D random jitter direction ---
 	{
-		const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
-		ctx.shadowAlphaMode = cfg->r_shadow_alpha_mode;
-	}
-	ctx.jitterScale = 0.01f;
-
-	// --- Reset detection: camera, light, and scene changes ---
-	{
-		auto* cache = r_renderCache.get();
-		bool cameraChanged = false;
-
-		if (ctx.scene)
-		{
-			const auto* scene = static_cast<const Scene*>(ctx.scene);
-			const Camera* cam = scene->GetActiveCamera();
-			if (cam)
-			{
-				glm::mat4 curView = cam->GetViewMatrix();
-				if (curView != m_lastViewMatrix)
-				{
-					cameraChanged = true;
-					m_lastViewMatrix = curView;
-				}
-			}
-
-			// Iterate all shadow-casting lights and check for changes
-			for (const auto& [uid, light] : scene->light_list)
-			{
-				if (!light || !light->use_shadow) continue;
-				if (!light->is_viewport || !light->is_rendered) continue;
-
-				bool reset = false;
-
-				// Camera change resets ALL lights
-				if (cameraChanged) reset = true;
-
-				// Check light-specific state changes
-				if (light->light_type == LightType::POINTLIGHT)
-				{
-					auto pos = light->GetPosition();
-					auto it = m_lastLightPositions.find(uid);
-					if (it == m_lastLightPositions.end() || it->second != pos)
-					{
-						reset = true;
-						m_lastLightPositions[uid] = pos;
-					}
-				}
-				else if (light->light_type == LightType::SUNLIGHT)
-				{
-					auto dir = light->GetDirection();
-					auto it = m_lastLightDirections.find(uid);
-					if (it == m_lastLightDirections.end() || it->second != dir)
-					{
-						reset = true;
-						m_lastLightDirections[uid] = dir;
-					}
-				}
-
-				if (reset)
-				{
-					cache->ResetShadowAccumulation(uid);
-				}
-			}
-		}
+		float x = 2.0f * HaltonSequence::Halton2(m_haltonIndex) - 1.0f;
+		float y = 2.0f * HaltonSequence::Halton3(m_haltonIndex) - 1.0f;
+		float z = 2.0f * HaltonSequence::Halton5(m_haltonIndex) - 1.0f;
+		float len = std::sqrt(x * x + y * y + z * z);
+		ctx.jitter = (len > 1e-6f) ? glm::vec3(x / len, y / len, z / len) : glm::vec3(0.0f, 0.0f, 1.0f);
 	}
 
-	// Advance Halton index (cycles through all Halton(2,3) pairs)
+	// Set global shadow frame count from DeferredRenderer's counter
+	ctx.shadowFrameCount = m_shadowFrameCount;
+	m_shadowFrameCount++;
+
+	// Advance Halton index (cycles through all Halton(2,3,5) triples)
 	m_haltonIndex++;
 
 	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---

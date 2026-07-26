@@ -10,7 +10,7 @@ layout(binding = 1) uniform sampler2D u_SunShadowMap;
 // --- Output / accumulation: R8 shadow intensity (2D_ARRAY), read+write ---
 layout(r8, binding = 2) uniform image2DArray outputShadow;
 
-// --- Push constants: 88 bytes GLSL ---
+// --- Push constants: 96 bytes GLSL ---
 layout(push_constant) uniform PushConstants
 {
     mat4  lightViewProj;    // offset 0,  64 bytes
@@ -18,8 +18,10 @@ layout(push_constant) uniform PushConstants
     int   layerIndex;       // offset 68, 4 bytes
     float jitterX;          // offset 72, 4 bytes
     float jitterY;          // offset 76, 4 bytes
-    float alpha;            // offset 80, 4 bytes
-    int   frameCount;       // offset 84, 4 bytes
+    float jitterZ;          // offset 80, 4 bytes
+    float lightRadius;      // offset 84, 4 bytes
+    float alpha;            // offset 88, 4 bytes
+    int   frameCount;       // offset 92, 4 bytes
 };
 
 void main()
@@ -44,8 +46,7 @@ void main()
 
     // Jitter the shadow map UV sample (sub-pixel offset equivalent to
     // directional light direction jitter)
-    const float jitterScale = 1.0 / 2048.0;  // sub-pixel at 2048x2048 shadow map
-    vec2 jitteredUV = shadowUV + vec2(jitterX, jitterY) * jitterScale;
+    vec2 jitteredUV = shadowUV + vec2(jitterX, jitterY) * lightRadius;
 
     float shadowDepth  = textureLod(u_SunShadowMap, jitteredUV, 0.0).r;
 

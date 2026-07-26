@@ -10,7 +10,7 @@ layout(binding = 1) uniform samplerCube u_ShadowCube;
 // --- Output / accumulation: R8 shadow intensity (2D_ARRAY), read+write ---
 layout(r8, binding = 2) uniform image2DArray outputShadow;
 
-// --- Push constants: 40 bytes ---
+// --- Push constants: 48 bytes ---
 layout(push_constant) uniform PushConstants
 {
     vec3  lightWorldPos;    // offset 0,  12 bytes
@@ -19,8 +19,10 @@ layout(push_constant) uniform PushConstants
     int   layerIndex;       // offset 20, 4 bytes
     float jitterX;          // offset 24, 4 bytes
     float jitterY;          // offset 28, 4 bytes
-    float alpha;            // offset 32, 4 bytes
-    int   frameCount;       // offset 36, 4 bytes
+    float jitterZ;          // offset 32, 4 bytes
+    float lightRadius;      // offset 36, 4 bytes
+    float alpha;            // offset 40, 4 bytes
+    int   frameCount;       // offset 44, 4 bytes
 };
 
 void main()
@@ -38,9 +40,8 @@ void main()
 
     vec3 worldPos     = posSample.xyz;
 
-    // Jitter light position in world space for sub-pixel shadow sampling
-    const float jitterScale = 0.01;
-    vec3 jitteredLightPos   = lightWorldPos + vec3(jitterX, jitterY, 0.0) * jitterScale;
+    // Jitter light position in world space using 3D random direction scaled by light radius
+    vec3 jitteredLightPos   = lightWorldPos + vec3(jitterX, jitterY, jitterZ) * lightRadius;
     vec3 toLight            = worldPos - jitteredLightPos;
     float dist              = length(toLight);
 

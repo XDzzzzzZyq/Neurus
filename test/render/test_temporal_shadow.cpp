@@ -45,6 +45,18 @@ TEST(HaltonSequenceTest, Deterministic)
     EXPECT_FLOAT_EQ(HaltonSequence::Halton3(2), 2.0f / 3.0f);
 }
 
+TEST(HaltonSequenceTest, Halton5InRange)
+{
+    for (uint32_t i = 0; i < 100; ++i)
+    {
+        float h5 = HaltonSequence::Halton5(i);
+        EXPECT_GE(h5, 0.0f) << "Halton5(" << i << ") = " << h5 << " < 0";
+        EXPECT_LT(h5, 1.0f) << "Halton5(" << i << ") = " << h5 << " >= 1";
+    }
+    EXPECT_FLOAT_EQ(HaltonSequence::Halton5(0), 0.0f);
+    EXPECT_FLOAT_EQ(HaltonSequence::Halton5(1), 1.0f / 5.0f);
+}
+
 TEST(HaltonSequenceTest, JitterRange)
 {
     // Jitter = Halton - 0.5 maps to [-0.5, 0.5)

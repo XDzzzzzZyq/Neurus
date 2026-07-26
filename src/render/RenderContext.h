@@ -23,6 +23,8 @@
 
 #include <cstdint>
 
+#include <glm/glm.hpp>
+
 #include "scene/UID.h"
 
 namespace neurus
@@ -54,17 +56,13 @@ struct RenderContext
 	/// Passes cast to const RenderConfig* to read quality/feature flags set by the user.
 	const void* config = nullptr;
 
-	/// @brief Halton(2) sub-pixel jitter X offset in [-0.5, 0.5].
-	float jitterX = 0.0f;
+	/// @brief Per-frame random 3D direction for shadow jitter (normalized unit-ball vector).
+	/// Point lights use: pos_jittered = pos + light.radius * jitter
+	/// Sun lights use: dir_jittered = normalize(lightDir + jitter * smallScale)
+	glm::vec3 jitter{0.0f, 0.0f, 0.0f};
 
-	/// @brief Halton(3) sub-pixel jitter Y offset in [-0.5, 0.5].
-	float jitterY = 0.0f;
-
-	/// @brief Shadow accumulation alpha mode (0 = FixedEMA/8, 1 = MovingAvg).
-	uint32_t shadowAlphaMode = 0;
-
-	/// @brief World-space scale applied to jitter offsets (e.g. 0.01 for point lights).
-	float jitterScale = 0.01f;
+	/// @brief Global shadow accumulation frame count (incremented each frame, reset by Editor).
+	uint32_t shadowFrameCount{0};
 };
 
 } // namespace neurus

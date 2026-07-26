@@ -189,6 +189,12 @@ public:
 	 */
 	void HandleSurfaceChange(const vk::raii::SurfaceKHR& newSurface);
 
+	/**
+	 * @brief Resets shadow accumulation. Called by Editor when camera/light/scene changes.
+	 * Sets the global shadow frame counter to 0, causing the next frame to overwrite (alpha=1).
+	 */
+	void ResetShadowAccumulation();
+
 private:
 	/**
 	 * @brief Records the full deferred pipeline into a command buffer.
@@ -259,10 +265,8 @@ private:
 	uint32_t r_lastImageIndex = 0;
 
 	// --- Temporal shadow accumulation state ---
-	glm::mat4  m_lastViewMatrix{1.0f};
-	std::unordered_map<int, glm::vec3> m_lastLightPositions;
-	std::unordered_map<int, glm::vec3> m_lastLightDirections;
-	uint32_t   m_haltonIndex = 0;
+	uint32_t m_haltonIndex = 0;
+	uint32_t m_shadowFrameCount = 0;
 
 };
 
