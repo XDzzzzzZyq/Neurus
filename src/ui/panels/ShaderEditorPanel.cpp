@@ -1,6 +1,5 @@
 #include "ShaderEditorPanel.h"
 
-#include "items/ShaderFieldRow.h"
 #include "items/ShaderStructSection.h"
 #include "UIContext.h"
 #include "scene/Mesh.h"
@@ -29,31 +28,38 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	rootLayout->setContentsMargins(4, 4, 4, 4);
 	rootLayout->setSpacing(4);
 
-	// --- Top toolbar ---
-	auto* toolbarLayout = new QHBoxLayout();
+	// --- Top toolbar (two rows) ---
+	auto* toolbarContainer = new QVBoxLayout();
+	toolbarContainer->setContentsMargins(0, 0, 0, 0);
+	toolbarContainer->setSpacing(2);
 
+	// Row 1: Mode + Stage
+	auto* row1 = new QHBoxLayout();
+	row1->addWidget(new QLabel("Mode:", this));
 	m_modeCombo = new QComboBox(this);
 	m_modeCombo->addItem("Code");
 	m_modeCombo->addItem("Structure");
-	m_modeCombo->setCurrentIndex(1);  // Default to Structure mode
-	toolbarLayout->addWidget(new QLabel("Mode:", this));
-	toolbarLayout->addWidget(m_modeCombo);
-
+	m_modeCombo->setCurrentIndex(1);
+	row1->addWidget(m_modeCombo);
+	row1->addSpacing(8);
+	row1->addWidget(new QLabel("Stage:", this));
 	m_stageCombo = new QComboBox(this);
 	m_stageCombo->addItem("VERTEX");
 	m_stageCombo->addItem("FRAGMENT");
-	toolbarLayout->addWidget(new QLabel("Stage:", this));
-	toolbarLayout->addWidget(m_stageCombo);
+	row1->addWidget(m_stageCombo);
+	row1->addStretch();
+	toolbarContainer->addLayout(row1);
 
-	toolbarLayout->addStretch();
-
+	// Row 2: Compile + Save
+	auto* row2 = new QHBoxLayout();
 	m_compileBtn = new QPushButton("Compile", this);
-	toolbarLayout->addWidget(m_compileBtn);
-
+	row2->addWidget(m_compileBtn);
 	m_saveBtn = new QPushButton("Save", this);
-	toolbarLayout->addWidget(m_saveBtn);
+	row2->addWidget(m_saveBtn);
+	row2->addStretch();
+	toolbarContainer->addLayout(row2);
 
-	rootLayout->addLayout(toolbarLayout);
+	rootLayout->addLayout(toolbarContainer);
 
 	// --- Content stack ---
 	m_contentStack = new QStackedWidget(this);
@@ -187,7 +193,7 @@ void ShaderEditorPanel::setActiveObject(int objectId)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
-		clearStructSections();
+		// Don't clear sections -- just hide them (setShowEmptyState already does this)
 		return;
 	}
 
@@ -196,7 +202,6 @@ void ShaderEditorPanel::setActiveObject(int objectId)
 	// In this hardcoded prototype, always show the struct tree
 	// with example data. Real wiring will check mesh->o_shader.
 	setShowCreateButton(false);
-	clearStructSections();
 	rebuildStructTree();
 }
 
@@ -209,6 +214,15 @@ void ShaderEditorPanel::setShowEmptyState(bool show)
 	if (m_showingEmptyState == show) return;
 	m_showingEmptyState = show;
 	m_emptyLabel->setVisible(show);
+
+	// Hide all sections when showing empty state
+	m_abSection->setVisible(!show);
+	m_passSection->setVisible(!show);
+	m_inputSection->setVisible(!show);
+	m_outputSection->setVisible(!show);
+	m_uniformSection->setVisible(!show);
+	m_structSection->setVisible(!show);
+	m_funcSection->setVisible(!show);
 }
 
 void ShaderEditorPanel::setShowCreateButton(bool show)
@@ -222,96 +236,46 @@ void ShaderEditorPanel::setShowCreateButton(bool show)
 // Struct tree
 // =========================================================================
 
-void ShaderEditorPanel::clearStructSections()
-{
-	m_abSection->clearRows();
-	m_passSection->clearRows();
-	m_inputSection->clearRows();
-	m_outputSection->clearRows();
-	m_uniformSection->clearRows();
-	m_structSection->clearRows();
-	m_funcSection->clearRows();
-}
-
 void ShaderEditorPanel::rebuildStructTree()
 {
-	// Hardcoded prototype data -- mimics a typical gbuffer.vert shader
-	// Attributes (AB_list)
-	{
-		auto* row = m_abSection->addRow();
-		row->setShowLocation(true);
-		row->setShowInterpolation(false);
-		row->setField(0, "vec3", "aPos");
+	using F = ShaderStructSection::FieldData;
 
-		row = m_abSection->addRow();
-		row->setShowLocation(true);
-		row->setShowInterpolation(false);
-		row->setField(1, "vec3", "aNormal");
+	m_abSection->setFields({
+		F{"vec3", "aPos", 0},
+		F{"vec3", "aNormal", 1},
+		F{"vec2", "aTexCoord", 2}
+	});
 
-		row = m_abSection->addRow();
-		row->setShowLocation(true);
-		row->setShowInterpolation(false);
-		row->setField(2, "vec2", "aTexCoord");
-	}
+	m_passSection->setFields({
+		F{"vec4", "fragAlbedo", 0},
+		F{"vec4", "fragNormal", 1},
+		F{"vec4", "fragPosition", 2}
+	});
 
-	// Pass Outputs
-	{
-		auto* row = m_passSection->addRow();
-		row->setShowLocation(true);
-		row->setShowInterpolation(false);
-		row->setField(0, "vec4", "fragAlbedo");
+	m_inputSection->setFields({
+		F{"vec3", "vNormal"},
+		F{"vec2", "vTexCoord"},
+		F{"vec3", "vWorldPos"}
+	});
 
-		row = m_passSection->addRow();
-		row->setShowLocation(true);
-		row->setShowInterpolation(false);
-		row->setField(1, "vec4", "fragNormal");
+	m_outputSection->setFields({
+		F{"vec4", "fragColor"}
+	});
 
-		row = m_passSection->addRow();
-		row->setShowLocation(true);
-		row->setShowInterpolation(false);
-		row->setField(2, "vec4", "fragPosition");
-	}
+	m_uniformSection->setFields({
+		F{"CameraUBO", "camera"},
+		F{"sampler2D", "diffuseTex"}
+	});
 
-	// Inputs
-	{
-		auto* row = m_inputSection->addRow();
-		row->setField("vec3", "vNormal");
+	m_structSection->setFields({
+		F{"Light", ""}
+	});
 
-		row = m_inputSection->addRow();
-		row->setField("vec2", "vTexCoord");
+	m_funcSection->setFields({
+		F{"void", "calculateLighting"}
+	});
 
-		row = m_inputSection->addRow();
-		row->setField("vec3", "vWorldPos");
-	}
-
-	// Outputs
-	{
-		auto* row = m_outputSection->addRow();
-		row->setField("vec4", "fragColor");
-	}
-
-	// Uniforms
-	{
-		auto* row = m_uniformSection->addRow();
-		row->setField("CameraUBO { mat4 viewProj }", "");
-
-		row = m_uniformSection->addRow();
-		row->setField("sampler2D", "diffuseTex");
-	}
-
-	// Struct Definitions
-	{
-		auto* row = m_structSection->addRow();
-		row->setField("Light", "{ vec3 pos, vec3 color }");
-	}
-
-	// Functions
-	{
-		auto* row = m_funcSection->addRow();
-		row->setField("calculateLighting()", "");
-	}
-
-	m_cachedShaderUID = -1;  // Hardcoded for now
+	m_cachedShaderUID = -1;
 }
 
 } // namespace neurus

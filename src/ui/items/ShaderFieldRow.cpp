@@ -31,14 +31,6 @@ ShaderFieldRow::ShaderFieldRow(QWidget* parent)
 	populateTypeCombo();
 	layout->addWidget(m_typeCombo);
 
-	// Interpolation combo (hidden by default)
-	m_interpCombo = new QComboBox(this);
-	m_interpCombo->addItem("smooth");
-	m_interpCombo->addItem("flat");
-	m_interpCombo->addItem("noperspective");
-	m_interpCombo->setVisible(false);
-	layout->addWidget(m_interpCombo);
-
 	// Name field
 	m_nameField = new QLineEdit(this);
 	m_nameField->setPlaceholderText("name");
@@ -90,13 +82,6 @@ void ShaderFieldRow::setShowLocation(bool show)
 	m_locationSpin->setVisible(show);
 }
 
-void ShaderFieldRow::setShowInterpolation(bool show)
-{
-	if (m_showInterp == show) return;
-	m_showInterp = show;
-	m_interpCombo->setVisible(show);
-}
-
 void ShaderFieldRow::setField(int location, const std::string& type, const std::string& name)
 {
 	// Dirty-check all three values
@@ -130,7 +115,6 @@ void ShaderFieldRow::setReadOnly(bool readOnly)
 	m_typeCombo->setEnabled(!readOnly);
 	m_nameField->setReadOnly(readOnly);
 	m_locationSpin->setReadOnly(readOnly);
-	m_interpCombo->setEnabled(!readOnly);
 }
 
 void ShaderFieldRow::resetCaches()

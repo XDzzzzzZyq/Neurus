@@ -58,9 +58,6 @@ private:
 	/** @brief Shows the "No object selected" message. */
 	void setShowEmptyState(bool show);
 
-	/** @brief Clears all sections in the struct editor. */
-	void clearStructSections();
-
 	// --- Top toolbar ---
 	QComboBox*    m_modeCombo    = nullptr;  // "Code" | "Structure"
 	QComboBox*    m_stageCombo   = nullptr;  // VERTEX | FRAGMENT

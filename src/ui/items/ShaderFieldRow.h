@@ -12,9 +12,8 @@ namespace neurus
 {
 
 /**
- * @brief Reusable widget for a single shader field (type + name + optional location).
+ * @brief Reusable widget for a single shader field (type combo + name field + optional location).
  *
- * Used by ShaderStructSection rows in the Shader Editor's Struct mode.
  * Supports lazy dirty-check via setField() caching to avoid redundant widget updates.
  */
 class ShaderFieldRow : public QWidget
@@ -31,16 +30,13 @@ public:
 	/** @brief Control visibility of the location spinbox. Default: hidden. */
 	void setShowLocation(bool show);
 
-	/** @brief Control visibility of the interpolation combo. Default: hidden. */
-	void setShowInterpolation(bool show);
-
 	/** @brief Set field data with location, type, and name. Dirty-checked. */
 	void setField(int location, const std::string& type, const std::string& name);
 
 	/** @brief Set field data with type and name only (no location). Dirty-checked. */
 	void setField(const std::string& type, const std::string& name);
 
-	/** @brief Make all widgets read-only (for Info section display). */
+	/** @brief Make all widgets read-only. */
 	void setReadOnly(bool readOnly);
 
 	/** @brief Reset all cached values to sentinel. Call when field identity changes. */
@@ -57,14 +53,12 @@ private:
 	QComboBox* m_typeCombo    = nullptr;
 	QLineEdit* m_nameField    = nullptr;
 	QSpinBox*  m_locationSpin = nullptr;
-	QComboBox* m_interpCombo  = nullptr;
 
 	// Cached values for dirty-check
 	int         m_cachedLocation = -1;
 	std::string m_cachedType;
 	std::string m_cachedName;
 	bool        m_showLocation   = false;
-	bool        m_showInterp     = false;
 };
 
 } // namespace neurus
