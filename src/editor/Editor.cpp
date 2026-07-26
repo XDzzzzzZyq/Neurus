@@ -77,17 +77,36 @@ void Editor::Initialize()
 	// --- Wire project file signal handlers ---
 	// (events are enqueued by Editor::OnUIEvent from UIEvents Qt signals)
 
-	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) { OnProjectNew(); });
-	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) { OnProjectOpen(e.path); });
+	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnProjectNew();
+	});
+	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnProjectOpen(e.path);
+	});
 	ed_eventBus.subscribe<ProjectSaveEvent>([this](const ProjectSaveEvent&) { OnProjectSave(); });
 	ed_eventBus.subscribe<ProjectSaveAsEvent>([this](const ProjectSaveAsEvent& e) { OnProjectSaveAs(e.path); });
 
-	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) { OnMeshImport(e.path); });
-	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) { OnCameraAdd(); });
-	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) { OnLightAdd(); });
-	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) { OnSunLightAdd(); });
+	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnMeshImport(e.path);
+	});
+	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnCameraAdd();
+	});
+	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnLightAdd();
+	});
+	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnSunLightAdd();
+	});
 
 	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		m_config = e.config;
 	});
 
@@ -232,6 +251,7 @@ void Editor::Initialize()
 	// --- Environment property events ---
 
 	ed_eventBus.subscribe<EnvironmentIntensityChanged>([this](const EnvironmentIntensityChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
@@ -240,6 +260,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<EnvironmentRotationChanged>([this](const EnvironmentRotationChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
@@ -255,6 +276,7 @@ void Editor::Initialize()
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto it = GetScene().env_list.find(e.envId);
 		if (it != GetScene().env_list.end())
 		{
