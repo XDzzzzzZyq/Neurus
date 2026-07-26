@@ -131,13 +131,16 @@ struct Pipeline;         // render/Pipeline.h
 	 * @param device         Logical device (Vulkan-HPP RAII).
 	 * @param shader         The CPU-side Shader (RenderShader or ComputeShader).
 	 * @param viewMask       Multiview view mask (0 = single view).
-	 * @param vertexLayout   Optional vertex input layout for graphics pipelines.
+	 * @param vertexLayout   Optional vertex input layout. nullptr = use default.
+	 * @param cameraLayout   Optional camera descriptor set layout (raw handle).
+	 *                       Must match the layout bound at draw time. nullptr = use default.
 	 * @return Fully constructed Pipeline, or an empty Pipeline on failure.
 	 */
 	Pipeline UploadShader(const vk::raii::Device& device,
 	                      const Shader& shader,
 	                      uint32_t viewMask = 0,
-	                      const BufferLayout* vertexLayout = nullptr);
+	                      const BufferLayout* vertexLayout = nullptr,
+	                      vk::DescriptorSetLayout cameraLayout = nullptr);
 
 private:
 	const vk::raii::Device* um_device = nullptr;

@@ -34,6 +34,7 @@ signals:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
 
 private:
     void updateLineNumberAreaWidth();
@@ -50,7 +51,6 @@ private:
     };
     friend class LineNumberArea;
     void lineNumberAreaPaintEvent(QPaintEvent* event);
-    void updateAlternatingRows();
 
     LineNumberArea*              m_lineNumberArea      = nullptr;
     std::unique_ptr<ShaderHighlighter> m_highlighter;

@@ -145,11 +145,21 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	QObject::connect(m_modeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 	                 m_contentStack, &QStackedWidget::setCurrentIndex);
 
-	// --- Compile button -> write code back + emit event ---
+	// --- Compile button -> emit with unitType (0=Code, 1=Struct) ---
 	QObject::connect(m_compileBtn, &QPushButton::clicked, [this]()
 	{
-		if (m_activeObjectId > 0 && m_codeEditor)
-			emit compileRequested({m_activeObjectId, m_cachedStageType, m_codeEditor->getCode()});
+		if (m_activeObjectId > 0)
+		{
+			int unitType = (m_contentStack->currentIndex() == 0) ? 0 : 1;
+			emit compileRequested({m_activeObjectId, m_cachedStageType, unitType});
+		}
+	});
+
+	// --- CodeEditor text changes -> codeEdited event ---
+	QObject::connect(m_codeEditor, &CodeEditor::codeChanged, [this](const std::string& code)
+	{
+		if (m_activeObjectId > 0)
+			emit codeEdited({m_activeObjectId, m_cachedStageType, code});
 	});
 
 	// --- Create Shader button -> event signal ---
@@ -167,21 +177,22 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	});
 
 	// --- Section field edits -> structModified event ---
-	auto connectFieldEdited = [this](ShaderStructSection* section)
+	auto connectFieldEdited = [this](ShaderStructSection* section, int sectionId)
 	{
 		QObject::connect(section, &ShaderStructSection::fieldEdited,
-		                 [this](int /*row*/) {
+		                 [this, sectionId](int fieldIndex, const QString& field, const QString& value) {
 			if (m_activeObjectId > 0)
-				emit structModified({m_activeObjectId, m_cachedStageType});
+				emit structModified({m_activeObjectId, m_cachedStageType, sectionId,
+				                     fieldIndex, field.toStdString(), value.toStdString()});
 		});
 	};
-	connectFieldEdited(m_abSection);
-	connectFieldEdited(m_passSection);
-	connectFieldEdited(m_inputSection);
-	connectFieldEdited(m_outputSection);
-	connectFieldEdited(m_uniformSection);
-	connectFieldEdited(m_structSection);
-	connectFieldEdited(m_funcSection);
+	connectFieldEdited(m_abSection,      static_cast<int>(Component::Attributes));
+	connectFieldEdited(m_passSection,    static_cast<int>(Component::PassOutputs));
+	connectFieldEdited(m_inputSection,   static_cast<int>(Component::Inputs));
+	connectFieldEdited(m_outputSection,  static_cast<int>(Component::Outputs));
+	connectFieldEdited(m_uniformSection, static_cast<int>(Component::Uniforms));
+	connectFieldEdited(m_structSection,  static_cast<int>(Component::StructDefs));
+	connectFieldEdited(m_funcSection,    static_cast<int>(Component::Functions));
 
 	// Start with empty state
 	setShowEmptyState(true);

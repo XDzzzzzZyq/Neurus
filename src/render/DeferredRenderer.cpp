@@ -197,6 +197,11 @@ DeferredRenderer::~DeferredRenderer()
 	//   SSAOPass → IBLPass), before RenderCache.
 }
 
+vk::DescriptorSetLayout DeferredRenderer::GetCameraDescriptorSetLayout() const
+{
+	return *r_geometryPass->GetCameraLayout().layout();
+}
+
 // ---------------------------------------------------------------------------
 // Static helpers
 // ---------------------------------------------------------------------------

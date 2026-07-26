@@ -68,9 +68,20 @@ void ShaderStructSection::setFields(const std::vector<FieldData>& fields)
 		// Disconnect old fieldChanged connection, reconnect to emit fieldEdited
 		QObject::disconnect(row, &ShaderFieldRow::fieldChanged, nullptr, nullptr);
 		int rowIndex = static_cast<int>(i);
+		// Track previous values to only emit what changed
 		QObject::connect(row, &ShaderFieldRow::fieldChanged,
-		                 [this, rowIndex](const QString& /*type*/, const QString& /*name*/) {
-			emit fieldEdited(rowIndex);
+		                 [this, rowIndex, prevType = fields[i].type, prevName = fields[i].name]
+		                 (const QString& type, const QString& name) mutable {
+			if (type != QString::fromStdString(prevType))
+			{
+				prevType = type.toStdString();
+				emit fieldEdited(rowIndex, "type", type);
+			}
+			if (name != QString::fromStdString(prevName))
+			{
+				prevName = name.toStdString();
+				emit fieldEdited(rowIndex, "name", name);
+			}
 		});
 	}
 

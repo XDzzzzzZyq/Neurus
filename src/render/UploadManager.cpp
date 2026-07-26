@@ -10,6 +10,7 @@
 
 #include "Image.h"
 #include "PipelineBuilder.h"
+#include "buffers/BufferLayout.h"
 #include "Texture.h"
 #include "resources/MeshGPU.h"
 #include "resources/EnvironmentGPU.h"
@@ -402,7 +403,8 @@ vk::ShaderStageFlagBits ShaderTypeToVkStage(const ShaderType type)
 Pipeline UploadManager::UploadShader(const vk::raii::Device& device,
                                      const Shader& shader,
                                      const uint32_t viewMask,
-                                     const BufferLayout* vertexLayout)
+                                     const BufferLayout* vertexLayout,
+                                     vk::DescriptorSetLayout cameraLayout)
 {
 	// --- 1. Compile all stages to SPIR-V ---
 	auto spirvs = ShaderLibrary::CompileAll(shader);
@@ -477,10 +479,36 @@ Pipeline UploadManager::UploadShader(const vk::raii::Device& device,
 	}
 	else
 	{
-		builder.SetVertexInput();
+		// Default vertex layout: aPos(0)@0, aNormal(1)@12, aTexCoord(2)@24, stride=32
+		BufferLayout defaultLayout;
+		defaultLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
+		defaultLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
+		defaultLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
+		builder.SetVertexInput(defaultLayout);
 	}
 
-	// --- 5c. Default render states ---
+	// --- 5c. Default pipeline layout (descriptor sets + push constants) ---
+	std::optional<vk::raii::DescriptorSetLayout> camLayout;
+	if ((!vertexLayout && !cameraLayout) || cameraLayout)
+	{
+		if (cameraLayout)
+		{
+			builder.AddDescriptorSetLayout(cameraLayout);
+		}
+		else
+		{
+			vk::DescriptorSetLayoutBinding camBinding(0, vk::DescriptorType::eUniformBuffer,
+			                                          1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
+			vk::DescriptorSetLayoutCreateInfo camLayoutCI({}, camBinding);
+			camLayout.emplace(device, camLayoutCI);
+			builder.AddDescriptorSetLayout(*(*camLayout));
+		}
+
+		vk::PushConstantRange pushRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, 128);
+		builder.SetPushConstantRanges({pushRange});
+	}
+
+	// --- 5d. Default render states ---
 	builder.SetInputAssembly();
 	builder.SetRasterization();
 	builder.SetMultisampling();

@@ -1,13 +1,6 @@
 /**
  * @file ShaderController.cpp
- * @brief Shader lifecycle controller — create and compile per-mesh shaders.
- *
- * OnCreateShader: loads the default gbuffer vertex/fragment shaders as a
- * template, parses them into ShaderUnits, and attaches to the mesh.
- *
- * OnCompileShader: compiles the attached shader's GLSL to SPIR-V and marks
- * the scene as ShaderChanged so the renderer rebuilds pipelines on the next
- * frame. Actual pipeline upload is deferred to the renderer (UploadManager).
+ * @brief Shader lifecycle controller — create, edit, compile per-mesh shaders.
  */
 
 #include "ShaderController.h"
@@ -19,6 +12,8 @@
 #include "scene/Scene.h"
 #include "render/shaders/Shader.h"
 #include "render/shaders/ShaderLibrary.h"
+#include "render/shaders/ShaderGenerator.h"
+#include "render/shaders/ShaderParser.h"
 #include "render/shaders/RenderShader.h"
 #include "core/Log.h"
 
@@ -41,6 +36,10 @@ void ShaderController::Init(EventQueue& bus)
 		[this](const ShaderCreateRequested& e) { OnCreateShader(e); });
 	bus.subscribe<ShaderCompileRequested>(
 		[this](const ShaderCompileRequested& e) { OnCompileShader(e); });
+	bus.subscribe<ShaderCodeEdited>(
+		[this](const ShaderCodeEdited& e) { OnCodeEdited(e); });
+	bus.subscribe<ShaderModified>(
+		[this](const ShaderModified& e) { OnStructModified(e); });
 }
 
 void ShaderController::OnCreateShader(const ShaderCreateRequested& e)
@@ -75,20 +74,50 @@ void ShaderController::OnCreateShader(const ShaderCreateRequested& e)
 
 		mesh->o_shader = std::move(shader);
 
-		// Bump version so the ShaderEditor UI detects the change
-		if (mesh->o_shader->HasStage(ShaderType::VERTEX))
-			mesh->o_shader->GetStage(ShaderType::VERTEX).BumpVersion();
-		if (mesh->o_shader->HasStage(ShaderType::FRAGMENT))
-			mesh->o_shader->GetStage(ShaderType::FRAGMENT).BumpVersion();
-
-		// Mark scene as changed so renderer knows to rebuild pipelines
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
+
+		// Compile and upload each stage
+		if (mesh->o_shader->HasStage(ShaderType::VERTEX))
+			OnCompileShader({e.objectId, static_cast<int>(ShaderType::VERTEX), 1});
+		if (mesh->o_shader->HasStage(ShaderType::FRAGMENT))
+			OnCompileShader({e.objectId, static_cast<int>(ShaderType::FRAGMENT), 1});
 
 		NEURUS_LOG("[ShaderController] Created shader for mesh " << e.objectId << ": " << shaderName);
 	}
 	catch (const std::exception& ex)
 	{
 		NEURUS_ERR("[ShaderController] Exception creating shader: " << ex.what());
+	}
+}
+
+void ShaderController::OnCodeEdited(const ShaderCodeEdited& e)
+{
+	auto& scene = c_editor->GetScene();
+	auto it = scene.mesh_list.find(e.objectId);
+	if (it == scene.mesh_list.end()) return;
+
+	auto& mesh = it->second;
+	if (!mesh->o_shader) return;
+
+	try
+	{
+		auto& shader = *mesh->o_shader;
+		auto type = static_cast<ShaderType>(e.shaderType);
+
+		if (!shader.HasStage(type)) return;
+
+		auto& unit = shader.GetStage(type);
+		if (unit.code == e.code) return;  // dirty-check
+
+		unit.code = e.code;
+		unit.BumpVersion();
+
+		NEURUS_LOG("[ShaderController] Code updated for mesh " << e.objectId
+		           << " (" << unit.code.size() << " bytes)");
+	}
+	catch (const std::exception& ex)
+	{
+		NEURUS_ERR("[ShaderController] Code update failed: " << ex.what());
 	}
 }
 
@@ -114,30 +143,130 @@ void ShaderController::OnCompileShader(const ShaderCompileRequested& e)
 		auto& shader = *mesh->o_shader;
 		auto type = static_cast<ShaderType>(e.shaderType);
 
-		// Write the edited code back to the ShaderUnit
-		if (!e.code.empty() && shader.HasStage(type))
-		{
-			auto& unit = shader.GetStage(type);
-			unit.code = e.code;
-			unit.BumpVersion();
+		if (!shader.HasStage(type)) return;
+		auto& unit = shader.GetStage(type);
 
-			NEURUS_LOG("[ShaderController] Updated shader code for mesh " << e.objectId
-			           << " (" << unit.code.size() << " bytes)");
+		if (e.unitType == 0)
+		{
+			// Code: parse the code into ShaderStruct IR, then generate GLSL
+			unit.parsed = ShaderParser::ParseShaderCode(unit.code, type);
+			unit.code = ShaderGenerator::Generate(unit.parsed);
+		}
+		else
+		{
+			// Struct: generate GLSL from ShaderStruct IR
+			unit.code = ShaderGenerator::Generate(unit.parsed);
 		}
 
-		// Compile all stages to SPIR-V
-		auto spvMap = ShaderLibrary::CompileAll(shader);
+		unit.BumpVersion();
 
-		// Mark scene as ShaderChanged so the renderer picks it up on the
-		// next frame and rebuilds pipelines via UploadManager::UploadShader().
+		ShaderLibrary::CompileAll(shader);
+
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
 
+		// Request Editor to upload compiled SPIR-V to GPU
+		c_editor->OnUIEvent(ShaderUploadRequest{e.objectId, e.shaderType});
+
 		NEURUS_LOG("[ShaderController] Compiled shader for mesh " << e.objectId
-		           << " (" << spvMap.size() << " stages)");
+		           << " (unitType=" << e.unitType << ")");
 	}
 	catch (const std::exception& ex)
 	{
 		NEURUS_ERR("[ShaderController] Compile failed: " << ex.what());
+	}
+}
+
+void ShaderController::OnStructModified(const ShaderModified& e)
+{
+	auto& scene = c_editor->GetScene();
+	auto it = scene.mesh_list.find(e.objectId);
+	if (it == scene.mesh_list.end()) return;
+
+	auto& mesh = it->second;
+	if (!mesh->o_shader) return;
+
+	try
+	{
+		auto& shader = *mesh->o_shader;
+		auto type = static_cast<ShaderType>(e.shaderType);
+
+		if (!shader.HasStage(type)) return;
+		auto& parsed = shader.GetStage(type).parsed;
+
+		// Apply the field edit to the correct ShaderStruct list
+		bool changed = false;
+
+		auto applyToIO = [&](std::vector<S_IO>& list) {
+			if (e.fieldIndex >= static_cast<int>(list.size())) return;
+			auto& io = list[e.fieldIndex];
+			if (e.field == "type")
+			{
+				io.type = ShaderStruct::ParseType(e.value);
+				io.typeName = e.value;
+				changed = true;
+			}
+			else if (e.field == "name")
+			{
+				io.name = e.value;
+				changed = true;
+			}
+		};
+
+		auto applyToUniform = [&](std::vector<S_Uniform>& list) {
+			if (e.fieldIndex >= static_cast<int>(list.size())) return;
+			auto& u = list[e.fieldIndex];
+			if (e.field == "type")
+			{
+				u.type = ShaderStruct::ParseType(e.value);
+				u.actualType = e.value;
+				u.actualType = e.value;
+				changed = true;
+			}
+			else if (e.field == "name")
+			{
+				u.name = e.value;
+				changed = true;
+			}
+		};
+
+		switch (e.sectionType)
+		{
+		case static_cast<int>(Component::Attributes):  applyToIO(parsed.AB_list); break;
+		case static_cast<int>(Component::PassOutputs): applyToIO(parsed.pass_list); break;
+		case static_cast<int>(Component::Inputs):      applyToUniform(parsed.input_list); break;
+		case static_cast<int>(Component::Outputs):     applyToUniform(parsed.output_list); break;
+		case static_cast<int>(Component::Uniforms):    applyToUniform(parsed.uniform_list); break;
+		case static_cast<int>(Component::StructDefs):  // struct_def_list
+			if (e.fieldIndex < static_cast<int>(parsed.struct_def_list.size()))
+			{
+				auto& sd = parsed.struct_def_list[e.fieldIndex];
+				if (e.field == "name") { sd.name = e.value; changed = true; }
+				else if (e.field == "type") { sd.varName = e.value; changed = true; }
+			}
+			break;
+		case static_cast<int>(Component::Functions):  // func_list
+			if (e.fieldIndex < static_cast<int>(parsed.func_list.size()))
+			{
+				auto& f = parsed.func_list[e.fieldIndex];
+				if (e.field == "name") { f.name = e.value; changed = true; }
+				else if (e.field == "type") { f.returnType = ShaderStruct::ParseType(e.value); changed = true; }
+			}
+			break;
+		default: return;
+		}
+
+		if (changed)
+		{
+			auto& unit = shader.GetStage(type);
+			unit.BumpVersion();
+			scene.UpdateSceneStatus(Scene::ShaderChanged, true);
+			NEURUS_LOG("[ShaderController] Struct modified: section=" << e.sectionType
+			           << " idx=" << e.fieldIndex << " field=" << e.field << " value=" << e.value);
+		}
+	}
+	catch (const std::exception& ex)
+	{
+		NEURUS_ERR("[ShaderController] Struct modify failed: " << ex.what());
 	}
 }
 

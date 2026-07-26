@@ -47,6 +47,7 @@ public:
 signals:
 	void createShaderRequested(const ShaderCreateRequested& e);
 	void compileRequested(const ShaderCompileRequested& e);
+	void codeEdited(const ShaderCodeEdited& e);
 	void structModified(const ShaderModified& e);
 
 private:

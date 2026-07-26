@@ -387,6 +387,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	{
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::compileRequested);
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::createShaderRequested);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::codeEdited);
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::structModified);
 	}
 

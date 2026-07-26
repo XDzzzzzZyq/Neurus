@@ -38,7 +38,7 @@ public:
 signals:
 	void addButtonClicked();
 	/** @brief Emitted when a field row's type or name is edited by the user. */
-	void fieldEdited(int row);
+	void fieldEdited(int row, const QString& field, const QString& value);
 
 private:
 	QLabel*       m_titleLabel    = nullptr;
