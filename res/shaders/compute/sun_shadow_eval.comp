@@ -1,80 +1,61 @@
 #version 450
-// ---------------------------------------------------------------------------
-// Sun (Directional) Shadow Evaluation Compute Shader
-//
-// For each pixel, reads the world-space position from the G-Buffer, transforms
-// it into the light's clip space using a view-projection matrix, performs
-// perspective divide to get NDC coordinates, and samples the 2D shadow depth
-// map for comparison.
-//
-// Shadow intensity convention (per spec):
-//   1.0 = fully shadowed
-//   0.0 = fully lit
-//
-// Dispatch: ceil(width/16), ceil(height/16), 1
-// ---------------------------------------------------------------------------
-
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-// --- G-Buffer input: world-space position (combined image sampler) ---
+// --- G-Buffer input: world-space position ---
 layout(binding = 0) uniform sampler2D gPosition;
 
-// --- Sun shadow depth map (non-compare, 2D; .r = depth in [0,1]) ---
+// --- Sun shadow depth map (non-compare, 2D, .r = depth in [0,1]) ---
 layout(binding = 1) uniform sampler2D u_SunShadowMap;
 
-// --- Output: R8 shadow intensity (2D_ARRAY, one layer per light) ---
-layout(r8, binding = 2) uniform writeonly image2DArray outputShadow;
+// --- Output / accumulation: R8 shadow intensity (2D_ARRAY), read+write ---
+layout(r8, binding = 2) uniform image2DArray outputShadow;
 
-// --- Push constants: 72 bytes total ---
+// --- Push constants: 88 bytes GLSL ---
 layout(push_constant) uniform PushConstants
 {
-	mat4 lightViewProj;     // offset 0,  64 bytes
-	float bias;             // offset 64, 4 bytes
-	int   layerIndex;       // offset 68, 4 bytes
+    mat4  lightViewProj;    // offset 0,  64 bytes
+    float bias;             // offset 64, 4 bytes
+    int   layerIndex;       // offset 68, 4 bytes
+    float jitterX;          // offset 72, 4 bytes
+    float jitterY;          // offset 76, 4 bytes
+    float alpha;            // offset 80, 4 bytes
+    int   frameCount;       // offset 84, 4 bytes
 };
-// Total: 72 bytes
 
 void main()
 {
-	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
-	ivec2 imgSize     = imageSize(outputShadow).xy;
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imgSize    = imageSize(outputShadow).xy;
 
-	if (pixelCoord.x >= imgSize.x || pixelCoord.y >= imgSize.y)
-	{
-		return;
-	}
+    if (pixelCoord.x >= imgSize.x || pixelCoord.y >= imgSize.y) return;
 
-	vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(imgSize);
+    vec2 uv = (vec2(pixelCoord) + 0.5) / vec2(imgSize);
+    vec4 posSample = textureLod(gPosition, uv, 0.0);
 
-	// --- Sample world-space position from G-Buffer ---
-	vec4 posSample = textureLod(gPosition, uv, 0.0);
+    // Background pixel (no geometry) -- keep previous accumulated value
+    if (posSample.w < 0.5) return;
 
-	// Background pixel (no geometry) — treat as fully lit
-	if (posSample.w < 0.5)
-	{
-		imageStore(outputShadow, ivec3(pixelCoord, layerIndex), vec4(0.0));
-		return;
-	}
+    vec3 worldPos     = posSample.xyz;
+    vec4 lightSpace   = lightViewProj * vec4(worldPos, 1.0);
+    vec3 ndc          = lightSpace.xyz / lightSpace.w;
 
-	vec3 worldPos = posSample.xyz;
+    // Map NDC.xy from [-1,1] to [0,1] UV
+    vec2 shadowUV = ndc.xy * 0.5 + 0.5;
 
-	// --- Transform to light clip space ---
-	vec4 lightSpace = lightViewProj * vec4(worldPos, 1.0);
+    // Jitter the shadow map UV sample (sub-pixel offset equivalent to
+    // directional light direction jitter)
+    const float jitterScale = 1.0 / 2048.0;  // sub-pixel at 2048x2048 shadow map
+    vec2 jitteredUV = shadowUV + vec2(jitterX, jitterY) * jitterScale;
 
-	// --- Perspective divide to NDC (Vulkan depth in [0,1]) ---
-	vec3 ndc = lightSpace.xyz / lightSpace.w;
+    float shadowDepth  = textureLod(u_SunShadowMap, jitteredUV, 0.0).r;
 
-	// --- Map NDC.xy from [-1,1] to [0,1] UV ---
-	vec2 shadowUV = ndc.xy * 0.5 + 0.5;
+    // ndc.z in [0,1]; bias offsets fragment depth toward light
+    float shadowSample = (ndc.z - bias > shadowDepth) ? 1.0 : 0.0;
 
-	// --- Sample shadow depth map ---
-	//     Border color = 0.0 (unshadowed) for out-of-bounds UV.
-	float shadowDepth = textureLod(u_SunShadowMap, shadowUV, 0.0).r;
+    // Temporal accumulation: read previous value, EMA blend, write back
+    float prevAccum = imageLoad(outputShadow, ivec3(pixelCoord, layerIndex)).r;
+    float newAccum  = (frameCount == 0) ? shadowSample
+                    : mix(prevAccum, shadowSample, alpha);
 
-	// --- Depth comparison ---
-	//     ndc.z is in [0,1]. Points farther than the stored depth are shadowed.
-	//     Bias offsets the fragment depth toward the light to reduce acne.
-	float shadow = (ndc.z - bias > shadowDepth) ? 1.0 : 0.0;
-
-	imageStore(outputShadow, ivec3(pixelCoord, layerIndex), vec4(shadow));
+    imageStore(outputShadow, ivec3(pixelCoord, layerIndex), vec4(newAccum));
 }
