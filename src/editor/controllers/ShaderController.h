@@ -32,7 +32,7 @@ private:
 	void OnCreateShader(const ShaderCreateRequested& e);
 	void OnCompileShader(const ShaderCompileRequested& e);
 	void OnCodeEdited(const ShaderCodeEdited& e);
-	void OnStructModified(const ShaderModified& e);
+	void OnStructEdited(const ShaderModified& e);
 
 	Editor*           c_editor        = nullptr;
 	DeferredRenderer* c_renderer      = nullptr;

@@ -161,30 +161,40 @@ void GeometryPass::ConfigureGBufferPipeline(PipelineBuilder& builder)
 // Per-mesh custom pipeline creation
 // ---------------------------------------------------------------------------
 
-Pipeline GeometryPass::CreatePerMeshPipeline(const Shader& shader, ShaderType stageType)
+Pipeline GeometryPass::CreatePerMeshPipeline(const Shader& shader, ShaderType /*stageType*/)
 {
-	// 1. Compile SPIR-V via ShaderLibrary
-	auto spirvs = ShaderLibrary::CompileAll(const_cast<Shader&>(shader));
-	if (spirvs.empty()) return Pipeline{};
+	// Create shader modules for all available stages
+	struct StageEntry
+	{
+		vk::PipelineShaderStageCreateInfo ci;
+		vk::raii::ShaderModule module;
+	};
+	std::vector<StageEntry> stages;
 
-	auto it = spirvs.find(stageType);
-	if (it == spirvs.end()) return Pipeline{};
+	for (auto t : {ShaderType::VERTEX, ShaderType::FRAGMENT})
+	{
+		if (!shader.HasStage(t)) continue;
+		const auto& unit = shader.GetStage(t);
+		if (unit.spv.empty()) continue;
 
-	// 2. Create temporary shader module
-	vk::ShaderModuleCreateInfo smCI({}, it->second);
-	vk::raii::ShaderModule shaderModule(*p_device, smCI);
+		vk::ShaderStageFlagBits flag = vk::ShaderStageFlagBits::eVertex;
+		if (t == ShaderType::FRAGMENT) flag = vk::ShaderStageFlagBits::eFragment;
+		else if (t == ShaderType::COMPUTE) flag = vk::ShaderStageFlagBits::eCompute;
 
-	// 3. Map ShaderType to Vulkan stage flag
-	vk::ShaderStageFlagBits stageFlag = vk::ShaderStageFlagBits::eVertex;
-	if (stageType == ShaderType::FRAGMENT) stageFlag = vk::ShaderStageFlagBits::eFragment;
-	if (stageType == ShaderType::COMPUTE)  stageFlag = vk::ShaderStageFlagBits::eCompute;
+		vk::ShaderModuleCreateInfo smCI({}, unit.spv);
+		vk::raii::ShaderModule module(*p_device, smCI);
+		vk::PipelineShaderStageCreateInfo stageCI({}, flag, *module, "main");
 
-	vk::PipelineShaderStageCreateInfo stageCI({}, stageFlag, *shaderModule, "main");
+		stages.push_back({stageCI, std::move(module)});
+	}
 
-	// 4. Build pipeline using shared G-Buffer configuration
+	if (stages.empty()) return Pipeline{};
+
+	// Build pipeline using shared G-Buffer configuration
 	PipelineBuilder builder;
-	builder.SetDebugName("PerMeshPipeline")
-	       .AddShaderStage(stageCI);
+	builder.SetDebugName("PerMeshPipeline");
+	for (auto& s : stages)
+		builder.AddShaderStage(s.ci);
 	ConfigureGBufferPipeline(builder);
 	return builder.BuildGraphicsPipeline(*p_device);
 }
@@ -265,14 +275,12 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			bool usingCustomPipeline = false;
 			if (mesh->o_shader)
 			{
-				auto shaderType = ShaderType::VERTEX;
-				int version = mesh->o_shader->HasStage(shaderType)
-					? mesh->o_shader->GetStage(shaderType).GetVersion() : 0;
+				int version = mesh->o_shader->GetVersion();
 
 				Pipeline* customPipeline = cache.GetPipeline(mesh->GetObjectID(), version);
 				if (!customPipeline)
 				{
-					Pipeline newPipeline = CreatePerMeshPipeline(*mesh->o_shader, shaderType);
+					Pipeline newPipeline = CreatePerMeshPipeline(*mesh->o_shader, ShaderType::VERTEX);
 					cache.UsePipeline(mesh->GetObjectID(), std::move(newPipeline), version);
 					customPipeline = cache.GetPipeline(mesh->GetObjectID(), version);
 				}

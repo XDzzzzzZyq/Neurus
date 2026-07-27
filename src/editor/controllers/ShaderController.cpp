@@ -39,7 +39,7 @@ void ShaderController::Init(EventQueue& bus)
 	bus.subscribe<ShaderCodeEdited>(
 		[this](const ShaderCodeEdited& e) { OnCodeEdited(e); });
 	bus.subscribe<ShaderModified>(
-		[this](const ShaderModified& e) { OnStructModified(e); });
+		[this](const ShaderModified& e) { OnStructEdited(e); });
 }
 
 void ShaderController::OnCreateShader(const ShaderCreateRequested& e)
@@ -110,7 +110,6 @@ void ShaderController::OnCodeEdited(const ShaderCodeEdited& e)
 		if (unit.code == e.code) return;  // dirty-check
 
 		unit.code = e.code;
-		unit.BumpVersion();
 
 		NEURUS_LOG("[ShaderController] Code updated for mesh " << e.objectId
 		           << " (" << unit.code.size() << " bytes)");
@@ -158,7 +157,16 @@ void ShaderController::OnCompileShader(const ShaderCompileRequested& e)
 			unit.code = ShaderGenerator::Generate(unit.parsed);
 		}
 
+		// Compile to SPIR-V and store in ShaderUnit
+		unit.spv  = ShaderLibrary::Compile(unit, type, shader.GetName());
+		if (unit.spv.empty())
+		{
+			NEURUS_ERR("[ShaderController] Compile failed for mesh " << e.objectId);
+			return;
+		}
 		unit.BumpVersion();
+		shader.BumpVersion();
+
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
 
 		NEURUS_LOG("[ShaderController] Compiled shader for mesh " << e.objectId
@@ -170,7 +178,7 @@ void ShaderController::OnCompileShader(const ShaderCompileRequested& e)
 	}
 }
 
-void ShaderController::OnStructModified(const ShaderModified& e)
+void ShaderController::OnStructEdited(const ShaderModified& e)
 {
 	auto& scene = c_editor->GetScene();
 	auto it = scene.mesh_list.find(e.objectId);
@@ -251,10 +259,7 @@ void ShaderController::OnStructModified(const ShaderModified& e)
 
 		if (changed)
 		{
-			auto& unit = shader.GetStage(type);
-			unit.BumpVersion();
-			scene.UpdateSceneStatus(Scene::ShaderChanged, true);
-			NEURUS_LOG("[ShaderController] Struct modified: section=" << e.sectionType
+			NEURUS_LOG("[ShaderController] Struct edited: section=" << e.sectionType
 			           << " idx=" << e.fieldIndex << " field=" << e.field << " value=" << e.value);
 		}
 	}

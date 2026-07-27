@@ -112,9 +112,14 @@ public:
 	/** @brief Returns the last error message, if any. */
 	const std::string& GetErrorMessage() const { return m_errorMessage; }
 
+	/** @brief Monotonic version; bumped on each successful compile of any stage. */
+	int  GetVersion() const            { return m_version; }
+	void BumpVersion()                 { m_version++; }
+
 protected:
 	std::string m_name;          ///< Human-readable shader name
 	std::string m_errorMessage;  ///< Last error message
+	int         m_version = 0;   ///< Version counter for pipeline cache invalidation
 
 	/** @brief Map of ShaderUnits, keyed by ShaderType. */
 	std::unordered_map<ShaderType, ShaderUnit> m_stages;
