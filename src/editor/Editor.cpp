@@ -278,31 +278,6 @@ void Editor::Initialize()
 			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
 	});
 
-	ed_eventBus.subscribe<ShaderUploadRequest>([this](const ShaderUploadRequest& e) {
-		auto& scene = GetScene();
-		auto it = scene.mesh_list.find(e.objectId);
-		if (it == scene.mesh_list.end()) return;
-
-		auto& mesh = it->second;
-		if (!mesh->o_shader) return;
-
-		try
-		{
-			Pipeline pipeline = ed_uploadManager->UploadShader(
-				ed_renderer->GetDevice(), *mesh->o_shader, 0, nullptr,
-				ed_renderer->GetCameraDescriptorSetLayout());
-
-			ed_renderer->GetRenderCache().UsePipeline(
-				mesh->GetObjectID(), std::move(pipeline));
-
-			NEURUS_LOG("[Editor] Uploaded shader pipeline for mesh " << e.objectId);
-		}
-		catch (const std::exception& ex)
-		{
-			NEURUS_ERR("[Editor] Shader upload failed for mesh " << e.objectId << ": " << ex.what());
-		}
-	});
-
 	NEURUS_LOG("[Editor] Initialized");
 }
 

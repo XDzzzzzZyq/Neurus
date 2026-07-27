@@ -40,12 +40,6 @@ struct ShaderSaveRequested
 	int objectId;
 };
 
-struct ShaderUploadRequest
-{
-	int objectId;
-	int shaderType;
-};
-
 struct ShaderModified
 {
 	int objectId;

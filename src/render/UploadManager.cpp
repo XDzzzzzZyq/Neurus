@@ -10,19 +10,16 @@
 
 #include "Image.h"
 #include "PipelineBuilder.h"
-#include "buffers/BufferLayout.h"
 #include "Texture.h"
 #include "resources/MeshGPU.h"
 #include "resources/EnvironmentGPU.h"
 #include "resources/LightGPU.h"
 #include "resources/LightingGPU.h"
-#include "shaders/Shader.h"
-#include "shaders/ShaderLibrary.h"
+
 
 #include "asset/ImageData.h"
 #include "asset/MeshData.h"
 #include "asset/PixelFormat.h"
-#include "buffers/BufferLayout.h"
 #include "buffers/IndexBuffer.h"
 #include "buffers/VertexBuffer.h"
 #include "core/Log.h"
@@ -374,169 +371,6 @@ UploadManager::UploadLighting(const Light& light)
 	// NONELIGHT — return default PointLightStruct (empty variant alternative)
 	NEURUS_ERR("[UploadManager] Unhandled light type: " << static_cast<int>(light.light_type));
 	return PointLightStruct{};
-}
-
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-namespace {
-
-vk::ShaderStageFlagBits ShaderTypeToVkStage(const ShaderType type)
-{
-	switch (type)
-	{
-	case ShaderType::VERTEX:   return vk::ShaderStageFlagBits::eVertex;
-	case ShaderType::FRAGMENT: return vk::ShaderStageFlagBits::eFragment;
-	case ShaderType::COMPUTE:  return vk::ShaderStageFlagBits::eCompute;
-	case ShaderType::GEOMETRY: return vk::ShaderStageFlagBits::eGeometry;
-	}
-	return vk::ShaderStageFlagBits::eAll; // unreachable
-}
-
-} // anonymous namespace
-
-// ---------------------------------------------------------------------------
-// Shader upload (compile + pipeline build)
-// ---------------------------------------------------------------------------
-
-Pipeline UploadManager::UploadShader(const vk::raii::Device& device,
-                                     const Shader& shader,
-                                     const uint32_t viewMask,
-                                     const BufferLayout* vertexLayout,
-                                     vk::DescriptorSetLayout cameraLayout)
-{
-	// --- 1. Compile all stages to SPIR-V ---
-	auto spirvs = ShaderLibrary::CompileAll(shader);
-	if (spirvs.empty())
-	{
-		NEURUS_ERR("[UploadManager] UploadShader: CompileAll returned empty for \""
-		           << shader.GetName() << "\"");
-		return Pipeline{};
-	}
-
-	// --- 2. Create temporary ShaderModule per stage ---
-	struct ModuleEntry
-	{
-		ShaderType type;
-		vk::raii::ShaderModule module = { nullptr };
-	};
-	std::vector<ModuleEntry> modules;
-	modules.reserve(spirvs.size());
-
-	for (const auto& [type, code] : spirvs)
-	{
-		vk::ShaderModuleCreateInfo smCI({}, code);
-		modules.emplace_back(type, vk::raii::ShaderModule(device, smCI));
-	}
-
-	// --- 3. Determine pipeline type ---
-	const bool isCompute = (shader.GetType() == ShaderType::COMPUTE);
-
-	// --- 4. Build pipeline via PipelineBuilder ---
-	PipelineBuilder builder;
-
-	for (const auto& entry : modules)
-	{
-		const vk::ShaderStageFlagBits stageFlag = ShaderTypeToVkStage(entry.type);
-		vk::PipelineShaderStageCreateInfo stageCI({}, stageFlag, *entry.module, "main");
-		builder.AddShaderStage(stageCI);
-	}
-
-	if (isCompute)
-	{
-		// Compute shader: no vertex input, no rasterization state
-		builder.SetDebugName(("Upload_" + shader.GetName()).c_str());
-		return builder.BuildComputePipeline(device);
-	}
-
-	// --- 5a. Render shader: configure attachment formats ---
-	if (viewMask != 0)
-	{
-		// Multiview shadow depth pass: depth-only, D32_SFLOAT
-		builder.SetDepthFormat(vk::Format::eD32Sfloat);
-		builder.SetViewMask(viewMask);
-		builder.SetDepthStencil(true, true, vk::CompareOp::eLessOrEqual);
-	}
-	else
-	{
-		// Standard G-Buffer geometry pass: 5 color attachments + depth
-		builder.SetColorFormats({
-			vk::Format::eR16G16B16A16Sfloat,  // Position
-			vk::Format::eR16G16B16A16Sfloat,  // Normal
-			vk::Format::eR8G8B8A8Srgb,        // Albedo
-			vk::Format::eR8G8B8A8Unorm,       // MetallicRoughness
-			vk::Format::eR32Uint              // IDBuffer
-		});
-		builder.SetDepthFormat(vk::Format::eD32Sfloat);
-		builder.SetDepthStencil(true, true);
-	}
-
-	// --- 5b. Vertex input ---
-	if (vertexLayout)
-	{
-		builder.SetVertexInput(*vertexLayout);
-	}
-	else
-	{
-		// Default vertex layout: aPos(0)@0, aNormal(1)@12, aTexCoord(2)@24, stride=32
-		BufferLayout defaultLayout;
-		defaultLayout.AddAttribute(0, vk::Format::eR32G32B32Sfloat, 0);
-		defaultLayout.AddAttribute(1, vk::Format::eR32G32B32Sfloat, 12);
-		defaultLayout.AddAttribute(2, vk::Format::eR32G32Sfloat, 24);
-		builder.SetVertexInput(defaultLayout);
-	}
-
-	// --- 5c. Default pipeline layout (descriptor sets + push constants) ---
-	std::optional<vk::raii::DescriptorSetLayout> camLayout;
-	if ((!vertexLayout && !cameraLayout) || cameraLayout)
-	{
-		if (cameraLayout)
-		{
-			builder.AddDescriptorSetLayout(cameraLayout);
-		}
-		else
-		{
-			vk::DescriptorSetLayoutBinding camBinding(0, vk::DescriptorType::eUniformBuffer,
-			                                          1, vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment);
-			vk::DescriptorSetLayoutCreateInfo camLayoutCI({}, camBinding);
-			camLayout.emplace(device, camLayoutCI);
-			builder.AddDescriptorSetLayout(*(*camLayout));
-		}
-
-		vk::PushConstantRange pushRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment, 0, 128);
-		builder.SetPushConstantRanges({pushRange});
-	}
-
-	// --- 5d. Default render states ---
-	builder.SetInputAssembly();
-	builder.SetRasterization();
-	builder.SetMultisampling();
-
-	// Color blend attachments
-	if (viewMask == 0)
-	{
-		const vk::PipelineColorBlendAttachmentState kBlendNone(
-			VK_FALSE,                       // blendEnable
-			vk::BlendFactor::eOne,          // srcColorBlendFactor
-			vk::BlendFactor::eZero,         // dstColorBlendFactor
-			vk::BlendOp::eAdd,              // colorBlendOp
-			vk::BlendFactor::eOne,          // srcAlphaBlendFactor
-			vk::BlendFactor::eZero,         // dstAlphaBlendFactor
-			vk::BlendOp::eAdd,              // alphaBlendOp
-			vk::ColorComponentFlagBits::eR |
-			vk::ColorComponentFlagBits::eG |
-			vk::ColorComponentFlagBits::eB |
-			vk::ColorComponentFlagBits::eA);
-		for (int i = 0; i < 5; ++i)
-		{
-			builder.AddColorBlendAttachment(kBlendNone);
-		}
-	}
-	// else: depth-only pass, no color blend attachments needed
-
-	builder.SetDebugName(("Upload_" + shader.GetName()).c_str());
-	return builder.BuildGraphicsPipeline(device);
 }
 
 } // namespace neurus

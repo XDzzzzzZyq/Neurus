@@ -76,11 +76,11 @@ void ShaderController::OnCreateShader(const ShaderCreateRequested& e)
 
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
 
-		// Compile and upload each stage
+		// Parse and generate each stage (CPU only — pipeline creation is handled by GeometryPass)
 		if (mesh->o_shader->HasStage(ShaderType::VERTEX))
-			OnCompileShader({e.objectId, static_cast<int>(ShaderType::VERTEX), 1});
+			OnCompileShader({e.objectId, static_cast<int>(ShaderType::VERTEX), 0});
 		if (mesh->o_shader->HasStage(ShaderType::FRAGMENT))
-			OnCompileShader({e.objectId, static_cast<int>(ShaderType::FRAGMENT), 1});
+			OnCompileShader({e.objectId, static_cast<int>(ShaderType::FRAGMENT), 0});
 
 		NEURUS_LOG("[ShaderController] Created shader for mesh " << e.objectId << ": " << shaderName);
 	}
@@ -159,13 +159,7 @@ void ShaderController::OnCompileShader(const ShaderCompileRequested& e)
 		}
 
 		unit.BumpVersion();
-
-		ShaderLibrary::CompileAll(shader);
-
 		scene.UpdateSceneStatus(Scene::ShaderChanged, true);
-
-		// Request Editor to upload compiled SPIR-V to GPU
-		c_editor->OnUIEvent(ShaderUploadRequest{e.objectId, e.shaderType});
 
 		NEURUS_LOG("[ShaderController] Compiled shader for mesh " << e.objectId
 		           << " (unitType=" << e.unitType << ")");

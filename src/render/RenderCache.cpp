@@ -297,9 +297,19 @@ Pipeline* RenderCache::GetPipeline(const int uid)
 	return rc_pipelineCache.Get(uid);
 }
 
+Pipeline* RenderCache::GetPipeline(const int uid, const int version)
+{
+	return rc_pipelineCache.GetPipeline(uid, version);
+}
+
 void RenderCache::UsePipeline(const int uid, Pipeline pipeline)
 {
 	rc_pipelineCache.Store(uid, std::move(pipeline));
+}
+
+void RenderCache::UsePipeline(const int uid, Pipeline pipeline, const int version)
+{
+	rc_pipelineCache.UsePipeline(uid, std::move(pipeline), version);
 }
 
 void RenderCache::RemovePipeline(const int uid)

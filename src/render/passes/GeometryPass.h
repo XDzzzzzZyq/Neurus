@@ -22,6 +22,7 @@
 #pragma once
 
 #include "../DescriptorManager.h"
+#include "../PipelineBuilder.h"
 #include "../buffers/BufferLayout.h"
 #include "../buffers/UniformBuffer.h"
 #include "../shaders/ShaderLibrary.h"
@@ -110,6 +111,20 @@ private:
 	 */
 	void BuildPipeline(const vk::raii::Device& device,
 	                   const std::string& debugName) override;
+
+	/**
+	 * @brief Creates a per-mesh graphics pipeline from a custom Shader.
+	 *
+	 * Compiles the shader stage via ShaderLibrary, creates a temporary
+	 * ShaderModule, and builds a graphics pipeline matching the default
+	 * G-Buffer attachment formats and vertex layout.
+	 *
+	 * @param shader    The CPU-side Shader containing stage source code.
+	 * @param stageType Which shader stage to compile (VERTEX for graphics).
+	 * @return Fully constructed Pipeline, or an empty Pipeline on failure.
+	 */
+	Pipeline CreatePerMeshPipeline(const Shader& shader, ShaderType stageType);
+	void ConfigureGBufferPipeline(PipelineBuilder& builder);
 
 	// --- Descriptor resources ---
 	DescriptorSetLayout p_cameraLayout;             ///< Set 0 layout definition

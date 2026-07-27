@@ -145,8 +145,6 @@ public:
 
 	const vk::raii::Device& GetDevice() const { return r_device; }
 
-	vk::DescriptorSetLayout GetCameraDescriptorSetLayout() const;
-
 	/**
 	 * @brief Reads a single pixel from the IDBuffer attachment and returns the object ID.
 	 *
