@@ -49,7 +49,7 @@ class Texture;
  * Reads the G-Buffer (Position, Normal, Albedo, MetallicRoughness) as
  * combined image samplers, dispatches the PBR lighting compute shader,
  * and writes HDR colour to the output image.  Light SSBOs are now owned
- * by LightingGPU (stored in RenderCache) rather than LightingPass itself.
+ * by LightingCache (stored in RenderCache) rather than LightingPass itself.
  *
  * Non-copyable, movable.
  */
@@ -130,7 +130,7 @@ private:
 	/**
 	 * @brief Writes all descriptors (image + buffer) into the specified set.
 	 *
-	 * Light SSBOs are read from RenderCache::GetLightingGPU() at binding
+	 * Light SSBOs are read from RenderCache::GetLightingCache() at binding
 	 * time, not stored locally.
 	 *
 	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).

@@ -15,10 +15,10 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
 - `src/render/shaders/ShaderGPU.h, src/render/shaders/Shader.h/cpp` - SPIR-V loading, pipeline creation
 - `src/render/Renderer.h` - Public renderer API, frame drawing
-- `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingGPU, attachments, shadow maps
+- `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingCache, attachments, shadow maps
 - `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
 - `src/render/Texture.h/cpp` - Texture resource (Image + sampler + descriptor)
-- `src/render/resources/LightingGPU.h/cpp` - GPU-side light SSBO storage (point + sun, push constants)
+- `src/render/resources/LightingCache.h/cpp` - GPU-side light SSBO storage (point + sun, push constants)
 - `src/render/resources/MeshGPU.h` - GPU-side mesh resources (VertexBuffer + IndexBuffer) + MeshPushConstants
 - `src/render/resources/EnvironmentGPU.h` - GPU-side IBL resources (diffuse + specular cubemap Textures)
 - `src/render/resources/LightGPU.h` - Per-light shadow GPU resources (shadow depth cubemap/map)
@@ -156,9 +156,9 @@ ShadowIntensityPass (compute: per-light shadow eval → layered R8_UNORM 2D_ARRA
     │
     ▼
 LightingPass (compute: reads G-Buffer + AO + shadow intensity array,
-              reads LightingGPU SSBOs from RenderCache, writes HDRColor)
-    ├── Binding 5: PointLight SSBO (from RenderCache::GetLightingGPU())
-    └── Binding 6: SunLight SSBO   (from RenderCache::GetLightingGPU())
+              reads LightingCache SSBOs from RenderCache, writes HDRColor)
+    ├── Binding 5: PointLight SSBO (from RenderCache::GetLightingCache())
+    └── Binding 6: SunLight SSBO   (from RenderCache::GetLightingCache())
     │
     ▼
 IBLPass (compute: reads G-Buffer + HDRColor, applies diffuse+specular IBL, writes HDRColor)
@@ -345,13 +345,13 @@ These resources separate GPU ownership from the Vulkan-free scene and asset laye
 - Read per-frame by `LightingPass` via `RenderCache::GetEnvironmentGPU(envId)`
 - Destroyed via `RenderCache::RemoveEnvironmentGPU(envId)`
 
-**LightingGPU** (`src/render/resources/LightingGPU.h`)
+**LightingCache** (`src/render/resources/LightingCache.h`)
 - Manages point light and sun light SSBOs (device-local GPUBuffers)
-- Created by `RenderCache` via `InitLightingGPU(queue, qfi)` (separated from constructor
+- Created by `RenderCache` via `InitLightingCache(queue, qfi)` (separated from constructor
   so queue/qfi don't need to be stored as members)
 - Updated via `RenderCache::UpdateLighting(variantDict)` — accepts a map of
   `variant<PointLightStruct, SunLightStruct>` keyed by light UID
-- `RenderCache::GetLightingGPU()` returns the LightingGPU for per-frame SSBO binding
+- `RenderCache::GetLightingCache()` returns the LightingCache for per-frame SSBO binding
   by `LightingPass`
 - Also defines `PointLightStruct`, `SunLightStruct` (std140-compatible, 48 bytes),
   and `LightingPushConstants` (176 bytes) — byte-for-byte matches with GLSL shaders

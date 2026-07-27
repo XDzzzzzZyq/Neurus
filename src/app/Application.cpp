@@ -119,9 +119,9 @@ int Application::Run()
 		app_vkContext->transferQueue(),
 		app_vkContext->transferQueueFamily());
 
-	// --- Wire LightingGPU to RenderCache via transfer queue ---
-	app_renderer->GetRenderCache().SetLightingGPU(
-		app_uploadManager->CreateLightingGPU(
+	// --- Wire LightingCache to RenderCache via transfer queue ---
+	app_renderer->GetRenderCache().SetLightingCache(
+		app_uploadManager->CreateLightingCache(
 			app_vkContext->device(),
 			app_vkContext->physicalDevice()));
 

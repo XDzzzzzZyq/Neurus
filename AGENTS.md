@@ -173,8 +173,8 @@ Neurus/
 │   │   ├── resources/        # GPU resource structs (owned by RenderCache)
 │   │   │   ├── EnvironmentGPU.h     # IBL cubemap Textures
 │   │   │   ├── LightGPU.h           # Per-light shadow resources
-│   │   │   ├── LightingGPU.h/cpp    # Light SSBO storage (point + sun)
-│   │   │   └── MeshGPU.h           # GPU-side mesh + MeshPushConstants
+│   │   │   ├── LightingCache.h/cpp  # Light SSBO storage (point + sun)
+│   │   │   └── MeshGPU.h            # GPU-side mesh + MeshPushConstants
 │   │   ├── passes/          # Render passes
 │   │   │   ├── GeometryPass.h/cpp
 │   │   │   ├── SSAOPass.h/cpp

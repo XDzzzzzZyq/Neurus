@@ -20,10 +20,10 @@ RenderCache::RenderCache(const vk::raii::Device& device,
 	NEURUS_LOG("[RenderCache] Created");
 }
 
-void RenderCache::SetLightingGPU(std::unique_ptr<LightingGPU> lightingGPU)
+void RenderCache::SetLightingCache(std::unique_ptr<LightingCache> lightingCache)
 {
-	rc_lightingGPU = std::move(lightingGPU);
-	NEURUS_LOG("[RenderCache] LightingGPU set");
+	rc_lightingCache = std::move(lightingCache);
+	NEURUS_LOG("[RenderCache] LightingCache set");
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ void RenderCache::Clean()
 	rc_environmentGPUs.clear();
 	rc_lightGPUs.clear();
 	rc_uidToShadowLayer.clear();
-	rc_lightingGPU.reset();
+	rc_lightingCache.reset();
 	rc_pipelineCache.Clear();
 }
 
@@ -314,7 +314,7 @@ void RenderCache::RemovePipeline(const int uid)
 void RenderCache::UpdateLighting(const std::unordered_map<int,
                                  std::variant<PointLightStruct, SunLightStruct>>& lightDict)
 {
-	assert(rc_lightingGPU && "InitLightingGPU must be called before UpdateLighting");
+	assert(rc_lightingCache && "InitLightingCache must be called before UpdateLighting");
 
 	// --- Clear index maps ---
 	rc_uidToSSBOIdx.clear();
@@ -386,8 +386,8 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 	}
 
 	// --- Upload to GPU ---
-	rc_lightingGPU->UpdatePointLights(pointVec);
-	rc_lightingGPU->UpdateSunLights(sunVec);
+	rc_lightingCache->UpdatePointLights(pointVec);
+	rc_lightingCache->UpdateSunLights(sunVec);
 
 	NEURUS_LOG("[RenderCache] UpdateLighting: " << pointVec.size()
 	           << " point lights, " << sunVec.size() << " sun lights, "
@@ -397,7 +397,7 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 void RenderCache::UpdateLight(int lightUID,
                               const std::variant<PointLightStruct, SunLightStruct>& light)
 {
-	assert(rc_lightingGPU && "InitLightingGPU must be called before UpdateLight");
+	assert(rc_lightingCache && "InitLightingCache must be called before UpdateLight");
 
 	if (std::holds_alternative<PointLightStruct>(light))
 	{
@@ -409,7 +409,7 @@ void RenderCache::UpdateLight(int lightUID,
 		updated.shadowMapIndex = (shadowIt != rc_uidToShadowLayer.end())
 			? static_cast<int32_t>(shadowIt->second) : -1;
 
-		rc_lightingGPU->UpdatePointLight(updated, it->second);
+		rc_lightingCache->UpdatePointLight(updated, it->second);
 	}
 	else if (std::holds_alternative<SunLightStruct>(light))
 	{
@@ -421,7 +421,7 @@ void RenderCache::UpdateLight(int lightUID,
 		updated.shadowMapIndex = (shadowIt != rc_uidToShadowLayer.end())
 			? static_cast<int32_t>(shadowIt->second) : -1;
 
-		rc_lightingGPU->UpdateSunLight(updated, it->second);
+		rc_lightingCache->UpdateSunLight(updated, it->second);
 	}
 }
 
@@ -431,14 +431,14 @@ uint32_t RenderCache::GetShadowIndex(int lightUID) const
 	return (it != rc_uidToShadowLayer.end()) ? it->second : 0;
 }
 
-LightingGPU* RenderCache::GetLightingGPU()
+LightingCache* RenderCache::GetLightingCache()
 {
-	return rc_lightingGPU.get();
+	return rc_lightingCache.get();
 }
 
-const LightingGPU* RenderCache::GetLightingGPU() const
+const LightingCache* RenderCache::GetLightingCache() const
 {
-	return rc_lightingGPU.get();
+	return rc_lightingCache.get();
 }
 
 // ---------------------------------------------------------------------------

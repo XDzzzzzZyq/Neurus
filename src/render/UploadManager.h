@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "resources/LightingGPU.h"
+#include "resources/LightingCache.h"
 
 #include <cstdint>
 #include <memory>
@@ -98,16 +98,16 @@ struct Pipeline;         // render/Pipeline.h
 	void WaitIdle();
 
 	/**
-	 * @brief Creates a LightingGPU (light SSBO storage) using the transfer queue.
+	 * @brief Creates a LightingCache (light SSBO storage) using the transfer queue.
 	 *
-	 * The LightingGPU holds device-local SSBOs for point and sun light data.
+	 * The LightingCache holds device-local SSBOs for point and sun light data.
 	 * Staging uploads use the transfer queue for true async operation.
 	 *
 	 * @param device          Logical device.
 	 * @param physicalDevice  Physical device (for buffer memory queries).
-	 * @return Fully constructed LightingGPU, ready to be passed to RenderCache::SetLightingGPU().
+	 * @return Fully constructed LightingCache, ready to be passed to RenderCache::SetLightingCache().
 	 */
-	std::unique_ptr<LightingGPU> CreateLightingGPU(const vk::raii::Device& device,
+	std::unique_ptr<LightingCache> CreateLightingCache(const vk::raii::Device& device,
 	                                               const vk::raii::PhysicalDevice& physicalDevice);
 
 	/**

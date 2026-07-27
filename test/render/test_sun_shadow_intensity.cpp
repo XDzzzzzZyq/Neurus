@@ -80,8 +80,8 @@ protected:
 		if (!m_hasVulkan) return;
 		auto& pd = PhysicalDevice();
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
-		m_renderCache->SetLightingGPU(
-		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
+		m_renderCache->SetLightingCache(
+		std::make_unique<neurus::LightingCache>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 		m_geometryPass = std::make_unique<GeometryPass>(
 			*m_device, pd);
 		m_shadowDepthPass = std::make_unique<ShadowDepthPass>(

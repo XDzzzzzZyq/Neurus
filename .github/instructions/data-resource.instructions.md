@@ -33,7 +33,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 - `src/render/Texture.h/cpp` - Texture resource (combines Image + sampler + descriptor)
 - `src/render/DescriptorManager.h/cpp` - Descriptor pool/set lifecycle management
 - `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
-- `src/render/resources/LightingGPU.h/cpp` - GPU-side light SSBO storage (point + sun, push constants)
+- `src/render/resources/LightingCache.h/cpp` - GPU-side light SSBO storage (point + sun, push constants)
 
 ## Core Responsibilities
 
@@ -125,10 +125,10 @@ All image layout transitions go through `Barrier::Transition()`.
 - Barrier for centralized image barrier management (ImageState → Vulkan layout/stage/access, maps Invalid → Undefined)
 - DescriptorManager with per-frame descriptor pool rotation
 - UploadManager for CPU-to-GPU uploads (meshes, lights, environments, IBL cubemaps)
-- LightingGPU for point/sun light SSBO management (owned by RenderCache)
+- LightingCache for point/sun light SSBO management (owned by RenderCache)
 - Project: pure registration-based serializer (no data ownership) with Serializable base class,
   SceneComponent, and ConfigComponent adapter components
-- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`), cross-frame GPU resources for meshes (`MeshGPU` via `GetMeshGPU()`) and environments (`EnvironmentGPU` via `CreateEnvironmentGPU()`), and LightingGPU for light SSBOs (`InitLightingGPU()`, `GetLightingGPU()`, `UpdateLighting(variantDict)`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
+- RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`), cross-frame GPU resources for meshes (`MeshGPU` via `GetMeshGPU()`) and environments (`EnvironmentGPU` via `CreateEnvironmentGPU()`), and LightingCache for light SSBOs (`InitLightingCache()`, `GetLightingCache()`, `UpdateLighting(variantDict)`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
 
 ## Future Enhancements
 

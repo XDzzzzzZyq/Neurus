@@ -17,7 +17,7 @@
 #include "render/RenderCache.h"
 #include "render/UploadManager.h"
 #include "render/resources/LightGPU.h"
-#include "render/resources/LightingGPU.h"
+#include "render/resources/LightingCache.h"
 #include "render/resources/MeshGPU.h"
 
 #include "render/RenderContext.h"

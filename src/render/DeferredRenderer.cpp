@@ -11,7 +11,7 @@
 #include "RenderContext.h"
 #include "Swapchain.h"
 
-#include "resources/LightingGPU.h"
+#include "resources/LightingCache.h"
 
 #include "passes/GeometryPass.h"
 #include "passes/LightingPass.h"
@@ -61,7 +61,7 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 
 	// --- 2. Create G-Buffer attachment cache (lazy creation on first access) ---
 	r_renderCache = std::make_unique<RenderCache>(device, physicalDevice);
-	// LightingGPU is set via Application after construction (from UploadManager).
+	// LightingCache is set via Application after construction (from UploadManager).
 
 	// --- 3. Create geometry pass ---
 	{
