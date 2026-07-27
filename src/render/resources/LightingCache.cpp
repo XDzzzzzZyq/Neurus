@@ -1,9 +1,9 @@
 /**
- * @file LightingGPU.cpp
+ * @file LightingCache.cpp
  * @brief Light SSBO storage implementation using ArrayBuffer<T>.
  */
 
-#include "render/resources/LightingGPU.h"
+#include "render/resources/LightingCache.h"
 
 #include "core/Log.h"
 
@@ -16,7 +16,7 @@ namespace neurus {
 // Construction
 // ---------------------------------------------------------------------------
 
-LightingGPU::LightingGPU(const vk::raii::Device& device,
+LightingCache::LightingCache(const vk::raii::Device& device,
                          const vk::raii::PhysicalDevice& physicalDevice,
                          vk::Queue graphicsQueue,
                          uint32_t queueFamilyIndex)
@@ -25,30 +25,30 @@ LightingGPU::LightingGPU(const vk::raii::Device& device,
 	, m_sunLightSSBO(device, physicalDevice, graphicsQueue, queueFamilyIndex,
 	                 vk::BufferUsageFlagBits::eStorageBuffer, "SunLightSSBO")
 {
-	NEURUS_LOG("[LightingGPU] Created");
+	NEURUS_LOG("[LightingCache] Created");
 }
 
 // ---------------------------------------------------------------------------
 // Point light SSBO
 // ---------------------------------------------------------------------------
 
-void LightingGPU::UpdatePointLights(const std::vector<PointLightStruct>& lights)
+void LightingCache::UpdatePointLights(const std::vector<PointLightStruct>& lights)
 {
 	m_pointLightSSBO.Upload(lights);
-	NEURUS_LOG("[LightingGPU] Uploaded " << m_pointLightSSBO.size() << " point lights");
+	NEURUS_LOG("[LightingCache] Uploaded " << m_pointLightSSBO.size() << " point lights");
 }
 
-void LightingGPU::UpdatePointLight(const PointLightStruct& light, uint32_t index)
+void LightingCache::UpdatePointLight(const PointLightStruct& light, uint32_t index)
 {
 	m_pointLightSSBO.Update(light, index);
 }
 
-const GPUBuffer* LightingGPU::GetPointLightSSBO() const
+const GPUBuffer* LightingCache::GetPointLightSSBO() const
 {
 	return m_pointLightSSBO.gpuBuffer();
 }
 
-uint32_t LightingGPU::GetPointLightCount() const
+uint32_t LightingCache::GetPointLightCount() const
 {
 	return m_pointLightSSBO.size();
 }
@@ -57,23 +57,23 @@ uint32_t LightingGPU::GetPointLightCount() const
 // Sun light SSBO
 // ---------------------------------------------------------------------------
 
-void LightingGPU::UpdateSunLights(const std::vector<SunLightStruct>& lights)
+void LightingCache::UpdateSunLights(const std::vector<SunLightStruct>& lights)
 {
 	m_sunLightSSBO.Upload(lights);
-	NEURUS_LOG("[LightingGPU] Uploaded " << m_sunLightSSBO.size() << " sun lights");
+	NEURUS_LOG("[LightingCache] Uploaded " << m_sunLightSSBO.size() << " sun lights");
 }
 
-void LightingGPU::UpdateSunLight(const SunLightStruct& light, uint32_t index)
+void LightingCache::UpdateSunLight(const SunLightStruct& light, uint32_t index)
 {
 	m_sunLightSSBO.Update(light, index);
 }
 
-const GPUBuffer* LightingGPU::GetSunLightSSBO() const
+const GPUBuffer* LightingCache::GetSunLightSSBO() const
 {
 	return m_sunLightSSBO.gpuBuffer();
 }
 
-uint32_t LightingGPU::GetSunLightCount() const
+uint32_t LightingCache::GetSunLightCount() const
 {
 	return m_sunLightSSBO.size();
 }
