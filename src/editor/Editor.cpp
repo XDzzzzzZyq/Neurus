@@ -240,7 +240,7 @@ void Editor::Initialize()
 
 	// --- Register controllers ---
 	RegisterController<CameraController>();
-	RegisterController<ShaderController>(this, ed_renderer, ed_uploadManager);
+	RegisterController<ShaderController>();
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {

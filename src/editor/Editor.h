@@ -17,7 +17,6 @@ class DeferredRenderer;
 class Scene;
 class Environment;
 class UploadManager;
-class ShaderController;
 }
 
 namespace neurus {
@@ -58,10 +57,10 @@ public:
 	RenderContext GetRenderContext() const;
 	UIContext GetUIContext() const;
 
-	template<typename T, typename... Args>
-	void RegisterController(Args&&... args)
+	template<typename T>
+	void RegisterController()
 	{
-		auto ctrl = std::make_unique<T>(std::forward<Args>(args)...);
+		auto ctrl = std::make_unique<T>();
 		ctrl->Init(ed_eventBus);
 		ed_controllers.push_back(std::move(ctrl));
 	}

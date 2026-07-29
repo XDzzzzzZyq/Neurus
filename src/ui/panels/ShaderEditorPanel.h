@@ -19,7 +19,7 @@ class QLabel;
 class QPlainTextEdit;
 class QPushButton;
 
-namespace neurus { class CodeEditor; }
+namespace neurus { class CodeEditor; class ObjectID; }
 class QScrollArea;
 class QStackedWidget;
 class QVBoxLayout;
@@ -48,7 +48,7 @@ signals:
 	void createShaderRequested(const ShaderCreateRequested& e);
 	void compileRequested(const ShaderCompileRequested& e);
 	void codeEdited(const ShaderCodeEdited& e);
-	void structModified(const ShaderModified& e);
+	void structEdited(const ShaderStructEdited& e);
 
 private:
 	/** @brief Populates struct sections from a parsed ShaderUnit. */
@@ -91,7 +91,7 @@ private:
 	QPushButton*  m_createBtn     = nullptr;
 
 	// --- State ---
-	int  m_activeObjectId       = -1;
+	const ObjectID* m_activeObject    = nullptr;
 	int  m_cachedStageType      = 0;   // 0=VERTEX, 1=FRAGMENT
 	int  m_cachedShaderVersion  = -1;  // ShaderUnit::m_version; -1 = no shader
 	bool m_showingCreateButton  = false;

@@ -1,42 +1,50 @@
 /**
  * @file ShaderController.h
- * @brief Controller for per-mesh shader lifecycle (create, compile, save).
+ * @brief Shader lifecycle controller — event-driven, no per-frame polling.
+ *
+ * ShaderController translates shader editor events (create, compile, code edit,
+ * struct edit) into shader data mutations. All shader logic is triggered by
+ * events enqueued from the UI layer (ShaderEditorPanel).
+ *
+ * Stateless — all handler logic lives as free functions in the .cpp file.
+ *
+ * Event Mapping:
+ *   - ShaderCreateRequested  → OnCreateShader  (load default, parse, compile, bump version)
+ *   - ShaderCompileRequested → OnCompileShader (compile stage, store spv, bump version)
+ *   - ShaderCodeEdited       → OnCodeEdited    (update ShaderUnit::code, no version bump)
+ *   - ShaderStructEdited     → OnStructEdited  (mutate ShaderStruct IR, regenerate GLSL, no bump)
+ *
+ * Architecture:
+ *   - Bound to an EventQueue via Init() — no per-frame Update() polling.
+ *   - Operates on ObjectID* provided by each event (cast to Mesh* in .cpp).
+ *   - No Editor*, no DeferredRenderer*, no UploadManager* — pure shader logic.
+ *
+ * @note ShaderController does not own the shader — it operates on a pointer
+ *       provided by each event (via ObjectID* -> GetShader()).
  */
+
 #pragma once
 
 #include "editor/controllers/Controllers.h"
+#include "editor/events/EventBus.h"
 
-namespace neurus
-{
-
-class DeferredRenderer;
-class Editor;
-class UploadManager;
-struct ShaderCreateRequested;
-struct ShaderCompileRequested;
-struct ShaderCodeEdited;
-struct ShaderModified;
+namespace neurus {
 
 class ShaderController : public Controllers
 {
 public:
-	ShaderController(Editor* editor, DeferredRenderer* renderer, UploadManager* uploadManager);
-	~ShaderController() override = default;
+	ShaderController() = default;
 
-	ShaderController(const ShaderController&) = delete;
-	ShaderController& operator=(const ShaderController&) = delete;
-
+	/**
+	 * @brief Subscribes to shader events on the given EventQueue.
+	 *
+	 * Registers lambda handlers that forward each event to the
+	 * corresponding free-function handler. Must be called once during
+	 * initialization, before any events are enqueued.
+	 *
+	 * @param bus EventQueue to subscribe to.
+	 */
 	void Init(EventQueue& bus) override;
-
-private:
-	void OnCreateShader(const ShaderCreateRequested& e);
-	void OnCompileShader(const ShaderCompileRequested& e);
-	void OnCodeEdited(const ShaderCodeEdited& e);
-	void OnStructEdited(const ShaderModified& e);
-
-	Editor*           c_editor        = nullptr;
-	DeferredRenderer* c_renderer      = nullptr;
-	UploadManager*    c_uploadManager = nullptr;
 };
 
 } // namespace neurus

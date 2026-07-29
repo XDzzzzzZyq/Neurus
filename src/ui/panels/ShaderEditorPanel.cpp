@@ -148,51 +148,51 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	// --- Compile button -> emit with unitType (0=Code, 1=Struct) ---
 	QObject::connect(m_compileBtn, &QPushButton::clicked, [this]()
 	{
-		if (m_activeObjectId > 0)
+		if (m_activeObject)
 		{
 			int unitType = (m_contentStack->currentIndex() == 0) ? 0 : 1;
-			emit compileRequested({m_activeObjectId, m_cachedStageType, unitType});
+			emit compileRequested({m_activeObject, m_cachedStageType, unitType});
 		}
 	});
 
 	// --- CodeEditor text changes -> codeEdited event ---
 	QObject::connect(m_codeEditor, &CodeEditor::codeChanged, [this](const std::string& code)
 	{
-		if (m_activeObjectId > 0)
-			emit codeEdited({m_activeObjectId, m_cachedStageType, code});
+		if (m_activeObject)
+			emit codeEdited({m_activeObject, m_cachedStageType, code});
 	});
 
 	// --- Create Shader button -> event signal ---
 	QObject::connect(m_createBtn, &QPushButton::clicked, [this]()
 	{
-		if (m_activeObjectId > 0)
-			emit createShaderRequested({m_activeObjectId});
+		if (m_activeObject)
+			emit createShaderRequested({m_activeObject});
 	});
 
 	// --- Stage combo change -> invalidate cache ---
 	QObject::connect(m_stageCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 	                 [this](int index) {
 		m_cachedStageType = index;
-		m_activeObjectId = -1;  // Re-read on next Refresh
+		m_activeObject = nullptr;  // Re-read on next Refresh
 	});
 
-	// --- Section field edits -> structModified event ---
-	auto connectFieldEdited = [this](ShaderStructSection* section, int sectionId)
+	// --- Section field edits -> structEdited event ---
+	auto connectFieldEdited = [this](ShaderStructSection* section, ShaderSection sectionId)
 	{
 		QObject::connect(section, &ShaderStructSection::fieldEdited,
 		                 [this, sectionId](int fieldIndex, const QString& field, const QString& value) {
-			if (m_activeObjectId > 0)
-				emit structModified({m_activeObjectId, m_cachedStageType, sectionId,
-				                     fieldIndex, field.toStdString(), value.toStdString()});
+			if (m_activeObject)
+				emit structEdited({m_activeObject, m_cachedStageType, sectionId,
+				                   fieldIndex, field.toStdString(), value.toStdString()});
 		});
 	};
-	connectFieldEdited(m_abSection,      static_cast<int>(Component::Attributes));
-	connectFieldEdited(m_passSection,    static_cast<int>(Component::PassOutputs));
-	connectFieldEdited(m_inputSection,   static_cast<int>(Component::Inputs));
-	connectFieldEdited(m_outputSection,  static_cast<int>(Component::Outputs));
-	connectFieldEdited(m_uniformSection, static_cast<int>(Component::Uniforms));
-	connectFieldEdited(m_structSection,  static_cast<int>(Component::StructDefs));
-	connectFieldEdited(m_funcSection,    static_cast<int>(Component::Functions));
+	connectFieldEdited(m_abSection,      ShaderSection::Attributes);
+	connectFieldEdited(m_passSection,    ShaderSection::PassOutputs);
+	connectFieldEdited(m_inputSection,   ShaderSection::Inputs);
+	connectFieldEdited(m_outputSection,  ShaderSection::Outputs);
+	connectFieldEdited(m_uniformSection, ShaderSection::Uniforms);
+	connectFieldEdited(m_structSection,  ShaderSection::StructDefs);
+	connectFieldEdited(m_funcSection,    ShaderSection::Functions);
 
 	// Start with empty state
 	setShowEmptyState(true);
@@ -209,7 +209,7 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
-		m_activeObjectId = -1;
+		m_activeObject = nullptr;
 		return;
 	}
 
@@ -218,17 +218,16 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
-		m_activeObjectId = -1;
+		m_activeObject = nullptr;
 		return;
 	}
-
-	int objectId = activeObj->GetObjectID();
 
 	// Only handle GO_MESH objects
 	if (activeObj->o_type != ObjectID::GOType::GO_MESH)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
+		m_activeObject = nullptr;
 		return;
 	}
 
@@ -239,10 +238,10 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 		unitVersion = static_cast<const ShaderUnit*>(unitPtr)->GetVersion();
 
 	// Dirty-check: same object AND same version = nothing changed
-	if (objectId == m_activeObjectId && unitVersion == m_cachedShaderVersion)
+	if (activeObj == m_activeObject && unitVersion == m_cachedShaderVersion)
 		return;
 
-	m_activeObjectId = objectId;
+	m_activeObject = activeObj;
 	m_cachedShaderVersion = unitVersion;
 
 	if (!unitPtr)
