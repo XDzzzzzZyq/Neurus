@@ -1,7 +1,6 @@
 #include "Editor.h"
 
 #include "editor/events/InputEvents.h"
-#include "editor/events/ProjectEvents.h"
 #include "editor/events/AssetEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/CameraEvents.h"
@@ -9,9 +8,6 @@
 
 #include "editor/controllers/CameraController.h"
 #include "editor/events/EventBus.h"
-#include "asset/Project.h"
-#include "asset/SceneComponent.h"
-#include "asset/ConfigComponent.h"
 
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
@@ -72,21 +68,7 @@ void Editor::Initialize()
 {
 	// Note: Mesh/light GPU upload happens AFTER window is shown and surface
 	// is ready — see UploadSceneResources() called from Application::Run()
-	// and from OnProjectOpen() / OnProjectNew().
-
-	// --- Wire project file signal handlers ---
-	// (events are enqueued by Editor::OnUIEvent from UIEvents Qt signals)
-
-	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		OnProjectNew();
-	});
-	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		OnProjectOpen(e.path);
-	});
-	ed_eventBus.subscribe<ProjectSaveEvent>([this](const ProjectSaveEvent&) { OnProjectSave(); });
-	ed_eventBus.subscribe<ProjectSaveAsEvent>([this](const ProjectSaveAsEvent& e) { OnProjectSaveAs(e.path); });
+	// and from the scene load lifecycle (BeginLoad/FinishLoad, NewScene).
 
 	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) {
 		ed_eventBus.enqueue(RenderResetEvent{});
@@ -343,7 +325,7 @@ UIContext Editor::GetUIContext() const
 }
 
 // =========================================================================
-// Project lifecycle
+// Scene lifecycle
 // =========================================================================
 
 void Editor::CreateDefaultScene(const std::string& objPath)
@@ -368,52 +350,10 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 	env->SetEquirectPath("tex/hdr/room.hdr");
 	m_scene->UseEnvironment(env);
 
-	m_projectPath.clear();
 	m_dirty = true;
 }
 
-void Editor::LoadProject(const std::string& path, const std::string& assetDir)
-{
-	if (ed_renderer)
-		ed_renderer->WaitIdle();
-
-	m_scene = std::make_unique<Scene>();
-	m_config = RenderConfig{};
-
-	neurus::project::Project serializer;
-	serializer.Register<neurus::project::SceneComponent>(*m_scene);
-	serializer.Register<neurus::project::ConfigComponent>(m_config);
-	serializer.Load(path);
-
-	for (auto& [id, mesh] : m_scene->mesh_list)
-		mesh->ReloadMeshData(assetDir);
-
-	m_projectPath = path;
-	m_dirty = false;
-	UploadSceneResources();
-	OnIBLLoad();
-}
-
-void Editor::SaveProject(const std::string& path)
-{
-	neurus::project::Project serializer;
-	serializer.Register<neurus::project::SceneComponent>(*m_scene);
-	serializer.Register<neurus::project::ConfigComponent>(m_config);
-	serializer.Save(path);
-	m_projectPath = path;
-	m_dirty = false;
-}
-
-void Editor::SaveProject()
-{
-	if (m_projectPath.empty())
-		throw std::runtime_error("No file path set. Use SaveProject(path) first.");
-	SaveProject(m_projectPath);
-}
-
-// --- Project signal handlers ---
-
-void Editor::OnProjectNew()
+void Editor::NewScene()
 {
 	try
 	{
@@ -425,9 +365,8 @@ void Editor::OnProjectNew()
 
 		m_scene = std::make_unique<Scene>();
 		m_config = RenderConfig{};
-		m_projectPath.clear();
 		m_dirty = false;
-		NEURUS_LOG("[Editor] Created new project.");
+		NEURUS_LOG("[Editor] Created new scene.");
 
 		UploadSceneResources();
 
@@ -436,29 +375,31 @@ void Editor::OnProjectNew()
 	}
 	catch (const std::exception& e)
 	{
-		NEURUS_ERR("Failed to create new project: " << e.what());
+		NEURUS_ERR("Failed to create new scene: " << e.what());
 	}
 }
 
-void Editor::OnProjectOpen(const std::string& path)
+void Editor::BeginLoad()
 {
-	try { LoadProject(path, m_assetDir); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to open project: " << e.what()); }
+	// Drain GPU work before destroying the old scene's GPU resources.
+	if (ed_renderer)
+		ed_renderer->WaitIdle();
+
+	m_scene = std::make_unique<Scene>();
+	m_config = RenderConfig{};
+	// Application deserializes into GetScene()/GetRenderConfig() before FinishLoad().
 }
 
-void Editor::OnProjectSave()
+void Editor::FinishLoad()
 {
-	try { SaveProject(); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
+	for (auto& [id, mesh] : m_scene->mesh_list)
+		mesh->ReloadMeshData(m_assetDir);
+
+	m_dirty = false;
+	UploadSceneResources();
+	OnIBLLoad();
 }
 
-void Editor::OnProjectSaveAs(const std::string& path)
-{
-	try { SaveProject(path); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to save project as: " << e.what()); }
-}
-
-// --- Mesh, Camera, Light signal handlers ---
 
 void Editor::OnMeshImport(const std::string& path)
 {

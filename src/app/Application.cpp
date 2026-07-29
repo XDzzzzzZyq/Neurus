@@ -30,6 +30,10 @@
 #include "editor/events/UIEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/InputEvents.h"
+#include "asset/Project.h"
+#include "asset/SceneComponent.h"
+#include "asset/ConfigComponent.h"
+#include "asset/UIComponent.h"
 #include "scene/Scene.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
@@ -67,6 +71,17 @@ namespace {
 static QString resolveResourcePath(const char* relativePath)
 {
 	return QCoreApplication::applicationDirPath() + "/res/" + relativePath;
+}
+
+// Registers the three cross-layer components against live data each call:
+// Scene + RenderConfig (Editor-owned) and the UI-state blob (Application-owned).
+static void BuildProject(neurus::project::Project& proj,
+                         neurus::Editor& editor,
+                         std::string& uiLayout)
+{
+	proj.Register<neurus::project::SceneComponent>(editor.GetScene());
+	proj.Register<neurus::project::ConfigComponent>(editor.GetRenderConfig());
+	proj.Register<neurus::project::UIComponent>(uiLayout);
 }
 
 } // anonymous namespace
@@ -135,7 +150,17 @@ int Application::Run()
 
 	try
 	{
-		app_editor->LoadProject(projectPath, assetDir);
+		// Open the existing project: restores scene, config, AND UI layout.
+		// Inlined (rather than OnProjectOpen) so a missing file throws through
+		// to the default-project fallback below.
+		app_editor->BeginLoad();
+		neurus::project::Project proj;
+		BuildProject(proj, *app_editor, app_uiLayout);
+		proj.Load(projectPath);
+		app_editor->FinishLoad();
+		app_mainWindow->ApplyLayout(app_uiLayout);
+		app_projectPath = projectPath;
+		app_savedUiState = app_uiLayout;
 		NEURUS_LOG("[Application] Loaded project: " << projectPath);
 	}
 	catch (const std::exception& e)
@@ -145,9 +170,8 @@ int Application::Run()
 		// Store relative paths in the project file for portability
 		for (auto& [id, mesh] : app_editor->GetScene().mesh_list)
 			mesh->o_meshPath = "obj/sphere.obj";
-		// Save for future runs
-		try { app_editor->SaveProject(projectPath); }
-		catch (const std::exception& se) { NEURUS_ERR("Could not save default project: " << se.what()); }
+		// Save for future runs (captures the current default UI layout too)
+		OnProjectSave(projectPath);
 	}
 
 	app_mainWindow->show();
@@ -283,6 +307,68 @@ void Application::WireSignals()
 }
 
 // =========================================================================
+// Project lifecycle – app-level persistence coordination
+// =========================================================================
+
+void Application::OnProjectNew()
+{
+	app_editor->NewScene();
+	app_projectPath.clear();
+	// Layout is intentionally left untouched on New; rebase the dirty
+	// baseline so a fresh project isn't reported as having unsaved changes.
+	app_savedUiState = app_mainWindow->ExportLayout();
+}
+
+void Application::OnProjectOpen(const std::string& path)
+{
+	try
+	{
+		app_editor->BeginLoad();                       // WaitIdle + fresh Scene/RenderConfig
+		neurus::project::Project proj;
+		BuildProject(proj, *app_editor, app_uiLayout); // refs bind to the fresh scene
+		proj.Load(path);
+		app_editor->FinishLoad();                      // reload mesh data, upload, IBL
+		app_mainWindow->ApplyLayout(app_uiLayout);
+		app_projectPath = path;
+		app_savedUiState = app_uiLayout;
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("[Application] Failed to open project: " << e.what());
+	}
+}
+
+void Application::OnProjectSave(const std::string& path)
+{
+	const std::string target = path.empty() ? app_projectPath : path;
+	if (target.empty())
+	{
+		NEURUS_ERR("[Application] Save requested but no project path is set.");
+		return;
+	}
+
+	try
+	{
+		app_uiLayout = app_mainWindow->ExportLayout();
+		neurus::project::Project proj;
+		BuildProject(proj, *app_editor, app_uiLayout);
+		proj.Save(target);
+		app_projectPath = target;
+		app_savedUiState = app_uiLayout;
+		app_editor->ClearDirty();
+	}
+	catch (const std::exception& e)
+	{
+		NEURUS_ERR("[Application] Failed to save project: " << e.what());
+	}
+}
+
+bool Application::IsDirty() const
+{
+	return app_editor->IsDirty() || (app_mainWindow->ExportLayout() != app_savedUiState);
+}
+
+// =========================================================================
 // NewFrameSignals – render request + timer-driven loop
 // =========================================================================
 
@@ -313,10 +399,15 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 void Application::PanelSignals(neurus::UIEvents& uiEvents)
 {
 	// --- UIEvents → Editor (via ConnectUIEvent → OnUIEvent → EventQueue) ---
-	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectNewRequested);
-	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectOpenRequested);
-	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectSaveRequested);
-	ConnectUIEvent(&uiEvents, &neurus::UIEvents::projectSaveAsRequested);
+	// --- Project file signals → Application (app-level persistence) ---
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectNewRequested,
+	                 [this](const neurus::ProjectNewEvent&) { OnProjectNew(); });
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectOpenRequested,
+	                 [this](const neurus::ProjectOpenEvent& e) { OnProjectOpen(e.path); });
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveRequested,
+	                 [this](const neurus::ProjectSaveEvent&) { OnProjectSave(); });
+	QObject::connect(&uiEvents, &neurus::UIEvents::projectSaveAsRequested,
+	                 [this](const neurus::ProjectSaveAsEvent& e) { OnProjectSave(e.path); });
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::meshImportRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::cameraAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);

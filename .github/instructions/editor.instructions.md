@@ -10,6 +10,12 @@ changes through the event system.
 
 - `src/editor/Input.h` - InputState struct + GetInputState() / UpdateState()
 - `src/editor/Editor.h` - Editor orchestrator (owns Scene, RenderConfig, Context, Controllers)
+  - Exposes an explicit scene-load lifecycle for Application-driven persistence:
+    `NewScene()` (empty project), `BeginLoad()` (WaitIdle + fresh Scene/RenderConfig)
+    and `FinishLoad()` (reload mesh data, upload, IBL). Editor no longer owns the
+    project file path or performs Save/LoadProject — `Application` coordinates
+    persistence and owns the project path + dirty aggregation (`Editor::IsDirty()` /
+    `ClearDirty()` still track scene/config edits).
 - `src/editor/EditorContext.h` - Editor + scene state container
 - `src/editor/controllers/Controllers.h` - Base class for all controllers
 - `src/editor/controllers/CameraController.h` - Event-driven camera manipulation (orbit/zoom/dolly/pan)

@@ -20,9 +20,9 @@
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": -4.642979145050049,
-                                        "y": 5.96278715133667,
-                                        "z": 3.858483076095581
+                                        "x": -3.941206932067871,
+                                        "y": 6.702083587646484,
+                                        "z": 3.398374319076538
                                     },
                                     "m_rotation": {
                                         "x": 0.0,
@@ -35,8 +35,8 @@
                                         "z": 1.0
                                     }
                                 },
-                                "cam_w": 935.0,
-                                "cam_h": 656.0,
+                                "cam_w": 706.0,
+                                "cam_h": 498.0,
                                 "cam_pers": 60.0,
                                 "cam_near": 0.10000000149011612,
                                 "cam_far": 100.0,
@@ -53,7 +53,7 @@
             ],
             "mesh_list": [
                 {
-                    "key": 8,
+                    "key": 10,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -61,9 +61,9 @@
                             "data": {
                                 "value0": {
                                     "value0": {
-                                        "o_id": 8
+                                        "o_id": 10
                                     },
-                                    "o_name": "Grid 1",
+                                    "o_name": "Ground",
                                     "o_type": 1,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -85,7 +85,7 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/grid1.obj",
+                                "o_meshPath": "obj/shadow/ground.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
@@ -137,7 +137,7 @@
                     }
                 },
                 {
-                    "key": 10,
+                    "key": 8,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -145,9 +145,9 @@
                             "data": {
                                 "value0": {
                                     "value0": {
-                                        "o_id": 10
+                                        "o_id": 8
                                     },
-                                    "o_name": "Ground",
+                                    "o_name": "Grid 1",
                                     "o_type": 1,
                                     "is_viewport": true,
                                     "is_rendered": true
@@ -169,7 +169,7 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/ground.obj",
+                                "o_meshPath": "obj/shadow/grid1.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
@@ -181,7 +181,7 @@
             ],
             "light_list": [
                 {
-                    "key": 4,
+                    "key": 6,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -189,21 +189,21 @@
                             "data": {
                                 "value0": {
                                     "value0": {
-                                        "o_id": 4
+                                        "o_id": 6
                                     },
-                                    "o_name": "Point Light 1",
+                                    "o_name": "Sun Light",
                                     "o_type": 2,
                                     "is_viewport": true,
                                     "is_rendered": true
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": 3.0,
+                                        "x": 0.0,
                                         "y": 0.0,
-                                        "z": 4.0
+                                        "z": 10.0
                                     },
                                     "m_rotation": {
-                                        "x": 0.0,
+                                        "x": -90.0,
                                         "y": 0.0,
                                         "z": 0.0
                                     },
@@ -214,14 +214,14 @@
                                     }
                                 },
                                 "use_shadow": true,
-                                "light_type": 0,
-                                "light_power": 10.0,
+                                "light_type": 1,
+                                "light_power": 0.5,
                                 "light_color": {
-                                    "x": 0.30000001192092898,
+                                    "x": 1.0,
                                     "y": 0.30000001192092898,
-                                    "z": 1.0
+                                    "z": 0.30000001192092898
                                 },
-                                "light_radius": 0.01,
+                                "light_radius": 0.009999999776482582,
                                 "spot_cutoff": 0.8999999761581421,
                                 "spot_outer_cutoff": 0.800000011920929,
                                 "area_ratio": 1.0
@@ -270,7 +270,7 @@
                                     "y": 1.0,
                                     "z": 0.30000001192092898
                                 },
-                                "light_radius": 0.01,
+                                "light_radius": 0.009999999776482582,
                                 "spot_cutoff": 0.8999999761581421,
                                 "spot_outer_cutoff": 0.800000011920929,
                                 "area_ratio": 1.0
@@ -279,7 +279,7 @@
                     }
                 },
                 {
-                    "key": 6,
+                    "key": 4,
                     "value": {
                         "polymorphic_id": 1073741824,
                         "ptr_wrapper": {
@@ -287,21 +287,21 @@
                             "data": {
                                 "value0": {
                                     "value0": {
-                                        "o_id": 6
+                                        "o_id": 4
                                     },
-                                    "o_name": "Sun Light",
+                                    "o_name": "Point Light 1",
                                     "o_type": 2,
                                     "is_viewport": true,
                                     "is_rendered": true
                                 },
                                 "transform": {
                                     "m_position": {
-                                        "x": 0.0,
+                                        "x": 3.0,
                                         "y": 0.0,
-                                        "z": 10.0
+                                        "z": 4.0
                                     },
                                     "m_rotation": {
-                                        "x": -90.0,
+                                        "x": 0.0,
                                         "y": 0.0,
                                         "z": 0.0
                                     },
@@ -312,14 +312,14 @@
                                     }
                                 },
                                 "use_shadow": true,
-                                "light_type": 1,
-                                "light_power": 0.5,
+                                "light_type": 0,
+                                "light_power": 10.0,
                                 "light_color": {
-                                    "x": 1.0,
+                                    "x": 0.30000001192092898,
                                     "y": 0.30000001192092898,
-                                    "z": 0.30000001192092898
+                                    "z": 1.0
                                 },
-                                "light_radius": 0.01,
+                                "light_radius": 0.009999999776482582,
                                 "spot_cutoff": 0.8999999761581421,
                                 "spot_outer_cutoff": 0.800000011920929,
                                 "area_ratio": 1.0
@@ -340,11 +340,16 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.0002,
+            "r_shadow_bias": 0.019999999552965165,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,
-            "r_transparent": true
-        }
+            "r_transparent": false,
+            "r_fxaa_subpix": 0.75,
+            "r_fxaa_edge_threshold": 0.16599999368190766,
+            "r_fxaa_edge_threshold_min": 0.08330000191926956,
+            "r_sampling_mode": 0
+        },
+        "ui": "AdnQywADAAAAAAAAAAAAMgAABZ8AAAM9AAAAAAAAAE4AAAWfAAADPQAAAAAAAAAABaAAAAAAAAAATgAABZ8AAAM9\nAAADS3jalZNBU8IwEIXv/oqd3rGQToFDW4ZBOQpawHMkK2Zsk066RXD88SbodKBS1FO7+16/3de00WiXZ7BFU0qtYq933fUA1VoLqTaxt1xMO0NvlET3NBZbrtYobvT61WrpviTMYVU/6MGyRFPXFjPRirhUtuPkJKprmGaa02FA1/bTIpNEtj0zEq2FDoCOA1SKYo+1ej5qT/BHztgghwV/OqwEk8oYdNKsosxtZh2PUmyQ4I7neNSHSaZLFG5hP4l8h2mFzY0u0NAe5lxh1kQ21LPgVL5jmbBwCCwcQOR/1fb6nbB19EriW6ENNYfW/d9ysCPYAyph36Y9tme5aRJPxVPsiTF94c54KyRpcylu0Gcw6PYhsLH/EXmBO6oMgov48wAb6oXxIWPAWO/saL/+dO19y6+QXH0CLGsUow=="
     }
 }

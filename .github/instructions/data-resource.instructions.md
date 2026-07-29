@@ -22,6 +22,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 - `src/asset/Serializable.h` - Abstract base class: Key/Save/Load virtual interface
 - `src/asset/SceneComponent.h/cpp` - Scene serialization adapter (Serializable implementation)
 - `src/asset/ConfigComponent.h/cpp` - RenderConfig serialization adapter (Serializable implementation)
+- `src/asset/UIComponent.h/cpp` - UI-state serialization adapter (opaque layout blob; Serializable implementation)
 - `src/render/buffers/Buffer.h` - Virtual base class (Buffer) with m_buffer, m_memory
 - `src/render/buffers/StagingBuffer.h/cpp` - Host-visible staging buffer (StagingBuffer) for CPU↔GPU transfers
 - `src/render/buffers/GPUBuffer.h/cpp` - Device-local GPU buffer (GPUBuffer) with staging Map/Unmap
@@ -71,10 +72,14 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
    - Descriptor set layout caching
 
 7. **Project Serialization** (`src/asset/Project.h/cpp`)
-   - Pure registration-based serializer; owns no data
+   - Pure registration-based serializer; owns no data (no project path, no dirty flag)
    - Components register via `Register<T>(args...)` and implement `Serializable` base class
    - Save/Load iterates all registered components for persistence
    - No coupling to Scene, RenderConfig, or any concrete type
+   - Coordinated at the Application level: `Application` owns the project path and
+     builds a transient `Project` per save/open, registering `SceneComponent` +
+     `ConfigComponent` (Editor-owned) and `UIComponent` (Application-owned UI blob
+     sourced from `UIManager::ExportLayout()` / applied via `UIManager::ApplyLayout()`)
 
 ## Data Flow
 
@@ -127,7 +132,7 @@ All image layout transitions go through `Barrier::Transition()`.
 - UploadManager for CPU-to-GPU uploads (meshes, lights, environments, IBL cubemaps)
 - LightingCache for point/sun light SSBO management (owned by RenderCache)
 - Project: pure registration-based serializer (no data ownership) with Serializable base class,
-  SceneComponent, and ConfigComponent adapter components
+  SceneComponent, ConfigComponent, and UIComponent adapter components
 - RenderCache (renderer-owned): cross-frame mutable resource pool with lazy attachment creation (`GetAttachment(name, extent)`), per-light shadow map management (`GetShadowMap(lightUID, lightType)` supporting `LightType::POINTLIGHT` cubemap and `LightType::SUNLIGHT` 2D orthographic), a shared layered shadow intensity array (`GetShadowIntensityArray(extent)` with per-light layer indices via `GetShadowIntensityLayer(lightUID, extent)`), cross-frame GPU resources for meshes (`MeshGPU` via `GetMeshGPU()`) and environments (`EnvironmentGPU` via `CreateEnvironmentGPU()`), and LightingCache for light SSBOs (`InitLightingCache()`, `GetLightingCache()`, `UpdateLighting(variantDict)`). The `m_shadowMaps` map stores both `vk::ImageType::eCube` (point) and `vk::ImageType::e2D` (sun) `Image` instances by light UID.
 
 ## Future Enhancements

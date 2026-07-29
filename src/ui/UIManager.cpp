@@ -9,7 +9,6 @@
 #include "editor/events/UIEvents.h"
 
 #include <QApplication>
-#include <QFile>
 #include <QFileDialog>
 #include <QLabel>
 #include <QMenuBar>
@@ -43,7 +42,6 @@ UIManager::UIManager(QWidget* parent)
 	win_dockManager = new ads::CDockManager(this);
 
 	CreateDocks();
-	LoadLayout();   // Restore saved layout if available
 	CreateMenus();
 }
 
@@ -134,10 +132,6 @@ void UIManager::CreateMenus()
 	connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
 
 	auto* viewMenu = menuBar()->addMenu("&View");
-
-	auto* saveLayoutAction = viewMenu->addAction("&Save Layout");
-	saveLayoutAction->setShortcut(QKeySequence("Ctrl+Shift+L"));
-	connect(saveLayoutAction, &QAction::triggered, this, &UIManager::SaveLayout);
 
 	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
 	connect(resetLayoutAction, &QAction::triggered, this, &UIManager::RestoreDefaultLayout);
@@ -284,28 +278,24 @@ void UIManager::CreateDocks()
 // Layout persistence
 // =========================================================================
 
-void UIManager::SaveLayout()
+std::string UIManager::ExportLayout() const
 {
-	QString path = QApplication::applicationDirPath() + "/layout.ads";
-	QFile file(path);
-	if (file.open(QIODevice::WriteOnly))
-	{
-		QByteArray state = win_dockManager->saveState();
-		file.write(state);
-		file.close();
-	}
+	QByteArray geom  = saveGeometry();
+	QByteArray state = win_dockManager->saveState();
+	QByteArray packed = geom.toBase64() + '\n' + state.toBase64();
+	return packed.toStdString();
 }
 
-void UIManager::LoadLayout()
+void UIManager::ApplyLayout(const std::string& blob)
 {
-	QString path = QApplication::applicationDirPath() + "/layout.ads";
-	QFile file(path);
-	if (file.open(QIODevice::ReadOnly))
-	{
-		QByteArray state = file.readAll();
-		file.close();
-		win_dockManager->restoreState(state);
-	}
+	if (blob.empty()) return;
+	QByteArray packed = QByteArray::fromStdString(blob);
+	int nl = packed.indexOf('\n');
+	if (nl < 0) return;
+	QByteArray geom  = QByteArray::fromBase64(packed.left(nl));
+	QByteArray state = QByteArray::fromBase64(packed.mid(nl + 1));
+	if (!geom.isEmpty())  restoreGeometry(geom);
+	if (!state.isEmpty()) win_dockManager->restoreState(state);
 }
 
 void UIManager::RestoreDefaultLayout()

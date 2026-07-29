@@ -68,6 +68,16 @@ private:
 	void RecreateSignals(UIEvents& uiEvents);
 	void ScreenShotSignals(UIEvents& uiEvents);
 
+	// --- Project lifecycle (app-level persistence coordination) ---
+	// Application owns the project path and orchestrates save/open across
+	// Editor (scene/config) and UIManager (UI-state blob).
+	void OnProjectNew();
+	void OnProjectOpen(const std::string& path);
+	void OnProjectSave(const std::string& path = std::string());
+
+	/** @brief Aggregated document dirtiness: editor scene/config OR UI-state drift. */
+	bool IsDirty() const;
+
 	template<typename Panel, typename Event>
 	void ConnectUIEvent(
 		QObject* sender,
@@ -89,6 +99,11 @@ private:
 	// --- Qt infrastructure (destroyed after GPU stack) ---
 	std::unique_ptr<QApplication>         app_qtApp;
 	std::unique_ptr<QTimer>               app_renderTimer;
+
+	// --- Project/document state (app-level; Project itself stays stateless) ---
+	std::string app_projectPath;    ///< Current project file path ("" = unsaved).
+	std::string app_uiLayout;       ///< Transient UI-state blob for (de)serialization.
+	std::string app_savedUiState;   ///< UI blob as last saved/loaded (dirty baseline).
 
 	// --- GPU / UI stack (destroyed in REVERSE order: renderer first, vkContext last) ---
 	// Screenshot holds refs to RenderCache (owned by DeferredRenderer) — must be destroyed BEFORE renderer.

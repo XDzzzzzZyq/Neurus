@@ -12,6 +12,8 @@ add_library(neurus_asset STATIC
 	SceneComponent.h
 	SceneComponent.cpp
 	Serializable.h
+	UIComponent.h
+	UIComponent.cpp
 	TypeRegistration.cpp
 )
 
