@@ -124,6 +124,11 @@ DescriptorSetLayout LightingPass::CreateDescriptorSetLayout(const vk::raii::Devi
 		.AddBinding(10,
 		            vk::DescriptorType::eCombinedImageSampler,
 		            vk::ShaderStageFlagBits::eCompute)
+		// SpotLight SSBO (PARTIALLY_BOUND - valid to skip update when no spot lights)
+		.AddBindingWithFlags(11,
+		                     vk::DescriptorType::eStorageBuffer,
+		                     vk::ShaderStageFlagBits::eCompute,
+		                     vk::DescriptorBindingFlagBits::ePartiallyBound)
 		.Build(device);
 }
 
@@ -232,6 +237,20 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		}
 		// When sunSSBO is nullptr, PARTIALLY_BOUND makes this safe
 		// because sunLightCount=0 guarantees the shader never accesses binding 6.
+	}
+
+	// --- Write spot light SSBO (from RenderCache::LightingCache) ---
+	{
+		const auto* lightingCache = cache.GetLightingCache();
+		const GPUBuffer* spotSSBO = lightingCache ? lightingCache->GetSpotLightSSBO() : nullptr;
+
+		if (spotSSBO)
+		{
+			dstSet.WriteBuffer(11, spotSSBO->GetDescriptorInfo(),
+			                   vk::DescriptorType::eStorageBuffer);
+		}
+		// When spotSSBO is nullptr, PARTIALLY_BOUND makes this safe
+		// because spotLightCount=0 guarantees the shader never accesses binding 11.
 	}
 
 	// --- Write SSAO attachment (combined image sampler) ---
@@ -417,6 +436,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		const auto* lightingCache = cache.GetLightingCache();
 		pc.lightCount    = lightingCache ? static_cast<int32_t>(lightingCache->GetPointLightCount()) : 0;
 		pc.sunLightCount = lightingCache ? static_cast<int32_t>(lightingCache->GetSunLightCount()) : 0;
+		pc.spotLightCount = lightingCache ? static_cast<int32_t>(lightingCache->GetSpotLightCount()) : 0;
 
 		pc.camX = cameraPos.x;
 		pc.camY = cameraPos.y;

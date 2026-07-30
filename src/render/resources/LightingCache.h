@@ -2,14 +2,14 @@
  * @file LightingCache.h
  * @brief GPU-side light SSBO storage and push constants.
  *
- * LightingCache manages point light and sun light SSBOs (storage buffers)
- * and defines the std140-compatible GPU data structures used by the
- * PBR lighting compute shader.  Separated from LightingPass so the
- * SSBO lifecycle can be managed independently of the compute pass.
+ * LightingCache manages point light, sun light, and spot light SSBOs
+ * (storage buffers) and defines the std140-compatible GPU data structures
+ * used by the PBR lighting compute shader.  Separated from LightingPass so
+ * the SSBO lifecycle can be managed independently of the compute pass.
  *
  * The structs defined here (PointLightStruct, SunLightStruct,
- * LightingPushConstants) are byte-for-byte replacements for the
- * original PointLightGpu / SunLightGpu types in LightingPass.h.
+ * SpotLightStruct, LightingPushConstants) are byte-for-byte replacements
+ * for the original PointLightGpu / SunLightGpu types in LightingPass.h.
  * Renamed to avoid collision with the scene-layer LightGPU struct.
  */
 
@@ -73,25 +73,60 @@ struct alignas(16) SunLightStruct
 static_assert(sizeof(SunLightStruct) == 48, "SunLightStruct must be 48 bytes (std140)");
 
 /**
+ * @brief Spot light data uploaded to the GPU SSBO.
+ *
+ * Cone-shaped light with position, direction, and inner/outer cone-angle
+ * cosines.  Shadows follow the point-light cubemap path and share the same
+ * shadow-map atlas.
+ *
+ * Layout matches the GLSL SpotLight struct (std140, 64 bytes per element):
+ *   vec3  pos          (offset 0,  padded to 16)
+ *   float power        (offset 12)
+ *   vec3  direction    (offset 16, padded to 16)
+ *   float radius       (offset 28)
+ *   vec3  color        (offset 32, padded to 16)
+ *   float innerCutoff  (offset 44)   -- cosine of inner cone half-angle
+ *   float outerCutoff  (offset 48)   -- cosine of outer cone half-angle
+ *   int32_t shadowMapIndex (offset 52)
+ *   float _pad[2]      (offset 56)
+ *   Total: 64 bytes (struct is alignas(16)).
+ */
+struct alignas(16) SpotLightStruct
+{
+	float posX, posY, posZ;                   ///< World-space position
+	float power;                               ///< Luminous intensity
+	float dirX, dirY, dirZ;                    ///< Cone axis direction (world-space, normalized)
+	float radius;                              ///< Physical radius for soft shadow jitter
+	float colorR, colorG, colorB;              ///< RGB colour (linear)
+	float innerCutoff;                         ///< cos(inner cone half-angle) -- full brightness inside
+	float outerCutoff;                         ///< cos(outer cone half-angle) -- falloff to zero
+	int32_t shadowMapIndex = -1;               ///< Index into shadow maps array; -1 = no shadow
+	float _pad[2];                             ///< Padding to 64 bytes (16-byte aligned struct)
+};
+static_assert(sizeof(SpotLightStruct) == 64, "SpotLightStruct must be 64 bytes (std140)");
+
+/**
  * @brief Push constants for the PBR lighting compute shader.
  *
  * Layout (matches GLSL push_constant block with std430 alignment):
- *   int  lightCount    offset 0   (4 bytes)
- *   int  sunLightCount offset 4   (4 bytes — reuses former padding slot)
- *          padding     offset 8   (8 bytes)
- *   vec4 cameraPos     offset 16  (16 bytes)
- *   mat4 view          offset 32  (64 bytes)
- *   int  iblEnabled    offset 96  (4 bytes)
+ *   int  lightCount     offset 0   (4 bytes)
+ *   int  sunLightCount  offset 4   (4 bytes — reuses former padding slot)
+ *   int  spotLightCount offset 8   (4 bytes — reuses former padding slot)
+ *          padding      offset 12  (4 bytes)
+ *   vec4 cameraPos      offset 16  (16 bytes)
+ *   mat4 view           offset 32  (64 bytes)
+ *   int  iblEnabled     offset 96  (4 bytes)
  *   int  transEnabled   offset 100 (4 bytes — transparent background)
- *          padding     offset 104 (8 bytes, aligns mat4 to 16)
- *   mat4 invProjView   offset 112 (64 bytes - inverse(proj * view) for skybox ray)
+ *          padding      offset 104 (8 bytes, aligns mat4 to 16)
+ *   mat4 invProjView    offset 112 (64 bytes - inverse(proj * view) for skybox ray)
  *   Total: 176 bytes. Must NOT use alignas.
  */
 struct LightingPushConstants
 {
 	int32_t  lightCount;            ///< Number of active point lights in SSBO
 	int32_t  sunLightCount;         ///< Number of active sun (directional) lights in SSBO
-	float    _pad0[2];              ///< Padding to align cameraPos at offset 16
+	int32_t  spotLightCount;        ///< Number of active spot lights in SSBO
+	float    _pad0;                 ///< Padding to align cameraPos at offset 16
 	float    camX, camY, camZ;      ///< Camera world-space position
 	float    _pad1;                 ///< Padding (vec4 → 16 bytes)
 	float    view[16];              ///< View matrix (for normal transform VS→WS)
@@ -165,6 +200,15 @@ public:
 	 */
 	void UpdateSunLights(const std::vector<SunLightStruct>& lights);
 
+	/**
+	 * @brief Creates or updates the spot light SSBO from a pre-built vector.
+	 *
+	 * Same semantics as UpdatePointLights().
+	 *
+	 * @param lights  Spot light GPU structs (sorted, shadow indices set).
+	 */
+	void UpdateSpotLights(const std::vector<SpotLightStruct>& lights);
+
 	// --- Per-light update (single element, no full rebuild) ---
 
 	/**
@@ -189,6 +233,16 @@ public:
 	 */
 	void UpdateSunLight(const SunLightStruct& light, uint32_t index);
 
+	/**
+	 * @brief Overwrites a single spot light element at the given SSBO index.
+	 *
+	 * Same semantics as UpdatePointLight().
+	 *
+	 * @param light  Updated spot light struct.
+	 * @param index  Zero-based SSBO element index.
+	 */
+	void UpdateSpotLight(const SpotLightStruct& light, uint32_t index);
+
 	// --- Accessors ---
 
 	/** @brief Returns the point light SSBO, or nullptr when no lights exist. */
@@ -197,16 +251,23 @@ public:
 	/** @brief Returns the sun light SSBO, or nullptr when no sun lights exist. */
 	const GPUBuffer* GetSunLightSSBO() const;
 
+	/** @brief Returns the spot light SSBO, or nullptr when no spot lights exist. */
+	const GPUBuffer* GetSpotLightSSBO() const;
+
 	/** @brief Number of point lights in the SSBO. */
 	uint32_t GetPointLightCount() const;
 
 	/** @brief Number of sun lights in the SSBO. */
 	uint32_t GetSunLightCount() const;
 
+	/** @brief Number of spot lights in the SSBO. */
+	uint32_t GetSpotLightCount() const;
+
 private:
 	// --- Owned GPU buffers ---
 	ArrayBuffer<PointLightStruct> m_pointLightSSBO;
 	ArrayBuffer<SunLightStruct> m_sunLightSSBO;
+	ArrayBuffer<SpotLightStruct> m_spotLightSSBO;
 };
 
 } // namespace neurus

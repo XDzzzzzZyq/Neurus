@@ -355,24 +355,25 @@ public:
 	const LightingCache* GetLightingCache() const;
 
 	/**
-	 * @brief Updates the point light and sun light SSBOs from a variant dict.
+	 * @brief Updates the point / sun / spot light SSBOs from a variant dict.
 	 *
-	 * Separates point/sun entries, sorts by UID, assigns shadow map indices,
-	 * and uploads to LightingCache.  Maintains internal uid→SSBO-index and
+	 * Separates entries by type, sorts by UID, assigns shadow map indices,
+	 * and uploads to LightingCache.  Point and spot lights share the
+	 * cubemap shadow atlas.  Maintains internal uid→SSBO-index and
 	 * uid→shadow-index maps for later per-light updates.
 	 *
-	 * @param lightDict  Map: light UID → variant<PointLightStruct, SunLightStruct>.
+	 * @param lightDict  Map: light UID → variant<PointLightStruct, SunLightStruct, SpotLightStruct>.
 	 */
 	void UpdateLighting(const std::unordered_map<int,
-	                    std::variant<PointLightStruct, SunLightStruct>>& lightDict);
+	                    std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>>& lightDict);
 
 	/**
 	 * @brief Updates a single light in the SSBO without rebuilding the array.
 	 *
 	 * Looks up @a lightUID in the internal uid→index maps, stamps
-	 * shadowMapIndex, and delegates to LightingCache::UpdatePointLight or
-	 * UpdateSunLight.  No-op if the uid is not found (light added after
-	 * the last full rebuild — call UpdateLighting first).
+	 * shadowMapIndex, and delegates to LightingCache::UpdatePointLight,
+	 * UpdateSunLight or UpdateSpotLight.  No-op if the uid is not found
+	 * (light added after the last full rebuild — call UpdateLighting first).
 	 *
 	 * @param lightUID  Unique light identifier.
 	 * @param light     Variant containing the updated GPU struct
@@ -380,7 +381,7 @@ public:
 	 *                  from the shadow index map).
 	 */
 	void UpdateLight(int lightUID,
-	                 const std::variant<PointLightStruct, SunLightStruct>& light);
+	                 const std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>& light);
 
 	/**
 	 * @brief Returns the shadow map index for a light UID.

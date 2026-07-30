@@ -412,6 +412,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::cameraAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::spotLightAddRequested);
 
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
@@ -490,6 +491,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightPowerChanged);
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightRadiusChanged);
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightShadowChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightCutoffChanged);
+		ConnectUIEvent(propPanel, &neurus::PropertyPanel::lightOuterCutoffChanged);
 
 		// Environment properties
 		ConnectUIEvent(propPanel, &neurus::PropertyPanel::envIntensityChanged);

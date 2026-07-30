@@ -312,7 +312,7 @@ void RenderCache::RemovePipeline(const int uid)
 // ---------------------------------------------------------------------------
 
 void RenderCache::UpdateLighting(const std::unordered_map<int,
-                                 std::variant<PointLightStruct, SunLightStruct>>& lightDict)
+                                 std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>>& lightDict)
 {
 	assert(rc_lightingCache && "InitLightingCache must be called before UpdateLighting");
 
@@ -323,6 +323,7 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 	// --- Separate and sort by UID for deterministic SSBO ordering ---
 	std::vector<std::pair<int, PointLightStruct>> pointEntries;
 	std::vector<std::pair<int, SunLightStruct>> sunEntries;
+	std::vector<std::pair<int, SpotLightStruct>> spotEntries;
 
 	for (const auto& [uid, lightVariant] : lightDict)
 	{
@@ -334,11 +335,17 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 		{
 			sunEntries.push_back({uid, std::get<SunLightStruct>(lightVariant)});
 		}
+		else if (std::holds_alternative<SpotLightStruct>(lightVariant))
+		{
+			spotEntries.push_back({uid, std::get<SpotLightStruct>(lightVariant)});
+		}
 	}
 
 	std::sort(pointEntries.begin(), pointEntries.end(),
 	          [](const auto& a, const auto& b) { return a.first < b.first; });
 	std::sort(sunEntries.begin(), sunEntries.end(),
+	          [](const auto& a, const auto& b) { return a.first < b.first; });
+	std::sort(spotEntries.begin(), spotEntries.end(),
 	          [](const auto& a, const auto& b) { return a.first < b.first; });
 
 	// --- Build SSBO vectors and populate uid→index map ---
@@ -356,9 +363,21 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 		sunVec.push_back(sunEntries[i].second);
 	}
 
-	// --- Assign shadow map indices (shared pool, point first then sun, max 4) ---
+	std::vector<SpotLightStruct> spotVec;
+	for (size_t i = 0; i < spotEntries.size(); ++i)
+	{
+		rc_uidToSSBOIdx[spotEntries[i].first] = static_cast<uint32_t>(i);
+		spotVec.push_back(spotEntries[i].second);
+	}
+
+	// --- Assign shadow map indices (shared pool: point, then spot, then sun, max MAX_SHADOW_LAYERS) ---
 	uint32_t shadowIdx = 0;
 	for (const auto& [uid, pl] : pointEntries)
+	{
+		if (shadowIdx >= MAX_SHADOW_LAYERS) break;
+		rc_uidToShadowLayer[uid] = shadowIdx++;
+	}
+	for (const auto& [uid, sp] : spotEntries)
 	{
 		if (shadowIdx >= MAX_SHADOW_LAYERS) break;
 		rc_uidToShadowLayer[uid] = shadowIdx++;
@@ -384,18 +403,27 @@ void RenderCache::UpdateLighting(const std::unordered_map<int,
 		sunVec[i].shadowMapIndex = (it != rc_uidToShadowLayer.end())
 			? static_cast<int32_t>(it->second) : -1;
 	}
+	for (size_t i = 0; i < spotEntries.size(); ++i)
+	{
+		const int uid = spotEntries[i].first;
+		auto it = rc_uidToShadowLayer.find(uid);
+		spotVec[i].shadowMapIndex = (it != rc_uidToShadowLayer.end())
+			? static_cast<int32_t>(it->second) : -1;
+	}
 
 	// --- Upload to GPU ---
 	rc_lightingCache->UpdatePointLights(pointVec);
 	rc_lightingCache->UpdateSunLights(sunVec);
+	rc_lightingCache->UpdateSpotLights(spotVec);
 
 	NEURUS_LOG("[RenderCache] UpdateLighting: " << pointVec.size()
 	           << " point lights, " << sunVec.size() << " sun lights, "
+	           << spotVec.size() << " spot lights, "
 	           << rc_uidToShadowLayer.size() << " shadow casters");
 }
 
 void RenderCache::UpdateLight(int lightUID,
-                              const std::variant<PointLightStruct, SunLightStruct>& light)
+                              const std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>& light)
 {
 	assert(rc_lightingCache && "InitLightingCache must be called before UpdateLight");
 
@@ -422,6 +450,18 @@ void RenderCache::UpdateLight(int lightUID,
 			? static_cast<int32_t>(shadowIt->second) : -1;
 
 		rc_lightingCache->UpdateSunLight(updated, it->second);
+	}
+	else if (std::holds_alternative<SpotLightStruct>(light))
+	{
+		auto it = rc_uidToSSBOIdx.find(lightUID);
+		if (it == rc_uidToSSBOIdx.end()) return;
+
+		SpotLightStruct updated = std::get<SpotLightStruct>(light);
+		auto shadowIt = rc_uidToShadowLayer.find(lightUID);
+		updated.shadowMapIndex = (shadowIt != rc_uidToShadowLayer.end())
+			? static_cast<int32_t>(shadowIt->second) : -1;
+
+		rc_lightingCache->UpdateSpotLight(updated, it->second);
 	}
 }
 

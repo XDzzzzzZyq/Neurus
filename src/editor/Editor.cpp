@@ -86,6 +86,10 @@ void Editor::Initialize()
 		ed_eventBus.enqueue(RenderResetEvent{});
 		OnSunLightAdd();
 	});
+	ed_eventBus.subscribe<SpotLightAddEvent>([this](const SpotLightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnSpotLightAdd();
+	});
 
 	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
 		ed_eventBus.enqueue(RenderResetEvent{});
@@ -225,6 +229,28 @@ void Editor::Initialize()
 		it->second->SetShadow(e.enabled);
 		m_dirty = true;
 		UploadLighting();
+	});
+
+	ed_eventBus.subscribe<LightCutoffChanged>([this](const LightCutoffChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		auto& scene = *m_scene;
+		auto it = scene.light_list.find(e.objectId);
+		if (it == scene.light_list.end()) return;
+		it->second->SetCutoff(e.cutoff);
+		m_dirty = true;
+		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
+		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
+	});
+
+	ed_eventBus.subscribe<LightOuterCutoffChanged>([this](const LightOuterCutoffChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		auto& scene = *m_scene;
+		auto it = scene.light_list.find(e.objectId);
+		if (it == scene.light_list.end()) return;
+		it->second->SetOuterCutoff(e.outerCutoff);
+		m_dirty = true;
+		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
+		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
 	});
 
 	// --- Environment property events ---
@@ -483,6 +509,34 @@ void Editor::OnSunLightAdd()
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to add sun light: " << e.what());
+	}
+}
+
+void Editor::OnSpotLightAdd()
+{
+	try {
+		auto light = std::make_shared<neurus::Light>(
+			neurus::SPOTLIGHT, 30.0f, glm::vec3(1.0f, 0.75f, 0.4f));
+		light->SetPosition(glm::vec3(0.0f, 0.0f, 6.0f));
+		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
+		light->SetRadius(0.01f);
+		light->SetCutoff(0.95f);        // ~18° inner cone half-angle
+		light->SetOuterCutoff(0.85f);   // ~32° outer cone half-angle
+		light->use_shadow = true;
+		m_scene->UseLight(light);
+		// Upload lighting via UploadManager (variant API) → RenderCache
+		UploadLighting();
+		// Upload shadow map (cubemap, shared point-light pool)
+		if (ed_uploadManager && ed_renderer && light->use_shadow)
+		{
+			auto lightGPU = ed_uploadManager->UploadLight(*light);
+			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
+		}
+		m_dirty = true;
+		NEURUS_LOG("[Editor] Added spot light at (0, 0, 6) pointing down");
+	}
+	catch (const std::exception& e) {
+		NEURUS_ERR("Failed to add spot light: " << e.what());
 	}
 }
 

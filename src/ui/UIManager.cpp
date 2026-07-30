@@ -166,6 +166,11 @@ void UIManager::CreateMenus()
 		neurus::UIEvents::instance().requestSunLightAdd();
 	});
 
+	auto* spotLightAction = lightSubmenu->addAction("Spo&t Light");
+	connect(spotLightAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestSpotLightAdd();
+	});
+
 	auto* toolsMenu = menuBar()->addMenu("&Tools");
 
 	auto* screenshotAction = toolsMenu->addAction("Take &Screenshot");

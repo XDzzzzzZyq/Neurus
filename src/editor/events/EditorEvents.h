@@ -181,6 +181,20 @@ struct LightShadowChanged
 	bool enabled = true;
 };
 
+/** @brief Emitted when spot-light inner cone cutoff (cosine) is edited. */
+struct LightCutoffChanged
+{
+	int   objectId;
+	float cutoff = 0.9f;  ///< Cosine of inner cone half-angle.
+};
+
+/** @brief Emitted when spot-light outer cone cutoff (cosine) is edited. */
+struct LightOuterCutoffChanged
+{
+	int   objectId;
+	float outerCutoff = 0.8f;  ///< Cosine of outer cone half-angle.
+};
+
 // ---------------------------------------------------------------------------
 // Environment property events
 // ---------------------------------------------------------------------------

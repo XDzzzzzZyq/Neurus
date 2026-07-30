@@ -106,6 +106,9 @@ signals:
 	/** @brief Emitted when a new sun light should be added to the scene (Edit → Add → Sun Light). */
 	void sunLightAddRequested(const SunLightAddEvent& e);
 
+	/** @brief Emitted when a new spot light should be added to the scene (Edit → Add → Spot Light). */
+	void spotLightAddRequested(const SpotLightAddEvent& e);
+
 public:
 	/**
 	 * @brief Convenience method to emit screenshotRequested from any layer.
@@ -132,6 +135,7 @@ public:
 	void requestCameraAdd() { emit cameraAddRequested(CameraAddEvent{}); }
 	void requestLightAdd() { emit lightAddRequested(LightAddEvent{}); }
 	void requestSunLightAdd() { emit sunLightAddRequested(SunLightAddEvent{}); }
+	void requestSpotLightAdd() { emit spotLightAddRequested(SpotLightAddEvent{}); }
 
 	void requestUIRecreation(quintptr newHwnd) { emit uiRecreated(newHwnd); }
 

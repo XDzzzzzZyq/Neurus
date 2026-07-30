@@ -46,25 +46,42 @@ public:
 	/** @brief Updates the shadow checkbox (dirty-checked). */
 	void setShadowEnabled(bool enabled);
 
+	/** @brief Updates the inner cone cutoff slider from cosine value (dirty-checked). */
+	void setCutoff(float cosine);
+
+	/** @brief Updates the outer cone cutoff slider from cosine value (dirty-checked). */
+	void setOuterCutoff(float cosine);
+
+	/** @brief Shows/hides the spot-cone rows (only meaningful for SPOTLIGHT). */
+	void setSpotConeVisible(bool visible);
+
 signals:
 	void powerChanged(int objectId, float power);
 	void radiusChanged(int objectId, float radius);
 	void shadowChanged(int objectId, bool enabled);
+	void cutoffChanged(int objectId, float cosine);
+	void outerCutoffChanged(int objectId, float cosine);
 
 private:
 	int m_objectId = -1;
 
 	// --- Widgets ---
-	QLabel*       m_typeLabel   = nullptr;
-	ScalarSlider* m_powerSlider = nullptr;
-	ScalarSlider* m_radiusSlider = nullptr;
-	QCheckBox*    m_shadowChk   = nullptr;
+	QLabel*       m_typeLabel        = nullptr;
+	ScalarSlider* m_powerSlider      = nullptr;
+	ScalarSlider* m_radiusSlider     = nullptr;
+	QCheckBox*    m_shadowChk        = nullptr;
+	QWidget*      m_innerConeRow     = nullptr;
+	ScalarSlider* m_innerConeSlider  = nullptr;
+	QWidget*      m_outerConeRow     = nullptr;
+	ScalarSlider* m_outerConeSlider  = nullptr;
 
 	// --- Cached values for dirty-check ---
 	std::string m_cachedType;
-	float       m_cachedPower  = -1.0f;
-	float       m_cachedRadius = -1.0f;
-	int         m_cachedShadow = -1;  // -1 = uninitialized
+	float       m_cachedPower       = -1.0f;
+	float       m_cachedRadius      = -1.0f;
+	int         m_cachedShadow      = -1;  // -1 = uninitialized
+	float       m_cachedCutoff      = -2.0f;  // out of [-1,1] domain
+	float       m_cachedOuterCutoff = -2.0f;
 };
 
 } // namespace neurus

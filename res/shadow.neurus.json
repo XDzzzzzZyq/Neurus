@@ -326,6 +326,55 @@
                             }
                         }
                     }
+                },
+                {
+                    "key": 3,
+                    "value": {
+                        "polymorphic_id": 1073741824,
+                        "ptr_wrapper": {
+                            "id": 2147483656,
+                            "data": {
+                                "value0": {
+                                    "value0": {
+                                        "o_id": 3
+                                    },
+                                    "o_name": "Spot Light",
+                                    "o_type": 2,
+                                    "is_viewport": true,
+                                    "is_rendered": true
+                                },
+                                "transform": {
+                                    "m_position": {
+                                        "x": 2.0,
+                                        "y": -2.0,
+                                        "z": 6.0
+                                    },
+                                    "m_rotation": {
+                                        "x": -60.0,
+                                        "y": 0.0,
+                                        "z": 45.0
+                                    },
+                                    "m_scale": {
+                                        "x": 1.0,
+                                        "y": 1.0,
+                                        "z": 1.0
+                                    }
+                                },
+                                "use_shadow": true,
+                                "light_type": 2,
+                                "light_power": 30.0,
+                                "light_color": {
+                                    "x": 0.699999988079071,
+                                    "y": 0.400000005960464,
+                                    "z": 1.0
+                                },
+                                "light_radius": 0.009999999776482582,
+                                "spot_cutoff": 0.949999988079071,
+                                "spot_outer_cutoff": 0.850000023841858,
+                                "area_ratio": 1.0
+                            }
+                        }
+                    }
                 }
             ],
             "sprite_list": [],
@@ -340,7 +389,7 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.019999999552965165,
+            "r_shadow_bias": 0.002,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,

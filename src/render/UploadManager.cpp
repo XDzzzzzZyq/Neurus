@@ -314,10 +314,10 @@ LightGPU UploadManager::UploadLight(const Light& light)
 // Variant-based UploadLighting (batch)
 // ---------------------------------------------------------------------------
 
-std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>>
+std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>>
 UploadManager::UploadLighting(const std::unordered_map<int, std::shared_ptr<Light>>& lights)
 {
-	std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>> result;
+	std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>> result;
 
 	for (const auto& [uid, light] : lights)
 	{
@@ -333,7 +333,7 @@ UploadManager::UploadLighting(const std::unordered_map<int, std::shared_ptr<Ligh
 // Variant-based UploadLighting (single)
 // ---------------------------------------------------------------------------
 
-std::variant<PointLightStruct, SunLightStruct>
+std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>
 UploadManager::UploadLighting(const Light& light)
 {
 	if (light.light_type == LightType::POINTLIGHT)
@@ -365,6 +365,29 @@ UploadManager::UploadLighting(const Light& light)
 		gpu.colorG = light.light_color.g;
 		gpu.colorB = light.light_color.b;
 		gpu.power = light.light_power;
+		gpu.shadowMapIndex = -1;
+
+		return gpu;
+	}
+	else if (light.light_type == LightType::SPOTLIGHT)
+	{
+		SpotLightStruct gpu = {};
+		const auto& pos = light.GetPosition();
+		const auto& dir = light.GetDirection();
+
+		gpu.posX = pos.x;
+		gpu.posY = pos.y;
+		gpu.posZ = pos.z;
+		gpu.dirX = dir.x;
+		gpu.dirY = dir.y;
+		gpu.dirZ = dir.z;
+		gpu.colorR = light.light_color.r;
+		gpu.colorG = light.light_color.g;
+		gpu.colorB = light.light_color.b;
+		gpu.power = light.light_power;
+		gpu.radius = light.light_radius;
+		gpu.innerCutoff = light.spot_cutoff;
+		gpu.outerCutoff = light.spot_outer_cutoff;
 		gpu.shadowMapIndex = -1;
 
 		return gpu;

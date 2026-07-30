@@ -8,7 +8,27 @@
 #include <QLabel>
 #include <QVBoxLayout>
 
+#include <cmath>
+
 namespace neurus {
+
+namespace {
+
+// --- Degree ↔ cosine conversion helpers (spot-cone UI convention) ---
+// UI presents user-friendly half-angle in degrees; scene stores cosines.
+constexpr float kPi = 3.14159265358979323846f;
+
+inline float DegToCosine(double deg)
+{
+	return std::cos(static_cast<float>(deg) * kPi / 180.0f);
+}
+
+inline double CosineToDeg(float cosine)
+{
+	return static_cast<double>(std::acos(cosine) * 180.0f / kPi);
+}
+
+} // anonymous namespace
 
 // =========================================================================
 // Constructor
@@ -55,6 +75,31 @@ LightProperties::LightProperties(QWidget* parent)
 	m_shadowChk = new QCheckBox("Cast Shadow");
 	groupLayout->addWidget(m_shadowChk);
 
+	// --- Row: Inner cone half-angle (degrees) — SPOTLIGHT only ---
+	m_innerConeRow = new QWidget();
+	{
+		auto* row = new QHBoxLayout(m_innerConeRow);
+		row->setContentsMargins(0, 0, 0, 0);
+		row->addWidget(new QLabel("Inner Cone"));
+		m_innerConeSlider = new ScalarSlider(0.5, 89.0, 1000, 25.0);
+		row->addWidget(m_innerConeSlider, 1);
+	}
+	groupLayout->addWidget(m_innerConeRow);
+
+	// --- Row: Outer cone half-angle (degrees) — SPOTLIGHT only ---
+	m_outerConeRow = new QWidget();
+	{
+		auto* row = new QHBoxLayout(m_outerConeRow);
+		row->setContentsMargins(0, 0, 0, 0);
+		row->addWidget(new QLabel("Outer Cone"));
+		m_outerConeSlider = new ScalarSlider(0.5, 89.0, 1000, 35.0);
+		row->addWidget(m_outerConeSlider, 1);
+	}
+	groupLayout->addWidget(m_outerConeRow);
+
+	m_innerConeRow->setVisible(false);
+	m_outerConeRow->setVisible(false);
+
 	outerLayout->addStretch();
 
 	// --- Signal wiring ---
@@ -75,6 +120,18 @@ LightProperties::LightProperties(QWidget* parent)
 			if (m_objectId < 0) return;
 			emit shadowChanged(m_objectId, checked);
 		});
+
+	QObject::connect(m_innerConeSlider, &ScalarSlider::valueChanged, this,
+		[this]() {
+			if (m_objectId < 0) return;
+			emit cutoffChanged(m_objectId, DegToCosine(m_innerConeSlider->value()));
+		});
+
+	QObject::connect(m_outerConeSlider, &ScalarSlider::valueChanged, this,
+		[this]() {
+			if (m_objectId < 0) return;
+			emit outerCutoffChanged(m_objectId, DegToCosine(m_outerConeSlider->value()));
+		});
 }
 
 // =========================================================================
@@ -87,9 +144,11 @@ void LightProperties::setObjectId(int id)
 	{
 		m_objectId = id;
 		m_cachedType.clear();
-		m_cachedPower  = -1.0f;
-		m_cachedRadius = -1.0f;
-		m_cachedShadow = -1;
+		m_cachedPower       = -1.0f;
+		m_cachedRadius      = -1.0f;
+		m_cachedShadow      = -1;
+		m_cachedCutoff      = -2.0f;
+		m_cachedOuterCutoff = -2.0f;
 	}
 }
 
@@ -122,6 +181,26 @@ void LightProperties::setShadowEnabled(bool enabled)
 	m_shadowChk->blockSignals(true);
 	m_shadowChk->setChecked(enabled);
 	m_shadowChk->blockSignals(false);
+}
+
+void LightProperties::setCutoff(float cosine)
+{
+	if (m_cachedCutoff == cosine) return;
+	m_cachedCutoff = cosine;
+	m_innerConeSlider->setValue(CosineToDeg(cosine));
+}
+
+void LightProperties::setOuterCutoff(float cosine)
+{
+	if (m_cachedOuterCutoff == cosine) return;
+	m_cachedOuterCutoff = cosine;
+	m_outerConeSlider->setValue(CosineToDeg(cosine));
+}
+
+void LightProperties::setSpotConeVisible(bool visible)
+{
+	m_innerConeRow->setVisible(visible);
+	m_outerConeRow->setVisible(visible);
 }
 
 } // namespace neurus

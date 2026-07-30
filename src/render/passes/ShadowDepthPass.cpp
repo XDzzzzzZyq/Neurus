@@ -285,13 +285,14 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 		// Skip invisible lights
 		if (!lightPtr->is_viewport || !lightPtr->is_rendered) continue;
 
-		const glm::vec3 lightPos = lightPtr->GetPosition();
-		const float farPlane = (lightPtr->light_type == LightType::POINTLIGHT)
-			? Light::point_shadow_far
-			: Light::sun_shadow_far;
+		// Only handle POINTLIGHT and SPOTLIGHT with shadow cubemaps; skip other types
+		if (lightPtr->light_type != LightType::POINTLIGHT &&
+		    lightPtr->light_type != LightType::SPOTLIGHT) continue;
 
-		// Only handle POINTLIGHT with shadow cubemaps; skip other types
-		if (lightPtr->light_type != LightType::POINTLIGHT) continue;
+		const glm::vec3 lightPos = lightPtr->GetPosition();
+		const float farPlane = (lightPtr->light_type == LightType::SPOTLIGHT)
+			? Light::spot_shadow_far
+			: Light::point_shadow_far;
 
 		// --- Push per-light data (lightWorldPos + farPlane, offset 0, 16 bytes) ---
 		{

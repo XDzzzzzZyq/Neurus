@@ -85,6 +85,7 @@ private:
 	void OnCameraAdd();
 	void OnLightAdd();
 	void OnSunLightAdd();
+	void OnSpotLightAdd();
 	void OnScreenshotRequested();
 	void OnScreenshotAllRequested();
 	void OnIBLLoad();

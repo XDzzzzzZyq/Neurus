@@ -174,6 +174,9 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 			m_lightProps->setPower(light->light_power);
 			m_lightProps->setRadius(light->light_radius);
 			m_lightProps->setShadowEnabled(light->use_shadow);
+			m_lightProps->setCutoff(light->spot_cutoff);
+			m_lightProps->setOuterCutoff(light->spot_outer_cutoff);
+			m_lightProps->setSpotConeVisible(light->light_type == LightType::SPOTLIGHT);
 		}
 		break;
 	}
@@ -343,6 +346,14 @@ void PropertyPanel::BuildTypeSubpanels()
 	QObject::connect(m_lightProps, &LightProperties::shadowChanged, this,
 		[this](int objectId, bool enabled) {
 			emit lightShadowChanged({objectId, enabled});
+		});
+	QObject::connect(m_lightProps, &LightProperties::cutoffChanged, this,
+		[this](int objectId, float cosine) {
+			emit lightCutoffChanged({objectId, cosine});
+		});
+	QObject::connect(m_lightProps, &LightProperties::outerCutoffChanged, this,
+		[this](int objectId, float cosine) {
+			emit lightOuterCutoffChanged({objectId, cosine});
 		});
 
 	// Environment

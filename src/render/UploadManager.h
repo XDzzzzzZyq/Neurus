@@ -70,14 +70,15 @@ struct Pipeline;         // render/Pipeline.h
 	 * @brief Convert a map of lights to GPU structs (variant-based).
 	 *
 	 * Pure CPU conversion — no GPU operations.  Iterates the light map,
-	 * converts each light to PointLightStruct or SunLightStruct with
-	 * shadowMapIndex set to -1, and returns a map keyed by light UID.
-	 * The caller (RenderCache::UpdateLighting) assigns real shadow indices.
+	 * converts each light to PointLightStruct / SunLightStruct /
+	 * SpotLightStruct with shadowMapIndex set to -1, and returns a map
+	 * keyed by light UID.  The caller (RenderCache::UpdateLighting)
+	 * assigns real shadow indices.
 	 *
 	 * @param lights  Map of light UID to shared pointers to Light objects.
-	 * @return Map: light UID → variant<PointLightStruct, SunLightStruct>.
+	 * @return Map: light UID → variant<PointLightStruct, SunLightStruct, SpotLightStruct>.
 	 */
-	std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>>
+	std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>>
 	UploadLighting(const std::unordered_map<int, std::shared_ptr<Light>>& lights);
 
 	/**
@@ -89,9 +90,9 @@ struct Pipeline;         // render/Pipeline.h
 	 * LightType::NONELIGHT.
 	 *
 	 * @param light  The light to convert.
-	 * @return variant<PointLightStruct, SunLightStruct>.
+	 * @return variant<PointLightStruct, SunLightStruct, SpotLightStruct>.
 	 */
-	std::variant<PointLightStruct, SunLightStruct>
+	std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>
 	UploadLighting(const Light& light);
 
 	/** @brief Wait for all pending upload operations to complete. */

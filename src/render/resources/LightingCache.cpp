@@ -24,6 +24,8 @@ LightingCache::LightingCache(const vk::raii::Device& device,
 	                   vk::BufferUsageFlagBits::eStorageBuffer, "PointLightSSBO")
 	, m_sunLightSSBO(device, physicalDevice, graphicsQueue, queueFamilyIndex,
 	                 vk::BufferUsageFlagBits::eStorageBuffer, "SunLightSSBO")
+	, m_spotLightSSBO(device, physicalDevice, graphicsQueue, queueFamilyIndex,
+	                  vk::BufferUsageFlagBits::eStorageBuffer, "SpotLightSSBO")
 {
 	NEURUS_LOG("[LightingCache] Created");
 }
@@ -76,6 +78,31 @@ const GPUBuffer* LightingCache::GetSunLightSSBO() const
 uint32_t LightingCache::GetSunLightCount() const
 {
 	return m_sunLightSSBO.size();
+}
+
+// ---------------------------------------------------------------------------
+// Spot light SSBO
+// ---------------------------------------------------------------------------
+
+void LightingCache::UpdateSpotLights(const std::vector<SpotLightStruct>& lights)
+{
+	m_spotLightSSBO.Upload(lights);
+	NEURUS_LOG("[LightingCache] Uploaded " << m_spotLightSSBO.size() << " spot lights");
+}
+
+void LightingCache::UpdateSpotLight(const SpotLightStruct& light, uint32_t index)
+{
+	m_spotLightSSBO.Update(light, index);
+}
+
+const GPUBuffer* LightingCache::GetSpotLightSSBO() const
+{
+	return m_spotLightSSBO.gpuBuffer();
+}
+
+uint32_t LightingCache::GetSpotLightCount() const
+{
+	return m_spotLightSSBO.size();
 }
 
 } // namespace neurus

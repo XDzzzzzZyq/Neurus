@@ -453,10 +453,11 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	uint32_t lightIndex = 0;
 	for (const auto& [uid, light] : scene->light_list)
 	{
-		// Skip non-shadow-casting, invisible, and non-point lights (sun lights handled separately)
+		// Skip non-shadow-casting, invisible, and non-cubemap lights (sun lights handled separately)
 		if (!light || !light->use_shadow) continue;
 		if (!light->is_viewport || !light->is_rendered) continue;
-		if (light->light_type != LightType::POINTLIGHT) continue;
+		if (light->light_type != LightType::POINTLIGHT &&
+		    light->light_type != LightType::SPOTLIGHT) continue;
 
 		p_currentLightUID = uid;
 
@@ -498,7 +499,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 			pc.lightPosX   = pos.x;
 			pc.lightPosY   = pos.y;
 			pc.lightPosZ   = pos.z;
-			pc.farPlane    = Light::point_shadow_far;
+			pc.farPlane    = (light->light_type == LightType::SPOTLIGHT)
+				? Light::spot_shadow_far
+				: Light::point_shadow_far;
 			pc.bias        = shadowBias;
 			pc.layerIndex  = static_cast<int32_t>(layer);
 			pc.jitterX     = ctx.jitter.x;

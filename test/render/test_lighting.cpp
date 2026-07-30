@@ -304,7 +304,7 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 
 	// --- Upload zero lights (empty variant map — SSBOs become null) ---
 	{
-		m_renderCache->UpdateLighting(std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct>>{});
+		m_renderCache->UpdateLighting(std::unordered_map<int, std::variant<PointLightStruct, SunLightStruct, SpotLightStruct>>{});
 	}
 
 	// --- Record lighting pass with 0 lights (PARTIALLY_BOUND SSBO) ---

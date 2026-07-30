@@ -62,6 +62,8 @@ signals:
 	void lightPowerChanged(const LightPowerChanged& e);
 	void lightRadiusChanged(const LightRadiusChanged& e);
 	void lightShadowChanged(const LightShadowChanged& e);
+	void lightCutoffChanged(const LightCutoffChanged& e);
+	void lightOuterCutoffChanged(const LightOuterCutoffChanged& e);
 
 	// --- Environment ---
 	void envIntensityChanged(const EnvironmentIntensityChanged& e);

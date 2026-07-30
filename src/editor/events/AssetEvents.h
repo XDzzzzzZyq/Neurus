@@ -16,4 +16,7 @@ struct LightAddEvent {};
 /** @brief Emitted when a new sun light should be added to the scene (Edit → Add → Sun Light). */
 struct SunLightAddEvent {};
 
+/** @brief Emitted when a new spot light should be added to the scene (Edit → Add → Spot Light). */
+struct SpotLightAddEvent {};
+
 } // namespace neurus
