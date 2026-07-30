@@ -50,8 +50,11 @@ void main()
 
     float shadowDepth  = textureLod(u_SunShadowMap, jitteredUV, 0.0).r;
 
-    // ndc.z in [0,1]; bias offsets fragment depth toward light
-    float shadowSample = (ndc.z - bias > shadowDepth) ? 1.0 : 0.0;
+    // Fragments outside shadow frustum (UV or depth) are treated as lit
+    const bool out_of_range = jitteredUV.x<0.0 || jitteredUV.x>1.0 || jitteredUV.y<0.0 || jitteredUV.y>1.0;
+    const bool out_of_depth = ndc.z > 1.0 || ndc.z < 0.0;
+    const bool in_shadow = !out_of_range && !out_of_depth && (ndc.z - bias > shadowDepth);
+    float shadowSample = in_shadow ? 1.0 : 0.0;
 
     // Temporal accumulation: read previous value, EMA blend, write back
     float prevAccum = imageLoad(outputShadow, ivec3(pixelCoord, layerIndex)).r;
