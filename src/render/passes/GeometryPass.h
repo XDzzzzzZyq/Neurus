@@ -93,6 +93,10 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
+	/// Declares the G-Buffer + IDBuffer + Depth writes for RenderGraph wiring
+	/// (this pass has no image reads; camera data comes via a UBO).
+	PassIO GetIO() const override;
+
 	/**
 	 * @brief Returns the camera descriptor set layout (set 0).
 	 */

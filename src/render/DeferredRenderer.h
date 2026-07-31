@@ -22,6 +22,7 @@
 #include "RenderConfig.h"
 #include "RenderContext.h"
 #include "Swapchain.h"
+#include "render_graph/RenderGraph.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -224,9 +225,6 @@ private:
 	vk::Queue r_graphicsQueue;
 	uint32_t r_queueFamilyIndex;
 
-	// --- Render config (user-settable pipeline options) ---
-	RenderConfig r_config;
-
 	// --- Swapchain ---
 	std::unique_ptr<Swapchain> r_swapchain;
 
@@ -244,6 +242,49 @@ private:
 	GizmoPass*    r_gizmoPass    = nullptr;
 	ComposePass*  r_composePass  = nullptr;
 	FXAAPass*     r_fxaaPass     = nullptr;
+
+	// --- RenderGraph (the active pipeline) ---
+	// Compile-once-per-topology DAG holding the whole deferred pipeline:
+	// Geometry → Shadows → SSAO → Lighting → {Gizmo} → Compose → [FXAA].
+	// recordFrame dispatches the entire pipeline via m_mainGraph.Execute(),
+	// rebuilding it (RebuildMainGraph) only when the pipeline signature
+	// derived from RenderConfig changes.
+	RenderGraph m_mainGraph;
+
+	/**
+	 * @brief Topology-affecting projection of RenderConfig.
+	 *
+	 * RenderConfig is the single source of truth for render settings. The
+	 * graph is a *derived* view of it: this signature captures exactly the
+	 * config choices that change which passes are in the graph. recordFrame
+	 * compares the current signature against the last-built one and rebuilds
+	 * the graph only when they differ — so there is no independent per-node
+	 * "enabled" state to fall out of sync with RenderConfig.
+	 *
+	 * Add a field here whenever a new pass becomes conditional (e.g. AO/shadow
+	 * once those passes are graph-managed). This struct is the one place that
+	 * maps config → graph topology.
+	 */
+	struct PipelineSignature
+	{
+		bool fxaa = false; ///< FXAAPass present (RenderConfig::RequiresFXAA()).
+
+		static PipelineSignature From(const RenderConfig& cfg)
+		{
+			return PipelineSignature{ cfg.RequiresFXAA() };
+		}
+
+		bool operator==(const PipelineSignature&) const = default;
+	};
+
+	/// Signature the current m_mainGraph was built for (dirty-key, not truth).
+	PipelineSignature m_builtSignature;
+
+	/**
+	 * @brief Rebuild m_mainGraph to match a pipeline signature.
+	 * @param sig  Projection of RenderConfig deciding which passes participate.
+	 */
+	void RebuildMainGraph(const PipelineSignature& sig);
 
 	// --- Command pool ---
 	vk::raii::CommandPool r_commandPool;

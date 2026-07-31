@@ -9,26 +9,64 @@
  *
  * Also hosts the PassType enum and associated static query helpers that
  * were previously on RenderPassManager.
- *
- * @note RenderContext is forward-declared here; its definition lives in
- *       RenderContext.h.
  */
 
 #pragma once
 
 #include "../Pipeline.h"
+#include "../RenderCache.h"
+#include "../RenderContext.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include <cstdint>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace neurus {
 
-// --- Forward declarations ---
-struct RenderContext;
-class RenderCache;
+/**
+ * @brief One declared image resource used by a pass, plus its optional
+ *        descriptor-binding slot (consumed by the DescriptorBinder in Wave 2).
+ *
+ * @c resource is an AttachmentName. Most name a single RenderCache attachment;
+ * ShadowDepth / ShadowIntensity are logical resources resolved by their owning
+ * pass (see RenderCache.h) but still identified here as one object.
+ * @c descriptorType and @c imageLayout describe how the pass sees the resource
+ * through its descriptor set:
+ *   - Sampled input:  eCombinedImageSampler + eShaderReadOnlyOptimal (default)
+ *   - Compute write:  eStorageImage         + eGeneral
+ *
+ * The fields exist on both read and write bindings because compute shaders
+ * bind writable attachments via storage-image descriptors just like reads.
+ */
+struct AttachmentBinding
+{
+	AttachmentName     resource;
+	uint32_t           binding        = 0;
+	vk::DescriptorType descriptorType = vk::DescriptorType::eCombinedImageSampler;
+	vk::ImageLayout    imageLayout    = vk::ImageLayout::eShaderReadOnlyOptimal;
+};
+
+/**
+ * @brief Plain-data description of a pass's image-attachment I/O, returned by
+ *        Pass::GetIO() and consumed by RenderGraph to build the DAG.
+ *
+ * `name` is used for topological error messages and debug labels.
+ * `reads`/`writes` list the image attachments the pass consumes/produces.
+ * Wave 1 scope: images only; UBO/SSBO/sampler bindings stay hand-written
+ * on the pass and are not modeled here.
+ *
+ * Kept inline with Pass so passes remain unaware of RenderGraph types while
+ * exposing enough for the graph to wire itself.
+ */
+struct PassIO
+{
+	std::string                    name;
+	std::vector<AttachmentBinding> reads;
+	std::vector<AttachmentBinding> writes;
+};
 
 /**
  * @brief Base class for a single render pass in the pipeline.
@@ -74,6 +112,18 @@ public:
 	 * @param ctx      Per-frame context (attachments, viewport, frame index, etc.).
 	 */
 	virtual void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) = 0;
+
+	/**
+	 * @brief Declares this pass's read/write attachment dependencies.
+	 *
+	 * Returns a plain POD describing which RenderCache attachments the pass
+	 * consumes and produces.  The RenderGraph consumes this to build the
+	 * DAG; passes remain unaware of RenderGraph types.
+	 *
+	 * Default returns an empty PassIO — passes that don't participate in the
+	 * graph (or haven't been migrated yet) simply omit the override.
+	 */
+	virtual PassIO GetIO() const { return {}; }
 
 	// --- Pass type queries (moved from RenderPassManager) ---
 

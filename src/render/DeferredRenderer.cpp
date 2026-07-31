@@ -141,6 +141,11 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] FXAAPass created");
 	}
 
+	// --- 8f. Build the Wave 3 shading-tail RenderGraph ---
+	// Initial build uses a default signature (no FXAA); recordFrame rebuilds
+	// it whenever the pipeline signature derived from RenderConfig changes.
+	RebuildMainGraph(PipelineSignature{});
+
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
 	uint32_t imageCount = r_swapchain->imageCount();
 
@@ -302,6 +307,55 @@ void DeferredRenderer::ResetShadowAccumulation()
 	m_iteration = 0;
 }
 
+void DeferredRenderer::RebuildMainGraph(const PipelineSignature& sig)
+{
+	// Rebuild the whole-pipeline DAG so it contains exactly the passes that
+	// will run. Edges follow image data-flow; camera/light SSBOs and the
+	// per-light shadow maps are addressed by the passes internally.
+	m_mainGraph.Clear();
+
+	auto* geometryNode  = m_mainGraph.AddPass(r_geometryPass);
+	auto* shadowDepth   = m_mainGraph.AddPass(r_shadowDepthPass);
+	auto* shadowInt     = m_mainGraph.AddPass(r_shadowIntensityPass);
+	auto* ssaoNode      = m_mainGraph.AddPass(r_ssaoPass);
+	auto* lightingNode  = m_mainGraph.AddPass(r_lightingPass);
+	auto* gizmoNode     = m_mainGraph.AddPass(r_gizmoPass);
+	auto* composeNode   = m_mainGraph.AddPass(r_composePass);
+
+	// Geometry (G-Buffer) → consumers
+	m_mainGraph.Connect(geometryNode, AttachmentName::Position,          ssaoNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::Normal,            ssaoNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::Albedo,            ssaoNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::Position,          shadowInt);
+	m_mainGraph.Connect(geometryNode, AttachmentName::Position,          lightingNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::Normal,            lightingNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::Albedo,            lightingNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::MetallicRoughness, lightingNode);
+	m_mainGraph.Connect(geometryNode, AttachmentName::IDBuffer,          gizmoNode);
+
+	// Shadow depth bundle → shadow intensity → lighting
+	m_mainGraph.Connect(shadowDepth, AttachmentName::ShadowDepth,     shadowInt);
+	m_mainGraph.Connect(shadowInt,   AttachmentName::ShadowIntensity, lightingNode);
+
+	// SSAO → lighting; lighting + gizmo → compose
+	m_mainGraph.Connect(ssaoNode,     AttachmentName::SSAO,           lightingNode);
+	m_mainGraph.Connect(lightingNode, AttachmentName::HDRColor,       composeNode);
+	m_mainGraph.Connect(gizmoNode,    AttachmentName::GizmoHighlight, composeNode);
+
+	if (sig.fxaa)
+	{
+		auto* fxaaNode = m_mainGraph.AddPass(r_fxaaPass);
+		m_mainGraph.Connect(composeNode, AttachmentName::ComposedOutput, fxaaNode);
+	}
+
+	m_mainGraph.Compile();
+	m_builtSignature = sig;
+
+	NEURUS_LOG("[DeferredRenderer] RenderGraph rebuilt ("
+	           << m_mainGraph.PassCount() << " passes, FXAA="
+	           << (sig.fxaa ? "on" : "off") << ")");
+}
+
 void DeferredRenderer::WaitIdle()
 {
 	r_device.waitIdle();
@@ -455,35 +509,23 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// Advance Halton index (cycles through all Halton(2,3,5) triples)
 	m_haltonIndex++;
 
-	// --- Phase 1: GeometryPass → G-Buffer MRT (iterates scene.mesh_list via MeshGPU) ---
-	r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 1b: ShadowDepthPass → cubemap depth from light's POV ---
-	r_shadowDepthPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 1c: ShadowIntensityPass → per-pixel shadow evaluation from cubemap ---
-	r_shadowIntensityPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
-	r_ssaoPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
-	r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3b: GizmoPass → compute edge highlight for active selection ---
-	r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3c: ComposePass → blend highlight + gamma correction → ComposedOutput ---
-	r_composePass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3d: FXAAPass → luma-based anti-aliasing (conditional on config) ---
+	// --- Pipeline: Geometry → Shadows → SSAO → Lighting → Gizmo → Compose → [FXAA] ---
+	// The whole deferred pipeline runs through one RenderGraph. FXAA is
+	// optional; useFXAA also selects the blit source below.
 	const bool useFXAA = ctx.config &&
 		static_cast<const RenderConfig*>(ctx.config)->RequiresFXAA();
 
-	if (useFXAA)
+	// Rebuild the graph only when the config-derived signature changes (single
+	// source of truth is RenderConfig; the graph is its projection — currently
+	// just FXAA presence).
+	if (const auto* cfg = static_cast<const RenderConfig*>(ctx.config))
 	{
-		r_fxaaPass->Record(cmdBuf, *r_renderCache, ctx);
+		const PipelineSignature sig = PipelineSignature::From(*cfg);
+		if (!(sig == m_builtSignature))
+			RebuildMainGraph(sig);
 	}
+
+	m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 4: Blit output → swapchain image ---
 	auto& blitSource = r_renderCache->GetAttachment(

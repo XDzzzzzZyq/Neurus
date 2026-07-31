@@ -100,6 +100,11 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
+	/// Declares the Position + ShadowDepth reads and the ShadowIntensity write
+	/// for RenderGraph wiring (per-light depth maps and intensity layers are
+	/// addressed internally via LightGPU / GetShadowIntensityArray).
+	PassIO GetIO() const override;
+
 	/**
 	 * @brief Writes all descriptors (image) into the specified set.
 	 *
@@ -176,9 +181,12 @@ private:
 	std::unique_ptr<ComputeShader> p_pointLightShader;  ///< Point-light cubemap eval (shadow_eval.comp)
 	std::unique_ptr<ComputeShader> p_sunLightShader;    ///< Sun-light 2D eval (sun_shadow_eval.comp)
 
-	/// Two descriptor sets per in-flight frame slot so the per-light loop
-	/// can alternate between them without updating a currently-bound set.
-	static constexpr uint32_t kSetsPerFrameSlot = 2;
+	/// One descriptor set per shadow-casting light per in-flight frame slot, so
+	/// the per-light loop never updates a set that is still bound from an
+	/// earlier light in the same command buffer (which would alias descriptors
+	/// and drop that light's shadow). Sized to the shadow-layer cap; a
+	/// static_assert in the .cpp keeps it equal to RenderCache::MAX_SHADOW_LAYERS.
+	static constexpr uint32_t kSetsPerFrameSlot = 4;
 
 	// --- Current light UID (set before WriteDescriptors) ---
 	int32_t p_currentLightUID = -1;

@@ -420,4 +420,23 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	}
 }
 
+PassIO SSAOPass::GetIO() const
+{
+	// Binding metadata is indicative only: SSAOPass still writes its own
+	// descriptors in WriteDescriptors(). Resource names drive RenderGraph
+	// edge wiring (Position/Normal/Albedo are external inputs from
+	// GeometryPass; SSAO feeds LightingPass).
+	PassIO io;
+	io.name  = "SSAOPass";
+	io.reads = {
+		{AttachmentName::Position, 0, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::Normal,   1, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::Albedo,   2, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+	};
+	io.writes = {
+		{AttachmentName::SSAO, 3, vk::DescriptorType::eStorageImage, vk::ImageLayout::eGeneral},
+	};
+	return io;
+}
+
 } // namespace neurus

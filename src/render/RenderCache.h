@@ -46,7 +46,14 @@ enum class AttachmentName
 	FXAAOffsets,        ///< FXAA edge subpixel offsets (RG16F, 2-channel)
 
 	// --- Shadow ---
-	ShadowDepth,        ///< Point light shadow depth cubemap (D32_SFLOAT, eCube)
+	// Logical shadow resources. Unlike the single-image attachments above,
+	// these are resolved specially by their owning pass (ShadowDepth is a
+	// per-light bundle in LightGPU; ShadowIntensity is a 2D array via
+	// GetShadowIntensityArray). They still read as one logical object to the
+	// rest of the pipeline / RenderGraph, so they live here — but are NOT
+	// fetched through GetAttachment().
+	ShadowDepth,        ///< Per-light shadow depth maps (logical bundle).
+	ShadowIntensity,    ///< Unified shadow-intensity 2D array.
 
 	// Count sentinel
 	Count,

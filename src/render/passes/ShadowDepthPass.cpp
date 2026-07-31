@@ -513,4 +513,15 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 	}
 }
 
+PassIO ShadowDepthPass::GetIO() const
+{
+	// Renders per-light depth maps (cubemap/2D) into LightGPU. The graph models
+	// the whole set as one ShadowDepthBundle write token; the per-light maps
+	// are addressed internally. No image reads (scene-driven).
+	PassIO io;
+	io.name   = "ShadowDepthPass";
+	io.writes = { { AttachmentName::ShadowDepth } };
+	return io;
+}
+
 } // namespace neurus

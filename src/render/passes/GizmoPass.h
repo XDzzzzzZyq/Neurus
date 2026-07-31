@@ -80,6 +80,17 @@ public:
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/**
+	 * @brief Declares the image attachments this pass reads and writes.
+	 *
+	 * Reads:  IDBuffer       @ slot 0 (combined image sampler, eShaderReadOnlyOptimal)
+	 * Writes: GizmoHighlight @ slot 1 (storage image, eGeneral)
+	 *
+	 * Drives both the RenderGraph DAG wiring and the DescriptorBinder image
+	 * writes in WriteDescriptors().
+	 */
+	PassIO GetIO() const override;
+
+	/**
 	 * @brief Writes all descriptors (image bindings) into the specified set.
 	 *
 	 * Bindings:
