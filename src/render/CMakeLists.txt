@@ -60,6 +60,8 @@ add_library(neurus_render STATIC
 	Screenshot.cpp
 	UploadManager.h
 	UploadManager.cpp
+	render_graph/RenderGraph.h
+	render_graph/RenderGraph.cpp
 )
 
 add_subdirectory(passes)
