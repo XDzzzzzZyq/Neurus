@@ -9,6 +9,7 @@
 #include "../PipelineBuilder.h"
 #include "Image.h"
 #include "render/Barrier.h"
+#include "render/render_graph/DescriptorBinder.h"
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
@@ -105,40 +106,40 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
 }
 
 // ---------------------------------------------------------------------------
+// I/O declaration
+// ---------------------------------------------------------------------------
+
+PassIO GizmoPass::GetIO() const
+{
+	PassIO io;
+	io.name = "GizmoPass";
+	io.reads = {
+		// IDBuffer sampled as usampler2D at binding 0.
+		{AttachmentName::IDBuffer, 0,
+		 vk::DescriptorType::eCombinedImageSampler,
+		 vk::ImageLayout::eShaderReadOnlyOptimal},
+	};
+	io.writes = {
+		// GizmoHighlight written as a storage image at binding 1.
+		{AttachmentName::GizmoHighlight, 1,
+		 vk::DescriptorType::eStorageImage,
+		 vk::ImageLayout::eGeneral},
+	};
+	return io;
+}
+
+// ---------------------------------------------------------------------------
 // Descriptor writes
 // ---------------------------------------------------------------------------
 
 void GizmoPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache)
 {
-	DescriptorSet& dstSet = p_descriptorSets[setIndex];
-
-	// --- Write IDBuffer input descriptor (combined image sampler, R32_UINT) ---
-	{
-		const auto& idAtt = cache.GetAttachment(AttachmentName::IDBuffer, extent);
-
-		vk::DescriptorImageInfo imageInfo(
-			*p_sampler,                              // sampler
-			*idAtt.ImageViewHandle(),                // imageView
-			vk::ImageLayout::eShaderReadOnlyOptimal  // imageLayout
-		);
-
-		dstSet.WriteImage(0, imageInfo,
-		                  vk::DescriptorType::eCombinedImageSampler);
-	}
-
-	// --- Write GizmoHighlight output (storage image, R8) ---
-	{
-		const auto& gizmoAtt = cache.GetAttachment(AttachmentName::GizmoHighlight, extent);
-
-		vk::DescriptorImageInfo imageInfo(
-			nullptr,                              // sampler (not used for storage images)
-			*gizmoAtt.ImageViewHandle(),          // imageView
-			vk::ImageLayout::eGeneral             // imageLayout
-		);
-
-		dstSet.WriteImage(1, imageInfo,
-		                  vk::DescriptorType::eStorageImage);
-	}
+	// Image bindings are derived from GetIO() and applied by DescriptorBinder,
+	// so the binding list lives in exactly one place (GetIO).
+	const PassIO io = GetIO();
+	DescriptorBinder::BindImages(p_descriptorSets[setIndex],
+	                             io.reads, io.writes,
+	                             cache, extent, *p_sampler);
 }
 
 // ---------------------------------------------------------------------------

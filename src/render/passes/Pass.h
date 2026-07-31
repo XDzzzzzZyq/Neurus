@@ -29,11 +29,21 @@ namespace neurus {
 /**
  * @brief One declared image attachment used by a pass, plus its optional
  *        descriptor-binding slot (consumed by the DescriptorBinder in Wave 2).
+ *
+ * @c descriptorType and @c imageLayout describe how the pass sees the
+ * attachment through its descriptor set:
+ *   - Sampled input:  eCombinedImageSampler + eShaderReadOnlyOptimal (default)
+ *   - Compute write:  eStorageImage         + eGeneral
+ *
+ * The fields exist on both read and write bindings because compute shaders
+ * bind writable attachments via storage-image descriptors just like reads.
  */
 struct AttachmentBinding
 {
-	AttachmentName resource;
-	uint32_t       binding = 0;
+	AttachmentName     resource;
+	uint32_t           binding        = 0;
+	vk::DescriptorType descriptorType = vk::DescriptorType::eCombinedImageSampler;
+	vk::ImageLayout    imageLayout    = vk::ImageLayout::eShaderReadOnlyOptimal;
 };
 
 /**

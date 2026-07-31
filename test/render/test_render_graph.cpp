@@ -135,14 +135,21 @@ TEST(RenderGraphTest, CompileLinearChain)
 	EXPECT_EQ(order[2], nc);
 }
 
-TEST(RenderGraphTest, CompileRejectsUnconnectedInput)
+TEST(RenderGraphTest, CompileAllowsExternalInputs)
 {
+	// An input with no in-graph producer is "external" (produced by a
+	// RenderCache attachment or a legacy pass during incremental migration).
+	// Compile() must accept it rather than treating it as an error.
 	MockPass consumer("cons", {AttachmentName::Position}, {});
 
 	RenderGraph g;
-	g.AddPass(&consumer);
+	auto* cn = g.AddPass(&consumer);
 
-	EXPECT_THROW(g.Compile(), std::runtime_error);
+	g.Compile();
+
+	const auto& order = g.CompiledOrder();
+	ASSERT_EQ(order.size(), 1u);
+	EXPECT_EQ(order[0], cn);
 }
 
 TEST(RenderGraphTest, CompileRejectsCycle)

@@ -22,6 +22,7 @@
 #include "RenderConfig.h"
 #include "RenderContext.h"
 #include "Swapchain.h"
+#include "render_graph/RenderGraph.h"
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -244,6 +245,12 @@ private:
 	GizmoPass*    r_gizmoPass    = nullptr;
 	ComposePass*  r_composePass  = nullptr;
 	FXAAPass*     r_fxaaPass     = nullptr;
+
+	// --- RenderGraph migration (Wave 2: GizmoPass only) ---
+	// Compile-once static graph rebuilt only when passes change. When
+	// r_config.r_useRenderGraph is set, recordFrame dispatches GizmoPass
+	// through this graph instead of calling r_gizmoPass->Record() directly.
+	RenderGraph m_gizmoGraph;
 
 	// --- Command pool ---
 	vk::raii::CommandPool r_commandPool;

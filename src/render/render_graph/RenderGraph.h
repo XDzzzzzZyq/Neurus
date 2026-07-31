@@ -87,8 +87,9 @@ public:
 	/**
 	 * @brief Validate connectivity and cache the topological execution order.
 	 *
-	 * A declared input that has no source connection is a hard error: each
-	 * pass must be fully wired before the graph can execute. Cycles are
+	 * Inputs without an in-graph producer are treated as external (supplied by
+	 * a RenderCache attachment or a pass still on the legacy path) and are not
+	 * an error — this is expected during incremental migration. Cycles are
 	 * detected by Kahn's algorithm and surface as `std::runtime_error`.
 	 */
 	void Compile();

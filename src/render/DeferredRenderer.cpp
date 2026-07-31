@@ -119,6 +119,12 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		r_gizmoPass = gizmoPass.get();
 		r_passes.push_back(std::move(gizmoPass));
 		NEURUS_LOG("[DeferredRenderer] GizmoPass created");
+
+		// Register GizmoPass in its RenderGraph (Wave 2). IDBuffer is an
+		// external input (produced by GeometryPass on the legacy path), so
+		// Compile() leaves it unwired without error.
+		m_gizmoGraph.AddPass(r_gizmoPass);
+		m_gizmoGraph.Compile();
 	}
 
 	// --- 8d. Create compose pass (highlight blend + gamma correction) ---
@@ -471,7 +477,10 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 3b: GizmoPass → compute edge highlight for active selection ---
-	r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);
+	if (r_config.r_useRenderGraph)
+		m_gizmoGraph.Execute(cmdBuf, *r_renderCache, ctx);
+	else
+		r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 3c: ComposePass → blend highlight + gamma correction → ComposedOutput ---
 	r_composePass->Record(cmdBuf, *r_renderCache, ctx);

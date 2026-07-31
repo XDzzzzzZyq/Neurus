@@ -10,7 +10,6 @@
 
 #include "../RenderContext.h"
 
-#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -88,23 +87,11 @@ bool RenderGraph::Connect(NodeT* producer, AttachmentName resource, NodeT* consu
 
 void RenderGraph::Compile()
 {
-	// Every declared input socket must be wired to a producer. Missing
-	// edges are usually programmer error (e.g. LightingPass declares a
-	// Position input but the user forgot to connect it from GeometryPass).
-	for (const auto& node : m_graph.nodes)
-	{
-		for (const auto& in : node->inputs)
-		{
-			if (!in->IsConnected())
-			{
-				std::ostringstream oss;
-				oss << "RenderGraph::Compile: pass '" << node->name
-				    << "' has unconnected input '" << in->name << "'";
-				throw std::runtime_error(oss.str());
-			}
-		}
-	}
-
+	// Inputs with no in-graph producer are "external": they are produced by
+	// a resource outside this graph (RenderCache attachments, or a pass still
+	// on the legacy path during incremental migration). They are valid and
+	// simply do not contribute an ordering edge. Only cycles are rejected.
+	//
 	// Kahn's algorithm — throws std::runtime_error on cycle.
 	m_compiled   = m_graph.TopologicalSort();
 	m_isCompiled = true;
