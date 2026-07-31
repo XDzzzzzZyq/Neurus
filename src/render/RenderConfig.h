@@ -130,7 +130,7 @@ public:
 	/// Wave 2 scope: GizmoPass. Later waves migrate additional passes behind
 	/// the same flag; when Wave 5 lands the legacy path is deleted and the
 	/// flag itself is removed.
-	bool r_useRenderGraph = false;
+	bool r_useRenderGraph = true;
 
 public:
 	RenderConfig() = default;

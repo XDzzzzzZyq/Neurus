@@ -119,12 +119,6 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		r_gizmoPass = gizmoPass.get();
 		r_passes.push_back(std::move(gizmoPass));
 		NEURUS_LOG("[DeferredRenderer] GizmoPass created");
-
-		// Register GizmoPass in its RenderGraph (Wave 2). IDBuffer is an
-		// external input (produced by GeometryPass on the legacy path), so
-		// Compile() leaves it unwired without error.
-		m_gizmoGraph.AddPass(r_gizmoPass);
-		m_gizmoGraph.Compile();
 	}
 
 	// --- 8d. Create compose pass (highlight blend + gamma correction) ---
@@ -146,6 +140,11 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		r_passes.push_back(std::move(fxaaPass));
 		NEURUS_LOG("[DeferredRenderer] FXAAPass created");
 	}
+
+	// --- 8f. Build the Wave 3 shading-tail RenderGraph ---
+	// Initial build uses a default signature (no FXAA); recordFrame rebuilds
+	// it whenever the pipeline signature derived from RenderConfig changes.
+	RebuildMainGraph(PipelineSignature{});
 
 	// --- 9. Allocate command buffers (one per swapchain image, reused) ---
 	uint32_t imageCount = r_swapchain->imageCount();
@@ -306,6 +305,37 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 void DeferredRenderer::ResetShadowAccumulation()
 {
 	m_iteration = 0;
+}
+
+void DeferredRenderer::RebuildMainGraph(const PipelineSignature& sig)
+{
+	// Rebuild the shading-tail DAG so it contains exactly the passes that will
+	// run. Edges follow image data-flow; G-Buffer and shadow inputs are
+	// external (produced by GeometryPass / the legacy shadow passes) and stay
+	// unwired. Called at init and whenever the pipeline signature changes.
+	m_mainGraph.Clear();
+
+	auto* ssaoNode     = m_mainGraph.AddPass(r_ssaoPass);
+	auto* lightingNode = m_mainGraph.AddPass(r_lightingPass);
+	auto* gizmoNode    = m_mainGraph.AddPass(r_gizmoPass);
+	auto* composeNode  = m_mainGraph.AddPass(r_composePass);
+
+	m_mainGraph.Connect(ssaoNode,     AttachmentName::SSAO,           lightingNode);
+	m_mainGraph.Connect(lightingNode, AttachmentName::HDRColor,       composeNode);
+	m_mainGraph.Connect(gizmoNode,    AttachmentName::GizmoHighlight, composeNode);
+
+	if (sig.fxaa)
+	{
+		auto* fxaaNode = m_mainGraph.AddPass(r_fxaaPass);
+		m_mainGraph.Connect(composeNode, AttachmentName::ComposedOutput, fxaaNode);
+	}
+
+	m_mainGraph.Compile();
+	m_builtSignature = sig;
+
+	NEURUS_LOG("[DeferredRenderer] RenderGraph rebuilt ("
+	           << m_mainGraph.PassCount() << " passes, FXAA="
+	           << (sig.fxaa ? "on" : "off") << ")");
 }
 
 void DeferredRenderer::WaitIdle()
@@ -470,28 +500,33 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Phase 1c: ShadowIntensityPass → per-pixel shadow evaluation from cubemap ---
 	r_shadowIntensityPass->Record(cmdBuf, *r_renderCache, ctx);
 
-	// --- Phase 2: SSAO → compute ambient occlusion from G-Buffer ---
-	r_ssaoPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3: LightingPass → compute PBR → HDRColor ---
-	r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3b: GizmoPass → compute edge highlight for active selection ---
-	if (r_config.r_useRenderGraph)
-		m_gizmoGraph.Execute(cmdBuf, *r_renderCache, ctx);
-	else
-		r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3c: ComposePass → blend highlight + gamma correction → ComposedOutput ---
-	r_composePass->Record(cmdBuf, *r_renderCache, ctx);
-
-	// --- Phase 3d: FXAAPass → luma-based anti-aliasing (conditional on config) ---
+	// --- Phase 2–3d: shading tail (SSAO → Lighting → Gizmo → Compose → FXAA) ---
+	// FXAA is optional; useFXAA also selects the blit source below.
 	const bool useFXAA = ctx.config &&
 		static_cast<const RenderConfig*>(ctx.config)->RequiresFXAA();
 
-	if (useFXAA)
+	if (r_config.r_useRenderGraph)
 	{
-		r_fxaaPass->Record(cmdBuf, *r_renderCache, ctx);
+		// Rebuild only when the config-derived signature changes (single
+		// source of truth is RenderConfig; the graph is its projection).
+		const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+		if (cfg)
+		{
+			const PipelineSignature sig = PipelineSignature::From(*cfg);
+			if (!(sig == m_builtSignature))
+				RebuildMainGraph(sig);
+		}
+
+		m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
+	}
+	else
+	{
+		r_ssaoPass->Record(cmdBuf, *r_renderCache, ctx);      // SSAO from G-Buffer
+		r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);  // PBR → HDRColor
+		r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);     // selection edge highlight
+		r_composePass->Record(cmdBuf, *r_renderCache, ctx);   // blend + gamma → ComposedOutput
+		if (useFXAA)
+			r_fxaaPass->Record(cmdBuf, *r_renderCache, ctx);  // luma AA → FXAAOutput
 	}
 
 	// --- Phase 4: Blit output → swapchain image ---

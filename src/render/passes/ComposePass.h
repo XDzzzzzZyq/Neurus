@@ -87,6 +87,10 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
+	/// Declares HDRColor + GizmoHighlight reads and the ComposedOutput write
+	/// for RenderGraph wiring.
+	PassIO GetIO() const override;
+
 	/**
 	 * @brief Writes all descriptors (HDRColor, GizmoHighlight, ComposedOutput)
 	 *        into the specified set.

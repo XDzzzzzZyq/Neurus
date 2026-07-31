@@ -108,6 +108,13 @@ void RenderGraph::Execute(vk::CommandBuffer cmd, RenderCache& cache, const Rende
 	}
 }
 
+void RenderGraph::Clear()
+{
+	m_graph.nodes.clear();
+	m_compiled.clear();
+	m_isCompiled = false;
+}
+
 void RenderGraph::Reset()
 {
 	m_compiled.clear();

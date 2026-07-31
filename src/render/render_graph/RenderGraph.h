@@ -110,6 +110,16 @@ public:
 	/** @brief Drop the cached order (call after edits before the next Compile). */
 	void Reset();
 
+	/**
+	 * @brief Remove all nodes and clear the compiled order.
+	 *
+	 * Used to rebuild the graph from scratch when the active pass set changes
+	 * (e.g. the user toggles FXAA), so the DAG always reflects exactly the
+	 * passes that will run. Pass objects are non-owning and outlive the graph,
+	 * so only the node/socket bookkeeping is discarded.
+	 */
+	void Clear();
+
 private:
 	GraphT               m_graph;
 	std::vector<NodeT*>  m_compiled;

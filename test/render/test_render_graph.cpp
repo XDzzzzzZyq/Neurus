@@ -187,6 +187,30 @@ TEST(RenderGraphTest, ExecuteThrowsIfNotCompiled)
 	             std::runtime_error);
 }
 
+TEST(RenderGraphTest, ClearRemovesAllNodes)
+{
+	// Rebuild-on-toggle relies on Clear() emptying the graph so it can be
+	// repopulated with the currently-active pass set.
+	MockPass a("A", {}, {AttachmentName::Position});
+	MockPass b("B", {AttachmentName::Position}, {});
+
+	RenderGraph g;
+	auto* na = g.AddPass(&a);
+	auto* nb = g.AddPass(&b);
+	g.Connect(na, AttachmentName::Position, nb);
+	g.Compile();
+	ASSERT_EQ(g.PassCount(), 2u);
+
+	g.Clear();
+	EXPECT_EQ(g.PassCount(), 0u);
+	EXPECT_TRUE(g.CompiledOrder().empty());
+
+	// Graph is reusable after Clear().
+	g.AddPass(&a);
+	g.Compile();
+	EXPECT_EQ(g.PassCount(), 1u);
+}
+
 // ---------------------------------------------------------------------------
 // Reset — invalidates the compiled order without dropping nodes.
 // ---------------------------------------------------------------------------

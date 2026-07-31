@@ -101,6 +101,11 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
+	/// Declares G-Buffer + SSAO reads and the HDRColor write for RenderGraph
+	/// wiring. (Shadow-intensity array and IBL cubemaps are external/complex
+	/// bindings and are not modeled here.)
+	PassIO GetIO() const override;
+
 	/**
 	 * @brief Creates the descriptor set layout (10 bindings).
 	 *

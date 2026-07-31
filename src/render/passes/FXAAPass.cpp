@@ -135,4 +135,20 @@ void FXAAPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	}
 }
 
+PassIO FXAAPass::GetIO() const
+{
+	// Binding metadata is indicative only: FXAAPass still writes its own
+	// descriptors. ComposedOutput (from ComposePass) is the in-graph input;
+	// FXAAOutput is consumed by the swapchain blit outside the graph.
+	PassIO io;
+	io.name  = "FXAAPass";
+	io.reads = {
+		{AttachmentName::ComposedOutput, 0, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+	};
+	io.writes = {
+		{AttachmentName::FXAAOutput, 1, vk::DescriptorType::eStorageImage, vk::ImageLayout::eGeneral},
+	};
+	return io;
+}
+
 } // namespace neurus

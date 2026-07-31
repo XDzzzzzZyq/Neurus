@@ -218,4 +218,22 @@ void ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Ren
 	}
 }
 
+PassIO ComposePass::GetIO() const
+{
+	// Binding metadata is indicative only: ComposePass still writes its own
+	// descriptors. Resource names drive RenderGraph edges — HDRColor (from
+	// LightingPass) and GizmoHighlight (from GizmoPass) are in-graph inputs;
+	// ComposedOutput feeds FXAAPass / the swapchain blit.
+	PassIO io;
+	io.name  = "ComposePass";
+	io.reads = {
+		{AttachmentName::HDRColor,       0, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::GizmoHighlight, 1, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+	};
+	io.writes = {
+		{AttachmentName::ComposedOutput, 2, vk::DescriptorType::eStorageImage, vk::ImageLayout::eGeneral},
+	};
+	return io;
+}
+
 } // namespace neurus

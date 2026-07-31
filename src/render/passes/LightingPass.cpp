@@ -484,4 +484,26 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	}
 }
 
+PassIO LightingPass::GetIO() const
+{
+	// Binding metadata is indicative only: LightingPass still writes its own
+	// descriptors (including UBOs, the shadow-intensity array and IBL cubemaps
+	// which are not modeled here). Resource names drive RenderGraph edges —
+	// SSAO is the in-graph producer edge; the G-Buffer reads are external
+	// inputs from GeometryPass; HDRColor feeds ComposePass.
+	PassIO io;
+	io.name  = "LightingPass";
+	io.reads = {
+		{AttachmentName::Position,          0, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::Normal,            1, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::Albedo,            2, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::MetallicRoughness, 3, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		{AttachmentName::SSAO,              4, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+	};
+	io.writes = {
+		{AttachmentName::HDRColor, 5, vk::DescriptorType::eStorageImage, vk::ImageLayout::eGeneral},
+	};
+	return io;
+}
+
 } // namespace neurus

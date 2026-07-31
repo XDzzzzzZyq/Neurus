@@ -19,6 +19,10 @@ public:
 	         const vk::raii::PhysicalDevice& physicalDevice,
 	         uint32_t numSets);
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+
+	/// Declares the ComposedOutput read and FXAAOutput write for RenderGraph
+	/// wiring.
+	PassIO GetIO() const override;
 	void WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCache& cache) override;
 private:
 	static DescriptorSetLayout CreateLayout(const vk::raii::Device& d);

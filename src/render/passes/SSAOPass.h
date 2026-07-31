@@ -147,6 +147,10 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
+	/// Declares G-Buffer reads (Position/Normal/Albedo) and the SSAO write
+	/// for RenderGraph wiring.
+	PassIO GetIO() const override;
+
 	/**
 	 * @brief Writes all descriptors (image + buffer) into the specified set.
 	 * @param setIndex  Index into p_descriptorSets (0 … numSets-1).
