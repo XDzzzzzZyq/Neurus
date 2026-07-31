@@ -30,8 +30,9 @@ namespace neurus {
  * @brief One declared image resource used by a pass, plus its optional
  *        descriptor-binding slot (consumed by the DescriptorBinder in Wave 2).
  *
- * @c resource is a ResourceId (implicitly built from AttachmentName for the
- * common attachment case; shadow bundle/intensity use ResourceId factories).
+ * @c resource is an AttachmentName. Most name a single RenderCache attachment;
+ * ShadowDepth / ShadowIntensity are logical resources resolved by their owning
+ * pass (see RenderCache.h) but still identified here as one object.
  * @c descriptorType and @c imageLayout describe how the pass sees the resource
  * through its descriptor set:
  *   - Sampled input:  eCombinedImageSampler + eShaderReadOnlyOptimal (default)
@@ -42,7 +43,7 @@ namespace neurus {
  */
 struct AttachmentBinding
 {
-	ResourceId         resource;
+	AttachmentName     resource;
 	uint32_t           binding        = 0;
 	vk::DescriptorType descriptorType = vk::DescriptorType::eCombinedImageSampler;
 	vk::ImageLayout    imageLayout    = vk::ImageLayout::eShaderReadOnlyOptimal;

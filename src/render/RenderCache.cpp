@@ -506,7 +506,6 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 
 	constexpr auto e2D = Image::ImageType::e2D;
 	constexpr auto eDS = Image::ImageType::eDepthStencil;
-	constexpr auto eCube = Image::ImageType::eCube;
 
 	switch (name)
 	{
@@ -533,12 +532,15 @@ RenderCache::AttachmentConfig RenderCache::ConfigFor(const AttachmentName name)
 	case AttachmentName::SSR:
 		return { vk::Format::eR16G16B16A16Sfloat, kColorAttachmentUsage, e2D };
 
-	// --- Shadow ---
+	// --- Shadow (logical resources, not backed by GetAttachment) ---
+	// ShadowDepth is a per-light bundle (LightGPU::shadowDepthMap); ShadowIntensity
+	// is the 2D array from GetShadowIntensityArray(). They are graph/pipeline
+	// identities only, resolved by their owning pass — never a single attachment.
 	case AttachmentName::ShadowDepth:
-		// Cubemap depth attachment: written by ShadowDepthPass, sampled by shadow evaluation
-		return { vk::Format::eD32Sfloat,
-		         vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
-		         eCube };
+	case AttachmentName::ShadowIntensity:
+		throw std::invalid_argument(
+			"RenderCache::ConfigFor: ShadowDepth/ShadowIntensity are logical "
+			"resources resolved by their owning pass, not via GetAttachment");
 
 	// --- ID ---
 	case AttachmentName::IDBuffer:
@@ -583,6 +585,7 @@ const char* AttachmentNameToString(const AttachmentName name)
 	case AttachmentName::SSAO:              return "SSAO";
 	case AttachmentName::SSR:               return "SSR";
 	case AttachmentName::ShadowDepth:       return "ShadowDepth";
+	case AttachmentName::ShadowIntensity:   return "ShadowIntensity";
 	case AttachmentName::IDBuffer:          return "IDBuffer";
 	case AttachmentName::GizmoHighlight:    return "GizmoHighlight";
 	case AttachmentName::ComposedOutput:    return "ComposedOutput";

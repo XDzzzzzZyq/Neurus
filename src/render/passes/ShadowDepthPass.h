@@ -68,6 +68,10 @@ public:
 
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& /*cache*/, const RenderContext& ctx) override;
 
+	/// Declares the ShadowDepthBundle write for RenderGraph wiring. Per-light
+	/// depth maps live in LightGPU; the bundle is a single ordering token.
+	PassIO GetIO() const override;
+
 	// --- Accessors ---
 	uint32_t Resolution() const { return p_resolution; }
 

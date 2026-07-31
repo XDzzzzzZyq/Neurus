@@ -633,4 +633,22 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	}
 }
 
+PassIO ShadowIntensityPass::GetIO() const
+{
+	// Reads the G-Buffer Position and the per-light shadow depth maps (the
+	// logical ShadowDepth bundle); writes the unified shadow-intensity 2D
+	// array. Per-light maps and intensity layers are addressed internally via
+	// LightGPU / GetShadowIntensityArray, so binding metadata is indicative.
+	PassIO io;
+	io.name  = "ShadowIntensityPass";
+	io.reads = {
+		{ AttachmentName::Position },
+		{ AttachmentName::ShadowDepth },
+	};
+	io.writes = {
+		{ AttachmentName::ShadowIntensity },
+	};
+	return io;
+}
+
 } // namespace neurus

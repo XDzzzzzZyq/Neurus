@@ -499,9 +499,12 @@ PassIO LightingPass::GetIO() const
 		{AttachmentName::Albedo,            2, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
 		{AttachmentName::MetallicRoughness, 3, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
 		{AttachmentName::SSAO,              4, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
+		// Shadow intensity array is produced by ShadowIntensityPass; establishes
+		// the in-graph ShadowIntensity → Lighting ordering edge.
+		{AttachmentName::ShadowIntensity,   5, vk::DescriptorType::eCombinedImageSampler, vk::ImageLayout::eShaderReadOnlyOptimal},
 	};
 	io.writes = {
-		{AttachmentName::HDRColor, 5, vk::DescriptorType::eStorageImage, vk::ImageLayout::eGeneral},
+		{AttachmentName::HDRColor, 6, vk::DescriptorType::eStorageImage, vk::ImageLayout::eGeneral},
 	};
 	return io;
 }

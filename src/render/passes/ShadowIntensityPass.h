@@ -100,6 +100,11 @@ public:
 	 */
 	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
+	/// Declares the Position + ShadowDepth reads and the ShadowIntensity write
+	/// for RenderGraph wiring (per-light depth maps and intensity layers are
+	/// addressed internally via LightGPU / GetShadowIntensityArray).
+	PassIO GetIO() const override;
+
 	/**
 	 * @brief Writes all descriptors (image) into the specified set.
 	 *

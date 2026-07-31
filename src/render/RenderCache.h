@@ -46,7 +46,14 @@ enum class AttachmentName
 	FXAAOffsets,        ///< FXAA edge subpixel offsets (RG16F, 2-channel)
 
 	// --- Shadow ---
-	ShadowDepth,        ///< Point light shadow depth cubemap (D32_SFLOAT, eCube)
+	// Logical shadow resources. Unlike the single-image attachments above,
+	// these are resolved specially by their owning pass (ShadowDepth is a
+	// per-light bundle in LightGPU; ShadowIntensity is a 2D array via
+	// GetShadowIntensityArray). They still read as one logical object to the
+	// rest of the pipeline / RenderGraph, so they live here — but are NOT
+	// fetched through GetAttachment().
+	ShadowDepth,        ///< Per-light shadow depth maps (logical bundle).
+	ShadowIntensity,    ///< Unified shadow-intensity 2D array.
 
 	// Count sentinel
 	Count,
@@ -447,62 +454,5 @@ private:
  * @return String name (e.g., "Position", "Normal", "Depth").
  */
 const char* AttachmentNameToString(AttachmentName name);
-
-/**
- * @brief Kind of a graph resource, distinguishing the different ways a
- *        RenderGraph edge's endpoint resource is stored/addressed.
- *
- * Not every graph resource is a single RenderCache attachment: shadow depth
- * is stored per-light in LightGPU (a "bundle"), and shadow intensity is a
- * unified 2D array reached via GetShadowIntensityArray(). ResourceId lets the
- * graph key edges on any of these uniformly.
- */
-enum class ResourceKind : uint8_t
-{
-	Attachment,        ///< A RenderCache attachment addressed by AttachmentName.
-	ShadowDepthBundle, ///< Per-light shadow depth maps (LightGPU) — a wiring/ordering token.
-	ShadowIntensity,   ///< Unified shadow-intensity 2D array (GetShadowIntensityArray).
-};
-
-/**
- * @brief Identity of a resource an edge in the RenderGraph carries.
- *
- * Implicitly convertible from AttachmentName so the common attachment case
- * stays terse (`AttachmentName::Position`). Non-attachment resources use the
- * named factories. Two ResourceIds are equal iff kind and attachment match,
- * and Key() yields a stable string used as the graph's socket name.
- */
-struct ResourceId
-{
-	ResourceKind   kind       = ResourceKind::Attachment;
-	AttachmentName attachment = AttachmentName::Position; ///< Meaningful iff kind==Attachment.
-
-	constexpr ResourceId() = default;
-	constexpr ResourceId(AttachmentName name) // NOLINT(google-explicit-constructor): intentional
-		: kind(ResourceKind::Attachment), attachment(name) {}
-
-	static constexpr ResourceId ShadowDepthBundle()
-	{
-		ResourceId r; r.kind = ResourceKind::ShadowDepthBundle; return r;
-	}
-	static constexpr ResourceId ShadowIntensity()
-	{
-		ResourceId r; r.kind = ResourceKind::ShadowIntensity; return r;
-	}
-
-	bool operator==(const ResourceId&) const = default;
-
-	/** @return Stable string key identifying this resource (used as socket name). */
-	const char* Key() const
-	{
-		switch (kind)
-		{
-		case ResourceKind::Attachment:        return AttachmentNameToString(attachment);
-		case ResourceKind::ShadowDepthBundle: return "ShadowDepthBundle";
-		case ResourceKind::ShadowIntensity:   return "ShadowIntensity";
-		}
-		return "Unknown";
-	}
-};
 
 } // namespace neurus

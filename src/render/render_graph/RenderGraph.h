@@ -4,7 +4,7 @@
  *
  * Wave 1 scope:
  *   - Node pool (one Node per registered pass) built on top of the template
- *     `neurus::Graph<ResourceId, PassEntry>` from `core/Graph.h`.
+ *     `neurus::Graph<AttachmentName, PassEntry>` from `core/Graph.h`.
  *   - Per-resource named sockets materialized from each pass's `PassIO`
  *     description (`Pass::GetIO()`).
  *   - Connect(): validates producer/consumer sockets exist for the given
@@ -58,7 +58,7 @@ public:
 		PassIO io;             ///< Cached I/O declaration returned by pass->GetIO().
 	};
 
-	using GraphT = Graph<ResourceId, PassEntry>;
+	using GraphT = Graph<AttachmentName, PassEntry>;
 	using NodeT  = typename GraphT::NodeType;
 
 	RenderGraph() = default;
@@ -82,7 +82,7 @@ public:
 	 * @note   Self-loops and duplicate edges are rejected by the underlying
 	 *         core Graph<> and surface here as `false`.
 	 */
-	bool Connect(NodeT* producer, ResourceId resource, NodeT* consumer);
+	bool Connect(NodeT* producer, AttachmentName resource, NodeT* consumer);
 
 	/**
 	 * @brief Validate connectivity and cache the topological execution order.
