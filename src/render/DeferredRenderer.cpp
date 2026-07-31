@@ -510,38 +510,22 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	m_haltonIndex++;
 
 	// --- Pipeline: Geometry → Shadows → SSAO → Lighting → Gizmo → Compose → [FXAA] ---
-	// FXAA is optional; useFXAA also selects the blit source below.
+	// The whole deferred pipeline runs through one RenderGraph. FXAA is
+	// optional; useFXAA also selects the blit source below.
 	const bool useFXAA = ctx.config &&
 		static_cast<const RenderConfig*>(ctx.config)->RequiresFXAA();
 
-	if (r_config.r_useRenderGraph)
+	// Rebuild the graph only when the config-derived signature changes (single
+	// source of truth is RenderConfig; the graph is its projection — currently
+	// just FXAA presence).
+	if (const auto* cfg = static_cast<const RenderConfig*>(ctx.config))
 	{
-		// Rebuild only when the config-derived signature changes (single
-		// source of truth is RenderConfig; the graph is its projection).
-		const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
-		if (cfg)
-		{
-			const PipelineSignature sig = PipelineSignature::From(*cfg);
-			if (!(sig == m_builtSignature))
-				RebuildMainGraph(sig);
-		}
+		const PipelineSignature sig = PipelineSignature::From(*cfg);
+		if (!(sig == m_builtSignature))
+			RebuildMainGraph(sig);
+	}
 
-		// One graph now covers the entire pipeline (Geometry through Compose,
-		// plus FXAA when enabled).
-		m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
-	}
-	else
-	{
-		r_geometryPass->Record(cmdBuf, *r_renderCache, ctx);        // G-Buffer MRT
-		r_shadowDepthPass->Record(cmdBuf, *r_renderCache, ctx);     // per-light depth maps
-		r_shadowIntensityPass->Record(cmdBuf, *r_renderCache, ctx); // shadow intensity array
-		r_ssaoPass->Record(cmdBuf, *r_renderCache, ctx);            // SSAO from G-Buffer
-		r_lightingPass->Record(cmdBuf, *r_renderCache, ctx);        // PBR → HDRColor
-		r_gizmoPass->Record(cmdBuf, *r_renderCache, ctx);           // selection edge highlight
-		r_composePass->Record(cmdBuf, *r_renderCache, ctx);         // blend + gamma → ComposedOutput
-		if (useFXAA)
-			r_fxaaPass->Record(cmdBuf, *r_renderCache, ctx);        // luma AA → FXAAOutput
-	}
+	m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
 
 	// --- Phase 4: Blit output → swapchain image ---
 	auto& blitSource = r_renderCache->GetAttachment(

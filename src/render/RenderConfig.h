@@ -124,14 +124,6 @@ public:
 	float r_fxaa_edge_threshold   = 0.166f;  ///< Edge detection threshold (0.063-0.333)
 	float r_fxaa_edge_threshold_min = 0.0833f; ///< Minimum edge threshold (0.0312-0.0833)
 
-	// --- Debug / experimental toggles ---
-	/// When true, migrated passes are dispatched through RenderGraph instead
-	/// of the legacy hand-wired sequence in DeferredRenderer::recordFrame.
-	/// Wave 2 scope: GizmoPass. Later waves migrate additional passes behind
-	/// the same flag; when Wave 5 lands the legacy path is deleted and the
-	/// flag itself is removed.
-	bool r_useRenderGraph = true;
-
 public:
 	RenderConfig() = default;
 
@@ -148,8 +140,6 @@ public:
 		   CEREAL_NVP(r_fxaa_subpix), CEREAL_NVP(r_fxaa_edge_threshold),
 		   CEREAL_NVP(r_fxaa_edge_threshold_min),
 		   CEREAL_NVP(r_sampling_mode));
-		// Intentionally NOT serialized: r_useRenderGraph is an in-development
-		// migration flag; persisting it would surprise users on next launch.
 	}
 
 	// --- Query helpers ---

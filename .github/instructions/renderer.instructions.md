@@ -138,6 +138,21 @@ The triangle MVP implements a minimal but correct rendering path:
 
 ## Current Render Pipeline
 
+The whole pipeline is orchestrated by a **RenderGraph** (`src/render/render_graph/`).
+`DeferredRenderer::m_mainGraph` is a compile-once DAG of passes; each pass declares
+its image reads/writes via `Pass::GetIO()` (see `passes/Pass.h`), the graph wires
+producer→consumer edges by `AttachmentName`, topologically sorts once, and
+`recordFrame()` dispatches the whole pipeline with `m_mainGraph.Execute()`.
+
+The graph is a projection of `RenderConfig`: `RebuildMainGraph()` is re-run only
+when the config-derived `PipelineSignature` changes (e.g. FXAA toggled), so the
+DAG always contains exactly the passes that will run. Passes still own their
+barriers and descriptor writes internally; any valid topological order is correct.
+
+Shadow resources are logical `AttachmentName` members resolved by their owning
+pass (not `GetAttachment`): `ShadowDepth` (per-light bundle in `LightGPU`) and
+`ShadowIntensity` (2D array via `GetShadowIntensityArray`).
+
 ```
 ShadowDepthPass (per-light depth → RenderCache via GetShadowMap(uid, lightType))
     ├── Point light: cubemap geometry pass (6 faces, multiview)

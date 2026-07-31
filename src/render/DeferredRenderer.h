@@ -225,9 +225,6 @@ private:
 	vk::Queue r_graphicsQueue;
 	uint32_t r_queueFamilyIndex;
 
-	// --- Render config (user-settable pipeline options) ---
-	RenderConfig r_config;
-
 	// --- Swapchain ---
 	std::unique_ptr<Swapchain> r_swapchain;
 
@@ -246,12 +243,12 @@ private:
 	ComposePass*  r_composePass  = nullptr;
 	FXAAPass*     r_fxaaPass     = nullptr;
 
-	// --- RenderGraph migration (Wave 3: contiguous shading tail) ---
-	// Compile-once-per-topology static graph holding the passes downstream of
-	// the legacy shadow passes: SSAO → Lighting → {Gizmo} → Compose → [FXAA].
-	// When r_config.r_useRenderGraph is set, recordFrame dispatches this whole
-	// segment via m_mainGraph.Execute(). Geometry + shadow passes remain on
-	// the legacy path (Wave 4).
+	// --- RenderGraph (the active pipeline) ---
+	// Compile-once-per-topology DAG holding the whole deferred pipeline:
+	// Geometry → Shadows → SSAO → Lighting → {Gizmo} → Compose → [FXAA].
+	// recordFrame dispatches the entire pipeline via m_mainGraph.Execute(),
+	// rebuilding it (RebuildMainGraph) only when the pipeline signature
+	// derived from RenderConfig changes.
 	RenderGraph m_mainGraph;
 
 	/**
