@@ -99,14 +99,21 @@ ShadowIntensityPass::ShadowIntensityPass(const vk::raii::Device& device,
                                          const vk::raii::PhysicalDevice& physicalDevice,
                                          uint32_t numSets)
 	: ComputePass(device, physicalDevice,
-	              // Allocate 2× descriptor sets per in-flight frame so that
-	              // the per-light loop can alternate between two sets without
-	              // ever updating a currently-bound descriptor set (which would
-	              // invalidate the command buffer — see VUID 00059 et al.).
+	              // Allocate kSetsPerFrameSlot descriptor sets per in-flight
+	              // frame (one per shadow-casting light) so the per-light loop
+	              // never updates a set still bound from an earlier light — see
+	              // the static_assert below tying this to MAX_SHADOW_LAYERS.
 	              ShadowIntensityPass::CreateDescriptorSetLayout(device),
 	              numSets * kSetsPerFrameSlot)
 	, p_sunDescSetLayout(CreateSunDescriptorSetLayout(device))
 {
+	// Every shadow-casting light needs its own descriptor set per frame; the
+	// per-light loop selects (frameIndex * kSetsPerFrameSlot + lightIndex).
+	// Keep the pool sized to the shadow-layer cap so no two active lights ever
+	// share a set within a single command buffer (which would alias descriptors
+	// and drop a light's shadow).
+	static_assert(kSetsPerFrameSlot == RenderCache::MAX_SHADOW_LAYERS,
+	              "kSetsPerFrameSlot must match RenderCache::MAX_SHADOW_LAYERS");
 	// --- Load point-light cubemap eval shader via ShaderLibrary ---
 	p_pointLightShader = ShaderLibrary::LoadComputeShader(
 		"shadow_eval", "res/shaders/compute/shadow_eval.comp");
