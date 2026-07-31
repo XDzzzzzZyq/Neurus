@@ -380,6 +380,56 @@ These resources separate GPU ownership from the Vulkan-free scene and asset laye
 - Removed as part of CPU/GPU isolation refactoring. GPU resources now live in `MeshGPU`;
   CPU data stays in `MeshData`
 
+## RenderGraph
+
+The deferred pipeline is orchestrated by a **RenderGraph** (`src/render/render_graph/`),
+built on the generic `neurus::Graph<SData, NData>` DAG template (`src/core/Graph.h`).
+
+**Model**
+- `RenderGraph` = `Graph<AttachmentName, PassEntry>`. One node per pass; a node's
+  `PassEntry` holds the `Pass*` and its cached `PassIO`.
+- Each pass declares its image I/O via `Pass::GetIO()` returning a `PassIO`
+  (name + read/write `AttachmentBinding`s: resource, binding slot, descriptor
+  type, image layout). This is the single declaration the graph consumes.
+- Edges are keyed by `AttachmentName`: `Connect(producer, resource, consumer)`
+  links the producer's output socket for that resource to the consumer's input
+  socket. Fan-out (one write → many reads) is supported.
+
+**Lifecycle**
+- `AddPass(pass)` — materializes one socket per declared read/write from `GetIO()`.
+- `Connect(...)` — wires producer→consumer; self-loops and duplicate edges are
+  rejected (returns `false`).
+- `Compile()` — Kahn topological sort. Inputs with no in-graph producer are
+  **external** (produced by a RenderCache attachment) and are allowed. A cycle
+  throws `std::runtime_error` naming the involved passes.
+- `Execute(cmd, cache, ctx)` — invokes each pass's `Record()` in compiled order.
+- `Clear()` — drops all nodes so the graph can be rebuilt.
+
+**Config-driven topology (single source of truth = RenderConfig)**
+- `DeferredRenderer::m_mainGraph` holds the whole pipeline. It is rebuilt
+  (`RebuildMainGraph`) only when the `PipelineSignature` derived from
+  `RenderConfig` changes (currently FXAA on/off), so the DAG always contains
+  exactly the passes that will run — no per-node "enabled" state to drift.
+
+**Resources & descriptors**
+- `DescriptorBinder` (`render_graph/DescriptorBinder.h`) translates a pass's
+  `PassIO` image bindings into descriptor-set writes.
+- Shadow resources are logical `AttachmentName` members resolved by their owning
+  pass, **not** `GetAttachment`: `ShadowDepth` (per-light bundle in `LightGPU`)
+  and `ShadowIntensity` (2D array via `GetShadowIntensityArray`). `ConfigFor`
+  throws for them to catch accidental single-attachment fetches.
+
+**Ownership boundary (current)**
+- Passes still own their own barriers and descriptor writes inside `Record()`.
+  The graph only orders and dispatches. Moving barrier/descriptor/resource
+  ownership into the graph (and enabling transient aliasing + custom passes) is
+  tracked in issue #32; parallel execution built on it in #33–#37.
+
+**Tests**: `test/render/test_render_graph.cpp` — socket materialization,
+connect/duplicate rejection, external inputs, linear/fan-out/diamond ordering,
+multi-resource edges, cycle detection (with named nodes), rebuild determinism,
+clear/reuse, execute preconditions.
+
 ## Future Evolution
 
 - IBL enhancements (BRDF LUT, multi-scattering)
@@ -388,7 +438,8 @@ These resources separate GPU ownership from the Vulkan-free scene and asset laye
 - Tonemapping: filmic (ACES) + gamma correction
 - FXAA: luma-based edge anti-aliasing
 - VMA integration for memory management
-- Multiple in-flight frames (double/triple buffering)
-- Threaded command buffer recording
+- Multiple in-flight frames (double/triple buffering) — done (`kMaxFramesInFlight`)
+- Threaded command buffer recording — see issues #35 / #37
 - Pipeline cache for faster startup
-- Render graph abstraction
+- Render graph abstraction — done (see the RenderGraph section above); graph-owned
+  resources/barriers/descriptors tracked in #32
