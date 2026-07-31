@@ -343,9 +343,23 @@ public:
 			}
 		}
 
-		// 4. Cycle check
+		// 4. Cycle check — if not every node was emitted, the unprocessed nodes
+		//    (in-degree still > 0) are the ones on/downstream of a cycle. Name
+		//    them so a misconfigured graph is debuggable in one read.
 		if (sorted.size() != n)
-			throw std::runtime_error("Graph::TopologicalSort: cycle detected");
+		{
+			std::string cyclic;
+			for (size_t i = 0; i < n; ++i)
+			{
+				if (inDegree[i] > 0)
+				{
+					if (!cyclic.empty()) cyclic += ", ";
+					cyclic += nodes[i]->name;
+				}
+			}
+			throw std::runtime_error(
+				"Graph::TopologicalSort: cycle detected involving nodes: " + cyclic);
+		}
 
 		return sorted;
 	}

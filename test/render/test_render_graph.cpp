@@ -14,6 +14,8 @@
 #include "render/passes/Pass.h"
 #include "render/RenderCache.h"
 
+#include <cstdint>
+#include <string>
 #include <vector>
 
 using namespace neurus;
@@ -226,4 +228,152 @@ TEST(RenderGraphTest, ResetInvalidatesCompiledOrder)
 
 	g.Reset();
 	EXPECT_TRUE(g.CompiledOrder().empty());
+}
+
+// ---------------------------------------------------------------------------
+// Topology shape coverage: fan-out, diamond, multi-resource edges.
+// ---------------------------------------------------------------------------
+
+namespace {
+// Position of a node in the compiled order (or SIZE_MAX if absent).
+size_t OrderIndex(const RenderGraph& g, const RenderGraph::NodeT* node)
+{
+	const auto& order = g.CompiledOrder();
+	for (size_t i = 0; i < order.size(); ++i)
+		if (order[i] == node) return i;
+	return SIZE_MAX;
+}
+} // anonymous namespace
+
+TEST(RenderGraphTest, FanOutOneProducerManyConsumers)
+{
+	// prod writes X; consA and consB both read X.
+	MockPass prod ("prod",  {},                        {AttachmentName::Position});
+	MockPass consA("consA", {AttachmentName::Position}, {});
+	MockPass consB("consB", {AttachmentName::Position}, {});
+
+	RenderGraph g;
+	auto* np = g.AddPass(&prod);
+	auto* na = g.AddPass(&consA);
+	auto* nb = g.AddPass(&consB);
+
+	ASSERT_TRUE(g.Connect(np, AttachmentName::Position, na));
+	ASSERT_TRUE(g.Connect(np, AttachmentName::Position, nb));
+
+	g.Compile();
+
+	// Producer must precede both consumers.
+	EXPECT_LT(OrderIndex(g, np), OrderIndex(g, na));
+	EXPECT_LT(OrderIndex(g, np), OrderIndex(g, nb));
+	EXPECT_EQ(g.CompiledOrder().size(), 3u);
+}
+
+TEST(RenderGraphTest, DiamondDependency)
+{
+	// A → B, A → C, B → D, C → D.
+	MockPass a("A", {},                          {AttachmentName::Position});
+	MockPass b("B", {AttachmentName::Position},  {AttachmentName::Normal});
+	MockPass c("C", {AttachmentName::Position},  {AttachmentName::Albedo});
+	MockPass d("D", {AttachmentName::Normal, AttachmentName::Albedo}, {});
+
+	RenderGraph g;
+	auto* na = g.AddPass(&a);
+	auto* nb = g.AddPass(&b);
+	auto* nc = g.AddPass(&c);
+	auto* nd = g.AddPass(&d);
+
+	ASSERT_TRUE(g.Connect(na, AttachmentName::Position, nb));
+	ASSERT_TRUE(g.Connect(na, AttachmentName::Position, nc));
+	ASSERT_TRUE(g.Connect(nb, AttachmentName::Normal,   nd));
+	ASSERT_TRUE(g.Connect(nc, AttachmentName::Albedo,   nd));
+
+	g.Compile();
+
+	const size_t ia = OrderIndex(g, na), ib = OrderIndex(g, nb),
+	             ic = OrderIndex(g, nc), id = OrderIndex(g, nd);
+	// A before B and C; B and C before D.
+	EXPECT_LT(ia, ib);
+	EXPECT_LT(ia, ic);
+	EXPECT_LT(ib, id);
+	EXPECT_LT(ic, id);
+}
+
+TEST(RenderGraphTest, MultipleResourceEdgesBetweenSamePair)
+{
+	// A writes X and Y; B reads both. Two distinct edges, one per resource.
+	MockPass a("A", {}, {AttachmentName::Position, AttachmentName::Normal});
+	MockPass b("B", {AttachmentName::Position, AttachmentName::Normal}, {});
+
+	RenderGraph g;
+	auto* na = g.AddPass(&a);
+	auto* nb = g.AddPass(&b);
+
+	ASSERT_TRUE(g.Connect(na, AttachmentName::Position, nb));
+	ASSERT_TRUE(g.Connect(na, AttachmentName::Normal,   nb));
+	// Re-connecting an existing edge is rejected.
+	EXPECT_FALSE(g.Connect(na, AttachmentName::Position, nb));
+
+	g.Compile();
+	EXPECT_LT(OrderIndex(g, na), OrderIndex(g, nb));
+}
+
+// ---------------------------------------------------------------------------
+// Rebuild determinism + cycle diagnostics.
+// ---------------------------------------------------------------------------
+
+TEST(RenderGraphTest, RebuildProducesSameOrder)
+{
+	MockPass a("A", {},                         {AttachmentName::Position});
+	MockPass b("B", {AttachmentName::Position}, {AttachmentName::HDRColor});
+	MockPass c("C", {AttachmentName::HDRColor}, {});
+
+	auto build = [&](RenderGraph& g) {
+		auto* na = g.AddPass(&a);
+		auto* nb = g.AddPass(&b);
+		auto* nc = g.AddPass(&c);
+		g.Connect(na, AttachmentName::Position, nb);
+		g.Connect(nb, AttachmentName::HDRColor, nc);
+		g.Compile();
+	};
+
+	RenderGraph g;
+	build(g);
+	std::vector<std::string> first;
+	for (auto* n : g.CompiledOrder()) first.push_back(n->name);
+
+	g.Clear();
+	build(g);
+	std::vector<std::string> second;
+	for (auto* n : g.CompiledOrder()) second.push_back(n->name);
+
+	EXPECT_EQ(first, second);
+	ASSERT_EQ(first.size(), 3u);
+	EXPECT_EQ(first[0], "A");
+	EXPECT_EQ(first[2], "C");
+}
+
+TEST(RenderGraphTest, CycleErrorNamesInvolvedNodes)
+{
+	// 2-node cycle; the thrown message should name the cyclic passes so a
+	// misconfiguration is debuggable without bisecting.
+	MockPass a("AlphaPass", {AttachmentName::Position}, {AttachmentName::HDRColor});
+	MockPass b("BetaPass",  {AttachmentName::HDRColor}, {AttachmentName::Position});
+
+	RenderGraph g;
+	auto* na = g.AddPass(&a);
+	auto* nb = g.AddPass(&b);
+	ASSERT_TRUE(g.Connect(na, AttachmentName::HDRColor, nb));
+	ASSERT_TRUE(g.Connect(nb, AttachmentName::Position, na));
+
+	try
+	{
+		g.Compile();
+		FAIL() << "expected cycle to throw";
+	}
+	catch (const std::runtime_error& e)
+	{
+		const std::string msg = e.what();
+		EXPECT_NE(msg.find("AlphaPass"), std::string::npos) << msg;
+		EXPECT_NE(msg.find("BetaPass"),  std::string::npos) << msg;
+	}
 }
