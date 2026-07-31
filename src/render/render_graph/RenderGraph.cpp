@@ -17,10 +17,10 @@ namespace neurus {
 
 namespace {
 
-/** @brief Stable, human-readable per-socket key derived from the attachment enum. */
-std::string ResourceKey(AttachmentName name)
+/** @brief Stable, human-readable per-socket key for a graph resource. */
+std::string ResourceKey(ResourceId id)
 {
-	return AttachmentNameToString(name);
+	return id.Key();
 }
 
 } // anonymous namespace
@@ -58,7 +58,7 @@ RenderGraph::NodeT* RenderGraph::AddPass(Pass* pass)
 	return node;
 }
 
-bool RenderGraph::Connect(NodeT* producer, AttachmentName resource, NodeT* consumer)
+bool RenderGraph::Connect(NodeT* producer, ResourceId resource, NodeT* consumer)
 {
 	if (!producer || !consumer) return false;
 

@@ -56,7 +56,22 @@ struct DescriptorBinder
 	{
 		auto write = [&](const AttachmentBinding& b)
 		{
-			const auto& att = cache.GetAttachment(b.resource, extent);
+			// Resolve the ResourceId to a concrete GPU image view. Only the
+			// bindable kinds are handled here; ShadowDepthBundle is a wiring/
+			// ordering token (per-light maps live in LightGPU) and is never
+			// bound through this path.
+			const Image* img = nullptr;
+			switch (b.resource.kind)
+			{
+			case ResourceKind::Attachment:
+				img = &cache.GetAttachment(b.resource.attachment, extent);
+				break;
+			case ResourceKind::ShadowIntensity:
+				img = &cache.GetShadowIntensityArray(extent);
+				break;
+			case ResourceKind::ShadowDepthBundle:
+				return; // not a single bindable view
+			}
 
 			// Storage images are bound without a sampler; sampled images use
 			// the shared nearest-neighbour sampler supplied by the caller.
@@ -67,7 +82,7 @@ struct DescriptorBinder
 
 			vk::DescriptorImageInfo imageInfo(
 				boundSampler,
-				*att.ImageViewHandle(),
+				*img->ImageViewHandle(),
 				b.imageLayout);
 
 			dst.WriteImage(b.binding, imageInfo, b.descriptorType);
