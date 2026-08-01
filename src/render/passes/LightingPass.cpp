@@ -150,7 +150,7 @@ void LightingPass::BuildPipeline(const vk::raii::Device& device,
 	vk::PushConstantRange pushRange(
 		vk::ShaderStageFlagBits::eCompute,
 		0,
-		sizeof(LightingPushConstants));  // 176 bytes, from LightingGPU.h
+		sizeof(LightingPushConstants));  // 176 bytes, from LightingCache.h
 
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
@@ -206,10 +206,10 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		                  vk::DescriptorType::eStorageImage);
 	}
 
-	// --- Write light SSBO (from RenderCache::LightingGPU) ---
+	// --- Write light SSBO (from RenderCache::LightingCache) ---
 	{
-		const auto* lightingGPU = cache.GetLightingGPU();
-		const GPUBuffer* pointSSBO = lightingGPU ? lightingGPU->GetPointLightSSBO() : nullptr;
+		const auto* lightingCache = cache.GetLightingCache();
+		const GPUBuffer* pointSSBO = lightingCache ? lightingCache->GetPointLightSSBO() : nullptr;
 
 		if (pointSSBO)
 		{
@@ -221,10 +221,10 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 		// guarantees the shader never accesses binding 5.
 	}
 
-	// --- Write sun light SSBO (from RenderCache::LightingGPU) ---
+	// --- Write sun light SSBO (from RenderCache::LightingCache) ---
 	{
-		const auto* lightingGPU = cache.GetLightingGPU();
-		const GPUBuffer* sunSSBO = lightingGPU ? lightingGPU->GetSunLightSSBO() : nullptr;
+		const auto* lightingCache = cache.GetLightingCache();
+		const GPUBuffer* sunSSBO = lightingCache ? lightingCache->GetSunLightSSBO() : nullptr;
 
 		if (sunSSBO)
 		{
@@ -414,10 +414,10 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	{
 		LightingPushConstants pc = {};
 
-		// Get light counts from RenderCache::LightingGPU
-		const auto* lightingGPU = cache.GetLightingGPU();
-		pc.lightCount    = lightingGPU ? static_cast<int32_t>(lightingGPU->GetPointLightCount()) : 0;
-		pc.sunLightCount = lightingGPU ? static_cast<int32_t>(lightingGPU->GetSunLightCount()) : 0;
+		// Get light counts from RenderCache::LightingCache
+		const auto* lightingCache = cache.GetLightingCache();
+		pc.lightCount    = lightingCache ? static_cast<int32_t>(lightingCache->GetPointLightCount()) : 0;
+		pc.sunLightCount = lightingCache ? static_cast<int32_t>(lightingCache->GetSunLightCount()) : 0;
 
 		pc.camX = cameraPos.x;
 		pc.camY = cameraPos.y;

@@ -4,7 +4,7 @@
 #include "resources/MeshGPU.h"
 #include "resources/EnvironmentGPU.h"
 #include "resources/LightGPU.h"
-#include "resources/LightingGPU.h"
+#include "resources/LightingCache.h"
 #include "resources/PipelineCache.h"
 
 #include <vulkan/vulkan_raii.hpp>
@@ -67,7 +67,7 @@ class RenderCache
 {
 public:
 	/**
-	 * @brief Constructs the render cache and initializes LightingGPU.
+	 * @brief Constructs the render cache and initializes LightingCache.
 	 *
 	 * @param device            Logical device (retained reference).
 	 * @param physicalDevice    Physical device (retained reference, used for format/memory queries).
@@ -78,16 +78,16 @@ public:
 	            const vk::raii::PhysicalDevice& physicalDevice);
 
 	/**
-	 * @brief Sets the LightingGPU (light SSBO storage) for this cache.
+	 * @brief Sets the LightingCache (light SSBO storage) for this cache.
 	 *
-	 * Must be called before any UpdateLighting() calls.  The LightingGPU
-	 * is typically created by UploadManager::CreateLightingGPU() using
+	 * Must be called before any UpdateLighting() calls.  The LightingCache
+	 * is typically created by UploadManager::CreateLightingCache() using
 	 * the transfer queue so that SSBO staging uploads do not block the
 	 * graphics queue.
 	 *
-	 * @param lightingGPU  Fully constructed LightingGPU (moved in).
+	 * @param lightingCache  Fully constructed LightingCache (moved in).
 	 */
-	void SetLightingGPU(std::unique_ptr<LightingGPU> lightingGPU);
+	void SetLightingCache(std::unique_ptr<LightingCache> lightingCache);
 
 	~RenderCache() = default;
 
@@ -369,19 +369,19 @@ public:
 	// --- Lighting GPU resources (SSBO owner) ---
 
 	/**
-	 * @brief Returns the cached LightingGPU, or nullptr if not yet initialized.
+	 * @brief Returns the cached LightingCache, or nullptr if not yet initialized.
 	 * @return Non-owning pointer, or nullptr.
 	 */
-	LightingGPU* GetLightingGPU();
+	LightingCache* GetLightingCache();
 
-	/** @brief const overload of GetLightingGPU(). */
-	const LightingGPU* GetLightingGPU() const;
+	/** @brief const overload of GetLightingCache(). */
+	const LightingCache* GetLightingCache() const;
 
 	/**
 	 * @brief Updates the point light and sun light SSBOs from a variant dict.
 	 *
 	 * Separates point/sun entries, sorts by UID, assigns shadow map indices,
-	 * and uploads to LightingGPU.  Maintains internal uid→SSBO-index and
+	 * and uploads to LightingCache.  Maintains internal uid→SSBO-index and
 	 * uid→shadow-index maps for later per-light updates.
 	 *
 	 * @param lightDict  Map: light UID → variant<PointLightStruct, SunLightStruct>.
@@ -393,7 +393,7 @@ public:
 	 * @brief Updates a single light in the SSBO without rebuilding the array.
 	 *
 	 * Looks up @a lightUID in the internal uid→index maps, stamps
-	 * shadowMapIndex, and delegates to LightingGPU::UpdatePointLight or
+	 * shadowMapIndex, and delegates to LightingCache::UpdatePointLight or
 	 * UpdateSunLight.  No-op if the uid is not found (light added after
 	 * the last full rebuild — call UpdateLighting first).
 	 *
@@ -455,11 +455,12 @@ private:
 	PipelineCache rc_pipelineCache;
 
 	// --- Lighting SSBO storage (owned) ---
-	std::unique_ptr<LightingGPU> rc_lightingGPU;
+	std::unique_ptr<LightingCache> rc_lightingCache;
 
 	// --- Light UID → SSBO index / shadow index maps (populated by UpdateLighting) ---
 	std::unordered_map<int, uint32_t> rc_uidToSSBOIdx;     ///< uid → SSBO element index
 	std::unordered_map<int, uint32_t> rc_uidToShadowLayer; ///< uid → shadow intensity layer
+
 };
 
 /**

@@ -23,7 +23,7 @@
 // Render layer
 #include "render/RenderCache.h"
 #include "render/UploadManager.h"
-#include "render/resources/LightingGPU.h"
+#include "render/resources/LightingCache.h"
 #include "scene/Material.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
@@ -85,8 +85,8 @@ protected:
 
 		// --- Attachment manager (G-Buffer + HDR color + depth) - attachments created lazily ---
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
-		m_renderCache->SetLightingGPU(
-		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
+		m_renderCache->SetLightingCache(
+		std::make_unique<neurus::LightingCache>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 		// --- Geometry pass ---
 		m_geometryPass = std::make_unique<GeometryPass>(
@@ -215,7 +215,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 		glm::vec3(1.0f, 1.0f, 1.0f));
 
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-	light->light_radius = 0.05f;
+	light->light_radius = 0.0f;
 
 	// -----------------------------------------------------------------------
 	// Step 6: Create Mesh from loaded data, assign material

@@ -173,8 +173,8 @@ Neurus/
 │   │   ├── resources/        # GPU resource structs (owned by RenderCache)
 │   │   │   ├── EnvironmentGPU.h     # IBL cubemap Textures
 │   │   │   ├── LightGPU.h           # Per-light shadow resources
-│   │   │   ├── LightingGPU.h/cpp    # Light SSBO storage (point + sun)
-│   │   │   └── MeshGPU.h           # GPU-side mesh + MeshPushConstants
+│   │   │   ├── LightingCache.h/cpp  # Light SSBO storage (point + sun)
+│   │   │   └── MeshGPU.h            # GPU-side mesh + MeshPushConstants
 │   │   ├── passes/          # Render passes
 │   │   │   ├── GeometryPass.h/cpp
 │   │   │   ├── SSAOPass.h/cpp
@@ -275,6 +275,15 @@ Neurus/
 - See `.github/instructions/test.instructions.md` for GPU test patterns
   (VulkanTestShared, reference-image regression, attachment conversion rules,
   scene/light scaling, Python verification).
+
+### Temporal Accumulation Convention
+- **Iteration** (`DrawFrame()` counter): DeferredRenderer::m_iteration, reset by Editor
+  on scene changes via `RenderResetEvent` (see events.instructions.md).
+- **Jitter**: 3D jitter (`RenderContext::jitter`). Point: `pos + radius*jitter`.
+  Sun: UV-space `shadowUV + (jitter.x, jitter.y) * uvRadius`.
+- **Accumulation** (`ComposePass`): In-place read-modify-write on ShadowIntensity
+  with EMA blend: `mix(prev, sample, alpha)`.
+- **Alpha**: 0 = FixedAlpha (1/8), 1 = MovingAvg (1/(n+1)).
 
 ---
 

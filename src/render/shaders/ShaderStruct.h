@@ -88,6 +88,7 @@ struct S_Uniform
 	int binding = -1;       ///< Descriptor-set binding point (-1 = no layout qualifier)
 	std::string qualifiers; ///< Qualifiers (e.g. "writeonly", "readonly"; empty = none)
 	std::string actualType; ///< Original GLSL type string (e.g. "image2D"; empty -> use ParseType(type))
+	std::string imageFormat; ///< Image format qualifier (e.g. "r8", "rgba16f"; empty = none)
 };
 
 /**
@@ -276,7 +277,8 @@ public:
 	void SetUB(std::string type, std::string name, const Args& args, int binding = 0);
 	/** @brief Register a bare uniform variable. */
 	void SetUni(ParaType type, int count, const std::string& name, int binding = -1,
-	            const std::string& qualifiers = "", const std::string& actualType = "");
+	            const std::string& qualifiers = "", const std::string& actualType = "",
+	            const std::string& imageFormat = "");
 	/** @brief Register a shader-stage input variable. */
 	void SetInp(ParaType type, int count, const std::string& name);
 	/** @brief Register a shader-stage output variable. */

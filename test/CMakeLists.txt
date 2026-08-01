@@ -33,6 +33,7 @@ add_executable(neurus_test
 	render/test_shadow_intensity.cpp
 	render/test_sun_shadow_intensity.cpp
 	render/test_multilight_shadow.cpp
+	render/test_temporal_shadow.cpp
 	render/test_sun_shadow_depth.cpp
 	render/test_fxaa.cpp
 	render/test_pickpixel.cpp
@@ -52,6 +53,7 @@ add_executable(neurus_test
 	scene/test_debug.cpp
 	asset/test_project_roundtrip.cpp
 	asset/test_default_project.cpp
+	asset/test_ui_component.cpp
 	core/test_graph.cpp
 	core/test_selections.cpp
 )

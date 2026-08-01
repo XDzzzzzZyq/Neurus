@@ -22,11 +22,12 @@ class UploadManager;
 namespace neurus {
 
 /**
- * @brief Editor orchestrator — owns scene and render state, project lifecycle,
+ * @brief Editor orchestrator — owns scene and render state, scene lifecycle,
  *        scene mutations, and UI signal wiring.
  *
- * Owns Scene and RenderConfig directly. Uses project::Project as a pure
- * serializer for persistence (no data ownership).
+ * Owns Scene and RenderConfig directly. Persistence (project load/save) lives
+ * in the Application layer, which drives the scene load lifecycle via
+ * BeginLoad()/FinishLoad() and NewScene().
  * Accesses DeferredRenderer and UploadManager via non-owning pointers
  * for mesh/light/IBL GPU uploads.
  */
@@ -41,17 +42,18 @@ public:
 
 	void Initialize();
 
-	// --- Project lifecycle ---
+	// --- Scene lifecycle ---
 	void CreateDefaultScene(const std::string& objPath);
-	void LoadProject(const std::string& path, const std::string& assetDir = "");
-	void SaveProject(const std::string& path);
-	void SaveProject();
+	void NewScene();
+	void BeginLoad();
+	void FinishLoad();
 
 	// --- Accessors ---
 	Scene& GetScene();
-	const std::string& GetProjectPath() const { return m_projectPath; }
+	RenderConfig& GetRenderConfig() { return m_config; }
 	bool IsDirty() const { return m_dirty; }
 	void MarkDirty() { m_dirty = true; }
+	void ClearDirty() { m_dirty = false; }
 	void SetAssetDir(const std::string& dir) { m_assetDir = dir; }
 
 	RenderContext GetRenderContext() const;
@@ -80,10 +82,6 @@ public:
 
 private:
 	// --- Handlers called by EventQueue subscribers in Initialize() ---
-	void OnProjectNew();
-	void OnProjectOpen(const std::string& path);
-	void OnProjectSave();
-	void OnProjectSaveAs(const std::string& path);
 	void OnMeshImport(const std::string& path);
 	void OnCameraAdd();
 	void OnLightAdd();
@@ -96,7 +94,6 @@ private:
 	// --- Owned state ---
 	std::unique_ptr<Scene> m_scene;
 	RenderConfig          m_config;
-	std::string           m_projectPath;
 	std::string           m_assetDir;
 	bool                  m_dirty = false;
 

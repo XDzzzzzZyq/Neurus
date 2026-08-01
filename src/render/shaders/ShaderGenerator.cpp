@@ -182,7 +182,10 @@ std::string ShaderGenerator::Generate(ShaderStruct& s)
 		{
 			if (u.binding >= 0)
 			{
-				result << "layout(binding = " << u.binding << ") ";
+				if (!u.imageFormat.empty())
+					result << "layout(" << u.imageFormat << ", binding = " << u.binding << ") ";
+				else
+					result << "layout(binding = " << u.binding << ") ";
 			}
 			result << "uniform ";
 			if (!u.qualifiers.empty())

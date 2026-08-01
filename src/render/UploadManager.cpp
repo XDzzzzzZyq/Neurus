@@ -14,8 +14,9 @@
 #include "resources/MeshGPU.h"
 #include "resources/EnvironmentGPU.h"
 #include "resources/LightGPU.h"
-#include "resources/LightingGPU.h"
-
+#include "resources/LightingCache.h"
+#include "shaders/Shader.h"
+#include "shaders/ShaderLibrary.h"
 
 #include "asset/ImageData.h"
 #include "asset/MeshData.h"
@@ -58,14 +59,14 @@ void UploadManager::WaitIdle()
 }
 
 // ---------------------------------------------------------------------------
-// LightingGPU creation (transfer queue)
+// LightingCache creation (transfer queue)
 // ---------------------------------------------------------------------------
 
-std::unique_ptr<LightingGPU> UploadManager::CreateLightingGPU(
+std::unique_ptr<LightingCache> UploadManager::CreateLightingCache(
 	const vk::raii::Device& device,
 	const vk::raii::PhysicalDevice& physicalDevice)
 {
-	return std::make_unique<LightingGPU>(device, physicalDevice,
+	return std::make_unique<LightingCache>(device, physicalDevice,
 	                                     um_transferQueue, um_transferQueueFamily);
 }
 

@@ -1,8 +1,8 @@
 /**
- * @file LightingGPU.h
+ * @file LightingCache.h
  * @brief GPU-side light SSBO storage and push constants.
  *
- * LightingGPU manages point light and sun light SSBOs (storage buffers)
+ * LightingCache manages point light and sun light SSBOs (storage buffers)
  * and defines the std140-compatible GPU data structures used by the
  * PBR lighting compute shader.  Separated from LightingPass so the
  * SSBO lifecycle can be managed independently of the compute pass.
@@ -103,7 +103,7 @@ struct LightingPushConstants
 static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must be 176 bytes");
 
 // ---------------------------------------------------------------------------
-// LightingGPU
+// LightingCache
 // ---------------------------------------------------------------------------
 
 /**
@@ -119,7 +119,7 @@ static_assert(sizeof(LightingPushConstants) == 176, "LightingPushConstants must 
  *
  * Non-copyable.  All borrowed Vulkan handles must outlive this object.
  */
-class LightingGPU
+class LightingCache
 {
 public:
 	/**
@@ -132,17 +132,17 @@ public:
 	 * @param graphicsQueue     Graphics queue for staging uploads.
 	 * @param queueFamilyIndex  Queue family index for staging command pool.
 	 */
-	LightingGPU(const vk::raii::Device& device,
+	LightingCache(const vk::raii::Device& device,
 	            const vk::raii::PhysicalDevice& physicalDevice,
 	            vk::Queue graphicsQueue,
 	            uint32_t queueFamilyIndex);
 
 	// Non-copyable — owns GPU resources (reference members prevent move-assign)
-	LightingGPU(const LightingGPU&) = delete;
-	LightingGPU& operator=(const LightingGPU&) = delete;
+	LightingCache(const LightingCache&) = delete;
+	LightingCache& operator=(const LightingCache&) = delete;
 
 	// Movable
-	LightingGPU(LightingGPU&&) noexcept = default;
+	LightingCache(LightingCache&&) noexcept = default;
 
 	// --- Full SSBO rebuild ---
 

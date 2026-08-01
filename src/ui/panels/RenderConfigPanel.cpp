@@ -114,6 +114,9 @@ void RenderConfigPanel::BuildShadowsSection()
 
 	m_shadowBiasSlider = new ScalarSlider(0.0, 0.01, 1000, 0.0005, this);
 	form->addRow("Bias", m_shadowBiasSlider);
+
+	m_samplingModeCombo = addComboRow(form, "Sampling Mode",
+		{"Fixed EMA (1/8)", "Moving Average"});
 }
 
 // =========================================================================
@@ -234,6 +237,8 @@ void RenderConfigPanel::ConnectAllSignals()
 		this, emitCfg);
 	connect(m_shadowBiasSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	connect(m_samplingModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+		this, emitCfg);
 
 	// --- Ambient Occlusion ---
 	connect(m_aoGroup, &QGroupBox::toggled, this, emitCfg);
@@ -294,6 +299,10 @@ void RenderConfigPanel::Refresh(const UIContext& ctx)
 		m_shadowsGroup->setChecked(config->r_shadow != ShadowAlg::None);
 
 		m_shadowBiasSlider->setValue(config->r_shadow_bias);
+
+		QSignalBlocker b3(m_samplingModeCombo);
+		m_samplingModeCombo->setCurrentIndex(
+			static_cast<int>(config->r_sampling_mode));
 	}
 
 	// --- Ambient Occlusion ---
@@ -373,6 +382,8 @@ RenderConfig RenderConfigPanel::Save() const
 		config.r_shadow = ShadowAlg::None;
 
 	config.r_shadow_bias = static_cast<float>(m_shadowBiasSlider->value());
+
+	config.r_sampling_mode = static_cast<uint32_t>(m_samplingModeCombo->currentIndex());
 
 	// --- Ambient Occlusion ---
 	switch (m_aoAlgCombo->currentIndex())

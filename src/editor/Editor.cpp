@@ -1,7 +1,6 @@
 #include "Editor.h"
 
 #include "editor/events/InputEvents.h"
-#include "editor/events/ProjectEvents.h"
 #include "editor/events/AssetEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/CameraEvents.h"
@@ -11,15 +10,12 @@
 #include "editor/controllers/CameraController.h"
 #include "editor/controllers/ShaderController.h"
 #include "editor/events/EventBus.h"
-#include "asset/Project.h"
-#include "asset/SceneComponent.h"
-#include "asset/ConfigComponent.h"
 
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
 #include "render/UploadManager.h"
 #include "render/resources/LightGPU.h"
-#include "render/resources/LightingGPU.h"
+#include "render/resources/LightingCache.h"
 #include "render/resources/MeshGPU.h"
 
 #include "render/RenderContext.h"
@@ -74,26 +70,32 @@ void Editor::Initialize()
 {
 	// Note: Mesh/light GPU upload happens AFTER window is shown and surface
 	// is ready — see UploadSceneResources() called from Application::Run()
-	// and from OnProjectOpen() / OnProjectNew().
+	// and from the scene load lifecycle (BeginLoad/FinishLoad, NewScene).
 
-	// --- Wire project file signal handlers ---
-	// (events are enqueued by Editor::OnUIEvent from UIEvents Qt signals)
-
-	ed_eventBus.subscribe<ProjectNewEvent>([this](const ProjectNewEvent&) { OnProjectNew(); });
-	ed_eventBus.subscribe<ProjectOpenEvent>([this](const ProjectOpenEvent& e) { OnProjectOpen(e.path); });
-	ed_eventBus.subscribe<ProjectSaveEvent>([this](const ProjectSaveEvent&) { OnProjectSave(); });
-	ed_eventBus.subscribe<ProjectSaveAsEvent>([this](const ProjectSaveAsEvent& e) { OnProjectSaveAs(e.path); });
-
-	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) { OnMeshImport(e.path); });
-	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) { OnCameraAdd(); });
-	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) { OnLightAdd(); });
-	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) { OnSunLightAdd(); });
+	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnMeshImport(e.path);
+	});
+	ed_eventBus.subscribe<CameraAddEvent>([this](const CameraAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnCameraAdd();
+	});
+	ed_eventBus.subscribe<LightAddEvent>([this](const LightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnLightAdd();
+	});
+	ed_eventBus.subscribe<SunLightAddEvent>([this](const SunLightAddEvent&) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnSunLightAdd();
+	});
 
 	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		m_config = e.config;
 	});
 
 	ed_eventBus.subscribe<PositionChanged>([this](const PositionChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -110,6 +112,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -126,6 +129,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.obj_list.find(e.objectId);
 		if (it == scene.obj_list.end()) return;
@@ -147,12 +151,14 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
 	});
 
 	// --- Camera property events ---
 
 	ed_eventBus.subscribe<CameraTargetChanged>([this](const CameraTargetChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
@@ -161,6 +167,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<CameraFovChanged>([this](const CameraFovChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.cam_list.find(e.objectId);
 		if (it == scene.cam_list.end()) return;
@@ -171,6 +178,7 @@ void Editor::Initialize()
 	// --- Mesh property events ---
 
 	ed_eventBus.subscribe<MeshShadowChanged>([this](const MeshShadowChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
@@ -179,6 +187,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<MeshMaterialChanged>([this](const MeshMaterialChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.mesh_list.find(e.objectId);
 		if (it == scene.mesh_list.end()) return;
@@ -189,6 +198,7 @@ void Editor::Initialize()
 	// --- Light property events ---
 
 	ed_eventBus.subscribe<LightPowerChanged>([this](const LightPowerChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -199,6 +209,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -209,6 +220,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.light_list.find(e.objectId);
 		if (it == scene.light_list.end()) return;
@@ -220,6 +232,7 @@ void Editor::Initialize()
 	// --- Environment property events ---
 
 	ed_eventBus.subscribe<EnvironmentIntensityChanged>([this](const EnvironmentIntensityChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
@@ -228,6 +241,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<EnvironmentRotationChanged>([this](const EnvironmentRotationChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto& scene = *m_scene;
 		auto it = scene.env_list.find(e.objectId);
 		if (it == scene.env_list.end()) return;
@@ -244,6 +258,7 @@ void Editor::Initialize()
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
 		auto it = GetScene().env_list.find(e.envId);
 		if (it != GetScene().env_list.end())
 		{
@@ -278,6 +293,12 @@ void Editor::Initialize()
 			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
 	});
 
+	// --- Subscribe to RenderResetEvent to reset temporal accumulation ---
+	ed_eventBus.subscribe<RenderResetEvent>([this](const RenderResetEvent&) {
+		if (ed_renderer)
+			ed_renderer->ResetShadowAccumulation();
+	});
+
 	NEURUS_LOG("[Editor] Initialized");
 }
 
@@ -307,7 +328,7 @@ UIContext Editor::GetUIContext() const
 }
 
 // =========================================================================
-// Project lifecycle
+// Scene lifecycle
 // =========================================================================
 
 void Editor::CreateDefaultScene(const std::string& objPath)
@@ -325,59 +346,17 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 
 	auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-	light->SetRadius(0.05f);
+	light->SetRadius(0.01f);
 	m_scene->UseLight(light);
 
 	auto env = std::make_shared<Environment>();
 	env->SetEquirectPath("tex/hdr/room.hdr");
 	m_scene->UseEnvironment(env);
 
-	m_projectPath.clear();
 	m_dirty = true;
 }
 
-void Editor::LoadProject(const std::string& path, const std::string& assetDir)
-{
-	if (ed_renderer)
-		ed_renderer->WaitIdle();
-
-	m_scene = std::make_unique<Scene>();
-	m_config = RenderConfig{};
-
-	neurus::project::Project serializer;
-	serializer.Register<neurus::project::SceneComponent>(*m_scene);
-	serializer.Register<neurus::project::ConfigComponent>(m_config);
-	serializer.Load(path);
-
-	for (auto& [id, mesh] : m_scene->mesh_list)
-		mesh->ReloadMeshData(assetDir);
-
-	m_projectPath = path;
-	m_dirty = false;
-	UploadSceneResources();
-	OnIBLLoad();
-}
-
-void Editor::SaveProject(const std::string& path)
-{
-	neurus::project::Project serializer;
-	serializer.Register<neurus::project::SceneComponent>(*m_scene);
-	serializer.Register<neurus::project::ConfigComponent>(m_config);
-	serializer.Save(path);
-	m_projectPath = path;
-	m_dirty = false;
-}
-
-void Editor::SaveProject()
-{
-	if (m_projectPath.empty())
-		throw std::runtime_error("No file path set. Use SaveProject(path) first.");
-	SaveProject(m_projectPath);
-}
-
-// --- Project signal handlers ---
-
-void Editor::OnProjectNew()
+void Editor::NewScene()
 {
 	try
 	{
@@ -389,9 +368,8 @@ void Editor::OnProjectNew()
 
 		m_scene = std::make_unique<Scene>();
 		m_config = RenderConfig{};
-		m_projectPath.clear();
 		m_dirty = false;
-		NEURUS_LOG("[Editor] Created new project.");
+		NEURUS_LOG("[Editor] Created new scene.");
 
 		UploadSceneResources();
 
@@ -400,29 +378,31 @@ void Editor::OnProjectNew()
 	}
 	catch (const std::exception& e)
 	{
-		NEURUS_ERR("Failed to create new project: " << e.what());
+		NEURUS_ERR("Failed to create new scene: " << e.what());
 	}
 }
 
-void Editor::OnProjectOpen(const std::string& path)
+void Editor::BeginLoad()
 {
-	try { LoadProject(path, m_assetDir); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to open project: " << e.what()); }
+	// Drain GPU work before destroying the old scene's GPU resources.
+	if (ed_renderer)
+		ed_renderer->WaitIdle();
+
+	m_scene = std::make_unique<Scene>();
+	m_config = RenderConfig{};
+	// Application deserializes into GetScene()/GetRenderConfig() before FinishLoad().
 }
 
-void Editor::OnProjectSave()
+void Editor::FinishLoad()
 {
-	try { SaveProject(); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to save project: " << e.what()); }
+	for (auto& [id, mesh] : m_scene->mesh_list)
+		mesh->ReloadMeshData(m_assetDir);
+
+	m_dirty = false;
+	UploadSceneResources();
+	OnIBLLoad();
 }
 
-void Editor::OnProjectSaveAs(const std::string& path)
-{
-	try { SaveProject(path); }
-	catch (const std::exception& e) { NEURUS_ERR("Failed to save project as: " << e.what()); }
-}
-
-// --- Mesh, Camera, Light signal handlers ---
 
 void Editor::OnMeshImport(const std::string& path)
 {
@@ -466,7 +446,7 @@ void Editor::OnLightAdd()
 		auto light = std::make_shared<neurus::Light>(
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
-		light->SetRadius(0.05f);
+		light->SetRadius(0.01f);
 		m_scene->UseLight(light);
 		// Upload lighting via UploadManager (variant API) → RenderCache
 		UploadLighting();

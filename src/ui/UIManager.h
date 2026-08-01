@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include "platform/PlatformSurface.h"
 #include <map>
+#include <string>
 
 #include "panels/UIPanel.h"
 
@@ -70,11 +71,23 @@ public:
 		return (it != m_docks.end()) ? it->second : nullptr;
 	}
 
+	/**
+	 * @brief Serializes window geometry + ADS dock state into an opaque blob.
+	 *
+	 * The returned string bundles base64(window geometry) and base64(dock
+	 * state) separated by a newline. Application owns persistence.
+	 */
+	std::string ExportLayout() const;
+
+	/**
+	 * @brief Restores window geometry + ADS dock state from a blob produced
+	 *        by ExportLayout(). No-op if blob is empty or malformed.
+	 */
+	void ApplyLayout(const std::string& blob);
+
 private:
 	void CreateMenus();
 	void CreateDocks();
-	void SaveLayout();
-	void LoadLayout();
 	void RestoreDefaultLayout();
 
 	ads::CDockManager* win_dockManager = nullptr;

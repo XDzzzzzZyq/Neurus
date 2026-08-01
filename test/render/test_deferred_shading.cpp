@@ -23,7 +23,7 @@
 #include "render/RenderCache.h"
 #include "render/RenderContext.h"
 #include "render/UploadManager.h"
-#include "render/resources/LightingGPU.h"
+#include "render/resources/LightingCache.h"
 #include "render/passes/GeometryPass.h"
 #include "render/passes/LightingPass.h"
 #include "scene/Material.h"
@@ -92,8 +92,8 @@ protected:
 
 		// --- Render pass infrastructure (attachments created lazily) ---
 		m_renderCache = std::make_unique<RenderCache>(*m_device, pd);
-		m_renderCache->SetLightingGPU(
-		std::make_unique<neurus::LightingGPU>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
+		m_renderCache->SetLightingCache(
+		std::make_unique<neurus::LightingCache>(*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily));
 
 		// --- Upload manager for CPU→GPU struct conversion ---
 

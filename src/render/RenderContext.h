@@ -23,6 +23,8 @@
 
 #include <cstdint>
 
+#include <glm/glm.hpp>
+
 #include "scene/UID.h"
 
 namespace neurus
@@ -53,6 +55,18 @@ struct RenderContext
 	/// @brief Opaque pointer to RenderConfig (lifetime managed by Editor/UI layer).
 	/// Passes cast to const RenderConfig* to read quality/feature flags set by the user.
 	const void* config = nullptr;
+
+	/// @brief Per-frame random 3D direction for shadow jitter (normalized unit-ball vector).
+	/// Point lights use: pos_jittered = pos + light.radius * jitter
+	/// Sun lights use: dir_jittered = normalize(lightDir + jitter * smallScale)
+	glm::vec3 jitter{0.0f, 0.0f, 0.0f};
+
+	/// @brief Per-frame iteration counter (incremented each frame, reset by Editor on scene changes).
+	uint32_t iteration{0};
+
+	/// @brief True when the scene has changed and accumulation history should be discarded.
+	/// Set by Editor, consumed by DeferredRenderer each frame.
+	bool iterationReset{false};
 };
 
 } // namespace neurus

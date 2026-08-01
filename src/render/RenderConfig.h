@@ -113,6 +113,7 @@ public:
 
 	float   r_gamma       = 1.0f;     ///< Gamma correction factor
 	float   r_shadow_bias = 0.02f;  ///< Depth bias for shadow acne prevention
+	uint32_t r_sampling_mode = 0;  ///< Temporal sampling mode (0 = FixedEMA/8, 1 = MovingAvg)
 	int32_t r_ao_ksize    = 16;       ///< AO kernel size (number of samples)
 	float   r_ao_radius   = 0.5f;     ///< AO sample radius in world-space
 	int32_t r_sample_pf   = 128;      ///< Samples per frame for progressive rendering
@@ -137,7 +138,8 @@ public:
 		   CEREAL_NVP(r_ao_ksize), CEREAL_NVP(r_ao_radius),
 		   CEREAL_NVP(r_sample_pf), CEREAL_NVP(r_transparent),
 		   CEREAL_NVP(r_fxaa_subpix), CEREAL_NVP(r_fxaa_edge_threshold),
-		   CEREAL_NVP(r_fxaa_edge_threshold_min));
+		   CEREAL_NVP(r_fxaa_edge_threshold_min),
+		   CEREAL_NVP(r_sampling_mode));
 	}
 
 	// --- Query helpers ---
