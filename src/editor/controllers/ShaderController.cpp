@@ -268,20 +268,48 @@ void OnStructEdited(const neurus::ShaderStructEdited& e)
 	case neurus::ShaderSection::Inputs:       applyToUniform(parsed.input_list); break;
 	case neurus::ShaderSection::Outputs:      applyToUniform(parsed.output_list); break;
 	case neurus::ShaderSection::Uniforms:     applyToUniform(parsed.uniform_list); break;
-	case neurus::ShaderSection::StructDefs:
-		if (e.fieldIndex < static_cast<int>(parsed.struct_def_list.size()))
-		{
-			auto& sd = parsed.struct_def_list[e.fieldIndex];
-			if (e.field == "name") { sd.name = e.value; changed = true; }
-			else if (e.field == "type") { sd.varName = e.value; changed = true; }
-		}
-		break;
 	case neurus::ShaderSection::Functions:
 		if (e.fieldIndex < static_cast<int>(parsed.func_list.size()))
 		{
 			auto& f = parsed.func_list[e.fieldIndex];
 			if (e.field == "name") { f.name = e.value; changed = true; }
 			else if (e.field == "type") { f.returnType = neurus::ShaderStruct::ParseType(e.value); changed = true; }
+		}
+		break;
+	case neurus::ShaderSection::PushConstants:
+		if (e.fieldIndex < static_cast<int>(parsed.push_constants.size()))
+		{
+			auto& pc = parsed.push_constants[e.fieldIndex];
+			if (e.field == "name") { pc.name = e.value; changed = true; }
+			else if (e.field == "type") { pc.typeName = e.value; changed = true; }
+		}
+		break;
+	case neurus::ShaderSection::StructDefs:
+		if (e.fieldIndex < static_cast<int>(parsed.struct_def_list.size()))
+		{
+			auto& sd = parsed.struct_def_list[e.fieldIndex];
+			if (e.subFieldIndex < 0)
+			{
+				// Editing the struct definition itself (name or varName)
+				if (e.field == "name") { sd.name = e.value; changed = true; }
+				else if (e.field == "type") { sd.varName = e.value; changed = true; }
+			}
+			else if (e.subFieldIndex < static_cast<int>(sd.fields.size()))
+			{
+				// Editing a member field of the struct definition
+				auto& io = sd.fields[e.subFieldIndex];
+				if (e.field == "type")
+				{
+					io.type = neurus::ShaderStruct::ParseType(e.value);
+					io.typeName = e.value;
+					changed = true;
+				}
+				else if (e.field == "name")
+				{
+					io.name = e.value;
+					changed = true;
+				}
+			}
 		}
 		break;
 	}
@@ -291,6 +319,69 @@ void OnStructEdited(const neurus::ShaderStructEdited& e)
 		NEURUS_LOG("[ShaderController] Struct edited: section=" << static_cast<int>(e.section)
 		           << " idx=" << e.fieldIndex << " field=" << e.field << " value=" << e.value);
 	}
+}
+
+/**
+ * @brief Handles ShaderFieldAdded — appends a new default entry to a ShaderStruct container.
+ *
+ * Dispatches on ShaderSection to append a default-constructed entry to the
+ * correct vector. For StructDefs with subFieldIndex >= 0, appends a member
+ * field to the specified struct definition. After mutation, regenerates GLSL.
+ * Does NOT bump version — user must press Compile.
+ */
+void OnFieldAdded(const neurus::ShaderFieldAdded& e)
+{
+	auto* mesh = AsMesh(e.object);
+	if (!mesh || !mesh->o_shader) return;
+
+	auto& shader = *mesh->o_shader;
+	auto type = static_cast<neurus::ShaderType>(e.stage);
+
+	if (!shader.HasStage(type)) return;
+	auto& parsed = shader.GetStage(type).parsed;
+
+	switch (e.section)
+	{
+	case neurus::ShaderSection::Attributes:
+		parsed.AB_list.push_back({static_cast<int>(parsed.AB_list.size()),
+		                          "new_attr", neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
+		break;
+	case neurus::ShaderSection::PassOutputs:
+		parsed.pass_list.push_back({static_cast<int>(parsed.pass_list.size()),
+		                            "new_output", neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
+		break;
+	case neurus::ShaderSection::Inputs:
+		parsed.input_list.push_back({"new_input", neurus::ParaType::FLOAT, 1, -1, "", ""});
+		break;
+	case neurus::ShaderSection::Outputs:
+		parsed.output_list.push_back({"new_output", neurus::ParaType::FLOAT, 1, -1, "", ""});
+		break;
+	case neurus::ShaderSection::Uniforms:
+		parsed.uniform_list.push_back({"new_uniform", neurus::ParaType::FLOAT, 1, -1, "", ""});
+		break;
+	case neurus::ShaderSection::Functions:
+		parsed.func_list.push_back({neurus::ParaType::FLOAT, "new_func", "", {}});
+		break;
+	case neurus::ShaderSection::PushConstants:
+		parsed.push_constants.push_back({"new_pc", 0, 0, "float"});
+		break;
+	case neurus::ShaderSection::StructDefs:
+		if (e.subFieldIndex < 0)
+		{
+			// Add a new struct definition
+			parsed.struct_def_list.push_back({0, "NewStruct", {}, ""});
+		}
+		else if (e.subFieldIndex < static_cast<int>(parsed.struct_def_list.size()))
+		{
+			// Add a member field to the specified struct definition
+			parsed.struct_def_list[e.subFieldIndex].fields.push_back(
+				{0, "new_field", neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
+		}
+		break;
+	}
+
+	NEURUS_LOG("[ShaderController] Field added: section=" << static_cast<int>(e.section)
+	           << " subIdx=" << e.subFieldIndex);
 }
 
 } // anonymous namespace
@@ -318,6 +409,10 @@ void ShaderController::Init(EventQueue& bus)
 	bus.subscribe<ShaderStructEdited>(
 		[](const ShaderStructEdited& e) {
 			OnStructEdited(e);
+		});
+	bus.subscribe<ShaderFieldAdded>(
+		[](const ShaderFieldAdded& e) {
+			OnFieldAdded(e);
 		});
 }
 

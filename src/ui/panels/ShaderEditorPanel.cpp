@@ -111,6 +111,7 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_uniformSection = new ShaderStructSection(this);
 	m_structSection  = new ShaderStructSection(this);
 	m_funcSection    = new ShaderStructSection(this);
+	m_pushConstSection = new ShaderStructSection(this);
 
 	m_abSection->setTitle("Attributes (layout(location))");
 	m_passSection->setTitle("Pass Outputs (layout(location))");
@@ -119,6 +120,7 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_uniformSection->setTitle("Uniforms");
 	m_structSection->setTitle("Struct Definitions");
 	m_funcSection->setTitle("Functions");
+	m_pushConstSection->setTitle("Push Constants");
 
 	m_abSection->setAddButtonVisible(true);
 	m_passSection->setAddButtonVisible(true);
@@ -127,6 +129,7 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_uniformSection->setAddButtonVisible(true);
 	m_structSection->setAddButtonVisible(true);
 	m_funcSection->setAddButtonVisible(true);
+	m_pushConstSection->setAddButtonVisible(true);
 
 	m_structLayout->addWidget(m_abSection);
 	m_structLayout->addWidget(m_passSection);
@@ -135,6 +138,7 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_structLayout->addWidget(m_uniformSection);
 	m_structLayout->addWidget(m_structSection);
 	m_structLayout->addWidget(m_funcSection);
+	m_structLayout->addWidget(m_pushConstSection);
 
 	m_structLayout->addStretch();
 
@@ -189,7 +193,7 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 		                 [this, sectionId](int fieldIndex, const QString& field, const QString& value) {
 			if (m_activeObject)
 				emit structEdited({m_activeObject, m_cachedStageType, sectionId,
-				                   fieldIndex, field.toStdString(), value.toStdString()});
+				                   fieldIndex, -1, field.toStdString(), value.toStdString()});
 		});
 	};
 	connectFieldEdited(m_abSection,      ShaderSection::Attributes);
@@ -199,6 +203,25 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	connectFieldEdited(m_uniformSection, ShaderSection::Uniforms);
 	connectFieldEdited(m_structSection,  ShaderSection::StructDefs);
 	connectFieldEdited(m_funcSection,    ShaderSection::Functions);
+	connectFieldEdited(m_pushConstSection, ShaderSection::PushConstants);
+
+	// --- Section add buttons -> fieldAdded event ---
+	auto connectAddButton = [this](ShaderStructSection* section, ShaderSection sectionId)
+	{
+		QObject::connect(section, &ShaderStructSection::addButtonClicked,
+		                 [this, sectionId]() {
+			if (m_activeObject)
+				emit fieldAdded({m_activeObject, m_cachedStageType, sectionId, -1});
+		});
+	};
+	connectAddButton(m_abSection,      ShaderSection::Attributes);
+	connectAddButton(m_passSection,    ShaderSection::PassOutputs);
+	connectAddButton(m_inputSection,   ShaderSection::Inputs);
+	connectAddButton(m_outputSection,  ShaderSection::Outputs);
+	connectAddButton(m_uniformSection, ShaderSection::Uniforms);
+	connectAddButton(m_structSection,  ShaderSection::StructDefs);
+	connectAddButton(m_funcSection,    ShaderSection::Functions);
+	connectAddButton(m_pushConstSection, ShaderSection::PushConstants);
 
 	// Start with empty state
 	setShowEmptyState(true);
@@ -384,13 +407,24 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr)
 		m_uniformSection->setVisible(false);
 	}
 
-	// Struct Definitions (struct_def_list)
+	// Struct Definitions (struct_def_list) — show struct name + indented member fields
 	if (!parsed.struct_def_list.empty())
 	{
 		std::vector<F> fields;
 		fields.reserve(parsed.struct_def_list.size());
 		for (const auto& sd : parsed.struct_def_list)
+		{
+			// Struct definition row (name + varName)
 			fields.push_back({sd.name, sd.varName});
+			// Indented member fields
+			for (const auto& mf : sd.fields)
+			{
+				std::string typeName = mf.typeName.empty()
+					? ShaderStruct::ParseType(mf.type)
+					: mf.typeName;
+				fields.push_back({"  " + typeName, mf.name});
+			}
+		}
 		m_structSection->setFields(fields);
 		m_structSection->setVisible(true);
 	}
@@ -415,6 +449,22 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr)
 		m_funcSection->setFields({});
 		m_funcSection->setVisible(false);
 	}
+
+	// Push Constants (push_constants)
+	if (!parsed.push_constants.empty())
+	{
+		std::vector<F> fields;
+		fields.reserve(parsed.push_constants.size());
+		for (const auto& pc : parsed.push_constants)
+			fields.push_back({pc.typeName, pc.name});
+		m_pushConstSection->setFields(fields);
+		m_pushConstSection->setVisible(true);
+	}
+	else
+	{
+		m_pushConstSection->setFields({});
+		m_pushConstSection->setVisible(false);
+	}
 }
 
 // =========================================================================
@@ -436,6 +486,7 @@ void ShaderEditorPanel::setShowEmptyState(bool show)
 	m_uniformSection->setVisible(!show);
 	m_structSection->setVisible(!show);
 	m_funcSection->setVisible(!show);
+	m_pushConstSection->setVisible(!show);
 }
 
 void ShaderEditorPanel::setShowCreateButton(bool show)

@@ -49,6 +49,7 @@ signals:
 	void compileRequested(const ShaderCompileRequested& e);
 	void codeEdited(const ShaderCodeEdited& e);
 	void structEdited(const ShaderStructEdited& e);
+	void fieldAdded(const ShaderFieldAdded& e);
 
 private:
 	/** @brief Populates struct sections from a parsed ShaderUnit. */
@@ -85,6 +86,7 @@ private:
 	ShaderStructSection* m_uniformSection = nullptr;  // Uniforms
 	ShaderStructSection* m_structSection  = nullptr;  // Struct Definitions
 	ShaderStructSection* m_funcSection    = nullptr;  // Functions
+	ShaderStructSection* m_pushConstSection = nullptr; // Push Constants
 
 	// --- Empty state / create button ---
 	QLabel*       m_emptyLabel    = nullptr;
