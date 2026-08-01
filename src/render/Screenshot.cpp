@@ -11,7 +11,6 @@
 #include "DescriptorManager.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
-#include "resources/ShaderGPU.h"
 
 #include <algorithm>
 #include <chrono>
@@ -257,10 +256,12 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 
 	auto c2eSpv = ShaderLibrary::Compile(c2eShader->GetStage(ShaderType::COMPUTE),
 	                                     ShaderType::COMPUTE, "c2e_export");
-	ShaderGPU c2eGPU(m_device, vk::ShaderStageFlagBits::eCompute, c2eSpv);
+	vk::ShaderModuleCreateInfo c2eSmCI({}, c2eSpv);
+	vk::raii::ShaderModule c2eModule(m_device, c2eSmCI);
+	vk::PipelineShaderStageCreateInfo c2eStageCI({}, vk::ShaderStageFlagBits::eCompute, *c2eModule, "main");
 
 	PipelineBuilder c2eBuilder;
-	c2eBuilder.AddShaderStage(c2eGPU.GetStageCreateInfo());
+	c2eBuilder.AddShaderStage(c2eStageCI);
 	c2eBuilder.SetDebugName("Screenshot::CubemapToEquirect");
 	c2eBuilder.AddDescriptorSetLayout(*c2eLayout.layout());
 

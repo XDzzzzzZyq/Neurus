@@ -10,8 +10,6 @@
 #include "render/Barrier.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
-#include "resources/ShaderGPU.h"
-
 #include "core/Log.h"
 
 #include <cstring>
@@ -302,7 +300,9 @@ void IBLPass::BuildPipeline(const vk::raii::Device& device,
 
 		auto spv = ShaderLibrary::Compile(computeShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, subName);
-		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
+		vk::ShaderModuleCreateInfo smCI({}, spv);
+		vk::raii::ShaderModule module(device, smCI);
+		vk::PipelineShaderStageCreateInfo stageCI({}, vk::ShaderStageFlagBits::eCompute, *module, "main");
 
 		PipelineBuilder builder;
 
@@ -311,7 +311,7 @@ void IBLPass::BuildPipeline(const vk::raii::Device& device,
 			0,
 			sizeof(IBLPushConstants));
 
-		return builder.AddShaderStage(gpu.GetStageCreateInfo())
+		return builder.AddShaderStage(stageCI)
 			.SetDebugName(subName)
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)

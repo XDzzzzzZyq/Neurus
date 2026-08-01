@@ -27,6 +27,7 @@
 #include "core/Log.h"
 #include "editor/Editor.h"
 #include "editor/events/EditorEvents.h"
+#include "editor/events/ShaderEvents.h"
 #include "editor/events/UIEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/InputEvents.h"
@@ -45,6 +46,7 @@
 #include "ui/panels/Outliner.h"
 #include "ui/panels/PropertyPanel.h"
 #include "ui/panels/RenderConfigPanel.h"
+#include "ui/panels/ShaderEditorPanel.h"
 #include "ui/panels/Viewport.h"
 
 #include <QApplication>
@@ -470,6 +472,16 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
 		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
+	}
+
+	// --- Shader Editor signals → Editor ---
+	if (auto* shaderPanel = app_mainWindow->GetPanel<neurus::ShaderEditorPanel>())
+	{
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::compileRequested);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::createShaderRequested);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::codeEdited);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::structEdited);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::fieldAdded);
 	}
 
 	// Handle Transform changes from Property Panel → Editor

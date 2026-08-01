@@ -7,7 +7,6 @@
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
-#include "resources/ShaderGPU.h"
 #include "core/Log.h"
 #include <stdexcept>
 
@@ -68,11 +67,13 @@ void FXAAPass::BuildPipeline(const vk::raii::Device& device, const std::string& 
 		throw std::runtime_error("FXAAPass: shader invalid");
 	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
 	                                  ShaderType::COMPUTE, debugName);
-	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
+	vk::ShaderModuleCreateInfo smCI({}, spv);
+	vk::raii::ShaderModule module(device, smCI);
+	vk::PipelineShaderStageCreateInfo stageCI({}, vk::ShaderStageFlagBits::eCompute, *module, "main");
 	vk::PushConstantRange pc(vk::ShaderStageFlagBits::eCompute, 0, sizeof(FXAAPushConstants));
 	p_pipelines.push_back(
 		PipelineBuilder()
-			.AddShaderStage(gpu.GetStageCreateInfo())
+			.AddShaderStage(stageCI)
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pc)

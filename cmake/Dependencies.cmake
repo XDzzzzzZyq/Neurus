@@ -189,7 +189,8 @@ function(neurus_find_dependency name)
 			add_subdirectory("${DEP_DIR}")
 
 			set(NEURUS_DEP_${name}_FROM_LIB FALSE PARENT_SCOPE)
-		endif()
+
+	endif()
 
 	# -----------------------------------------------------------------------
 	# Unknown dependency

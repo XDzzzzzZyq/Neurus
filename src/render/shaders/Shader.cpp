@@ -20,6 +20,11 @@ Shader::Shader(std::string name)
 // Stage accessors
 // --------------------------------------
 
+bool Shader::HasStage(ShaderType type) const
+{
+	return m_stages.count(type) > 0;
+}
+
 ShaderUnit& Shader::GetStage(ShaderType type)
 {
 	return m_stages[type];

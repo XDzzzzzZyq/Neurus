@@ -13,7 +13,13 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
 - `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
-- `src/render/shaders/ShaderGPU.h, src/render/shaders/Shader.h/cpp` - SPIR-V loading, pipeline creation
+- `src/render/shaders/Shader.h/cpp` - Per-mesh shader container (multi-stage, owns ShaderUnits)
+- `src/render/shaders/ShaderUnit.h` - Per-stage shader state: code text, parsed IR (`ShaderStruct`), SPIR-V, version
+- `src/render/shaders/ShaderLibrary.h/cpp` - Load/parse/generate/compile service for shaders
+- `src/render/shaders/ShaderParser.h/cpp` - GLSL → `ShaderStruct` IR (ShaderEditor struct mode)
+- `src/render/shaders/ShaderGenerator.h/cpp` - `ShaderStruct` IR → GLSL
+- `src/render/shaders/RenderShader.h/cpp, ComputeShader.h/cpp` - Render/compute pipeline wrappers (parsed + generated shaders)
+- `src/render/shaders/ShaderCompiler.h/cpp, ShaderGPU.h` - SPIR-V compilation and GPU shader module
 - `src/render/Renderer.h` - Public renderer API, frame drawing
 - `src/render/RenderCache.h/cpp` - Cross-frame resource pool; owns MeshGPU, EnvironmentGPU, LightingCache, attachments, shadow maps
 - `src/render/UploadManager.h/cpp` - CPU-to-GPU upload service (meshes, lights, environments, IBL)
@@ -135,6 +141,35 @@ The triangle MVP implements a minimal but correct rendering path:
 4. **VK_KHR_dynamic_rendering** - No explicit VkRenderPass/VkFramebuffer objects
 5. **Single command buffer** - Recorded once, replayed each frame
 6. **Single in-flight frame** - No frame overlap (fence-synchronized)
+
+## Shader Editing & Pipeline
+
+Per-mesh shaders are editable at runtime through the Shader Editor panel. The
+pipeline lives entirely in the Renderer layer (`src/render/shaders/`):
+
+```
+ShaderLibrary::LoadRenderShader(name, vertPath, fragPath)
+    └── Shader (owns ShaderUnit per stage: VERTEX/FRAGMENT/COMPUTE/GEOMETRY)
+          ├── ShaderUnit::code     — GLSL source text (edited in Code mode)
+          ├── ShaderUnit::parsed   — ShaderStruct IR (edited in Structure mode)
+          ├── ShaderUnit::spv      — compiled SPIR-V
+          └── ShaderUnit::m_version— bumped on successful compile
+                │
+                ▼
+GeometryPass pipeline (mesh shader) rebuilt when Shader::m_version changes
+```
+
+**Edit flow (event-driven):** `ShaderEditorPanel` emits `ShaderEvents`
+(`ShaderCodeEdited`, `ShaderStructEdited`, `ShaderFieldAdded`) → `ShaderController`
+mutates the `Mesh`'s shader data. `ShaderCreateRequested` /
+`ShaderCompileRequested` recompile via `ShaderLibrary::Compile` and bump
+`m_version`; the pipeline cache sees the new version and rebuilds the pipeline
+on the next frame. After create/compile, `ShaderController` enqueues
+`RenderResetEvent` so temporal shadow accumulation resets.
+
+**Structure mode round-trip:** `ShaderParser` parses GLSL → `ShaderStruct` IR
+(8 containers: attributes, pass outputs, inputs, outputs, uniforms, struct defs,
+functions, push constants); `ShaderGenerator` regenerates GLSL from the IR.
 
 ## Current Render Pipeline
 

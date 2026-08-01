@@ -5,8 +5,10 @@
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"
+#include "editor/events/ShaderEvents.h"
 
 #include "editor/controllers/CameraController.h"
+#include "editor/controllers/ShaderController.h"
 #include "editor/events/EventBus.h"
 
 #include "render/DeferredRenderer.h"
@@ -278,6 +280,7 @@ void Editor::Initialize()
 
 	// --- Register controllers ---
 	RegisterController<CameraController>();
+	RegisterController<ShaderController>();
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {

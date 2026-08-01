@@ -333,6 +333,17 @@ public:
 	Pipeline* GetPipeline(int uid);
 
 	/**
+	 * @brief Version-aware pipeline lookup.
+	 *
+	 * Returns nullptr if the entry is not found or the version does not match.
+	 *
+	 * @param uid     Unique shader/object identifier.
+	 * @param version Expected version of the pipeline.
+	 * @return Non-owning pointer, or nullptr if missing/stale.
+	 */
+	Pipeline* GetPipeline(int uid, int version);
+
+	/**
 	 * @brief Register a previously-constructed Pipeline into the cache.
 	 *
 	 * Takes ownership via move semantics.  Overwrites any existing
@@ -342,6 +353,18 @@ public:
 	 * @param pipeline Fully constructed Pipeline to cache (moved in).
 	 */
 	void UsePipeline(int uid, Pipeline pipeline);
+
+	/**
+	 * @brief Register a pipeline with version tracking.
+	 *
+	 * Takes ownership via move semantics.  Overwrites any existing
+	 * entry for the same uid.
+	 *
+	 * @param uid      Unique shader/object identifier.
+	 * @param pipeline Fully constructed Pipeline to cache (moved in).
+	 * @param version  Shader version to associate with the pipeline.
+	 */
+	void UsePipeline(int uid, Pipeline pipeline, int version);
 
 	/**
 	 * @brief Removes the cached Pipeline for a given UID.

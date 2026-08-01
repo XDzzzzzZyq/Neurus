@@ -21,15 +21,27 @@ public:
 	Pipeline* Get(int uid);
 	const Pipeline* Get(int uid) const;
 
+	/** @brief Version-aware lookup. Returns nullptr if entry not found or version mismatch. */
+	Pipeline* GetPipeline(int uid, int version);
+
 	Pipeline& GetOrCreate(int uid,
 	                      std::function<Pipeline()> factory);
 
 	void Store(int uid, Pipeline pipeline);
+
+	/** @brief Store a pipeline with version tracking. Overwrites existing entry. */
+	void UsePipeline(int uid, Pipeline pipeline, int version);
+
 	void Remove(int uid);
 	void Clear();
 
 private:
-	std::unordered_map<int, Pipeline> p_pipelines;
+	struct CacheEntry
+	{
+		Pipeline pipeline;
+		int version = -1;
+	};
+	std::unordered_map<int, CacheEntry> p_entries;
 };
 
 } // namespace neurus

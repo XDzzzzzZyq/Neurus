@@ -28,8 +28,6 @@
 #include "render/Barrier.h"
 #include "../shaders/ShaderLibrary.h"
 #include "../shaders/RenderShader.h"
-#include "resources/ShaderGPU.h"
-
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -182,8 +180,12 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 		                                      ShaderType::VERTEX, debugName + "_multiview_vert");
 		auto fragSpv = ShaderLibrary::Compile(p_multiviewShader->GetStage(ShaderType::FRAGMENT),
 		                                      ShaderType::FRAGMENT, debugName + "_multiview_frag");
-		ShaderGPU vertGPU(device, vk::ShaderStageFlagBits::eVertex, vertSpv);
-		ShaderGPU fragGPU(device, vk::ShaderStageFlagBits::eFragment, fragSpv);
+		vk::ShaderModuleCreateInfo vertSmCI({}, vertSpv);
+		vk::raii::ShaderModule vertModule(device, vertSmCI);
+		vk::ShaderModuleCreateInfo fragSmCI({}, fragSpv);
+		vk::raii::ShaderModule fragModule(device, fragSmCI);
+		vk::PipelineShaderStageCreateInfo vertStageCI({}, vk::ShaderStageFlagBits::eVertex, *vertModule, "main");
+		vk::PipelineShaderStageCreateInfo fragStageCI({}, vk::ShaderStageFlagBits::eFragment, *fragModule, "main");
 
 		std::vector<vk::PushConstantRange> pushRanges = {
 			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex |
@@ -197,8 +199,8 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 		p_pipelines.push_back(
 			builder
 				.SetDebugName((debugName + "::Multiview").c_str())
-				.AddShaderStage(vertGPU.GetStageCreateInfo())
-				.AddShaderStage(fragGPU.GetStageCreateInfo())
+				.AddShaderStage(vertStageCI)
+				.AddShaderStage(fragStageCI)
 				.SetVertexInput(p_vtxLayout)
 				.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 				.SetViewMask(0x3f)  // 6 faces of cubemap
@@ -233,8 +235,12 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 		                                      ShaderType::VERTEX, debugName + "_sun_vert");
 		auto fragSpv = ShaderLibrary::Compile(p_sunShader->GetStage(ShaderType::FRAGMENT),
 		                                      ShaderType::FRAGMENT, debugName + "_sun_frag");
-		ShaderGPU vertGPU(device, vk::ShaderStageFlagBits::eVertex, vertSpv);
-		ShaderGPU fragGPU(device, vk::ShaderStageFlagBits::eFragment, fragSpv);
+		vk::ShaderModuleCreateInfo vertSmCI({}, vertSpv);
+		vk::raii::ShaderModule vertModule(device, vertSmCI);
+		vk::ShaderModuleCreateInfo fragSmCI({}, fragSpv);
+		vk::raii::ShaderModule fragModule(device, fragSmCI);
+		vk::PipelineShaderStageCreateInfo vertStageCI({}, vk::ShaderStageFlagBits::eVertex, *vertModule, "main");
+		vk::PipelineShaderStageCreateInfo fragStageCI({}, vk::ShaderStageFlagBits::eFragment, *fragModule, "main");
 
 		std::vector<vk::PushConstantRange> pushRanges = {
 			vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex,
@@ -245,8 +251,8 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 		p_pipelines.push_back(
 			builder
 				.SetDebugName((debugName + "::Sun").c_str())
-				.AddShaderStage(vertGPU.GetStageCreateInfo())
-				.AddShaderStage(fragGPU.GetStageCreateInfo())
+				.AddShaderStage(vertStageCI)
+				.AddShaderStage(fragStageCI)
 				.SetVertexInput(p_vtxLayout)
 				.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
 				.SetRasterization(vk::PolygonMode::eFill,

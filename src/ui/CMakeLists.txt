@@ -13,6 +13,16 @@ add_library(neurus_ui STATIC
 	items/OutlinerRow.cpp
 	items/Vec3Spin.h
 	items/Vec3Spin.cpp
+	items/ShaderFieldRow.h
+	items/ShaderFieldRow.cpp
+	items/ShaderStructModel.h
+	items/ShaderStructModel.cpp
+	items/ShaderFieldDelegate.h
+	items/ShaderFieldDelegate.cpp
+	elements/ShaderHighlighter.h
+	elements/ShaderHighlighter.cpp
+	elements/CodeEditor.h
+	elements/CodeEditor.cpp
 	presets/CameraProperties.h
 	presets/CameraProperties.cpp
 	presets/MeshProperties.h
@@ -30,6 +40,8 @@ add_library(neurus_ui STATIC
 	panels/RenderConfigPanel.cpp
 	panels/Viewport.h
 	panels/Viewport.cpp
+	panels/ShaderEditorPanel.h
+	panels/ShaderEditorPanel.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC
@@ -56,6 +68,7 @@ qt_add_resources(neurus_ui "resources"
 	FILES
 		qml/main.qml
 		qml/outliner.qss
+		qml/shader_editor.qss
 )
 
 # Qt resource file (SVG icons)

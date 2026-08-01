@@ -21,7 +21,6 @@
 
 #include "shaders/ComputeShader.h"
 #include "shaders/ShaderLibrary.h"
-#include "resources/ShaderGPU.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -226,7 +225,9 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		auto spv = ShaderLibrary::Compile(p_pointLightShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, debugName);
-		ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
+		vk::ShaderModuleCreateInfo smCI({}, spv);
+		vk::raii::ShaderModule module(device, smCI);
+		vk::PipelineShaderStageCreateInfo stageCI({}, vk::ShaderStageFlagBits::eCompute, *module, "main");
 
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
@@ -235,7 +236,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		PipelineBuilder builder;
 		p_pipelines.push_back(
-			builder.AddShaderStage(gpu.GetStageCreateInfo())
+			builder.AddShaderStage(stageCI)
 				.SetDebugName(debugName.c_str())
 				.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 				.AddPushConstantRange(pushRange)
@@ -251,7 +252,9 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		auto spv = ShaderLibrary::Compile(p_sunLightShader->GetStage(ShaderType::COMPUTE),
 		                                  ShaderType::COMPUTE, debugName + "_Sun");
-		ShaderGPU gpu2(device, vk::ShaderStageFlagBits::eCompute, spv);
+		vk::ShaderModuleCreateInfo smCI2({}, spv);
+		vk::raii::ShaderModule module2(device, smCI2);
+		vk::PipelineShaderStageCreateInfo stageCI2({}, vk::ShaderStageFlagBits::eCompute, *module2, "main");
 
 		vk::PushConstantRange pushRange(
 			vk::ShaderStageFlagBits::eCompute,
@@ -260,7 +263,7 @@ void ShadowIntensityPass::BuildPipeline(const vk::raii::Device& device,
 
 		PipelineBuilder sunBuilder;
 		p_pipelines.push_back(
-			sunBuilder.AddShaderStage(gpu2.GetStageCreateInfo())
+			sunBuilder.AddShaderStage(stageCI2)
 				.SetDebugName((debugName + "_Sun").c_str())
 				.AddDescriptorSetLayout(*p_sunDescSetLayout.layout())
 				.AddPushConstantRange(pushRange)

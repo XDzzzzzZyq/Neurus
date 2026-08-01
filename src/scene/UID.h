@@ -175,6 +175,17 @@ public:
 	}
 
 	/**
+	 * @brief Returns pointer to the ShaderUnit for a given shader stage, if applicable.
+	 * @param shaderType Integer representing the ShaderType to query.
+	 * @return Void pointer cast to ShaderUnit*, or nullptr if not found.
+	 * @note Override in derived classes that own shaders (Mesh, Material, etc.).
+	 */
+	virtual void* GetShaderUnit(int /*shaderType*/) const
+	{
+		return nullptr;
+	}
+
+	/**
 	 * @brief Returns pointer to object's transform, if applicable.
 	 * @return Void pointer cast to Transform*, or nullptr if no transform.
 	 * @note Override in derived classes with Transform component (Camera, Light, Mesh).

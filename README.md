@@ -122,6 +122,8 @@ screen-space ambient occlusion, image-based lighting, and full G-Buffer pipeline
 - Event-driven CameraController (orbit/zoom/dolly/pan via EventQueue)
 - OBJ mesh loading with MeshData (icosphere, cube, etc.)
 - Deferred PBR pipeline: ShadowDepthPass → GeometryPass → SSAOPass → LightingPass → IBLPass
+- Temporal shadow accumulation via Halton jitter (fixed EMA / moving average)
+- Shader Editor panel: per-mesh GLSL editing (Code + Structure modes) with live pipeline rebuild
 - Reference-image regression tests (capture → compare PNG)
 
 ## Dependency Management

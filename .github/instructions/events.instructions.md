@@ -26,8 +26,9 @@ Panel Qt signal (e.g. Outliner::objectSelected)
 | `src/editor/events/ProjectEvents.h` | Project lifecycle events (new, open, save, saveAs) |
 | `src/editor/events/AssetEvents.h` | Asset import events (mesh, camera, light add) |
 | `src/editor/events/ConfigEvents.h` | Render config change events |
+| `src/editor/events/ShaderEvents.h` | Shader editor events (create, compile, code/struct edit, field add) |
 | `src/editor/events/UIEvents.h` | QObject singleton — Qt signal definitions for UI→Editor dispatch |
-| `src/editor/events/EventQueue.h` | Header-only typed event dispatcher (zero Qt dependency) |
+| `src/editor/events/EventBus.h` | Header-only typed event dispatcher (`EventQueue` class, zero Qt dependency) |
 
 ## Event Structs (Pure Data)
 
@@ -67,6 +68,32 @@ struct MousePressEvent  { int x, y; MouseButton btn; Modifiers mods; };
 struct MouseReleaseEvent{ int x, y; MouseButton btn; Modifiers mods; };
 struct MouseScrollEvent { int x, y; float delta; Modifiers mods; };
 ```
+
+### ShaderEvents.h
+
+Events for the shader editor pipeline (UI → Editor → ShaderController). All events
+carry a `const ObjectID*` resolved once by the ShaderEditorPanel from the active
+scene selection. `ShaderSection` identifies which `ShaderStruct` container is edited.
+
+```cpp
+enum class ShaderSection : int {
+    Attributes = 0, PassOutputs = 1, Inputs = 2, Outputs = 3,
+    Uniforms = 4, StructDefs = 5, Functions = 6, PushConstants = 7
+};
+
+struct ShaderCreateRequested  { const ObjectID* object; };
+struct ShaderCompileRequested { const ObjectID* object; int stage; int unitType; };  // 0=Code path, 1=Struct path
+struct ShaderCodeEdited       { const ObjectID* object; int stage; std::string code; };
+struct ShaderStructEdited     { const ObjectID* object; int stage; ShaderSection section;
+                                int fieldIndex; int subFieldIndex; std::string field; std::string value; };
+struct ShaderFieldAdded       { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };
+```
+
+**Version flow:** Only `ShaderCreateRequested` and `ShaderCompileRequested` bump
+`Shader::m_version` (and only on successful compile). The other events mutate
+data without recompiling — the user must press Compile to apply changes to the
+GPU pipeline. Because create/compile rebuild the pipeline, `ShaderController`
+enqueues `RenderResetEvent` after both, so temporal accumulation resets.
 
 ## UIEvents (Qt Signal Bus)
 
@@ -214,10 +241,11 @@ struct RenderResetEvent
 
 An empty marker event emitted whenever the scene state changes in a way that
 invalidates temporal accumulation (camera movement, light/object transform,
-visibility toggle, config change, project load, asset import, environment change).
-Camera movement events are enqueued by `CameraController` after each frame handler
-(Zoom, Rotate, Push, Slide, Resize). Other scene mutations enqueue it directly
-from `Editor` event handlers.
+visibility toggle, config change, project load, asset import, environment change,
+shader create/compile). Camera movement events are enqueued by `CameraController`
+after each frame handler (Zoom, Rotate, Push, Slide, Resize). Shader create and
+compile events are enqueued by `ShaderController` after the shader version bumps.
+Other scene mutations enqueue it directly from `Editor` event handlers.
 
 **Subscribers** listen for this event to reset per-frame history:
 - `DeferredRenderer::ResetShadowAccumulation()` — zeros the shadow accumulation iteration counter.

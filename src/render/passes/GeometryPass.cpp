@@ -12,8 +12,6 @@
 #include "PipelineBuilder.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/RenderShader.h"
-#include "resources/ShaderGPU.h"
-
 #include "core/Log.h"
 
 #include "../resources/MeshGPU.h"
@@ -105,63 +103,100 @@ void GeometryPass::BuildPipeline(const vk::raii::Device& device,
 	                                      ShaderType::VERTEX, debugName + "_vert");
 	auto fragSpv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::FRAGMENT),
 	                                      ShaderType::FRAGMENT, debugName + "_frag");
-	ShaderGPU vertGPU(device, vk::ShaderStageFlagBits::eVertex, vertSpv);
-	ShaderGPU fragGPU(device, vk::ShaderStageFlagBits::eFragment, fragSpv);
-
-	// --- G-Buffer colour attachment formats ---
-	std::vector<vk::Format> colorFormats = {
-		vk::Format::eR16G16B16A16Sfloat,  // Position
-		vk::Format::eR16G16B16A16Sfloat,  // Normal
-		vk::Format::eR8G8B8A8Srgb,        // Albedo
-		vk::Format::eR8G8B8A8Unorm,       // MetallicRoughness
-		vk::Format::eR32Uint,             // IDBuffer
-	};
-
-	// --- Colour blend: 5 attachments, no blending (write all channels) ---
-	vk::PipelineColorBlendAttachmentState blendState;
-	blendState.blendEnable = VK_FALSE;
-	blendState.colorWriteMask =
-		vk::ColorComponentFlagBits::eR |
-		vk::ColorComponentFlagBits::eG |
-		vk::ColorComponentFlagBits::eB |
-		vk::ColorComponentFlagBits::eA;
-
-	// --- Push constant range: model + normalMatrix + objectID (vertex + fragment stages) ---
-	std::vector<vk::PushConstantRange> pushConstantRanges = {
-		vk::PushConstantRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-		                      0,
-		                      sizeof(MeshPushConstants))
-	};
-
-	// --- Descriptor set layout handles ---
-	std::vector<vk::DescriptorSetLayout> descriptorSetLayouts = {
-		*p_cameraLayout.layout()
-	};
+	vk::ShaderModuleCreateInfo vertSmCI({}, vertSpv);
+	vk::raii::ShaderModule vertModule(device, vertSmCI);
+	vk::ShaderModuleCreateInfo fragSmCI({}, fragSpv);
+	vk::raii::ShaderModule fragModule(device, fragSmCI);
+	vk::PipelineShaderStageCreateInfo vertStageCI({}, vk::ShaderStageFlagBits::eVertex, *vertModule, "main");
+	vk::PipelineShaderStageCreateInfo fragStageCI({}, vk::ShaderStageFlagBits::eFragment, *fragModule, "main");
 
 	// --- Build pipeline via PipelineBuilder ---
 	PipelineBuilder builder;
-	p_pipelines.push_back(
-		builder
-			.SetDebugName(debugName.c_str())
-			.AddShaderStage(vertGPU.GetStageCreateInfo())
-			.AddShaderStage(fragGPU.GetStageCreateInfo())
-			.SetVertexInput(p_vertexLayout)
-			.SetInputAssembly(vk::PrimitiveTopology::eTriangleList)
-			.SetRasterization(vk::PolygonMode::eFill,
-			                  vk::CullModeFlagBits::eNone,
-			                  vk::FrontFace::eClockwise)
-			.SetMultisampling()
-			.SetDepthStencil(true, true, vk::CompareOp::eLess)
-			.AddColorBlendAttachment(blendState)
-			.AddColorBlendAttachment(blendState)
-			.AddColorBlendAttachment(blendState)
-			.AddColorBlendAttachment(blendState)
-			.AddColorBlendAttachment(blendState)
-			.SetColorFormats(colorFormats)
-			.SetDepthFormat(vk::Format::eD32Sfloat)
-			.SetDescriptorSetLayouts(descriptorSetLayouts)
-			.SetPushConstantRanges(pushConstantRanges)
-			.BuildGraphicsPipeline(device));
+	builder.SetDebugName(debugName.c_str())
+	       .AddShaderStage(vertStageCI)
+	       .AddShaderStage(fragStageCI);
+	ConfigureGBufferPipeline(builder);
+	p_pipelines.push_back(builder.BuildGraphicsPipeline(device));
+}
+
+// ---------------------------------------------------------------------------
+// Shared G-Buffer pipeline configuration
+// ---------------------------------------------------------------------------
+
+void GeometryPass::ConfigureGBufferPipeline(PipelineBuilder& builder)
+{
+	static const vk::PipelineColorBlendAttachmentState kBlendNone(
+		VK_FALSE, vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
+		vk::BlendFactor::eOne, vk::BlendFactor::eZero, vk::BlendOp::eAdd,
+		vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
+		vk::ColorComponentFlagBits::eB | vk::ColorComponentFlagBits::eA);
+
+	builder.SetColorFormats({
+		vk::Format::eR16G16B16A16Sfloat,
+		vk::Format::eR16G16B16A16Sfloat,
+		vk::Format::eR8G8B8A8Srgb,
+		vk::Format::eR8G8B8A8Unorm,
+		vk::Format::eR32Uint
+	});
+	builder.SetDepthFormat(vk::Format::eD32Sfloat);
+	builder.SetDepthStencil(true, true, vk::CompareOp::eLess);
+	builder.SetVertexInput(p_vertexLayout);
+	builder.AddDescriptorSetLayout(*p_cameraLayout.layout());
+
+	vk::PushConstantRange pushRange(vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+	                                0, sizeof(MeshPushConstants));
+	builder.SetPushConstantRanges({pushRange});
+
+	builder.SetInputAssembly(vk::PrimitiveTopology::eTriangleList);
+	builder.SetRasterization(vk::PolygonMode::eFill,
+	                         vk::CullModeFlagBits::eNone,
+	                         vk::FrontFace::eClockwise);
+	builder.SetMultisampling();
+
+	for (int i = 0; i < 5; ++i)
+		builder.AddColorBlendAttachment(kBlendNone);
+}
+
+// ---------------------------------------------------------------------------
+// Per-mesh custom pipeline creation
+// ---------------------------------------------------------------------------
+
+Pipeline GeometryPass::CreatePerMeshPipeline(const Shader& shader, ShaderType /*stageType*/)
+{
+	// Create shader modules for all available stages
+	struct StageEntry
+	{
+		vk::PipelineShaderStageCreateInfo ci;
+		vk::raii::ShaderModule module;
+	};
+	std::vector<StageEntry> stages;
+
+	for (auto t : {ShaderType::VERTEX, ShaderType::FRAGMENT})
+	{
+		if (!shader.HasStage(t)) continue;
+		const auto& unit = shader.GetStage(t);
+		if (unit.spv.empty()) continue;
+
+		vk::ShaderStageFlagBits flag = vk::ShaderStageFlagBits::eVertex;
+		if (t == ShaderType::FRAGMENT) flag = vk::ShaderStageFlagBits::eFragment;
+		else if (t == ShaderType::COMPUTE) flag = vk::ShaderStageFlagBits::eCompute;
+
+		vk::ShaderModuleCreateInfo smCI({}, unit.spv);
+		vk::raii::ShaderModule module(*p_device, smCI);
+		vk::PipelineShaderStageCreateInfo stageCI({}, flag, *module, "main");
+
+		stages.push_back({stageCI, std::move(module)});
+	}
+
+	if (stages.empty()) return Pipeline{};
+
+	// Build pipeline using shared G-Buffer configuration
+	PipelineBuilder builder;
+	builder.SetDebugName("PerMeshPipeline");
+	for (auto& s : stages)
+		builder.AddShaderStage(s.ci);
+	ConfigureGBufferPipeline(builder);
+	return builder.BuildGraphicsPipeline(*p_device);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,17 +256,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	const vk::Rect2D scissor({0, 0}, renderExtent);
 	cmdBuf.setScissor(0, scissor);
 
-	// --- 5. Bind pipeline ---
-	cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[0].pipeline);
-
-	// --- 6. Bind camera descriptor set (set 0) ---
-	cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-	                          *p_pipelines[0].pipelineLayout,
-	                          0,
-	                          {p_cameraDescriptorSet.handle()},
-	                          {});
-
-	// --- 7. Draw each mesh from scene.mesh_list ---
+	// --- 5. Draw each mesh with optional per-mesh shader pipeline ---
 	if (scene)
 	{
 		for (const auto& [id, mesh] : scene->mesh_list)
@@ -246,15 +271,70 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 				continue;
 			}
 
+			// --- Per-mesh shader override (version-aware pipeline lookup) ---
+			bool usingCustomPipeline = false;
+			vk::PipelineLayout activeLayout = *p_pipelines[0].pipelineLayout;
+			if (mesh->o_shader)
+			{
+				int version = mesh->o_shader->GetVersion();
+
+				Pipeline* customPipeline = cache.GetPipeline(mesh->GetObjectID(), version);
+				if (!customPipeline)
+				{
+					Pipeline newPipeline = CreatePerMeshPipeline(*mesh->o_shader, ShaderType::VERTEX);
+					// Do not cache/bind a failed (empty) pipeline — fall back to the default one.
+					if (*newPipeline.pipeline)
+					{
+						cache.UsePipeline(mesh->GetObjectID(), std::move(newPipeline), version);
+						customPipeline = cache.GetPipeline(mesh->GetObjectID(), version);
+					}
+					else
+					{
+						NEURUS_ERR("[GeometryPass] Per-mesh pipeline creation failed for objectId="
+						           << mesh->GetObjectID() << " — falling back to default pipeline");
+					}
+				}
+
+				if (customPipeline)
+				{
+					cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics,
+					                    *customPipeline->pipeline);
+					// Bind camera descriptor set with the custom pipeline's layout
+					cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+					    *customPipeline->pipelineLayout,
+					    0,
+					    {p_cameraDescriptorSet.handle()},
+					    {});
+					activeLayout = *customPipeline->pipelineLayout;
+					usingCustomPipeline = true;
+				}
+			}
+
+			// Fall back to default pipeline if no custom shader or pipeline not cached
+			if (!usingCustomPipeline)
+			{
+				cmdBuf.bindPipeline(vk::PipelineBindPoint::eGraphics, *p_pipelines[0].pipeline);
+				cmdBuf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+				                          *p_pipelines[0].pipelineLayout,
+				                          0,
+				                          {p_cameraDescriptorSet.handle()},
+				                          {});
+			}
+
+			// --- Push constants ---
 			const glm::mat4 model = mesh->GetModelMatrix();
 			const glm::mat4 normalMat = glm::mat4(mesh->GetNormalMatrix());
 
 			MeshPushConstants pushConstants{model, normalMat,
 			                               static_cast<uint32_t>(mesh->GetObjectID())};
-			cmdBuf.pushConstants<MeshPushConstants>(*p_pipelines[0].pipelineLayout,
-			                                    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
-			                                    0, pushConstants);
 
+			// Push constants must use the layout of the currently bound pipeline
+			// (default layout, or the per-mesh custom pipeline's layout when set).
+			cmdBuf.pushConstants<MeshPushConstants>(activeLayout,
+			    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
+			    0, pushConstants);
+
+			// --- Draw ---
 			const vk::DeviceSize vbOffset = 0;
 			cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), vbOffset);
 			cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
@@ -262,7 +342,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		}
 	}
 
-	// --- 8. End dynamic rendering pass ---
+	// --- 6. End dynamic rendering pass ---
 	EndPass(cmdBuf);
 }
 

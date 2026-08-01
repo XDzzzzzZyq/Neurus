@@ -146,6 +146,8 @@ public:
 	 */
 	RenderCache& GetRenderCache() { return *r_renderCache; }
 
+	const vk::raii::Device& GetDevice() const { return r_device; }
+
 	/**
 	 * @brief Reads a single pixel from the IDBuffer attachment and returns the object ID.
 	 *

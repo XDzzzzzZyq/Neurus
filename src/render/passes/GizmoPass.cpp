@@ -13,7 +13,6 @@
 #include "RenderContext.h"
 #include "shaders/ShaderLibrary.h"
 #include "shaders/ComputeShader.h"
-#include "resources/ShaderGPU.h"
 
 #include "core/Log.h"
 
@@ -87,7 +86,9 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
 	// --- Compile and create temporary shader module ---
 	auto spv = ShaderLibrary::Compile(p_shader->GetStage(ShaderType::COMPUTE),
 	                                  ShaderType::COMPUTE, debugName);
-	ShaderGPU gpu(device, vk::ShaderStageFlagBits::eCompute, spv);
+	vk::ShaderModuleCreateInfo smCI({}, spv);
+	vk::raii::ShaderModule module(device, smCI);
+	vk::PipelineShaderStageCreateInfo stageCI({}, vk::ShaderStageFlagBits::eCompute, *module, "main");
 
 	// --- Push constant range (1 uint = 4 bytes) ---
 	vk::PushConstantRange pushRange(
@@ -98,7 +99,7 @@ void GizmoPass::BuildPipeline(const vk::raii::Device& device,
 	// --- Build compute pipeline ---
 	PipelineBuilder builder;
 	p_pipelines.push_back(
-		builder.AddShaderStage(gpu.GetStageCreateInfo())
+		builder.AddShaderStage(stageCI)
 			.SetDebugName(debugName.c_str())
 			.AddDescriptorSetLayout(*p_descriptorSetLayout.layout())
 			.AddPushConstantRange(pushRange)
