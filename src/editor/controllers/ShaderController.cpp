@@ -14,6 +14,7 @@
 
 #include "editor/controllers/ShaderController.h"
 #include "editor/events/ShaderEvents.h"
+#include "editor/events/EditorEvents.h"
 #include "editor/events/EventBus.h"
 
 #include "scene/Mesh.h"
@@ -447,13 +448,18 @@ namespace neurus {
 
 void ShaderController::Init(EventQueue& bus)
 {
+	// Create/Compile bump the shader version -> pipeline rebuilds on the next
+	// frame, so temporal accumulation (shadow intensity) must reset. Code/struct
+	// edits do NOT bump the version and only apply on the next Compile.
 	bus.subscribe<ShaderCreateRequested>(
-		[](const ShaderCreateRequested& e) {
+		[&bus](const ShaderCreateRequested& e) {
 			OnCreateShader(e);
+			bus.enqueue(RenderResetEvent{});
 		});
 	bus.subscribe<ShaderCompileRequested>(
-		[](const ShaderCompileRequested& e) {
+		[&bus](const ShaderCompileRequested& e) {
 			OnCompileShader(e);
+			bus.enqueue(RenderResetEvent{});
 		});
 	bus.subscribe<ShaderCodeEdited>(
 		[](const ShaderCodeEdited& e) {
