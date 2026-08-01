@@ -56,13 +56,9 @@ public:
 	/** @brief Rebuilds the entire tree from a ShaderStruct. */
 	void setShaderStruct(const ShaderStruct* shaderStruct);
 
-	/** @brief Emits fieldAdded for the given section / sub-field. */
-	void addEntry(ShaderSection section, int subFieldIndex);
-
 signals:
 	void fieldEdited(ShaderSection section, int fieldIndex, int subFieldIndex,
 	                 const QString& field, const QString& value);
-	void fieldAdded(ShaderSection section, int subFieldIndex);
 
 private:
 	struct Node

@@ -151,14 +151,10 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	structPageLayout->setSpacing(2);
 
 	auto* treeToolbar = new QHBoxLayout();
-	m_addBtn = new QPushButton("+", structPage);
-	m_addBtn->setToolTip("Add entry");
-	m_addBtn->setFixedSize(24, 24);
 	m_removeBtn = new QPushButton("-", structPage);
 	m_removeBtn->setToolTip("Remove entry");
 	m_removeBtn->setFixedSize(24, 24);
 	m_removeBtn->setEnabled(false);
-	treeToolbar->addWidget(m_addBtn);
 	treeToolbar->addWidget(m_removeBtn);
 	treeToolbar->addStretch();
 	structPageLayout->addLayout(treeToolbar);
@@ -236,19 +232,6 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 		}
 	});
 
-	// --- Tree model add -> fieldAdded event ---
-	QObject::connect(m_model, &ShaderStructModel::fieldAdded,
-	                 [this](ShaderSection section, int subFieldIndex) {
-		if (m_activeObject)
-		{
-			emit fieldAdded({m_activeObject, m_cachedStageType, section, subFieldIndex});
-			m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
-		}
-	});
-
-	// --- Add button -> add entry to selected section/struct ---
-	QObject::connect(m_addBtn, &QPushButton::clicked, this, &ShaderEditorPanel::handleAddEntry);
-
 	// Start with empty state
 	setShowEmptyState(true);
 }
@@ -308,7 +291,6 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 		setShowCreateButton(true);
 		if (m_codeEditor) m_codeEditor->setVisible(false);
 		m_treeView->setVisible(false);
-		m_addBtn->setVisible(false);
 		m_removeBtn->setVisible(false);
 		return;
 	}
@@ -319,7 +301,6 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	setShowCreateButton(false);
 	if (m_codeEditor) m_codeEditor->setVisible(true);
 	m_treeView->setVisible(true);
-	m_addBtn->setVisible(true);
 	m_removeBtn->setVisible(true);
 	populateSections(unitPtr, objectChanged);
 }
@@ -374,60 +355,72 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr, bool objectC
 		}
 	}
 
-	// Span first column for section headers and struct def rows. The model
-	// reset drops spans too, so re-apply them on every populate.
+	// Span first column for section headers and struct def rows, and install
+	// per-row "+" buttons. The model reset drops spans AND index widgets, so
+	// both are re-applied on every populate.
 	for (int row = 0; row < m_model->rowCount(QModelIndex()); ++row)
 	{
-		m_treeView->setFirstColumnSpanned(row, QModelIndex(), true);
 		QModelIndex sectionIdx = m_model->index(row, 0, QModelIndex());
+		m_treeView->setFirstColumnSpanned(row, QModelIndex(), true);
+		m_treeView->setIndexWidget(sectionIdx, createAddRowWidget(sectionIdx));
 		for (int child = 0; child < m_model->rowCount(sectionIdx); ++child)
 		{
 			QModelIndex childIdx = m_model->index(child, 0, sectionIdx);
 			int nodeType = childIdx.data(ShaderStructModel::RoleNodeType).toInt();
 			if (nodeType == ShaderStructModel::NodeStructDef)
+			{
 				m_treeView->setFirstColumnSpanned(child, sectionIdx, true);
+				m_treeView->setIndexWidget(childIdx, createAddRowWidget(childIdx));
+			}
 		}
 	}
 }
 
 // =========================================================================
-// handleAddEntry
+// Per-row add buttons
 // =========================================================================
 
-void ShaderEditorPanel::handleAddEntry()
+QWidget* ShaderEditorPanel::createAddRowWidget(const QModelIndex& index)
 {
-	ShaderSection section = ShaderSection::Attributes;
+	auto* widget = new QWidget(m_treeView);
+	auto* layout = new QHBoxLayout(widget);
+	layout->setContentsMargins(4, 0, 0, 0);
+	layout->setSpacing(4);
+
+	auto* label = new QLabel(index.data(Qt::DisplayRole).toString(), widget);
+	QFont font = label->font();
+	font.setBold(index.data(ShaderStructModel::RoleNodeType).toInt() == ShaderStructModel::NodeSection);
+	label->setFont(font);
+	layout->addWidget(label, 1);
+
+	auto* addBtn = new QPushButton("+", widget);
+	addBtn->setObjectName("sectionAddBtn");
+	addBtn->setToolTip("Add entry");
+	addBtn->setFixedSize(16, 16);
+	layout->addWidget(addBtn);
+
+	QObject::connect(addBtn, &QPushButton::clicked, this,
+	                 [this, index]() { handleAddClick(index); });
+
+	return widget;
+}
+
+void ShaderEditorPanel::handleAddClick(const QModelIndex& index)
+{
+	if (!m_activeObject || !index.isValid())
+		return;
+
+	m_treeView->expand(index);  // reveal the appended row
+
+	// Section row -> append to that section; struct def row -> add a member field.
+	int nodeType = index.data(ShaderStructModel::RoleNodeType).toInt();
+	ShaderSection section = static_cast<ShaderSection>(index.data(ShaderStructModel::RoleSection).toInt());
 	int subFieldIndex = -1;
+	if (nodeType == ShaderStructModel::NodeStructDef)
+		subFieldIndex = index.data(ShaderStructModel::RoleFieldIndex).toInt();
 
-	QModelIndex current = m_treeView->currentIndex();
-	while (current.isValid())
-	{
-		int nodeType = current.data(ShaderStructModel::RoleNodeType).toInt();
-		int currentSection = current.data(ShaderStructModel::RoleSection).toInt();
-
-		if (nodeType == ShaderStructModel::NodeStructDef)
-		{
-			section = ShaderSection::StructDefs;
-			subFieldIndex = current.data(ShaderStructModel::RoleFieldIndex).toInt();
-			break;
-		}
-		if (nodeType == ShaderStructModel::NodeStructMember)
-		{
-			section = ShaderSection::StructDefs;
-			subFieldIndex = current.data(ShaderStructModel::RoleFieldIndex).toInt();
-			break;
-		}
-		if (nodeType == ShaderStructModel::NodeSection || nodeType == ShaderStructModel::NodeField)
-		{
-			section = static_cast<ShaderSection>(currentSection);
-			subFieldIndex = -1;
-			break;
-		}
-
-		current = current.parent();
-	}
-
-	m_model->addEntry(section, subFieldIndex);
+	emit fieldAdded({m_activeObject, m_cachedStageType, section, subFieldIndex});
+	m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
 }
 
 // =========================================================================
@@ -443,7 +436,6 @@ void ShaderEditorPanel::setShowEmptyState(bool show)
 	// Hide all content when showing empty state
 	if (m_codeEditor) m_codeEditor->setVisible(!show);
 	m_treeView->setVisible(!show);
-	m_addBtn->setVisible(!show);
 	m_removeBtn->setVisible(!show);
 }
 

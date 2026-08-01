@@ -14,9 +14,11 @@
 
 class QComboBox;
 class QLabel;
+class QModelIndex;
 class QPushButton;
 class QStackedWidget;
 class QTreeView;
+class QWidget;
 
 namespace neurus { class CodeEditor; class ObjectID; class ShaderFieldDelegate; class ShaderStructModel; }
 
@@ -49,8 +51,11 @@ private:
 	/** @brief Populates the struct tree model and code editor from a ShaderUnit. */
 	void populateSections(const void* shaderUnitPtr, bool objectChanged);
 
-	/** @brief Resolves the target section/subField for the Add button from the current selection. */
-	void handleAddEntry();
+	/** @brief Builds a label + "+" button row widget for a section header or struct def row. */
+	QWidget* createAddRowWidget(const QModelIndex& index);
+
+	/** @brief Emits fieldAdded for the section/struct-def row whose "+" was clicked. */
+	void handleAddClick(const QModelIndex& index);
 
 	/** @brief Shows the "Create Shader" button for objects without a shader. */
 	void setShowCreateButton(bool show);
@@ -74,7 +79,6 @@ private:
 	QTreeView* m_treeView = nullptr;
 	ShaderStructModel* m_model = nullptr;
 	ShaderFieldDelegate* m_delegate = nullptr;
-	QPushButton* m_addBtn = nullptr;
 	QPushButton* m_removeBtn = nullptr;
 
 	// --- Empty state / create button ---

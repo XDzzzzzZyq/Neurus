@@ -145,11 +145,6 @@ void ShaderStructModel::setShaderStruct(const ShaderStruct* shaderStruct)
 	endResetModel();
 }
 
-void ShaderStructModel::addEntry(ShaderSection section, int subFieldIndex)
-{
-	emit fieldAdded(section, subFieldIndex);
-}
-
 void ShaderStructModel::buildTree()
 {
 	m_root = std::make_unique<Node>();
