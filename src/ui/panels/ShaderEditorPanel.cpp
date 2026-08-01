@@ -192,8 +192,11 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 		QObject::connect(section, &ShaderStructSection::fieldEdited,
 		                 [this, sectionId](int fieldIndex, const QString& field, const QString& value) {
 			if (m_activeObject)
+			{
 				emit structEdited({m_activeObject, m_cachedStageType, sectionId,
 				                   fieldIndex, -1, field.toStdString(), value.toStdString()});
+				m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
+			}
 		});
 	};
 	connectFieldEdited(m_abSection,      ShaderSection::Attributes);
@@ -211,7 +214,10 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 		QObject::connect(section, &ShaderStructSection::addButtonClicked,
 		                 [this, sectionId]() {
 			if (m_activeObject)
+			{
 				emit fieldAdded({m_activeObject, m_cachedStageType, sectionId, -1});
+				m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
+			}
 		});
 	};
 	connectAddButton(m_abSection,      ShaderSection::Attributes);
