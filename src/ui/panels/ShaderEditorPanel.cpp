@@ -1,23 +1,76 @@
 #include "ShaderEditorPanel.h"
 
 #include "elements/CodeEditor.h"
-#include "items/ShaderStructSection.h"
+#include "items/ShaderFieldDelegate.h"
+#include "items/ShaderStructModel.h"
 #include "UIContext.h"
 #include "scene/Scene.h"
 #include "render/shaders/ShaderUnit.h"
 #include "render/shaders/ShaderStruct.h"
 
+#include <QAbstractItemView>
 #include <QComboBox>
-#include <QGroupBox>
+#include <QFile>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
-#include <QScrollArea>
 #include <QSizePolicy>
 #include <QStackedWidget>
+#include <QTextStream>
+#include <QTreeView>
 #include <QVBoxLayout>
+
+#include <vector>
 
 namespace neurus
 {
+
+// =========================================================================
+// Tree state helpers (file-local)
+// =========================================================================
+
+namespace
+{
+
+/** @brief Returns the row path of @p idx: [rootRow, ..., idxRow]. */
+std::vector<int> indexPathOf(const QModelIndex& idx)
+{
+	std::vector<int> path;
+	for (QModelIndex cur = idx; cur.isValid(); cur = cur.parent())
+		path.insert(path.begin(), cur.row());
+	return path;
+}
+
+/** @brief Collects row paths of all expanded nodes under @p parent. */
+void collectExpandedPaths(QTreeView* tree, QAbstractItemModel* model,
+                          const QModelIndex& parent, std::vector<std::vector<int>>& out)
+{
+	for (int row = 0; row < model->rowCount(parent); ++row)
+	{
+		QModelIndex idx = model->index(row, 0, parent);
+		if (tree->isExpanded(idx))
+		{
+			out.push_back(indexPathOf(idx));
+			collectExpandedPaths(tree, model, idx, out);
+		}
+	}
+}
+
+/** @brief Resolves a row path back to a QModelIndex after a model rebuild. */
+QModelIndex indexFromPath(QAbstractItemModel* model, const std::vector<int>& path)
+{
+	QModelIndex parent;
+	for (int row : path)
+	{
+		QModelIndex child = model->index(row, 0, parent);
+		if (!child.isValid())
+			return QModelIndex();
+		parent = child;
+	}
+	return parent;
+}
+
+} // namespace
 
 // =========================================================================
 // Constructor
@@ -95,55 +148,40 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	auto* structPage = new QWidget();
 	auto* structPageLayout = new QVBoxLayout(structPage);
 	structPageLayout->setContentsMargins(0, 0, 0, 0);
+	structPageLayout->setSpacing(2);
 
-	m_structScroll = new QScrollArea(this);
-	m_structScroll->setWidgetResizable(true);
-	m_structContent = new QWidget();
-	m_structLayout = new QVBoxLayout(m_structContent);
-	m_structLayout->setContentsMargins(0, 0, 0, 0);
-	m_structLayout->setSpacing(4);
+	auto* treeToolbar = new QHBoxLayout();
+	m_addBtn = new QPushButton("+", structPage);
+	m_addBtn->setToolTip("Add entry");
+	m_addBtn->setFixedSize(24, 24);
+	m_removeBtn = new QPushButton("-", structPage);
+	m_removeBtn->setToolTip("Remove entry");
+	m_removeBtn->setFixedSize(24, 24);
+	m_removeBtn->setEnabled(false);
+	treeToolbar->addWidget(m_addBtn);
+	treeToolbar->addWidget(m_removeBtn);
+	treeToolbar->addStretch();
+	structPageLayout->addLayout(treeToolbar);
 
-	// Create all sections (hidden until populated)
-	m_abSection      = new ShaderStructSection(this);
-	m_passSection    = new ShaderStructSection(this);
-	m_inputSection   = new ShaderStructSection(this);
-	m_outputSection  = new ShaderStructSection(this);
-	m_uniformSection = new ShaderStructSection(this);
-	m_structSection  = new ShaderStructSection(this);
-	m_funcSection    = new ShaderStructSection(this);
-	m_pushConstSection = new ShaderStructSection(this);
+	m_treeView = new QTreeView(structPage);
+	m_model = new ShaderStructModel(this);
+	m_delegate = new ShaderFieldDelegate(this);
+	m_treeView->setModel(m_model);
+	m_treeView->setItemDelegate(m_delegate);
+	m_treeView->setAlternatingRowColors(true);
+	m_treeView->setUniformRowHeights(true);
+	m_treeView->setSelectionBehavior(QAbstractItemView::SelectRows);
+	m_treeView->setSelectionMode(QAbstractItemView::SingleSelection);
+	m_treeView->setIndentation(12);  // tighter indentation so struct members have more space
 
-	m_abSection->setTitle("Attributes (layout(location))");
-	m_passSection->setTitle("Pass Outputs (layout(location))");
-	m_inputSection->setTitle("Inputs");
-	m_outputSection->setTitle("Outputs");
-	m_uniformSection->setTitle("Uniforms");
-	m_structSection->setTitle("Struct Definitions");
-	m_funcSection->setTitle("Functions");
-	m_pushConstSection->setTitle("Push Constants");
+	// Load tree stylesheet from Qt resource (qml/shader_editor.qss)
+	{
+		QFile file(":/qml/shader_editor.qss");
+		if (file.open(QIODevice::ReadOnly | QIODevice::Text))
+			m_treeView->setStyleSheet(QTextStream(&file).readAll());
+	}
+	structPageLayout->addWidget(m_treeView, 1);
 
-	m_abSection->setAddButtonVisible(true);
-	m_passSection->setAddButtonVisible(true);
-	m_inputSection->setAddButtonVisible(true);
-	m_outputSection->setAddButtonVisible(true);
-	m_uniformSection->setAddButtonVisible(true);
-	m_structSection->setAddButtonVisible(true);
-	m_funcSection->setAddButtonVisible(true);
-	m_pushConstSection->setAddButtonVisible(true);
-
-	m_structLayout->addWidget(m_abSection);
-	m_structLayout->addWidget(m_passSection);
-	m_structLayout->addWidget(m_inputSection);
-	m_structLayout->addWidget(m_outputSection);
-	m_structLayout->addWidget(m_uniformSection);
-	m_structLayout->addWidget(m_structSection);
-	m_structLayout->addWidget(m_funcSection);
-	m_structLayout->addWidget(m_pushConstSection);
-
-	m_structLayout->addStretch();
-
-	m_structScroll->setWidget(m_structContent);
-	structPageLayout->addWidget(m_structScroll);
 	m_contentStack->addWidget(structPage);
 
 	// Default to Struct Editor
@@ -186,48 +224,30 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 		m_activeObject = nullptr;  // Re-read on next Refresh
 	});
 
-	// --- Section field edits -> structEdited event ---
-	auto connectFieldEdited = [this](ShaderStructSection* section, ShaderSection sectionId)
-	{
-		QObject::connect(section, &ShaderStructSection::fieldEdited,
-		                 [this, sectionId](int fieldIndex, const QString& field, const QString& value) {
-			if (m_activeObject)
-			{
-				emit structEdited({m_activeObject, m_cachedStageType, sectionId,
-				                   fieldIndex, -1, field.toStdString(), value.toStdString()});
-				m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
-			}
-		});
-	};
-	connectFieldEdited(m_abSection,      ShaderSection::Attributes);
-	connectFieldEdited(m_passSection,    ShaderSection::PassOutputs);
-	connectFieldEdited(m_inputSection,   ShaderSection::Inputs);
-	connectFieldEdited(m_outputSection,  ShaderSection::Outputs);
-	connectFieldEdited(m_uniformSection, ShaderSection::Uniforms);
-	connectFieldEdited(m_structSection,  ShaderSection::StructDefs);
-	connectFieldEdited(m_funcSection,    ShaderSection::Functions);
-	connectFieldEdited(m_pushConstSection, ShaderSection::PushConstants);
+	// --- Tree model edits -> structEdited event ---
+	QObject::connect(m_model, &ShaderStructModel::fieldEdited,
+	                 [this](ShaderSection section, int fieldIndex, int subFieldIndex,
+	                        const QString& field, const QString& value) {
+		if (m_activeObject)
+		{
+			emit structEdited({m_activeObject, m_cachedStageType, section,
+			                   fieldIndex, subFieldIndex, field.toStdString(), value.toStdString()});
+			m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
+		}
+	});
 
-	// --- Section add buttons -> fieldAdded event ---
-	auto connectAddButton = [this](ShaderStructSection* section, ShaderSection sectionId)
-	{
-		QObject::connect(section, &ShaderStructSection::addButtonClicked,
-		                 [this, sectionId]() {
-			if (m_activeObject)
-			{
-				emit fieldAdded({m_activeObject, m_cachedStageType, sectionId, -1});
-				m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
-			}
-		});
-	};
-	connectAddButton(m_abSection,      ShaderSection::Attributes);
-	connectAddButton(m_passSection,    ShaderSection::PassOutputs);
-	connectAddButton(m_inputSection,   ShaderSection::Inputs);
-	connectAddButton(m_outputSection,  ShaderSection::Outputs);
-	connectAddButton(m_uniformSection, ShaderSection::Uniforms);
-	connectAddButton(m_structSection,  ShaderSection::StructDefs);
-	connectAddButton(m_funcSection,    ShaderSection::Functions);
-	connectAddButton(m_pushConstSection, ShaderSection::PushConstants);
+	// --- Tree model add -> fieldAdded event ---
+	QObject::connect(m_model, &ShaderStructModel::fieldAdded,
+	                 [this](ShaderSection section, int subFieldIndex) {
+		if (m_activeObject)
+		{
+			emit fieldAdded({m_activeObject, m_cachedStageType, section, subFieldIndex});
+			m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
+		}
+	});
+
+	// --- Add button -> add entry to selected section/struct ---
+	QObject::connect(m_addBtn, &QPushButton::clicked, this, &ShaderEditorPanel::handleAddEntry);
 
 	// Start with empty state
 	setShowEmptyState(true);
@@ -276,6 +296,7 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	if (activeObj == m_activeObject && unitVersion == m_cachedShaderVersion)
 		return;
 
+	bool objectChanged = (activeObj != m_activeObject);
 	m_activeObject = activeObj;
 	m_cachedShaderVersion = unitVersion;
 
@@ -286,29 +307,28 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 		m_showingEmptyState = false;
 		setShowCreateButton(true);
 		if (m_codeEditor) m_codeEditor->setVisible(false);
-		m_abSection->setVisible(false);
-		m_passSection->setVisible(false);
-		m_inputSection->setVisible(false);
-		m_outputSection->setVisible(false);
-		m_uniformSection->setVisible(false);
-		m_structSection->setVisible(false);
-		m_funcSection->setVisible(false);
+		m_treeView->setVisible(false);
+		m_addBtn->setVisible(false);
+		m_removeBtn->setVisible(false);
 		return;
 	}
 
-	// Has shader — show sections and code editor, hide create button and empty label
+	// Has shader — show content, hide create button and empty label
 	m_emptyLabel->setVisible(false);
 	m_showingEmptyState = false;
 	setShowCreateButton(false);
 	if (m_codeEditor) m_codeEditor->setVisible(true);
-	populateSections(unitPtr);
+	m_treeView->setVisible(true);
+	m_addBtn->setVisible(true);
+	m_removeBtn->setVisible(true);
+	populateSections(unitPtr, objectChanged);
 }
 
 // =========================================================================
 // populateSections
 // =========================================================================
 
-void ShaderEditorPanel::populateSections(const void* shaderUnitPtr)
+void ShaderEditorPanel::populateSections(const void* shaderUnitPtr, bool objectChanged)
 {
 	auto* unit = static_cast<const ShaderUnit*>(shaderUnitPtr);
 	const auto& parsed = unit->parsed;
@@ -316,161 +336,98 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr)
 	// Populate code editor with generated source
 	m_codeEditor->setCode(unit->code);
 
-	using F = ShaderStructSection::FieldData;
-
-	// Attributes (AB_list)
-	if (!parsed.AB_list.empty())
+	// Remember which sections/structs are expanded and the current selection
+	// before the model rebuild: beginResetModel()/endResetModel() clears the
+	// view's expansion state AND its selection, which would collapse every
+	// section and drop the selected row on every refresh.
+	std::vector<std::vector<int>> expandedPaths;
+	std::vector<int> currentPath;
+	if (!objectChanged)
 	{
-		std::vector<F> fields;
-		fields.reserve(parsed.AB_list.size());
-		for (const auto& io : parsed.AB_list)
-			fields.push_back({ShaderStruct::ParseType(io.type), io.name, io.location});
-		m_abSection->setFields(fields);
-		m_abSection->setVisible(true);
+		collectExpandedPaths(m_treeView, m_model, QModelIndex(), expandedPaths);
+		QModelIndex current = m_treeView->currentIndex();
+		if (current.isValid())
+			currentPath = indexPathOf(current);
+	}
+
+	// Build tree model; only expand all when the object changes (preserve collapse state on refresh)
+	m_model->setShaderStruct(&parsed);
+	if (objectChanged)
+	{
+		m_treeView->expandAll();
 	}
 	else
 	{
-		m_abSection->setFields({});
-		m_abSection->setVisible(false);
-	}
-
-	// Pass Outputs (pass_list)
-	if (!parsed.pass_list.empty())
-	{
-		std::vector<F> fields;
-		fields.reserve(parsed.pass_list.size());
-		for (const auto& io : parsed.pass_list)
-			fields.push_back({ShaderStruct::ParseType(io.type), io.name, io.location});
-		m_passSection->setFields(fields);
-		m_passSection->setVisible(true);
-	}
-	else
-	{
-		m_passSection->setFields({});
-		m_passSection->setVisible(false);
-	}
-
-	// Inputs (input_list)
-	if (!parsed.input_list.empty())
-	{
-		std::vector<F> fields;
-		fields.reserve(parsed.input_list.size());
-		for (const auto& u : parsed.input_list)
+		for (const auto& path : expandedPaths)
 		{
-			std::string typeName = u.actualType.empty()
-				? ShaderStruct::ParseType(u.type)
-				: u.actualType;
-			fields.push_back({typeName, u.name});
+			QModelIndex idx = indexFromPath(m_model, path);
+			if (idx.isValid())
+				m_treeView->setExpanded(idx, true);
 		}
-		m_inputSection->setFields(fields);
-		m_inputSection->setVisible(true);
-	}
-	else
-	{
-		m_inputSection->setFields({});
-		m_inputSection->setVisible(false);
-	}
 
-	// Outputs (output_list)
-	if (!parsed.output_list.empty())
-	{
-		std::vector<F> fields;
-		fields.reserve(parsed.output_list.size());
-		for (const auto& u : parsed.output_list)
+		// Restore the selection so clicking "+" keeps the previously selected row.
+		if (!currentPath.empty())
 		{
-			std::string typeName = u.actualType.empty()
-				? ShaderStruct::ParseType(u.type)
-				: u.actualType;
-			fields.push_back({typeName, u.name});
+			QModelIndex idx = indexFromPath(m_model, currentPath);
+			if (idx.isValid())
+				m_treeView->setCurrentIndex(idx);
 		}
-		m_outputSection->setFields(fields);
-		m_outputSection->setVisible(true);
-	}
-	else
-	{
-		m_outputSection->setFields({});
-		m_outputSection->setVisible(false);
 	}
 
-	// Uniforms (uniform_list)
-	if (!parsed.uniform_list.empty())
+	// Span first column for section headers and struct def rows. The model
+	// reset drops spans too, so re-apply them on every populate.
+	for (int row = 0; row < m_model->rowCount(QModelIndex()); ++row)
 	{
-		std::vector<F> fields;
-		fields.reserve(parsed.uniform_list.size());
-		for (const auto& u : parsed.uniform_list)
+		m_treeView->setFirstColumnSpanned(row, QModelIndex(), true);
+		QModelIndex sectionIdx = m_model->index(row, 0, QModelIndex());
+		for (int child = 0; child < m_model->rowCount(sectionIdx); ++child)
 		{
-			std::string typeName = u.actualType.empty()
-				? ShaderStruct::ParseType(u.type)
-				: u.actualType;
-			fields.push_back({typeName, u.name});
+			QModelIndex childIdx = m_model->index(child, 0, sectionIdx);
+			int nodeType = childIdx.data(ShaderStructModel::RoleNodeType).toInt();
+			if (nodeType == ShaderStructModel::NodeStructDef)
+				m_treeView->setFirstColumnSpanned(child, sectionIdx, true);
 		}
-		m_uniformSection->setFields(fields);
-		m_uniformSection->setVisible(true);
 	}
-	else
-	{
-		m_uniformSection->setFields({});
-		m_uniformSection->setVisible(false);
-	}
+}
 
-	// Struct Definitions (struct_def_list) — show struct name + indented member fields
-	if (!parsed.struct_def_list.empty())
+// =========================================================================
+// handleAddEntry
+// =========================================================================
+
+void ShaderEditorPanel::handleAddEntry()
+{
+	ShaderSection section = ShaderSection::Attributes;
+	int subFieldIndex = -1;
+
+	QModelIndex current = m_treeView->currentIndex();
+	while (current.isValid())
 	{
-		std::vector<F> fields;
-		fields.reserve(parsed.struct_def_list.size());
-		for (const auto& sd : parsed.struct_def_list)
+		int nodeType = current.data(ShaderStructModel::RoleNodeType).toInt();
+		int currentSection = current.data(ShaderStructModel::RoleSection).toInt();
+
+		if (nodeType == ShaderStructModel::NodeStructDef)
 		{
-			// Struct definition row (name + varName)
-			fields.push_back({sd.name, sd.varName});
-			// Indented member fields
-			for (const auto& mf : sd.fields)
-			{
-				std::string typeName = mf.typeName.empty()
-					? ShaderStruct::ParseType(mf.type)
-					: mf.typeName;
-				fields.push_back({"  " + typeName, mf.name});
-			}
+			section = ShaderSection::StructDefs;
+			subFieldIndex = current.data(ShaderStructModel::RoleFieldIndex).toInt();
+			break;
 		}
-		m_structSection->setFields(fields);
-		m_structSection->setVisible(true);
-	}
-	else
-	{
-		m_structSection->setFields({});
-		m_structSection->setVisible(false);
+		if (nodeType == ShaderStructModel::NodeStructMember)
+		{
+			section = ShaderSection::StructDefs;
+			subFieldIndex = current.data(ShaderStructModel::RoleFieldIndex).toInt();
+			break;
+		}
+		if (nodeType == ShaderStructModel::NodeSection || nodeType == ShaderStructModel::NodeField)
+		{
+			section = static_cast<ShaderSection>(currentSection);
+			subFieldIndex = -1;
+			break;
+		}
+
+		current = current.parent();
 	}
 
-	// Functions (func_list)
-	if (!parsed.func_list.empty())
-	{
-		std::vector<F> fields;
-		fields.reserve(parsed.func_list.size());
-		for (const auto& fn : parsed.func_list)
-			fields.push_back({ShaderStruct::ParseType(fn.returnType), fn.name});
-		m_funcSection->setFields(fields);
-		m_funcSection->setVisible(true);
-	}
-	else
-	{
-		m_funcSection->setFields({});
-		m_funcSection->setVisible(false);
-	}
-
-	// Push Constants (push_constants)
-	if (!parsed.push_constants.empty())
-	{
-		std::vector<F> fields;
-		fields.reserve(parsed.push_constants.size());
-		for (const auto& pc : parsed.push_constants)
-			fields.push_back({pc.typeName, pc.name});
-		m_pushConstSection->setFields(fields);
-		m_pushConstSection->setVisible(true);
-	}
-	else
-	{
-		m_pushConstSection->setFields({});
-		m_pushConstSection->setVisible(false);
-	}
+	m_model->addEntry(section, subFieldIndex);
 }
 
 // =========================================================================
@@ -483,16 +440,11 @@ void ShaderEditorPanel::setShowEmptyState(bool show)
 	m_showingEmptyState = show;
 	m_emptyLabel->setVisible(show);
 
-	// Hide all sections and code editor when showing empty state
+	// Hide all content when showing empty state
 	if (m_codeEditor) m_codeEditor->setVisible(!show);
-	m_abSection->setVisible(!show);
-	m_passSection->setVisible(!show);
-	m_inputSection->setVisible(!show);
-	m_outputSection->setVisible(!show);
-	m_uniformSection->setVisible(!show);
-	m_structSection->setVisible(!show);
-	m_funcSection->setVisible(!show);
-	m_pushConstSection->setVisible(!show);
+	m_treeView->setVisible(!show);
+	m_addBtn->setVisible(!show);
+	m_removeBtn->setVisible(!show);
 }
 
 void ShaderEditorPanel::setShowCreateButton(bool show)

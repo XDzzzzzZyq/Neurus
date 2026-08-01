@@ -1,10 +1,9 @@
 /**
  * @file ShaderEditorPanel.h
- * @brief Shader Editor dock panel -- Struct mode + Code mode (placeholder).
+ * @brief Shader Editor dock panel -- Struct mode + Code mode.
  *
  * Provides a tree-based Struct Editor for editing per-mesh GLSL shaders.
- * A QStackedWidget switches between Code Editor (placeholder) and Struct
- * Editor views based on the mode combo selection.
+ * A QStackedWidget switches between Code Editor and Struct Editor views.
  */
 #pragma once
 
@@ -12,22 +11,17 @@
 #include "editor/events/ShaderEvents.h"
 
 #include <string>
-#include <vector>
 
 class QComboBox;
 class QLabel;
-class QPlainTextEdit;
 class QPushButton;
-
-namespace neurus { class CodeEditor; class ObjectID; }
-class QScrollArea;
 class QStackedWidget;
-class QVBoxLayout;
+class QTreeView;
+
+namespace neurus { class CodeEditor; class ObjectID; class ShaderFieldDelegate; class ShaderStructModel; }
 
 namespace neurus
 {
-
-class ShaderStructSection;
 
 class ShaderEditorPanel : public UIPanel
 {
@@ -52,8 +46,11 @@ signals:
 	void fieldAdded(const ShaderFieldAdded& e);
 
 private:
-	/** @brief Populates struct sections from a parsed ShaderUnit. */
-	void populateSections(const void* shaderUnitPtr);
+	/** @brief Populates the struct tree model and code editor from a ShaderUnit. */
+	void populateSections(const void* shaderUnitPtr, bool objectChanged);
+
+	/** @brief Resolves the target section/subField for the Add button from the current selection. */
+	void handleAddEntry();
 
 	/** @brief Shows the "Create Shader" button for objects without a shader. */
 	void setShowCreateButton(bool show);
@@ -74,23 +71,15 @@ private:
 	CodeEditor* m_codeEditor = nullptr;
 
 	// --- Struct Editor (Page 1) ---
-	QScrollArea*     m_structScroll  = nullptr;
-	QWidget*         m_structContent = nullptr;
-	QVBoxLayout*     m_structLayout  = nullptr;
-
-	// --- Struct sections (hardcoded for now) ---
-	ShaderStructSection* m_abSection      = nullptr;  // Attributes
-	ShaderStructSection* m_passSection    = nullptr;  // Outputs (pass)
-	ShaderStructSection* m_inputSection   = nullptr;  // Inputs
-	ShaderStructSection* m_outputSection  = nullptr;  // Outputs
-	ShaderStructSection* m_uniformSection = nullptr;  // Uniforms
-	ShaderStructSection* m_structSection  = nullptr;  // Struct Definitions
-	ShaderStructSection* m_funcSection    = nullptr;  // Functions
-	ShaderStructSection* m_pushConstSection = nullptr; // Push Constants
+	QTreeView* m_treeView = nullptr;
+	ShaderStructModel* m_model = nullptr;
+	ShaderFieldDelegate* m_delegate = nullptr;
+	QPushButton* m_addBtn = nullptr;
+	QPushButton* m_removeBtn = nullptr;
 
 	// --- Empty state / create button ---
-	QLabel*       m_emptyLabel    = nullptr;
-	QPushButton*  m_createBtn     = nullptr;
+	QLabel*      m_emptyLabel = nullptr;
+	QPushButton* m_createBtn  = nullptr;
 
 	// --- State ---
 	const ObjectID* m_activeObject    = nullptr;

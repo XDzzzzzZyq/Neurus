@@ -1,0 +1,25 @@
+QTreeView {
+	background: transparent;
+}
+
+QTreeView::item {
+	border: 1px solid transparent;
+	border-radius: 3px;
+	outline: none;
+}
+
+QTreeView::item:hover {
+	border-color: #313131;
+}
+
+QTreeView::item:selected {
+	background: #4A90D9;
+	color: white;
+	border-color: #4A90D9;
+}
+
+QTreeView::item:selected:active {
+	background: #ff6f00;
+	color: white;
+	border-color: #ff6f00;
+}

@@ -28,6 +28,7 @@
 
 #include "core/Log.h"
 
+#include <algorithm>
 #include <memory>
 #include <string>
 
@@ -322,6 +323,26 @@ void OnStructEdited(const neurus::ShaderStructEdited& e)
 }
 
 /**
+ * @brief Generates a unique name by appending a counter if the base name exists.
+ *
+ * Scans the provided list of existing names and appends "_2", "_3", etc.
+ * until a unique name is found. Used by OnFieldAdded to avoid duplicate
+ * field/struct names within the same container.
+ */
+std::string UniqueName(const std::string& base, const std::vector<std::string>& existing)
+{
+	auto exists = [&](const std::string& n) {
+		return std::find(existing.begin(), existing.end(), n) != existing.end();
+	};
+	if (!exists(base)) return base;
+	for (int i = 2; ; ++i)
+	{
+		std::string candidate = base + "_" + std::to_string(i);
+		if (!exists(candidate)) return candidate;
+	}
+}
+
+/**
  * @brief Handles ShaderFieldAdded — appends a new default entry to a ShaderStruct container.
  *
  * Dispatches on ShaderSection to append a default-constructed entry to the
@@ -343,39 +364,71 @@ void OnFieldAdded(const neurus::ShaderFieldAdded& e)
 	switch (e.section)
 	{
 	case neurus::ShaderSection::Attributes:
+	{
+		std::vector<std::string> names;
+		for (const auto& io : parsed.AB_list) names.push_back(io.name);
 		parsed.AB_list.push_back({static_cast<int>(parsed.AB_list.size()),
-		                          "new_attr", neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
+		                          UniqueName("new_attr", names), neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
 		break;
+	}
 	case neurus::ShaderSection::PassOutputs:
+	{
+		std::vector<std::string> names;
+		for (const auto& io : parsed.pass_list) names.push_back(io.name);
 		parsed.pass_list.push_back({static_cast<int>(parsed.pass_list.size()),
-		                            "new_output", neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
+		                            UniqueName("new_output", names), neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
 		break;
+	}
 	case neurus::ShaderSection::Inputs:
-		parsed.input_list.push_back({"new_input", neurus::ParaType::FLOAT, 1, -1, "", ""});
+	{
+		std::vector<std::string> names;
+		for (const auto& u : parsed.input_list) names.push_back(u.name);
+		parsed.input_list.push_back({UniqueName("new_input", names), neurus::ParaType::FLOAT, 1, -1, "", ""});
 		break;
+	}
 	case neurus::ShaderSection::Outputs:
-		parsed.output_list.push_back({"new_output", neurus::ParaType::FLOAT, 1, -1, "", ""});
+	{
+		std::vector<std::string> names;
+		for (const auto& u : parsed.output_list) names.push_back(u.name);
+		parsed.output_list.push_back({UniqueName("new_output", names), neurus::ParaType::FLOAT, 1, -1, "", ""});
 		break;
+	}
 	case neurus::ShaderSection::Uniforms:
-		parsed.uniform_list.push_back({"new_uniform", neurus::ParaType::FLOAT, 1, -1, "", ""});
+	{
+		std::vector<std::string> names;
+		for (const auto& u : parsed.uniform_list) names.push_back(u.name);
+		parsed.uniform_list.push_back({UniqueName("new_uniform", names), neurus::ParaType::FLOAT, 1, -1, "", ""});
 		break;
+	}
 	case neurus::ShaderSection::Functions:
-		parsed.func_list.push_back({neurus::ParaType::FLOAT, "new_func", "", {}});
+	{
+		std::vector<std::string> names;
+		for (const auto& f : parsed.func_list) names.push_back(f.name);
+		parsed.func_list.push_back({neurus::ParaType::FLOAT, UniqueName("new_func", names), "", {}});
 		break;
+	}
 	case neurus::ShaderSection::PushConstants:
-		parsed.push_constants.push_back({"new_pc", 0, 0, "float"});
+	{
+		std::vector<std::string> names;
+		for (const auto& pc : parsed.push_constants) names.push_back(pc.name);
+		parsed.push_constants.push_back({UniqueName("new_pc", names), 0, 0, "float"});
 		break;
+	}
 	case neurus::ShaderSection::StructDefs:
 		if (e.subFieldIndex < 0)
 		{
 			// Add a new struct definition
-			parsed.struct_def_list.push_back({0, "NewStruct", {}, ""});
+			std::vector<std::string> names;
+			for (const auto& sd : parsed.struct_def_list) names.push_back(sd.name);
+			parsed.struct_def_list.push_back({0, UniqueName("NewStruct", names), {}, ""});
 		}
 		else if (e.subFieldIndex < static_cast<int>(parsed.struct_def_list.size()))
 		{
 			// Add a member field to the specified struct definition
-			parsed.struct_def_list[e.subFieldIndex].fields.push_back(
-				{0, "new_field", neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
+			auto& fields = parsed.struct_def_list[e.subFieldIndex].fields;
+			std::vector<std::string> names;
+			for (const auto& mf : fields) names.push_back(mf.name);
+			fields.push_back({0, UniqueName("new_field", names), neurus::ParaType::FLOAT, "", neurus::Interp::Smooth});
 		}
 		break;
 	}
