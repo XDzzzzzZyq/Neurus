@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSizePolicy>
 #include <QStackedWidget>
 #include <QVBoxLayout>
 
@@ -41,26 +42,42 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_modeCombo->addItem("Code");
 	m_modeCombo->addItem("Structure");
 	m_modeCombo->setCurrentIndex(1);
-	row1->addWidget(m_modeCombo);
+	m_modeCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	row1->addWidget(m_modeCombo, 1);
 	row1->addSpacing(8);
 	row1->addWidget(new QLabel("Stage:", this));
 	m_stageCombo = new QComboBox(this);
 	m_stageCombo->addItem("VERTEX");
 	m_stageCombo->addItem("FRAGMENT");
-	row1->addWidget(m_stageCombo);
-	row1->addStretch();
+	m_stageCombo->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	row1->addWidget(m_stageCombo, 1);
 	toolbarContainer->addLayout(row1);
 
 	// Row 2: Compile + Save
 	auto* row2 = new QHBoxLayout();
 	m_compileBtn = new QPushButton("Compile", this);
-	row2->addWidget(m_compileBtn);
+	m_compileBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	row2->addWidget(m_compileBtn, 1);
 	m_saveBtn = new QPushButton("Save", this);
-	row2->addWidget(m_saveBtn);
-	row2->addStretch();
+	m_saveBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	row2->addWidget(m_saveBtn, 1);
 	toolbarContainer->addLayout(row2);
 
 	rootLayout->addLayout(toolbarContainer);
+
+	// --- Empty state label (shown above content stack in both modes) ---
+	m_emptyLabel = new QLabel("No object selected", this);
+	m_emptyLabel->setAlignment(Qt::AlignCenter);
+	m_emptyLabel->setStyleSheet("color: gray;");
+	m_emptyLabel->setVisible(false);
+	m_emptyLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	rootLayout->addWidget(m_emptyLabel);
+
+	// --- Create Shader button (shown above content stack in both modes) ---
+	m_createBtn = new QPushButton("Create Shader", this);
+	m_createBtn->setVisible(false);
+	m_createBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	rootLayout->addWidget(m_createBtn);
 
 	// --- Content stack ---
 	m_contentStack = new QStackedWidget(this);
@@ -85,17 +102,6 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_structLayout = new QVBoxLayout(m_structContent);
 	m_structLayout->setContentsMargins(0, 0, 0, 0);
 	m_structLayout->setSpacing(4);
-
-	// --- Empty state label ---
-	m_emptyLabel = new QLabel("No object selected", this);
-	m_emptyLabel->setAlignment(Qt::AlignCenter);
-	m_emptyLabel->setStyleSheet("color: gray;");
-	m_structLayout->addWidget(m_emptyLabel);
-
-	// --- Create Shader button ---
-	m_createBtn = new QPushButton("Create Shader", this);
-	m_createBtn->setVisible(false);
-	m_structLayout->addWidget(m_createBtn);
 
 	// Create all sections (hidden until populated)
 	m_abSection      = new ShaderStructSection(this);
