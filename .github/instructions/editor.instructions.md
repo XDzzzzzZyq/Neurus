@@ -19,6 +19,8 @@ changes through the event system.
 - `src/editor/EditorContext.h` - Editor + scene state container
 - `src/editor/controllers/Controllers.h` - Base class for all controllers
 - `src/editor/controllers/CameraController.h` - Event-driven camera manipulation (orbit/zoom/dolly/pan)
+- `src/editor/controllers/ShaderController.h` - Event-driven shader lifecycle (create, compile, code/struct edit, field add)
+- `src/editor/events/ShaderEvents.h` - Shader editor event structs (see events.instructions.md)
 
 ## Core Responsibilities
 
@@ -35,6 +37,7 @@ changes through the event system.
    - `Controllers` base class: `virtual Init(EventQueue& bus)` to bind controller to event bus
    - `Editor::RegisterController<T>(EventQueue& bus)` — template factory that creates controller, calls `Init(bus)`, stores in `m_controllers`
    - `CameraController` — event-driven orbit/zoom/dolly/pan via `CameraEvents` (rotate, push, slide, zoom)
+   - `ShaderController` — event-driven shader lifecycle via `ShaderEvents` (create, compile, code/struct edit, field add); enqueues `RenderResetEvent` after create/compile so temporal accumulation resets
    - Controllers receive discrete events (not per-frame polling); `Editor::Edit()` translates raw `InputState` into typed events
 
 4. **Scene State Management** (future)
@@ -135,6 +138,34 @@ void CameraController::Init(EventQueue& bus)
 - Each event carries the camera pointer and delta magnitude
 - Operates on Camera* provided by each event — does not own the camera
 - Located in `src/editor/controllers/CameraController.h`
+
+### ShaderController (Event-Driven)
+
+```cpp
+void ShaderController::Init(EventQueue& bus)
+{
+    bus.subscribe<ShaderCreateRequested>( [&bus](const ShaderCreateRequested& e) {
+        OnCreateShader(e);
+        bus.enqueue(RenderResetEvent{});  // pipeline created -> reset accumulation
+    });
+    bus.subscribe<ShaderCompileRequested>( [&bus](const ShaderCompileRequested& e) {
+        OnCompileShader(e);
+        bus.enqueue(RenderResetEvent{});  // pipeline rebuilt -> reset accumulation
+    });
+    bus.subscribe<ShaderCodeEdited>( [](const ShaderCodeEdited& e) { OnCodeEdited(e); });
+    bus.subscribe<ShaderStructEdited>( [](const ShaderStructEdited& e) { OnStructEdited(e); });
+    bus.subscribe<ShaderFieldAdded>( [](const ShaderFieldAdded& e) { OnFieldAdded(e); });
+}
+```
+
+**Design:**
+- Stateless: all handlers are free functions in an anonymous namespace
+- Handlers cast the event's `const ObjectID*` to `Mesh*` (the only shader-owning
+  object) and mutate `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
+- Create/Compile bump `Shader::m_version` on success (pipeline rebuild); the other
+  events only mutate IR/code and require the user to press Compile
+- Only Create/Compile enqueue `RenderResetEvent` (temporal accumulation reset)
+- Located in `src/editor/controllers/ShaderController.h`
 
 ## Data Flow
 

@@ -166,7 +166,13 @@ Neurus/
 │   │   ├── RenderCache.h/cpp        # Cross-frame mutable resource pool
 │   │   ├── RenderConfig.h           # User-settable pipeline options
 │   │   ├── RenderContext.h          # Per-frame immutable scene snapshot
-│   │   ├── shaders/ShaderGPU.h, shaders/Shader.h/cpp
+│   │   ├── shaders/          # Shader pipeline (parse/generate/compile)
+│   │   │   ├── Shader.h/cpp, ShaderGPU.h   # Per-mesh shader + GPU module
+│   │   │   ├── ShaderUnit.h     # Per-stage state: code, parsed IR, SPIR-V, version
+│   │   │   ├── ShaderLibrary.h/cpp  # Load/parse/generate/compile service
+│   │   │   ├── ShaderParser.h/cpp   # GLSL -> ShaderStruct IR
+│   │   │   ├── ShaderGenerator.h/cpp # ShaderStruct IR -> GLSL
+│   │   │   └── RenderShader.h/cpp, ComputeShader.h/cpp, ShaderCompiler.h/cpp
 │   │   ├── Swapchain.h/cpp
 │   │   ├── UploadManager.h/cpp      # CPU-to-GPU upload service
 │   │   ├── VulkanContext.h/cpp
@@ -193,23 +199,31 @@ Neurus/
 │   ├── editor/             # Editor layer (logic, controllers)
 │   │   ├── events/          # Event system (UIEvents + typed EventQueue)
 │   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor
-│   │   │   ├── EventQueue.h        # Typed EventQueue dispatcher (no Qt)
-│   │   │   └── CameraEvents.h    # Camera event structs
+│   │   │   ├── EventBus.h        # Typed EventQueue dispatcher (no Qt)
+│   │   │   ├── CameraEvents.h    # Camera event structs
+│   │   │   └── ShaderEvents.h    # Shader editor event structs
 │   │   ├── controllers/     # Controller implementations
 │   │   │   ├── Controllers.h     # Base class for all controllers
 │   │   │   ├── CameraController.h/cpp  # Event-driven camera controls
+│   │   │   └── ShaderController.h/cpp  # Event-driven shader lifecycle
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
 │   │   ├── UIContext.h          # Per-frame UI data snapshot
 │   │   ├── items/               # Reusable composite widgets
-│   │   │   └── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
+│   │   │   ├── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
+│   │   │   ├── ShaderStructModel.h/cpp  # Tree model for ShaderStruct IR
+│   │   │   └── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
+│   │   ├── elements/            # Editor widgets
+│   │   │   ├── CodeEditor.h/cpp     # GLSL code editor (line numbers, monospace)
+│   │   │   └── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
 │   │   ├── panels/               # Dock panel widgets
 │   │   │   ├── UIPanel.h         # Base class for all panels
 │   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
 │   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
 │   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
-│   │   │   └── RenderConfigPanel.h/cpp  # Live render setting controls
+│   │   │   ├── RenderConfigPanel.h/cpp  # Live render setting controls
+│   │   │   └── ShaderEditorPanel.h/cpp  # Code + Structure shader editor
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── ConfigComponent.h/cpp  # RenderConfig serialization adapter

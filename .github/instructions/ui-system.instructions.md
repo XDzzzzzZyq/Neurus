@@ -16,6 +16,11 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/Outliner.h/cpp` | Scene object hierarchy tree (Outliner dock) |
 | `src/ui/panels/PropertyPanel.h/cpp` | Object property inspector with GOType-aware subpanels (Property dock) |
 | `src/ui/panels/RenderConfigPanel.h/cpp` | Live render config controls (Render Config dock) |
+| `src/ui/panels/ShaderEditorPanel.h/cpp` | Shader editor dock — Code mode + Structure mode (tree-based Struct Editor) |
+| `src/ui/items/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
+| `src/ui/items/ShaderFieldDelegate.h/cpp` | Delegate with QComboBox (type) / QLineEdit (name) editors for struct field rows |
+| `src/ui/elements/CodeEditor.h/cpp` | GLSL code editor widget (line numbers, monospace font) |
+| `src/ui/elements/ShaderHighlighter.h/cpp` | GLSL syntax highlighter for the code editor |
 | `src/ui/presets/CameraProperties.h/cpp` | Camera property editor preset (target Vec3Spin + FOV ScalarSlider) |
 | `src/ui/presets/MeshProperties.h/cpp` | Mesh property editor preset (path label + shadow/material checkboxes) |
 | `src/ui/presets/LightProperties.h/cpp` | Light property editor preset (type label + power/radius sliders + shadow checkbox) |
@@ -136,6 +141,35 @@ All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 - **Pipeline**: Pipeline type (Forward/Deferred), SSR mode, samples per frame
 
 Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Application` to `Editor::SetRenderConfig(cfg)`.
+
+### ShaderEditorPanel
+
+`ShaderEditorPanel` (Left dock) edits the GLSL shader of the active mesh in two
+modes selected by a `QComboBox`:
+- **Code mode**: raw GLSL in a `CodeEditor` widget (line numbers, GLSL syntax
+  highlighting). Text changes emit `codeEdited`.
+- **Structure mode**: a `QTreeView` (`ShaderStructModel` + `ShaderFieldDelegate`)
+  showing the parsed `ShaderStruct` IR as a 3-level tree
+  (sections → fields/structs → members). Type/name cells are edited inline via
+  `QComboBox` / `QLineEdit` editors and emit `structEdited`.
+
+Each section header row and each struct-definition row carries a real
+`QPushButton` "+" (`QTreeView::setIndexWidget`), which appends a new entry to
+that section (or a member field to that struct) and emits `fieldAdded`. A
+toolbar "−" removes the selected entry. Both "Create Shader" (no shader yet)
+and "Compile" buttons are available; Compile re-parses/generates/compiles and
+bumps the shader version so the GeometryPass pipeline rebuilds.
+
+**State preservation across `Refresh()`:** the tree model is rebuilt on every
+shader version change (`setShaderStruct` → model reset), which would wipe
+expansion, selection, and index widgets. `populateSections()` captures the
+expanded rows and current selection before the rebuild and restores them after,
+then re-installs the per-row "+" buttons and column spans. Opened sections stay
+open, closed sections stay closed, and the selected row survives edits/adds.
+
+Signals (`createShaderRequested`, `compileRequested`, `codeEdited`,
+`structEdited`, `fieldAdded`) are wired by `Application` to `Editor` and
+dispatched to `ShaderController` (see events.instructions.md).
 
 ## Reusable Items
 
