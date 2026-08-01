@@ -273,6 +273,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 
 			// --- Per-mesh shader override (version-aware pipeline lookup) ---
 			bool usingCustomPipeline = false;
+			vk::PipelineLayout activeLayout = *p_pipelines[0].pipelineLayout;
 			if (mesh->o_shader)
 			{
 				int version = mesh->o_shader->GetVersion();
@@ -281,8 +282,17 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 				if (!customPipeline)
 				{
 					Pipeline newPipeline = CreatePerMeshPipeline(*mesh->o_shader, ShaderType::VERTEX);
-					cache.UsePipeline(mesh->GetObjectID(), std::move(newPipeline), version);
-					customPipeline = cache.GetPipeline(mesh->GetObjectID(), version);
+					// Do not cache/bind a failed (empty) pipeline — fall back to the default one.
+					if (*newPipeline.pipeline)
+					{
+						cache.UsePipeline(mesh->GetObjectID(), std::move(newPipeline), version);
+						customPipeline = cache.GetPipeline(mesh->GetObjectID(), version);
+					}
+					else
+					{
+						NEURUS_ERR("[GeometryPass] Per-mesh pipeline creation failed for objectId="
+						           << mesh->GetObjectID() << " — falling back to default pipeline");
+					}
 				}
 
 				if (customPipeline)
@@ -295,6 +305,7 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 					    0,
 					    {p_cameraDescriptorSet.handle()},
 					    {});
+					activeLayout = *customPipeline->pipelineLayout;
 					usingCustomPipeline = true;
 				}
 			}
@@ -317,10 +328,9 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			MeshPushConstants pushConstants{model, normalMat,
 			                               static_cast<uint32_t>(mesh->GetObjectID())};
 
-			// Custom shaders share the same push constant layout (MeshPushConstants)
-			const auto& pipelineLayout = p_pipelines[0].pipelineLayout;
-
-			cmdBuf.pushConstants<MeshPushConstants>(*pipelineLayout,
+			// Push constants must use the layout of the currently bound pipeline
+			// (default layout, or the per-mesh custom pipeline's layout when set).
+			cmdBuf.pushConstants<MeshPushConstants>(activeLayout,
 			    vk::ShaderStageFlagBits::eVertex | vk::ShaderStageFlagBits::eFragment,
 			    0, pushConstants);
 

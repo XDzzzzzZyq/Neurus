@@ -75,8 +75,9 @@ struct ShaderCodeEdited
  * entry), the field name (which property of that entry), and the new value.
  * For StructDefs, subFieldIndex identifies which member field of the struct
  * definition is being edited (-1 = the struct definition itself: name/varName).
- * After mutation, ShaderController regenerates GLSL via ShaderGenerator::Generate.
- * Does NOT bump version — user must press Compile.
+ * The IR is mutated in place; the generated GLSL (Code mode) is only refreshed
+ * on the next Compile (Struct path). Does NOT bump version — user must press
+ * Compile.
  */
 struct ShaderStructEdited
 {
@@ -95,7 +96,8 @@ struct ShaderStructEdited
  * Appends a new default entry to the specified ShaderStruct container.
  * For StructDefs, subFieldIndex identifies which struct definition to add
  * a member field to (-1 = add a new struct definition).
- * After mutation, ShaderController regenerates GLSL. Does NOT bump version.
+ * The IR is mutated in place; the generated GLSL (Code mode) is only refreshed
+ * on the next Compile (Struct path). Does NOT bump version.
  */
 struct ShaderFieldAdded
 {

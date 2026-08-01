@@ -215,8 +215,9 @@ void OnCompileShader(const neurus::ShaderCompileRequested& e)
  * @brief Handles ShaderStructEdited — mutates a single field in a ShaderStruct container.
  *
  * Dispatches on ShaderSection to the correct vector, then on field name to
- * the correct property. After mutation, regenerates GLSL via ShaderGenerator.
- * Does NOT bump version — user must press Compile.
+ * the correct property. The IR is mutated in place; the generated GLSL (Code
+ * mode) is only refreshed on the next Compile (Struct path). Does NOT bump
+ * version — user must press Compile.
  */
 void OnStructEdited(const neurus::ShaderStructEdited& e)
 {
@@ -348,8 +349,9 @@ std::string UniqueName(const std::string& base, const std::vector<std::string>& 
  *
  * Dispatches on ShaderSection to append a default-constructed entry to the
  * correct vector. For StructDefs with subFieldIndex >= 0, appends a member
- * field to the specified struct definition. After mutation, regenerates GLSL.
- * Does NOT bump version — user must press Compile.
+ * field to the specified struct definition. The IR is mutated in place; the
+ * generated GLSL (Code mode) is only refreshed on the next Compile (Struct
+ * path). Does NOT bump version — user must press Compile.
  */
 void OnFieldAdded(const neurus::ShaderFieldAdded& e)
 {

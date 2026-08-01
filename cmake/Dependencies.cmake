@@ -192,41 +192,6 @@ function(neurus_find_dependency name)
 
 	endif()
 
-	elseif(name STREQUAL "syntax-highlighting")
-
-		set(KSH_LIB_RELEASE "${LIB_DIR}/lib/KSyntaxHighlighting.lib")
-		set(KSH_LIB_DEBUG   "${LIB_DIR}/lib/KSyntaxHighlightingd.lib")
-
-		if(EXISTS "${KSH_LIB_RELEASE}")
-			message(STATUS "Using pre-compiled syntax-highlighting from ${LIB_DIR}")
-
-			add_library(KSyntaxHighlighting STATIC IMPORTED)
-			set_target_properties(KSyntaxHighlighting PROPERTIES
-				IMPORTED_LOCATION_RELEASE "${KSH_LIB_RELEASE}"
-				IMPORTED_LOCATION_DEBUG   "${KSH_LIB_DEBUG}"
-				MAP_IMPORTED_CONFIG_RELWITHDEBINFO Release
-				MAP_IMPORTED_CONFIG_MINSIZEREL     Release
-			)
-			set_property(TARGET KSyntaxHighlighting PROPERTY
-				INTERFACE_INCLUDE_DIRECTORIES "${DEP_DIR}/src"
-			)
-			target_link_libraries(KSyntaxHighlighting INTERFACE
-				Qt6::Core Qt6::Gui
-			)
-
-			set(NEURUS_DEP_${name}_FROM_LIB TRUE PARENT_SCOPE)
-
-		else()
-			message(STATUS "Pre-compiled syntax-highlighting not found, building from source (requires Perl)")
-
-			set(WITH_QT6 ON CACHE BOOL "" FORCE)
-			set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-			set(BUILD_QT5 OFF CACHE BOOL "" FORCE)
-			add_subdirectory("${DEP_DIR}")
-
-			set(NEURUS_DEP_${name}_FROM_LIB FALSE PARENT_SCOPE)
-		endif()
-
 	# -----------------------------------------------------------------------
 	# Unknown dependency
 	# -----------------------------------------------------------------------
