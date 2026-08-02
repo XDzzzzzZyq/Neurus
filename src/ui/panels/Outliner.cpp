@@ -8,7 +8,7 @@
  *   via OutlinerRow::setObject() from a growing pool.
  * - New rows are created when pool < scene objects, and connected to
  *   Outliner signals once. Extra rows are hidden (not destroyed).
- * - Signal lambdas on OutlinerRow read m_objectId at emission time,
+ * - Signal lambdas on OutlinerRow read m_object at emission time,
  *   so recycling a row to a different object is transparent.
  * - Type icons are resolved from GOType via the Outliner-owned Icons cache
  *   and passed as icon names ("scene:camera", "scene:light", etc.).
@@ -88,10 +88,13 @@ void Outliner::EnsureRowPool(std::size_t needed)
 		auto* row = new OutlinerRow(m_sceneGroup);
 
 		// Connect row signals to Outliner signals once (permanent).
-		// Lambdas read m_objectId at emission time, so recycling
-		// a row to a new objectId works without reconnecting.
+		// Lambdas read m_object at emission time, so recycling
+		// a row to a new object works without reconnecting.
 		QObject::connect(row, &OutlinerRow::objectSelected,
-			this, &Outliner::objectSelected);
+			this, [this](const ObjectSelected& e) {
+				// UI emits complete events: stamp the Editor-owned scene (UI state).
+				emit objectSelected(ObjectSelected{m_scene, e.object, e.modifiers});
+			});
 		QObject::connect(row, &OutlinerRow::visibilityChanged,
 			this, &Outliner::visibilityChanged);
 
@@ -118,6 +121,7 @@ void Outliner::Refresh(const UIContext& ctx)
 
 	// --- Query selection state from the scene's Selections<const ObjectID*> ---
 	const Scene* scene = static_cast<const Scene*>(ctx.scene);
+	m_scene = scene;
 
 	// Ensure pool is large enough for valid objects.
 	EnsureRowPool(ids.size());
@@ -126,11 +130,11 @@ void Outliner::Refresh(const UIContext& ctx)
 	std::size_t poolIndex = 0;
 	for (const auto* obj : ids)
 	{
-		// Phase 1 — bind object identity data (icon, name, id).
+		// Phase 1 — bind object identity data (icon, name, pointer).
 		m_rowPool[poolIndex]->setObject(
 			Icons::ObjectIcon(static_cast<int>(obj->o_type)),
 			QString::fromStdString(obj->o_name),
-			obj->GetObjectID());
+			obj);
 
 		// Sync visibility toggles to the object's actual flags.
 		m_rowPool[poolIndex]->setVisibilities(obj->is_viewport, obj->is_rendered);

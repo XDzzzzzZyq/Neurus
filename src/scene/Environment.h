@@ -163,6 +163,14 @@ public:
 		return nullptr;
 	}
 
+	/** @brief Casts a const ObjectID* to an Environment* if its type is GO_ENVIR, else nullptr. */
+	static Environment* As(const ObjectID* obj)
+	{
+		if (!obj || obj->o_type != ObjectID::GOType::GO_ENVIR)
+			return nullptr;
+		return static_cast<Environment*>(const_cast<ObjectID*>(obj));
+	}
+
 	// -----------------------------------------------------------------------
 	// Serialization (Cereal)
 	// -----------------------------------------------------------------------

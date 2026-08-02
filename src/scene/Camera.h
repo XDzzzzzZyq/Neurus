@@ -189,6 +189,14 @@ public:
 	 */
 	void* GetTransform() override;
 
+	/** @brief Casts a const ObjectID* to a Camera* if its type is GO_CAM, else nullptr. */
+	static Camera* As(const ObjectID* obj)
+	{
+		if (!obj || obj->o_type != ObjectID::GOType::GO_CAM)
+			return nullptr;
+		return static_cast<Camera*>(const_cast<ObjectID*>(obj));
+	}
+
 private:
 	/** @brief Recomputes view and projection matrices from current parameters. */
 	void RecomputeMatrices();

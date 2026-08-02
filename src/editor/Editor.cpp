@@ -6,9 +6,11 @@
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"
 #include "editor/events/ShaderEvents.h"
+#include "editor/events/SceneEvents.h"
 
 #include "editor/controllers/CameraController.h"
 #include "editor/controllers/ShaderController.h"
+#include "editor/controllers/SceneController.h"
 #include "editor/events/EventBus.h"
 
 #include "render/DeferredRenderer.h"
@@ -24,6 +26,8 @@
 #include "core/Log.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
+#include "scene/Light.h"
+#include "scene/Mesh.h"
 #include "scene/Scene.h"
 
 #include <QCoreApplication>
@@ -98,189 +102,13 @@ void Editor::Initialize()
 		m_config = e.config;
 	});
 
-	ed_eventBus.subscribe<PositionChanged>([this](const PositionChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.obj_list.find(e.objectId);
-		if (it == scene.obj_list.end()) return;
-		void* transformPtr = it->second->GetTransform();
-		if (!transformPtr) return;
-		static_cast<Transform3D*>(transformPtr)->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
-		m_dirty = true;
-
-		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
-			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
-		{
-			UploadLighting();
-		}
-	});
-
-	ed_eventBus.subscribe<RotationChanged>([this](const RotationChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.obj_list.find(e.objectId);
-		if (it == scene.obj_list.end()) return;
-		void* transformPtr = it->second->GetTransform();
-		if (!transformPtr) return;
-		static_cast<Transform3D*>(transformPtr)->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
-		m_dirty = true;
-
-		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
-			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
-		{
-			UploadLighting();
-		}
-	});
-
-	ed_eventBus.subscribe<ScaleChanged>([this](const ScaleChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.obj_list.find(e.objectId);
-		if (it == scene.obj_list.end()) return;
-		void* transformPtr = it->second->GetTransform();
-		if (!transformPtr) return;
-		static_cast<Transform3D*>(transformPtr)->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
-		m_dirty = true;
-
-		if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
-			it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
-		{
-			UploadLighting();
-		}
-	});
-
-	ed_eventBus.subscribe<ObjectSelected>([this](const ObjectSelected& e) {
-		bool shiftOrCtrl = (e.modifiers & (Input::Mod_Shift | Input::Mod_Ctrl)) != 0;
-		SelectObject(e.objectId, shiftOrCtrl);
-	});
-
-	ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
-	});
-
-	// --- Camera property events ---
-
-	ed_eventBus.subscribe<CameraTargetChanged>([this](const CameraTargetChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.cam_list.find(e.objectId);
-		if (it == scene.cam_list.end()) return;
-		it->second->SetTarPos(glm::vec3(e.targetX, e.targetY, e.targetZ));
-		m_dirty = true;
-	});
-
-	ed_eventBus.subscribe<CameraFovChanged>([this](const CameraFovChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.cam_list.find(e.objectId);
-		if (it == scene.cam_list.end()) return;
-		it->second->ChangeCamPersp(e.fov);
-		m_dirty = true;
-	});
-
-	// --- Mesh property events ---
-
-	ed_eventBus.subscribe<MeshShadowChanged>([this](const MeshShadowChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.mesh_list.find(e.objectId);
-		if (it == scene.mesh_list.end()) return;
-		it->second->EnableShadow(e.enabled);
-		m_dirty = true;
-	});
-
-	ed_eventBus.subscribe<MeshMaterialChanged>([this](const MeshMaterialChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.mesh_list.find(e.objectId);
-		if (it == scene.mesh_list.end()) return;
-		it->second->EnableMaterial(e.enabled);
-		m_dirty = true;
-	});
-
-	// --- Light property events ---
-
-	ed_eventBus.subscribe<LightPowerChanged>([this](const LightPowerChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.light_list.find(e.objectId);
-		if (it == scene.light_list.end()) return;
-		it->second->SetPower(e.power);
-		m_dirty = true;
-		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
-		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
-	});
-
-	ed_eventBus.subscribe<LightRadiusChanged>([this](const LightRadiusChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.light_list.find(e.objectId);
-		if (it == scene.light_list.end()) return;
-		it->second->SetRadius(e.radius);
-		m_dirty = true;
-		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
-		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
-	});
-
-	ed_eventBus.subscribe<LightShadowChanged>([this](const LightShadowChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.light_list.find(e.objectId);
-		if (it == scene.light_list.end()) return;
-		it->second->SetShadow(e.enabled);
-		m_dirty = true;
-		UploadLighting();
-	});
-
-	ed_eventBus.subscribe<LightCutoffChanged>([this](const LightCutoffChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.light_list.find(e.objectId);
-		if (it == scene.light_list.end()) return;
-		it->second->SetCutoff(e.cutoff);
-		m_dirty = true;
-		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
-		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
-	});
-
-	ed_eventBus.subscribe<LightOuterCutoffChanged>([this](const LightOuterCutoffChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.light_list.find(e.objectId);
-		if (it == scene.light_list.end()) return;
-		it->second->SetOuterCutoff(e.outerCutoff);
-		m_dirty = true;
-		auto gpuStruct = ed_uploadManager->UploadLighting(*it->second);
-		ed_renderer->GetRenderCache().UpdateLight(e.objectId, gpuStruct);
-	});
-
-	// --- Environment property events ---
-
-	ed_eventBus.subscribe<EnvironmentIntensityChanged>([this](const EnvironmentIntensityChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.env_list.find(e.objectId);
-		if (it == scene.env_list.end()) return;
-		it->second->SetIntensity(e.intensity);
-		m_dirty = true;
-	});
-
-	ed_eventBus.subscribe<EnvironmentRotationChanged>([this](const EnvironmentRotationChanged& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		auto& scene = *m_scene;
-		auto it = scene.env_list.find(e.objectId);
-		if (it == scene.env_list.end()) return;
-		it->second->SetRotation(e.rotation);
-		m_dirty = true;
-	});
-
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
 
 	// --- Register controllers ---
 	RegisterController<CameraController>();
 	RegisterController<ShaderController>();
+	RegisterController<SceneController>();
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
@@ -323,6 +151,22 @@ void Editor::Initialize()
 	ed_eventBus.subscribe<RenderResetEvent>([this](const RenderResetEvent&) {
 		if (ed_renderer)
 			ed_renderer->ResetShadowAccumulation();
+	});
+
+	// --- SceneController GPU-sync + dirty subscriptions ---
+	ed_eventBus.subscribe<SceneModified>([this](const SceneModified&) {
+		m_dirty = true;
+	});
+
+	ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
+		auto* light = Light::As(e.object);
+		if (!light) return;
+		auto gpuStruct = ed_uploadManager->UploadLighting(*light);
+		ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
+	});
+
+	ed_eventBus.subscribe<LightingRebuild>([this](const LightingRebuild&) {
+		UploadLighting();
 	});
 
 	NEURUS_LOG("[Editor] Initialized");
@@ -543,10 +387,6 @@ void Editor::OnSpotLightAdd()
 	}
 }
 
-// --- Remaining stub handlers (implemented in later tasks) ---
-void Editor::OnScreenshotRequested() { NEURUS_LOG("[Editor] OnScreenshotRequested stub"); }
-void Editor::OnScreenshotAllRequested() { NEURUS_LOG("[Editor] OnScreenshotAllRequested stub"); }
-
 void Editor::OnIBLLoad()
 {
 	Scene* scene = m_scene.get();
@@ -596,65 +436,6 @@ void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
 	ed_renderer->GetRenderCache().UseEnvironmentGPU(env->GetObjectID(), std::move(envGPU));
 
 	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
-}
-
-// =========================================================================
-// SelectObject – update scene.selections from outliner click
-// =========================================================================
-
-void Editor::SelectObject(int objectId, bool increment)
-{
-	auto& scene = *m_scene;
-
-	// id=0 means background click — clear everything
-	if (objectId == 0)
-	{
-		if (!increment)	scene.selections.ClearSelection();
-		return;
-	}
-
-	auto it = scene.obj_list.find(objectId);
-	if (it == scene.obj_list.end())
-	{
-		NEURUS_ERR("[Editor] SelectObject: object " << objectId << " not found in obj_list");
-		return;
-	}
-
-	auto* objPtr = it->second.get();
-	scene.selections.Select(objPtr, increment);
-
-	NEURUS_LOG("[Editor] SelectObject: id=" << objectId
-	           << " increment=" << increment
-	           << " count=" << scene.selections.GetSelectionCount());
-}
-
-// =========================================================================
-// ChangeObjectVisibility – propagate outliner toggle to scene object
-// =========================================================================
-
-void Editor::ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible)
-{
-	auto& scene = *m_scene;
-
-	auto it = scene.obj_list.find(objectId);
-	if (it == scene.obj_list.end())
-	{
-		NEURUS_ERR("[Editor] ChangeObjectVisibility: object " << objectId << " not found");
-		return;
-	}
-
-	it->second->SetVisible(viewportVisible, renderVisible);
-	m_dirty = true;
-
-	// Light visibility change → re-upload lighting SSBO to reflect new state.
-	// Shader variants (point/sun) are filtered by UploadLighting based on
-	// is_viewport/is_rendered, so re-uploading the full light_list propagates
-	// the toggle to GPU-side light arrays.
-	if (it->second->o_type == ObjectID::GOType::GO_LIGHT ||
-	    it->second->o_type == ObjectID::GOType::GO_POLYLIGHT)
-	{
-		UploadLighting();
-	}
 }
 
 void Editor::UploadSceneResources()

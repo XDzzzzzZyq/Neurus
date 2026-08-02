@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "editor/events/EventBus.h"
-#include "editor/events/EditorEvents.h"
+#include "editor/events/SceneEvents.h"
+#include "scene/UID.h"
 
 using namespace neurus;
 
@@ -12,13 +15,18 @@ using namespace neurus;
  *
  * These tests validate the typed event dispatch system: subscribe, emit,
  * deferred Process(), independent event channels, and handler ordering.
+ *
+ * ObjectSelected / ObjectDeselected carry const ObjectID* (ephemeral pointer
+ * payloads), so tests hold scene objects in unique_ptr holders via NewObject().
  */
 class TypedEventQueueTest : public ::testing::Test
 {
 protected:
-	void SetUp() override
+	/** @brief Creates a fresh ObjectID held by the fixture (ObjectID is non-copyable). */
+	ObjectID* NewObject()
 	{
-		// Each test gets a fresh EventQueue via fixture construction
+		m_objects.push_back(std::make_unique<ObjectID>());
+		return m_objects.back().get();
 	}
 
 	void TearDown() override
@@ -26,22 +34,21 @@ protected:
 		m_queue->Process();
 	}
 
+	std::vector<std::unique_ptr<ObjectID>> m_objects;
 	EventQueue m_eventBus;
 	class EventQueue* m_queue = &m_eventBus;
 };
 
 /**
- * @brief Expanded test fixture for typed EventQueue - covers concrete editor
- *        event types (ObjectSelected, SceneStatusChanged, etc.).
- *
- * Uses a separate fixture to avoid test name collisions with
- * TypedEventQueueTest.
+ * @brief Expanded fixture covering concrete editor event payloads.
  */
 class TypedEventQueueExpandedTest : public ::testing::Test
 {
 protected:
-	void SetUp() override
+	ObjectID* NewObject()
 	{
+		m_objects.push_back(std::make_unique<ObjectID>());
+		return m_objects.back().get();
 	}
 
 	void TearDown() override
@@ -49,6 +56,7 @@ protected:
 		m_queue->Process();
 	}
 
+	std::vector<std::unique_ptr<ObjectID>> m_objects;
 	EventQueue m_eventBus;
 	class EventQueue* m_queue = &m_eventBus;
 };
@@ -59,16 +67,17 @@ protected:
 
 TEST_F(TypedEventQueueTest, SubscribeAndEmit_HandlerReceivesEvent)
 {
+	ObjectID* obj = NewObject();
 	bool received = false;
 	int receivedId = 0;
 
 	m_queue->subscribe<ObjectSelected>(
 		[&](const ObjectSelected& e) {
 			received = true;
-			receivedId = e.objectId;
+			receivedId = e.object->GetObjectID();
 		});
 
-	m_queue->enqueue(ObjectSelected{42});
+	m_queue->enqueue(ObjectSelected{nullptr, obj, 0});
 
 	// Not received yet - deferred dispatch
 	EXPECT_FALSE(received);
@@ -76,7 +85,7 @@ TEST_F(TypedEventQueueTest, SubscribeAndEmit_HandlerReceivesEvent)
 	m_queue->Process();
 
 	EXPECT_TRUE(received);
-	EXPECT_EQ(receivedId, 42);
+	EXPECT_EQ(receivedId, obj->GetObjectID());
 }
 
 TEST_F(TypedEventQueueTest, Emit_MultipleHandlersAllReceive)
@@ -87,7 +96,7 @@ TEST_F(TypedEventQueueTest, Emit_MultipleHandlersAllReceive)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { callCount++; });
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { callCount++; });
 
-	m_queue->enqueue(ObjectSelected{1});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(callCount, 3);
@@ -95,16 +104,14 @@ TEST_F(TypedEventQueueTest, Emit_MultipleHandlersAllReceive)
 
 TEST_F(TypedEventQueueTest, Process_EmptyQueueIsNoOp)
 {
-	// Verify no crash or side effects when processing empty queue
 	EXPECT_NO_THROW({ m_queue->Process(); });
 	EXPECT_NO_THROW({ m_queue->Process(0); });
 }
 
 TEST_F(TypedEventQueueTest, Emit_WithoutSubscribersIsNoOp)
 {
-	// No subscribers registered - emit + process should not crash
 	EXPECT_NO_THROW({
-		m_queue->enqueue(ObjectSelected{99});
+		m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
 		m_queue->Process();
 	});
 }
@@ -121,9 +128,8 @@ TEST_F(TypedEventQueueTest, DifferentEventTypes_IndependentChannels)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { objectSelectedCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { objectDeselectedCount++; });
 
-	// Only emit ObjectSelected
-	m_queue->enqueue(ObjectSelected{1});
-	m_queue->enqueue(ObjectSelected{2});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(objectSelectedCount, 2);
@@ -134,65 +140,17 @@ TEST_F(TypedEventQueueTest, MultipleEventTypes_EmitAndProcess)
 {
 	int selectCount = 0;
 	int deselectCount = 0;
-	int addCount = 0;
-	int removeCount = 0;
-	int camCount = 0;
 
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
-	m_queue->subscribe<SceneObjectAdded>([&](const SceneObjectAdded&) { addCount++; });
-	m_queue->subscribe<SceneObjectRemoved>([&](const SceneObjectRemoved&) { removeCount++; });
-	m_queue->subscribe<ActiveCameraChanged>([&](const ActiveCameraChanged&) { camCount++; });
 
-	// Emit each type exactly once
-	m_queue->enqueue(ObjectSelected{1});
-	m_queue->enqueue(ObjectDeselected{2});
-	m_queue->enqueue(SceneObjectAdded{3, "Light"});
-	m_queue->enqueue(SceneObjectRemoved{4});
-	m_queue->enqueue(ActiveCameraChanged{5});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectDeselected{nullptr, NewObject()});
 
 	m_queue->Process();
 
 	EXPECT_EQ(selectCount, 1);
 	EXPECT_EQ(deselectCount, 1);
-	EXPECT_EQ(addCount, 1);
-	EXPECT_EQ(removeCount, 1);
-	EXPECT_EQ(camCount, 1);
-}
-
-// ---------------------------------------------------------------------------
-// Complex event data
-// ---------------------------------------------------------------------------
-
-TEST_F(TypedEventQueueTest, SceneObjectAdded_CarriesCorrectData)
-{
-	std::string receivedType;
-	int receivedId = 0;
-
-	m_queue->subscribe<SceneObjectAdded>(
-		[&](const SceneObjectAdded& e) {
-			receivedId = e.objectId;
-			receivedType = e.typeName;
-		});
-
-	m_queue->enqueue(SceneObjectAdded{100, std::string("Mesh")});
-	m_queue->Process();
-
-	EXPECT_EQ(receivedId, 100);
-	EXPECT_EQ(receivedType, "Mesh");
-}
-
-TEST_F(TypedEventQueueTest, ActiveCameraChanged_MinusOneForNoCamera)
-{
-	int receivedId = 999;
-
-	m_queue->subscribe<ActiveCameraChanged>(
-		[&](const ActiveCameraChanged& e) { receivedId = e.cameraId; });
-
-	m_queue->enqueue(ActiveCameraChanged{-1});
-	m_queue->Process();
-
-	EXPECT_EQ(receivedId, -1);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,21 +159,24 @@ TEST_F(TypedEventQueueTest, ActiveCameraChanged_MinusOneForNoCamera)
 
 TEST_F(TypedEventQueueTest, MultipleEmits_ProcessedInOrder)
 {
+	ObjectID* o1 = NewObject();
+	ObjectID* o2 = NewObject();
+	ObjectID* o3 = NewObject();
 	std::vector<int> receivedIds;
 
 	m_queue->subscribe<ObjectSelected>(
-		[&](const ObjectSelected& e) { receivedIds.push_back(e.objectId); });
+		[&](const ObjectSelected& e) { receivedIds.push_back(e.object->GetObjectID()); });
 
-	m_queue->enqueue(ObjectSelected{1});
-	m_queue->enqueue(ObjectSelected{3});
-	m_queue->enqueue(ObjectSelected{5});
+	m_queue->enqueue(ObjectSelected{nullptr, o1, 0});
+	m_queue->enqueue(ObjectSelected{nullptr, o2, 0});
+	m_queue->enqueue(ObjectSelected{nullptr, o3, 0});
 
 	m_queue->Process();
 
 	ASSERT_EQ(receivedIds.size(), 3);
-	EXPECT_EQ(receivedIds[0], 1);
-	EXPECT_EQ(receivedIds[1], 3);
-	EXPECT_EQ(receivedIds[2], 5);
+	EXPECT_EQ(receivedIds[0], o1->GetObjectID());
+	EXPECT_EQ(receivedIds[1], o2->GetObjectID());
+	EXPECT_EQ(receivedIds[2], o3->GetObjectID());
 }
 
 // ---------------------------------------------------------------------------
@@ -224,23 +185,22 @@ TEST_F(TypedEventQueueTest, MultipleEmits_ProcessedInOrder)
 
 TEST_F(TypedEventQueueTest, ReentrantEmit_HandlerEmitsDuringProcess)
 {
+	ObjectID* obj = NewObject();
 	int outerCount = 0;
 	int innerCount = 0;
 
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) {
 		outerCount++;
-		// Emit a different event type from within the handler
-		m_queue->enqueue(ObjectDeselected{outerCount});
+		m_queue->enqueue(ObjectDeselected{nullptr, obj});
 	});
 
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) {
 		innerCount++;
 	});
 
-	m_queue->enqueue(ObjectSelected{1});
+	m_queue->enqueue(ObjectSelected{nullptr, obj, 0});
 	m_queue->Process();
 
-	// Both should execute because re-entrant emits are deferred to end of queue
 	EXPECT_EQ(outerCount, 1);
 	EXPECT_EQ(innerCount, 1);
 }
@@ -253,11 +213,11 @@ TEST_F(TypedEventQueueTest, ReentrantEmit_SameTypeCreatesChain)
 		callCount++;
 		if (callCount < 5)
 		{
-			m_queue->enqueue(ObjectSelected{callCount});
+			m_queue->enqueue(ObjectSelected{nullptr, nullptr, 0});
 		}
 	});
 
-	m_queue->enqueue(ObjectSelected{0});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(callCount, 5);
@@ -269,19 +229,17 @@ TEST_F(TypedEventQueueTest, ReentrantEmit_SameTypeCreatesChain)
 
 TEST_F(TypedEventQueueTest, Process_MaxEventsCapPreventsInfiniteLoop)
 {
-	// Handler that keeps re-emitting
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) {
-		m_queue->enqueue(ObjectSelected{0});
+		m_queue->enqueue(ObjectSelected{nullptr, nullptr, 0});
 	});
 
-	m_queue->enqueue(ObjectSelected{0});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
 
-	// Should not hang - capped at maxEvents
 	EXPECT_NO_THROW({ m_queue->Process(10); });
 }
 
 // ---------------------------------------------------------------------------
-// EventQueue is NOT copyable (compile-time check via static assert)
+// EventQueue is NOT copyable (compile-time check)
 // ---------------------------------------------------------------------------
 
 TEST_F(TypedEventQueueTest, EventQueueIsNotCopyable)
@@ -294,31 +252,30 @@ TEST_F(TypedEventQueueTest, EventQueueIsNotCopyable)
 }
 
 // ===========================================================================
-// Tests merged from test_event_bus_expanded.cpp (TypedEventQueueExpandedTest)
+// Expanded tests (pointer payloads)
 // ===========================================================================
-
-// --- ObjectSelected: multiple values ---
 
 TEST_F(TypedEventQueueExpandedTest, ObjectSelected_MultipleEmits)
 {
+	ObjectID* o1 = NewObject();
+	ObjectID* o2 = NewObject();
+	ObjectID* o3 = NewObject();
 	std::vector<int> receivedIds;
 
 	m_queue->subscribe<ObjectSelected>(
-		[&](const ObjectSelected& e) { receivedIds.push_back(e.objectId); });
+		[&](const ObjectSelected& e) { receivedIds.push_back(e.object->GetObjectID()); });
 
-	m_queue->enqueue(ObjectSelected{1});
-	m_queue->enqueue(ObjectSelected{2});
-	m_queue->enqueue(ObjectSelected{99});
+	m_queue->enqueue(ObjectSelected{nullptr, o1, 0});
+	m_queue->enqueue(ObjectSelected{nullptr, o2, 0});
+	m_queue->enqueue(ObjectSelected{nullptr, o3, 0});
 
 	m_queue->Process();
 
 	ASSERT_EQ(receivedIds.size(), 3);
-	EXPECT_EQ(receivedIds[0], 1);
-	EXPECT_EQ(receivedIds[1], 2);
-	EXPECT_EQ(receivedIds[2], 99);
+	EXPECT_EQ(receivedIds[0], o1->GetObjectID());
+	EXPECT_EQ(receivedIds[1], o2->GetObjectID());
+	EXPECT_EQ(receivedIds[2], o3->GetObjectID());
 }
-
-// --- ObjectSelected vs ObjectDeselected - no cross-contamination ---
 
 TEST_F(TypedEventQueueExpandedTest, ObjectDeselected_NoCrossContamination)
 {
@@ -328,127 +285,44 @@ TEST_F(TypedEventQueueExpandedTest, ObjectDeselected_NoCrossContamination)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
 
-	m_queue->enqueue(ObjectDeselected{7});
+	m_queue->enqueue(ObjectDeselected{nullptr, NewObject()});
 	m_queue->Process();
 
 	EXPECT_EQ(selectCount, 0);
 	EXPECT_EQ(deselectCount, 1);
 }
 
-// --- ObjectDeselected: correct data ---
-
 TEST_F(TypedEventQueueExpandedTest, ObjectDeselected_EmitReceivesCorrectId)
 {
+	ObjectID* obj = NewObject();
 	int receivedId = 0;
 
 	m_queue->subscribe<ObjectDeselected>(
-		[&](const ObjectDeselected& e) { receivedId = e.objectId; });
+		[&](const ObjectDeselected& e) { receivedId = e.object->GetObjectID(); });
 
-	m_queue->enqueue(ObjectDeselected{7});
+	m_queue->enqueue(ObjectDeselected{nullptr, obj});
 	m_queue->Process();
 
-	EXPECT_EQ(receivedId, 7);
+	EXPECT_EQ(receivedId, obj->GetObjectID());
 }
 
-// --- SceneObjectRemoved: correct ID ---
-
-TEST_F(TypedEventQueueExpandedTest, SceneObjectRemoved_EmitReceivesCorrectId)
-{
-	int receivedId = 0;
-
-	m_queue->subscribe<SceneObjectRemoved>(
-		[&](const SceneObjectRemoved& e) { receivedId = e.objectId; });
-
-	m_queue->enqueue(SceneObjectRemoved{200});
-	m_queue->Process();
-
-	EXPECT_EQ(receivedId, 200);
-}
-
-// --- ActiveCameraChanged: normal value ---
-
-TEST_F(TypedEventQueueExpandedTest, ActiveCameraChanged_EmitReceivesCorrectId)
-{
-	int receivedId = -1;
-
-	m_queue->subscribe<ActiveCameraChanged>(
-		[&](const ActiveCameraChanged& e) { receivedId = e.cameraId; });
-
-	m_queue->enqueue(ActiveCameraChanged{3});
-	m_queue->Process();
-
-	EXPECT_EQ(receivedId, 3);
-}
-
-// --- SceneStatusChanged: propagation via EventQueue ---
-
-TEST_F(TypedEventQueueExpandedTest, SceneStatusChanged_EmitReceivesCorrectStatus)
-{
-	int receivedStatus = -1;
-
-	m_queue->subscribe<SceneStatusChanged>(
-		[&](const SceneStatusChanged& e) { receivedStatus = e.status; });
-
-	// Simulate scene status change notification
-	m_queue->enqueue(SceneStatusChanged{1 << 2});
-	m_queue->Process();
-
-	EXPECT_EQ(receivedStatus, 4);
-}
-
-// --- SceneStatusChanged: multiple status values ---
-
-TEST_F(TypedEventQueueExpandedTest, SceneStatusChanged_MultipleValues)
-{
-	std::vector<int> receivedStatuses;
-
-	m_queue->subscribe<SceneStatusChanged>(
-		[&](const SceneStatusChanged& e) { receivedStatuses.push_back(e.status); });
-
-	m_queue->enqueue(SceneStatusChanged{1});     // ObjectTransChanged
-	m_queue->enqueue(SceneStatusChanged{2 | 4});  // LightChanged | CameraChanged
-	m_queue->enqueue(SceneStatusChanged{0});      // NoChanges
-
-	m_queue->Process();
-
-	ASSERT_EQ(receivedStatuses.size(), 3);
-	EXPECT_EQ(receivedStatuses[0], 1);
-	EXPECT_EQ(receivedStatuses[1], 6);
-	EXPECT_EQ(receivedStatuses[2], 0);
-}
-
-// --- All event types: independent channels ---
+// ---------------------------------------------------------------------------
+// All remaining event types: independent channels
+// ---------------------------------------------------------------------------
 
 TEST_F(TypedEventQueueExpandedTest, AllNewSignals_IndependentChannels)
 {
 	int selectCount = 0;
 	int deselectCount = 0;
-	int addCount = 0;
-	int removeCount = 0;
-	int camCount = 0;
-	int statusCount = 0;
 
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
-	m_queue->subscribe<SceneObjectAdded>([&](const SceneObjectAdded&) { addCount++; });
-	m_queue->subscribe<SceneObjectRemoved>([&](const SceneObjectRemoved&) { removeCount++; });
-	m_queue->subscribe<ActiveCameraChanged>([&](const ActiveCameraChanged&) { camCount++; });
-	m_queue->subscribe<SceneStatusChanged>([&](const SceneStatusChanged&) { statusCount++; });
 
-	// Emit each signal exactly once
-	m_queue->enqueue(ObjectSelected{1});
-	m_queue->enqueue(ObjectDeselected{2});
-	m_queue->enqueue(SceneObjectAdded{3, "Light"});
-	m_queue->enqueue(SceneObjectRemoved{4});
-	m_queue->enqueue(ActiveCameraChanged{5});
-	m_queue->enqueue(SceneStatusChanged{0});
+	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectDeselected{nullptr, NewObject()});
 
 	m_queue->Process();
 
 	EXPECT_EQ(selectCount, 1);
 	EXPECT_EQ(deselectCount, 1);
-	EXPECT_EQ(addCount, 1);
-	EXPECT_EQ(removeCount, 1);
-	EXPECT_EQ(camCount, 1);
-	EXPECT_EQ(statusCount, 1);
 }
