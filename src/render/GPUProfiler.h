@@ -5,8 +5,8 @@
  * Owns one vk::raii::QueryPool sized for kMaxFramesInFlight frames; each
  * frame slot holds kMaxPasses + 2 timestamp queries:
  *   slot[0]               frame start (written by the renderer)
- *   slot[1 + i]           end of pass i (i in [0, kMaxPasses))
- *   slot[1 + kMaxPasses]  frame end   (written by the renderer)
+ *   slot[1 + i]           end of pass i (i in [0, passCount))
+ *   slot[1 + passCount]   frame end   (written by the renderer)
  *
  * Pass timings are derived from consecutive boundary timestamps, so only
  * one timestamp per pass is needed (the command buffer executes passes
@@ -69,8 +69,14 @@ public:
 	/** @brief Records the end timestamp for pass @p passIndex. */
 	void WritePassEnd(vk::CommandBuffer cmd, uint32_t frameIndex, uint32_t passIndex) const;
 
-	/** @brief Records the frame-end timestamp (after the final blit). */
-	void WriteFrameEnd(vk::CommandBuffer cmd, uint32_t frameIndex) const;
+	/**
+	 * @brief Records the frame-end timestamp (after the final blit).
+	 * @param passCount Number of passes recorded this frame; the frame-end
+	 *        timestamp is written at slot 1 + passCount so Collect()'s
+	 *        contiguous [0, passCount + 2) readback covers exactly the
+	 *        queries that were written.
+	 */
+	void WriteFrameEnd(vk::CommandBuffer cmd, uint32_t frameIndex, uint32_t passCount) const;
 
 	/**
 	 * @brief Reads back the frame slot's timestamps.

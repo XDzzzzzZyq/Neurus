@@ -331,7 +331,7 @@ private:
 	uint32_t m_haltonIndex = 0;
 	uint32_t m_iteration = 0;
 
-	// --- Per-frame profiling (opt-in via SetProfilingEnabled) ---
+	// --- Per-frame profiling (enabled by Application at startup; SetProfilingEnabled toggles) ---
 	bool m_profilingEnabled = false;
 	GPUProfiler m_profiler;
 	FrameProfile m_frameProfile;
@@ -340,6 +340,9 @@ private:
 	// Pass count recorded per frame slot so GPU readback stays aligned even
 	// when the graph topology changes between record and collect.
 	std::array<uint32_t, kMaxFramesInFlight> m_recordedPassCount{};
+	// True once a slot's queries were reset+written, so Collect() skips the
+	// pre-signaled first-frame readback (VUID-vkGetQueryPoolResults-None-09401).
+	std::array<bool, kMaxFramesInFlight> m_profilingQueriesWritten{};
 
 };
 

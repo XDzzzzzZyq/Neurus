@@ -71,12 +71,13 @@ void GPUProfiler::WritePassEnd(vk::CommandBuffer cmd, uint32_t frameIndex, uint3
 	                   **m_pool, QueryOffset(frameIndex) + 1 + passIndex);
 }
 
-void GPUProfiler::WriteFrameEnd(vk::CommandBuffer cmd, uint32_t frameIndex) const
+void GPUProfiler::WriteFrameEnd(vk::CommandBuffer cmd, uint32_t frameIndex,
+                                uint32_t passCount) const
 {
-	if (!m_available)
+	if (!m_available || passCount > kMaxPasses)
 		return;
 	cmd.writeTimestamp(vk::PipelineStageFlagBits::eAllCommands,
-	                   **m_pool, QueryOffset(frameIndex) + 1 + kMaxPasses);
+	                   **m_pool, QueryOffset(frameIndex) + 1 + passCount);
 }
 
 bool GPUProfiler::Collect(uint32_t frameIndex, uint32_t passCount,

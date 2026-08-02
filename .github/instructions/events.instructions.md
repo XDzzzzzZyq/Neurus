@@ -107,9 +107,10 @@ public:
     static UIEvents& instance();
 };
 
-// UIEvents also carries the profiling toggle:
-//   UIEvents::profilingToggleRequested(bool enabled) - Debug > GPU Profiling Overlay
-//   (wired in Application to DeferredRenderer::SetProfilingEnabled)
+// Profiling is always collected while the app runs: Application calls
+// DeferredRenderer::SetProfilingEnabled(true) at startup and forwards the
+// FrameProfile returned by DrawFrame() to Editor::SetFrameProfile(), which
+// exposes it to panels through UIContext::frameProfile (no UIEvents signal).
 //
 // Panel signals (defined on the panel itself, not UIEvents):
 //   Outliner::objectSelected(const ObjectSelected& e)

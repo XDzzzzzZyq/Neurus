@@ -380,6 +380,21 @@ TEST_F(SceneWiringTest, ProfilingEnabled_PopulatesFrameProfile)
 		EXPECT_GT(profile.passCount, 0u);
 	}
 
+	// Frame 3: the slot recorded in frame 1 is read back. The readback is
+	// guarded so pre-signaled, never-written slots are skipped on startup
+	// (VUID-vkGetQueryPoolResults-None-09401).
+	{
+		const FrameProfile& profile = m_renderer->DrawFrame(RenderContext{.scene = &scene});
+		EXPECT_GT(profile.passCount, 0u);
+		if (profile.gpuTimingAvailable)
+		{
+			EXPECT_TRUE(profile.gpuReady);
+			EXPECT_GE(profile.gpuTotalMs, 0.0);
+			for (const auto& pass : profile.passes)
+				EXPECT_GE(pass.gpuMs, 0.0);
+		}
+	}
+
 	// Toggling off resets the profile; later frames leave it empty.
 	m_renderer->SetProfilingEnabled(false);
 	EXPECT_FALSE(m_renderer->IsProfilingEnabled());

@@ -239,7 +239,11 @@ const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	if (m_profilingEnabled)
 	{
 		const uint32_t recordedPasses = m_recordedPassCount[r_currentFrame];
-		if (m_profiler.Collect(r_currentFrame, recordedPasses, m_passGpuMs, m_gpuTotalMs))
+		// Skip slots whose queries were never reset/written yet: their fences
+		// start pre-signaled, so the first readback would hit an uninitialized
+		// query (VUID-vkGetQueryPoolResults-None-09401).
+		if (m_profilingQueriesWritten[r_currentFrame] &&
+		    m_profiler.Collect(r_currentFrame, recordedPasses, m_passGpuMs, m_gpuTotalMs))
 		{
 			const size_t n = std::min(m_passGpuMs.size(), m_frameProfile.passes.size());
 			for (size_t i = 0; i < n; ++i)
@@ -333,12 +337,12 @@ void DeferredRenderer::SetProfilingEnabled(bool enabled)
 	m_frameProfile = FrameProfile{};
 	if (m_profilingEnabled)
 	{
-		NEURUS_LOG("[DeferredRenderer] Profiling overlay enabled"
+		NEURUS_LOG("[DeferredRenderer] GPU profiling enabled"
 		           << (m_profiler.Available() ? " (GPU timestamps)" : " (CPU-only, no GPU timestamps)"));
 	}
 	else
 	{
-		NEURUS_LOG("[DeferredRenderer] Profiling overlay disabled");
+		NEURUS_LOG("[DeferredRenderer] GPU profiling disabled");
 	}
 }
 
@@ -646,7 +650,13 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 
 	// --- Profiling: write the GPU frame-end timestamp (covers the final blit) ---
 	if (m_profilingEnabled)
-		m_profiler.WriteFrameEnd(cmdBuf, r_currentFrame);
+	{
+		m_profiler.WriteFrameEnd(cmdBuf, r_currentFrame,
+		                         static_cast<uint32_t>(m_frameProfile.passes.size()));
+		// Slot's queries are now validly reset+written; safe to read back once
+		// this frame's fence signals.
+		m_profilingQueriesWritten[r_currentFrame] = true;
+	}
 
 	// --- End command buffer ---
 	cmdBuf.end();

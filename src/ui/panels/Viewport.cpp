@@ -6,13 +6,9 @@
 
 #include <QKeyEvent>
 #include <QMouseEvent>
-#include <QPainter>
 #include <QPaintEvent>
 #include <QResizeEvent>
-#include <QStringList>
 #include <QWheelEvent>
-
-#include <algorithm>
 
 namespace neurus {
 
@@ -37,83 +33,16 @@ Viewport::Viewport(QWidget* parent)
 
 Viewport::~Viewport() = default;
 
-void Viewport::Refresh(const UIContext& ctx)
+void Viewport::Refresh(const UIContext& /*ctx*/)
 {
 	// Viewport is event-driven: input forwarding and Vulkan rendering
 	// are handled outside the Qt widget refresh cycle.
-
-	// GPU profiling overlay: copy the latest profile and repaint only when
-	// the numbers actually changed (profiling off => static/empty overlay).
-	const auto* profile = static_cast<const FrameProfile*>(ctx.frameProfile);
-	if (!profile)
-		return;
-	const bool changed = !m_hasProfile ||
-		m_latestProfile.cpuRecordMs != profile->cpuRecordMs ||
-		m_latestProfile.gpuTotalMs != profile->gpuTotalMs ||
-		m_latestProfile.passCount != profile->passCount;
-	m_latestProfile = *profile;
-	m_hasProfile = true;
-	if (changed)
-		update();  // Repaint the overlay when a new profile arrives.
 }
 
 void Viewport::paintEvent(QPaintEvent* /*event*/)
 {
 	// No-op: all rendering is handled by Vulkan. This override prevents
 	// Qt from drawing a default widget background behind the Vulkan content.
-
-	// --- GPU profiling overlay (Debug menu, opt-in) ---
-	// Drawn on top of the Vulkan viewport in the top-left corner.
-	if (!m_hasProfile || m_latestProfile.passCount == 0)
-		return;
-
-	QPainter painter(this);
-	painter.setRenderHint(QPainter::Antialiasing, false);
-
-	QFont font("Consolas", 8);
-	font.setStyleHint(QFont::Monospace);
-	painter.setFont(font);
-
-	QStringList lines;
-	lines << "Neurus GPU Profiling";
-	lines << QString("CPU record: %1 ms   GPU frame: %2 ms")
-		.arg(m_latestProfile.cpuRecordMs, 0, 'f', 2)
-		.arg((m_latestProfile.gpuTimingAvailable && m_latestProfile.gpuReady)
-			? QString::number(m_latestProfile.gpuTotalMs, 'f', 2)
-			: QString("--"));
-	lines << QString("Passes: %1   Draws: %2   Dispatches: %3")
-		.arg(m_latestProfile.passCount)
-		.arg(m_latestProfile.drawCalls)
-		.arg(m_latestProfile.dispatches);
-	for (const auto& pass : m_latestProfile.passes)
-	{
-		QString line = QString("%1  CPU %2 ms")
-			.arg(QString::fromStdString(pass.name), -28)
-			.arg(pass.cpuMs, 0, 'f', 2);
-		if (m_latestProfile.gpuTimingAvailable)
-			line += QString("  GPU %1 ms").arg(pass.gpuMs, 0, 'f', 2);
-		line += QString("  [%1 draw, %2 disp]").arg(pass.drawCalls).arg(pass.dispatches);
-		lines << line;
-	}
-
-	int maxWidth = 0;
-	for (const QString& line : lines)
-		maxWidth = std::max(maxWidth, painter.fontMetrics().horizontalAdvance(line));
-
-	const int margin = 8;
-	const int lineHeight = painter.fontMetrics().height() + 2;
-	const QRect panelRect(margin, margin,
-		maxWidth + 2 * margin, lines.size() * lineHeight + 2 * margin);
-
-	painter.fillRect(panelRect, QColor(20, 20, 20, 190));
-
-	int y = margin + painter.fontMetrics().ascent() + 1;
-	for (int i = 0; i < lines.size(); ++i)
-	{
-		painter.setPen(i == 0 ? QColor(130, 220, 130) : QColor(240, 240, 240));
-		painter.drawText(margin + 4, y, lines[i]);
-		y += lineHeight;
-	}
 }
 
 void Viewport::resizeEvent(QResizeEvent* event)

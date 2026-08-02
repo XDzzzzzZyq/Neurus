@@ -265,6 +265,9 @@ bool Application::InitRenderer()
 		return false;
 	}
 
+	// --- GPU profiling: always collect per-frame timings for the Profiling panel ---
+	app_renderer->SetProfilingEnabled(true);
+
 	// --- Create screenshot helper (needs Vulkan handles; RenderCache passed per-call) ---
 	app_screenshot = std::make_unique<neurus::Screenshot>(
 		app_vkContext->device(),
@@ -420,13 +423,6 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::spotLightAddRequested);
-
-	// --- GPU profiling overlay toggle (Debug menu) ---
-	QObject::connect(&uiEvents, &neurus::UIEvents::profilingToggleRequested,
-	                 [this](bool enabled) {
-	                     if (app_renderer)
-	                         app_renderer->SetProfilingEnabled(enabled);
-	                 });
 
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())

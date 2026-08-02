@@ -477,9 +477,11 @@ covered by `PassCountersTest.RecordTracksInternalCounters` (GPU fixture).
 Per-frame profiling answers whether the renderer is **CPU-bound** (command
 recording) or **GPU-bound** before any parallel-rendering work.
 
-**Opt-in only**: profiling is disabled by default. `DeferredRenderer::
-SetProfilingEnabled(true)` (Debug menu "GPU Profiling Overlay") turns it on;
-the default path adds no overhead.
+**Always on in the app**: `Application::InitRenderer()` calls `DeferredRenderer::
+SetProfilingEnabled(true)` at startup so the Profiling panel always shows live
+per-frame timings. The renderer's own default stays off (tests construct it
+fresh); embedded callers can still toggle collection with
+`SetProfilingEnabled(bool)`.
 
 **What is measured** (`FrameProfile` in `ProfilingData.h`)
 - `cpuRecordMs` - total `DeferredRenderer::recordFrame()` wall time.
@@ -489,13 +491,13 @@ the default path adds no overhead.
 
 **GPU timestamps** (`GPUProfiler`)
 - One `vk::QueryPool` of `kMaxFramesInFlight * (kMaxPasses + 2)` timestamps;
-  per frame slot: start@0, pass end@1+i, frame end@1+kMaxPasses.
+  per frame slot: start@0, pass end@1+i, frame end@1+passCount.
 - `WriteFrameStart`/`WritePassEnd`/`WriteFrameEnd` are recorded into the
   command buffer; `Collect()` reads them back non-blockingly after that frame
   slot's fence signals (results lag CPU data by 1-2 frames by design).
 - The pool is created only when `timestampComputeAndGraphics` and the graphics
   queue family's `timestampValidBits` allow it; otherwise `Available()==false`
-  and the overlay/log show CPU data only.
+  and the Profiling panel/log show CPU data only.
 
 **Counters**: each pass tracks its own draw/dispatch counts internally
 (`Pass::m_drawCalls` / `m_dispatches`, exposed via `GetDrawCalls()` /
@@ -507,8 +509,8 @@ snapshots them after each `Record()`, and sums them into the frame totals.
 **Surface**: `DeferredRenderer::DrawFrame()` returns the `FrameProfile`; the
 Application layer forwards it to `Editor::SetFrameProfile()`, and the Editor
 exposes its copy through `UIContext::frameProfile` (opaque `const void*`).
-The Viewport panel casts it back and draws the real-time overlay in the
-top-left corner. See ui-system.instructions.md.
+The ProfilingPanel casts it back and renders the per-pass timings as a tree
+(Frame totals + per-pass rows). See ui-system.instructions.md.
 
 ## Future Evolution
 
