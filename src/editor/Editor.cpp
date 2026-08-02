@@ -350,6 +350,7 @@ UIContext Editor::GetUIContext() const
 	UIContext ctx;
 	ctx.renderConfig = &m_config;
 	ctx.scene = m_scene.get();
+	ctx.frameProfile = &m_frameProfile;
 	return ctx;
 }
 

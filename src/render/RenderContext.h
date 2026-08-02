@@ -67,6 +67,7 @@ struct RenderContext
 	/// @brief True when the scene has changed and accumulation history should be discarded.
 	/// Set by Editor, consumed by DeferredRenderer each frame.
 	bool iterationReset{false};
+
 };
 
 } // namespace neurus

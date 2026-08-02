@@ -195,6 +195,7 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+	++m_dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition GizmoHighlight output: General → ShaderRead for downstream passes ---

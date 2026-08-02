@@ -7,6 +7,7 @@
 
 #include "controllers/Controllers.h"
 #include "editor/events/EventBus.h"
+#include "render/ProfilingData.h"
 #include "render/RenderConfig.h"
 #include "render/RenderContext.h"
 #include "ui/UIContext.h"
@@ -59,6 +60,15 @@ public:
 	RenderContext GetRenderContext() const;
 	UIContext GetUIContext() const;
 
+	/**
+	 * @brief Stores the renderer's latest per-frame profile.
+	 *
+	 * Called by the Application layer right after DeferredRenderer::DrawFrame()
+	 * returns the profile; GetUIContext() exposes it to panels (opaque
+	 * `const void*` in UIContext::frameProfile).
+	 */
+	void SetFrameProfile(const FrameProfile& profile) { m_frameProfile = profile; }
+
 	template<typename T>
 	void RegisterController()
 	{
@@ -97,6 +107,9 @@ private:
 	RenderConfig          m_config;
 	std::string           m_assetDir;
 	bool                  m_dirty = false;
+
+	// Latest per-frame render profile (Renderer -> Editor, via SetFrameProfile).
+	FrameProfile          m_frameProfile;
 
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.

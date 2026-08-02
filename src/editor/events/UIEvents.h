@@ -92,6 +92,12 @@ signals:
 	/** @brief Emitted when the current project should be saved to a new path (Ctrl+Shift+S). */
 	void projectSaveAsRequested(const ProjectSaveAsEvent& e);
 
+	// --- GPU profiling signals ---
+
+	/** @brief Emitted when the user toggles the GPU profiling overlay (Debug menu).
+	 *  @param enabled True to enable per-frame CPU/GPU profiling and the Viewport overlay. */
+	void profilingToggleRequested(bool enabled);
+
 	// --- Mesh import signals ---
 
 	/** @brief Emitted when a mesh file is selected for import (Edit → Add → Mesh...). */
@@ -138,6 +144,10 @@ public:
 	void requestSpotLightAdd() { emit spotLightAddRequested(SpotLightAddEvent{}); }
 
 	void requestUIRecreation(quintptr newHwnd) { emit uiRecreated(newHwnd); }
+
+	// --- GPU profiling convenience method ---
+
+	void requestProfilingToggle(bool enabled) { emit profilingToggleRequested(enabled); }
 
 private:
 	UIEvents() = default;

@@ -2,6 +2,7 @@
 
 #include "platform/PlatformSurface.h"
 #include "UIPanel.h"
+#include "render/ProfilingData.h"
 
 #include <glm/glm.hpp>
 
@@ -182,6 +183,9 @@ protected:
 	void wheelEvent(QWheelEvent* event) override;
 
 private:
+	FrameProfile m_latestProfile;    ///< Latest frame profile for the overlay.
+	bool         m_hasProfile = false; ///< True once a profile has been received.
+
 	QPointF m_lastPos;        ///< Last mouse position for delta computation.
 	bool    m_leftHeld = false;   ///< Left mouse button held.
 	bool    m_middleHeld = false; ///< Middle mouse button held.

@@ -209,6 +209,7 @@ void ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Ren
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+	++m_dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition ComposedOutput: General → TransferSrc (ready for swapchain blit) ---

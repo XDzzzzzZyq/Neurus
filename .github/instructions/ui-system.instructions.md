@@ -106,6 +106,7 @@ mainWindow->createViewportDock(container);
 |------|-------|
 | **File** | Exit (`Alt+F4`) |
 | **View** | Save Layout (`Ctrl+Shift+S`), Restore Default Layout |
+| **Debug** | GPU Profiling Overlay (checkable) |
 | **Help** | About Neurus |
 
 ## Build Integration
@@ -129,6 +130,11 @@ All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 - `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig)
 - `virtual void Refresh(const UIContext& ctx)` — called per-frame to sync panel UI with application state
 - `UIContext` carries a `const void* renderConfig` pointer; panels cast to `const RenderConfig*`
+- `UIContext` also carries a `const void* frameProfile` pointer to the Editor's copy
+  of the profile returned by `DeferredRenderer::DrawFrame()` (via
+  `Editor::SetFrameProfile`); the Viewport casts it to `const FrameProfile*` and
+  draws a real-time profiling overlay in the top-left corner
+  (enabled via Debug > GPU Profiling Overlay)
 - `UIManager` stores panels in `std::map<PanelType, ads::CDockWidget*> m_panelDocks`
 
 ### RenderConfigPanel

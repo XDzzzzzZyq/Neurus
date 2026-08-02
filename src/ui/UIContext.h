@@ -35,6 +35,13 @@ struct UIContext
 	/** @brief Opaque pointer to Project::proj_config (const RenderConfig*). */
 	const void* renderConfig = nullptr;
 
+	/**
+	 * @brief Opaque pointer to the Editor's copy of the latest FrameProfile
+	 *        (const FrameProfile*). Populated by Editor::SetFrameProfile()
+	 *        from the profile returned by DeferredRenderer::DrawFrame().
+	 */
+	const void* frameProfile = nullptr;
+
 	/** @brief Opaque pointer to Scene*. Cast to const Scene* in cpp. */
 	void* scene = nullptr;
 

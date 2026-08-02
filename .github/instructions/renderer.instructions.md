@@ -13,6 +13,8 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
 - `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
+- `src/render/ProfilingData.h` - Vulkan-free profiling POD (PassProfile, FrameProfile)
+- `src/render/GPUProfiler.h/cpp` - GPU timestamp query pool (per-frame, per-pass)
 - `src/render/shaders/Shader.h/cpp` - Per-mesh shader container (multi-stage, owns ShaderUnits)
 - `src/render/shaders/ShaderUnit.h` - Per-stage shader state: code text, parsed IR (`ShaderStruct`), SPIR-V, version
 - `src/render/shaders/ShaderLibrary.h/cpp` - Load/parse/generate/compile service for shaders
@@ -437,7 +439,11 @@ built on the generic `neurus::Graph<SData, NData>` DAG template (`src/core/Graph
 - `Compile()` — Kahn topological sort. Inputs with no in-graph producer are
   **external** (produced by a RenderCache attachment) and are allowed. A cycle
   throws `std::runtime_error` naming the involved passes.
-- `Execute(cmd, cache, ctx)` — invokes each pass's `Record()` in compiled order.
+- `Execute(cmd, cache, ctx)` - invokes each pass's `Record()` in compiled order.
+  Pure dispatch: the graph owns no profiling state. Per-pass CPU/GPU timing and
+  draw/dispatch counters are collected by `DeferredRenderer::recordFrame`, which
+  iterates `CompiledOrder()` itself while profiling is enabled - so
+  `RenderContext` stays an immutable snapshot.
 - `Clear()` — drops all nodes so the graph can be rebuilt.
 
 **Config-driven topology (single source of truth = RenderConfig)**
@@ -460,10 +466,49 @@ built on the generic `neurus::Graph<SData, NData>` DAG template (`src/core/Graph
   ownership into the graph (and enabling transient aliasing + custom passes) is
   tracked in issue #32; parallel execution built on it in #33–#37.
 
-**Tests**: `test/render/test_render_graph.cpp` — socket materialization,
+**Tests**: `test/render/test_render_graph.cpp` - socket materialization,
 connect/duplicate rejection, external inputs, linear/fan-out/diamond ordering,
 multi-resource edges, cycle detection (with named nodes), rebuild determinism,
-clear/reuse, execute preconditions.
+clear/reuse, and execute preconditions. Pass-owned profiling counters are
+covered by `PassCountersTest.RecordTracksInternalCounters` (GPU fixture).
+
+## GPU Profiling (issue #33)
+
+Per-frame profiling answers whether the renderer is **CPU-bound** (command
+recording) or **GPU-bound** before any parallel-rendering work.
+
+**Opt-in only**: profiling is disabled by default. `DeferredRenderer::
+SetProfilingEnabled(true)` (Debug menu "GPU Profiling Overlay") turns it on;
+the default path adds no overhead.
+
+**What is measured** (`FrameProfile` in `ProfilingData.h`)
+- `cpuRecordMs` - total `DeferredRenderer::recordFrame()` wall time.
+- Per pass: `cpuMs` (around `Record()` in `DeferredRenderer::recordFrame`), `gpuMs`
+  (timestamp queries), `drawCalls`, `dispatches`.
+- Frame totals: `drawCalls`, `dispatches`, `passCount`, `gpuTotalMs`.
+
+**GPU timestamps** (`GPUProfiler`)
+- One `vk::QueryPool` of `kMaxFramesInFlight * (kMaxPasses + 2)` timestamps;
+  per frame slot: start@0, pass end@1+i, frame end@1+kMaxPasses.
+- `WriteFrameStart`/`WritePassEnd`/`WriteFrameEnd` are recorded into the
+  command buffer; `Collect()` reads them back non-blockingly after that frame
+  slot's fence signals (results lag CPU data by 1-2 frames by design).
+- The pool is created only when `timestampComputeAndGraphics` and the graphics
+  queue family's `timestampValidBits` allow it; otherwise `Available()==false`
+  and the overlay/log show CPU data only.
+
+**Counters**: each pass tracks its own draw/dispatch counts internally
+(`Pass::m_drawCalls` / `m_dispatches`, exposed via `GetDrawCalls()` /
+`GetDispatches()`). `RenderContext` carries no profiling data - it stays an
+immutable per-frame snapshot. When profiling is enabled,
+`DeferredRenderer::recordFrame` resets every pass's counters at frame start,
+snapshots them after each `Record()`, and sums them into the frame totals.
+
+**Surface**: `DeferredRenderer::DrawFrame()` returns the `FrameProfile`; the
+Application layer forwards it to `Editor::SetFrameProfile()`, and the Editor
+exposes its copy through `UIContext::frameProfile` (opaque `const void*`).
+The Viewport panel casts it back and draws the real-time overlay in the
+top-left corner. See ui-system.instructions.md.
 
 ## Future Evolution
 

@@ -128,6 +128,7 @@ void FXAAPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 
 	const uint32_t gx = (extent.width  + 15) / 16;
 	const uint32_t gy = (extent.height + 15) / 16;
+	++m_dispatches;
 	cmdBuf.dispatch(gx, gy, 1);
 
 	{

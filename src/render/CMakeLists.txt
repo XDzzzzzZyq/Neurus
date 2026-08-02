@@ -54,6 +54,9 @@ add_library(neurus_render STATIC
 	RenderCache.h
 	RenderCache.cpp
 	RenderContext.h
+	ProfilingData.h
+	GPUProfiler.h
+	GPUProfiler.cpp
 	DeferredRenderer.h
 	DeferredRenderer.cpp
 	Screenshot.h

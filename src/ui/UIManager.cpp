@@ -186,6 +186,15 @@ void UIManager::CreateMenus()
 		neurus::UIEvents::instance().requestScreenshotAll();
 	});
 
+	auto* debugMenu = menuBar()->addMenu("&Debug");
+
+	auto* profilingAction = debugMenu->addAction("GPU &Profiling Overlay");
+	profilingAction->setCheckable(true);
+	profilingAction->setChecked(false);
+	connect(profilingAction, &QAction::toggled, [](bool checked) {
+		neurus::UIEvents::instance().requestProfilingToggle(checked);
+	});
+
 	auto* helpMenu = menuBar()->addMenu("&Help");
 	auto* aboutAction = helpMenu->addAction("&About Neurus");
 	connect(aboutAction, &QAction::triggered, this, [this]() {

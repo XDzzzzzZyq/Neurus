@@ -396,6 +396,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 				    kModelPushOffset, model);
 				cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), {vk::DeviceSize{0}});
 				cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+				++m_drawCalls;
 				cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 			}
 		}
@@ -507,6 +508,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 					cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), {vk::DeviceSize{0}});
 					cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
+					++m_drawCalls;
 					cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 				}
 			}

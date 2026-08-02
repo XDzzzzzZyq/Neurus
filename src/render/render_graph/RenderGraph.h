@@ -96,6 +96,12 @@ public:
 
 	/**
 	 * @brief Walk the compiled order and invoke each pass's Record().
+	 *
+	 * Pure dispatch: the graph owns no profiling state. Per-pass CPU/GPU
+	 * timing and draw/dispatch counters are collected by
+	 * DeferredRenderer::recordFrame (it iterates CompiledOrder() itself while
+	 * profiling is enabled), so RenderContext stays an immutable snapshot.
+	 *
 	 * @pre  Compile() has been called since the last topology change.
 	 * @throws std::runtime_error if the graph has not been compiled.
 	 */

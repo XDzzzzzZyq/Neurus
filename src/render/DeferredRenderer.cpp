@@ -30,6 +30,7 @@
 #include "core/Log.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <stdexcept>
@@ -55,6 +56,9 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	, r_queueFamilyIndex(queueFamilyIndex)
 	, r_commandPool(createCommandPool(device, queueFamilyIndex))
 {
+	// --- 0. Create the optional GPU timestamp query pool (no-op if unsupported) ---
+	m_profiler.Initialize(device, physicalDevice, queueFamilyIndex, kMaxFramesInFlight);
+
 	// --- 1. Create swapchain ---
 	r_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
 	const auto extent = r_swapchain->extent();
@@ -219,7 +223,7 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::DrawFrame(const RenderContext& ctx)
+const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 {
 	auto& fence = r_inFlightFences[r_currentFrame];
 	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
@@ -227,7 +231,22 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	// --- Wait for this frame slot's fence ---
 	if (r_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
-		return;  // Timeout - skip this frame
+		return m_frameProfile;  // Timeout - skip this frame
+	}
+
+	// --- Profiling: read back this slot's GPU timestamps (fence signaled) ---
+	// GPU times are 1-2 frames behind by design (fence-based readback).
+	if (m_profilingEnabled)
+	{
+		const uint32_t recordedPasses = m_recordedPassCount[r_currentFrame];
+		if (m_profiler.Collect(r_currentFrame, recordedPasses, m_passGpuMs, m_gpuTotalMs))
+		{
+			const size_t n = std::min(m_passGpuMs.size(), m_frameProfile.passes.size());
+			for (size_t i = 0; i < n; ++i)
+				m_frameProfile.passes[i].gpuMs = m_passGpuMs[i];
+			m_frameProfile.gpuTotalMs = m_gpuTotalMs;
+			m_frameProfile.gpuReady = true;
+		}
 	}
 
 	// --- Acquire next swapchain image ---
@@ -258,7 +277,7 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 
 	if (skipFrame)
 	{
-		return;
+		return m_frameProfile;
 	}
 
 	// Only reset fence after successful acquire
@@ -296,15 +315,31 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 
 	if (presentFailed)
 	{
-		return;
+		return m_frameProfile;
 	}
 
 	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
+	return m_frameProfile;
 }
 
 void DeferredRenderer::ResetShadowAccumulation()
 {
 	m_iteration = 0;
+}
+
+void DeferredRenderer::SetProfilingEnabled(bool enabled)
+{
+	m_profilingEnabled = enabled;
+	m_frameProfile = FrameProfile{};
+	if (m_profilingEnabled)
+	{
+		NEURUS_LOG("[DeferredRenderer] Profiling overlay enabled"
+		           << (m_profiler.Available() ? " (GPU timestamps)" : " (CPU-only, no GPU timestamps)"));
+	}
+	else
+	{
+		NEURUS_LOG("[DeferredRenderer] Profiling overlay disabled");
+	}
 }
 
 void DeferredRenderer::RebuildMainGraph(const PipelineSignature& sig)
@@ -479,6 +514,9 @@ void DeferredRenderer::recreateSwapchain()
 void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
                                    const RenderContext& editorCtx)
 {
+	// --- Profiling: CPU total for the whole recordFrame body ---
+	const auto cpuFrameStart = std::chrono::steady_clock::now();
+
 	const vk::Extent2D extent = r_swapchain->extent();
 
 	// --- Reset command buffer (ensures it's not in a bad state) then begin ---
@@ -525,7 +563,47 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 			RebuildMainGraph(sig);
 	}
 
-	m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
+	// --- Profiling: collect per-pass CPU times, GPU timestamps, and counters ---
+	// Passes track their own draw/dispatch counters (Pass::GetDrawCalls /
+	// GetDispatches); the renderer resets them at frame start and snapshots
+	// them per pass. RenderGraph stays a pure DAG dispatcher.
+	if (m_profilingEnabled)
+	{
+		for (auto& pass : r_passes)
+			pass->ResetCounters();
+
+		m_frameProfile.passes.clear();
+		m_profiler.ResetQueries(cmdBuf, r_currentFrame);
+		m_profiler.WriteFrameStart(cmdBuf, r_currentFrame);
+
+		const auto& order = m_mainGraph.CompiledOrder();
+		m_frameProfile.passes.reserve(order.size());
+		uint32_t passIndex = 0;
+		for (auto* node : order)
+		{
+			Pass* pass = node->data.pass;
+
+			const auto cpuStart = std::chrono::steady_clock::now();
+			pass->Record(*cmdBuf, *r_renderCache, ctx);
+			const auto cpuEnd = std::chrono::steady_clock::now();
+
+			PassProfile entry;
+			entry.name = node->data.io.name;
+			entry.cpuMs = std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
+			entry.drawCalls = pass->GetDrawCalls();
+			entry.dispatches = pass->GetDispatches();
+			m_frameProfile.passes.push_back(std::move(entry));
+
+			if (m_profiler.Available())
+				m_profiler.WritePassEnd(cmdBuf, r_currentFrame, passIndex);
+			++passIndex;
+		}
+		m_recordedPassCount[r_currentFrame] = static_cast<uint32_t>(m_frameProfile.passes.size());
+	}
+	else
+	{
+		m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
+	}
 
 	// --- Phase 4: Blit output → swapchain image ---
 	auto& blitSource = r_renderCache->GetAttachment(
@@ -566,8 +644,29 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 		ImageState::TransferDst, ImageState::Present,
 		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
+	// --- Profiling: write the GPU frame-end timestamp (covers the final blit) ---
+	if (m_profilingEnabled)
+		m_profiler.WriteFrameEnd(cmdBuf, r_currentFrame);
+
 	// --- End command buffer ---
 	cmdBuf.end();
+
+	// --- Profiling: finalize the CPU-side frame profile ---
+	if (m_profilingEnabled)
+	{
+		const auto cpuFrameEnd = std::chrono::steady_clock::now();
+		m_frameProfile.cpuRecordMs =
+			std::chrono::duration<double, std::milli>(cpuFrameEnd - cpuFrameStart).count();
+		m_frameProfile.drawCalls = 0;
+		m_frameProfile.dispatches = 0;
+		for (const PassProfile& pass : m_frameProfile.passes)
+		{
+			m_frameProfile.drawCalls += pass.drawCalls;
+			m_frameProfile.dispatches += pass.dispatches;
+		}
+		m_frameProfile.passCount = static_cast<uint32_t>(m_frameProfile.passes.size());
+		m_frameProfile.gpuTimingAvailable = m_profiler.Available();
+	}
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "GPUProfiler.h"
+#include "ProfilingData.h"
 #include "passes/Pass.h"
 #include "RenderConfig.h"
 #include "RenderContext.h"
@@ -27,6 +29,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include <glm/glm.hpp>
+#include <array>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -108,9 +111,16 @@ public:
 	 * Handles swapchain recreation on VK_ERROR_OUT_OF_DATE_KHR. Safe to
 	 * call repeatedly (fence-guarded, max kMaxFramesInFlight in flight).
 	 *
+	 * While profiling is enabled (SetProfilingEnabled), the returned profile
+	 * carries per-pass CPU times/counters from the frame just recorded and GPU
+	 * times read back from the fence that just signaled (1-2 frame lag by
+	 * design). When profiling is off, the returned profile is left untouched.
+	 *
 	 * @param editorCtx Editor-produced context with scene set.
+	 * @return The latest frame profile (owned by the renderer; valid until the
+	 *         next DrawFrame call).
 	 */
-	void DrawFrame(const RenderContext& ctx);
+	const FrameProfile& DrawFrame(const RenderContext& ctx);
 
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
@@ -197,6 +207,16 @@ public:
 	 * Sets the global shadow frame counter to 0, causing the next frame to overwrite (alpha=1).
 	 */
 	void ResetShadowAccumulation();
+
+	/**
+	 * @brief Enables or disables per-frame CPU/GPU profiling.
+	 * @param enabled True to record per-pass timings + draw/dispatch counters
+	 *        into the frame profile consumed by the UI overlay.
+	 */
+	void SetProfilingEnabled(bool enabled);
+
+	/** @brief Returns true when frame profiling is active. */
+	bool IsProfilingEnabled() const { return m_profilingEnabled; }
 
 private:
 	/**
@@ -310,6 +330,16 @@ private:
 	// --- Temporal shadow accumulation state ---
 	uint32_t m_haltonIndex = 0;
 	uint32_t m_iteration = 0;
+
+	// --- Per-frame profiling (opt-in via SetProfilingEnabled) ---
+	bool m_profilingEnabled = false;
+	GPUProfiler m_profiler;
+	FrameProfile m_frameProfile;
+	std::vector<double> m_passGpuMs; ///< Scratch: collected per-pass GPU ms.
+	double m_gpuTotalMs = 0.0;       ///< Scratch: collected GPU frame ms.
+	// Pass count recorded per frame slot so GPU readback stays aligned even
+	// when the graph topology changes between record and collect.
+	std::array<uint32_t, kMaxFramesInFlight> m_recordedPassCount{};
 
 };
 

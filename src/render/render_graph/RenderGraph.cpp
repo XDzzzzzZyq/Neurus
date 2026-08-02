@@ -102,6 +102,10 @@ void RenderGraph::Execute(vk::CommandBuffer cmd, RenderCache& cache, const Rende
 	if (!m_isCompiled)
 		throw std::runtime_error("RenderGraph::Execute: graph not compiled");
 
+	// Bare Record() dispatch in compiled order. Profiling is deliberately NOT
+	// part of the graph: DeferredRenderer::recordFrame owns the per-pass CPU
+	// timers, GPU timestamp writes, and pass-counter readback (see
+	// ProfilingData.h / GPUProfiler.h), so the graph stays a pure DAG executor.
 	for (auto* node : m_compiled)
 	{
 		node->data.pass->Record(cmd, cache, ctx);

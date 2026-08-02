@@ -383,8 +383,13 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 	                     if (app_renderer && app_editor)
 	                     {
 	                         app_editor->Edit();  // Process all enqueued events (camera, etc.)
-	                         app_renderer->DrawFrame(app_editor->GetRenderContext());
-	                         app_mainWindow->Refresh(app_editor->GetUIContext());
+	                         // Renderer -> Editor: DrawFrame returns the per-frame
+	                         // profile; the Editor stores it and exposes it through
+	                         // UIContext (opaque pointer) for the Viewport overlay.
+	                         app_editor->SetFrameProfile(
+	                             app_renderer->DrawFrame(app_editor->GetRenderContext()));
+	                         neurus::UIContext ctx = app_editor->GetUIContext();
+	                         app_mainWindow->Refresh(ctx);
 	                     }
 	                 });
 
@@ -415,6 +420,13 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::lightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::spotLightAddRequested);
+
+	// --- GPU profiling overlay toggle (Debug menu) ---
+	QObject::connect(&uiEvents, &neurus::UIEvents::profilingToggleRequested,
+	                 [this](bool enabled) {
+	                     if (app_renderer)
+	                         app_renderer->SetProfilingEnabled(enabled);
+	                 });
 
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
