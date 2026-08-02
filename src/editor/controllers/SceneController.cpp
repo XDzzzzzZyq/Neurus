@@ -4,7 +4,7 @@
  *
  * Stateless -- all handlers are free functions in an anonymous namespace.
  * Each handler receives a discrete scene event, extracts the const ObjectID*
- * pointer, casts it to the concrete object type (Mesh*/Light*/Camera*...),
+ * pointer, casts it to the concrete object type (Mesh*, Light*, Camera*, ...),
  * and applies the mutation. Scene-owned state (selection) uses the const UID*
  * cast to Scene*.
  *
