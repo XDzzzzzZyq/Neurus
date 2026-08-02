@@ -35,8 +35,8 @@
                                         "z": 1.0
                                     }
                                 },
-                                "cam_w": 706.0,
-                                "cam_h": 498.0,
+                                "cam_w": 902.0,
+                                "cam_h": 601.0,
                                 "cam_pers": 60.0,
                                 "cam_near": 0.10000000149011612,
                                 "cam_far": 100.0,
@@ -365,12 +365,12 @@
                                 "light_power": 30.0,
                                 "light_color": {
                                     "x": 0.699999988079071,
-                                    "y": 0.400000005960464,
+                                    "y": 0.4000000059604645,
                                     "z": 1.0
                                 },
                                 "light_radius": 0.009999999776482582,
                                 "spot_cutoff": 0.949999988079071,
-                                "spot_outer_cutoff": 0.850000023841858,
+                                "spot_outer_cutoff": 0.8500000238418579,
                                 "area_ratio": 1.0
                             }
                         }
@@ -389,7 +389,7 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.002,
+            "r_shadow_bias": 0.0020000000949949028,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,
@@ -399,6 +399,6 @@
             "r_fxaa_edge_threshold_min": 0.08330000191926956,
             "r_sampling_mode": 0
         },
-        "ui": "AdnQywADAAAAAAAAAAAAMgAABZ8AAAM9AAAAAAAAAE4AAAWfAAADPQAAAAAAAAAABaAAAAAAAAAATgAABZ8AAAM9\nAAADS3jalZNBU8IwEIXv/oqd3rGQToFDW4ZBOQpawHMkK2Zsk066RXD88SbodKBS1FO7+16/3de00WiXZ7BFU0qtYq933fUA1VoLqTaxt1xMO0NvlET3NBZbrtYobvT61WrpviTMYVU/6MGyRFPXFjPRirhUtuPkJKprmGaa02FA1/bTIpNEtj0zEq2FDoCOA1SKYo+1ej5qT/BHztgghwV/OqwEk8oYdNKsosxtZh2PUmyQ4I7neNSHSaZLFG5hP4l8h2mFzY0u0NAe5lxh1kQ21LPgVL5jmbBwCCwcQOR/1fb6nbB19EriW6ENNYfW/d9ysCPYAyph36Y9tme5aRJPxVPsiTF94c54KyRpcylu0Gcw6PYhsLH/EXmBO6oMgov48wAb6oXxIWPAWO/saL/+dO19y6+QXH0CLGsUow=="
+        "ui": "AdnQywADAAAAAAAAAAAAMAAABdsAAANaAAAAAAAAAE4AAAXbAAADWgAAAAAAAAAABqsAAAAAAAAATgAABdsAAANa\nAAADbniclVPBToNAEL37FRPulQKmagI0DdqjrdLW89qd4kbYbZahtsaPd7caUtdS9UBg5j3em3kL8XBblbBBXQslEy8473uAcqm4kEXizWfj3pU3TON7GvENk0vkN2r5YrB8VxNWsGhf9GBeo25rI5MpSUxI07FwGrc1jEvFaG/QN/18XQoi055ogYZCe4GeFWgkJV7YyXlvOdEfdUYaGczY034kyBqt0UKThko7mWE8Cl4gwR2r8KAPWalq5HZgP419K9MpNtVqjZp2MGUSS1fSQY8K5+IN6zQKArBX7H/W5v61Yaf1QuDrWmlyTdv+b3tEB2IPKLlJ0xzbShSuYv7MLHjLBSk3HnfflTAhFqdI361OZBKGl3DdDyEa/CuXGW6p0Qg2h5+n7KAn7AfGPggujlr77fdtnjv+l/TsA+fBIJQ="
     }
 }

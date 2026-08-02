@@ -19,7 +19,7 @@ namespace neurus
 // =========================================================================
 
 ProfilingPanel::ProfilingPanel(QWidget* parent)
-	: UIPanel(PanelType::Profiling, QString(), parent)
+	: UIPanel(PanelType::Profiling, QStringLiteral("Profiling"), parent)
 {
 	auto* layout = new QVBoxLayout(this);
 	layout->setContentsMargins(4, 4, 4, 4);
