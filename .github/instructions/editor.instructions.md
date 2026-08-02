@@ -19,6 +19,7 @@ changes through the event system.
 - `src/editor/EditorContext.h` - Editor + scene state container
 - `src/editor/controllers/Controllers.h` - Base class for all controllers
 - `src/editor/controllers/CameraController.h` - Event-driven camera manipulation (orbit/zoom/dolly/pan)
+- `src/editor/controllers/SceneController.h/cpp` - Event-driven scene mutations (selection, transform, visibility, property edits); emits EditorEvents for GPU uploads
 - `src/editor/controllers/ShaderController.h` - Event-driven shader lifecycle (create, compile, code/struct edit, field add)
 - `src/editor/events/ShaderEvents.h` - Shader editor event structs (see events.instructions.md)
 
@@ -37,13 +38,14 @@ changes through the event system.
    - `Controllers` base class: `virtual Init(EventQueue& bus)` to bind controller to event bus
    - `Editor::RegisterController<T>(EventQueue& bus)` — template factory that creates controller, calls `Init(bus)`, stores in `m_controllers`
    - `CameraController` — event-driven orbit/zoom/dolly/pan via `CameraEvents` (rotate, push, slide, zoom)
+   - `SceneController` — event-driven scene mutations (selection, transform, visibility, camera/mesh/light/env property edits); stateless with free-function handlers in the .cpp; emits `EditorEvents` (SceneModified, LightGpuChanged, LightingRebuild, RenderResetEvent) for GPU uploads and dirty tracking; see events.instructions.md for the GPU-sync flow
    - `ShaderController` — event-driven shader lifecycle via `ShaderEvents` (create, compile, code/struct edit, field add); enqueues `RenderResetEvent` after create/compile so temporal accumulation resets
-   - Controllers receive discrete events (not per-frame polling); `Editor::Edit()` translates raw `InputState` into typed events
+   - Controllers receive discrete events (not per-frame polling); `Editor::Edit()` dispatches all enqueued events via `EventQueue::Process()`
 
-4. **Scene State Management** (future)
-   - Create, modify, delete scene objects
-   - Update transforms, materials, parameters
-   - Manage scene hierarchy
+4. **GPU Upload & Asset Import**
+   - Editor handles asset import events (mesh, camera, light adds) and performs GPU uploads directly (mesh upload, light SSBO dict update, IBL generation)
+   - Editor subscribes to cross-component `EditorEvents` (LightGpuChanged, LightingRebuild, SceneModified) emitted by `SceneController` and executes GPU uploads against its `DeferredRenderer`/`UploadManager`
+   - Must NOT directly mutate GPU resources outside of event handlers — scene mutations go through `SceneController`
 
 ## Key Components
 
@@ -104,20 +106,22 @@ void Editor::RegisterController(EventQueue& bus)
 
 **Design:**
 - Template factory: creates controller, calls `Init(bus)`, stores ownership
-- Called during Editor initialization for each controller type
+- Called during Editor initialization for each controller type (CameraController, ShaderController, SceneController)
 - Controllers are event-driven — no per-frame polling required
 
-### Editor::Edit() — Input Translation
+### Editor::Edit() — Event Dispatch
 
-`Editor::Edit(const InputState& input)` translates raw `InputState` (mouse deltas,
-modifier keys) into typed event structs and dispatches them through the EventQueue.
-This is the bridge between raw Qt input and controller logic:
+`Editor::Edit()` dispatches all enqueued events through the EventQueue. Input
+translation (mouse events → camera events) is handled in `Editor::Initialize()`
+via `MouseMoveEvent` / `MouseScrollEvent` subscriptions, so `Edit()` is a pure
+`EventQueue::Process()` call:
 
 ```
-Input::GetInputState() → Editor::Edit(input)
-                          ├── CameraEvents enqueued on EventQueue
-                          └── EventQueue().Process()
-                                └── CameraController handles each event
+Editor::Edit()
+  └── EventQueue::Process()
+        ├── CameraController handles each event
+        ├── SceneController handles each event
+        └── etc.
 ```
 
 ### CameraController (Event-Driven)
@@ -138,6 +142,47 @@ void CameraController::Init(EventQueue& bus)
 - Each event carries the camera pointer and delta magnitude
 - Operates on Camera* provided by each event — does not own the camera
 - Located in `src/editor/controllers/CameraController.h`
+
+### SceneController (Event-Driven)
+
+```cpp
+void SceneController::Init(EventQueue& bus)
+{
+    bus.subscribe<ObjectSelected>([&bus](const ObjectSelected& e) { OnObjectSelected(e, bus); });
+    bus.subscribe<ObjectDeselected>([&bus](const ObjectDeselected& e) { OnObjectDeselected(e, bus); });
+    bus.subscribe<VisibilityChanged>([&bus](const VisibilityChanged& e) { OnVisibilityChanged(e, bus); });
+    bus.subscribe<PositionChanged>([&bus](const PositionChanged& e) { OnPositionChanged(e, bus); });
+    bus.subscribe<RotationChanged>([&bus](const RotationChanged& e) { OnRotationChanged(e, bus); });
+    bus.subscribe<ScaleChanged>([&bus](const ScaleChanged& e) { OnScaleChanged(e, bus); });
+    bus.subscribe<CameraTargetChanged>([&bus](const CameraTargetChanged& e) { OnCameraTargetChanged(e, bus); });
+    bus.subscribe<CameraFovChanged>([&bus](const CameraFovChanged& e) { OnCameraFovChanged(e, bus); });
+    bus.subscribe<MeshShadowChanged>([&bus](const MeshShadowChanged& e) { OnMeshShadowChanged(e, bus); });
+    bus.subscribe<MeshMaterialChanged>([&bus](const MeshMaterialChanged& e) { OnMeshMaterialChanged(e, bus); });
+    bus.subscribe<LightPowerChanged>([&bus](const LightPowerChanged& e) { OnLightPowerChanged(e, bus); });
+    bus.subscribe<LightRadiusChanged>([&bus](const LightRadiusChanged& e) { OnLightRadiusChanged(e, bus); });
+    bus.subscribe<LightShadowChanged>([&bus](const LightShadowChanged& e) { OnLightShadowChanged(e, bus); });
+    bus.subscribe<LightCutoffChanged>([&bus](const LightCutoffChanged& e) { OnLightCutoffChanged(e, bus); });
+    bus.subscribe<LightOuterCutoffChanged>([&bus](const LightOuterCutoffChanged& e) { OnLightOuterCutoffChanged(e, bus); });
+    bus.subscribe<EnvironmentIntensityChanged>([&bus](const EnvironmentIntensityChanged& e) { OnEnvironmentIntensityChanged(e, bus); });
+    bus.subscribe<EnvironmentRotationChanged>([&bus](const EnvironmentRotationChanged& e) { OnEnvironmentRotationChanged(e, bus); });
+}
+```
+
+**Design:**
+- Stateless: all handlers are free functions in an anonymous namespace
+- Handlers cast the event's `const ObjectID*` to the concrete object type
+  (`Mesh*`, `Light*`, `Camera*`, `Environment*`) in the .cpp and mutate
+  directly — no Scene lookup by ID
+- Selection events (`ObjectSelected`, `ObjectDeselected`) use `const UID*`
+  cast to `Scene*` to access the Editor-owned selection system
+- GPU uploads are delegated to Editor via EditorEvents:
+  - `LightGpuChanged{object}` → single light SSBO struct update
+  - `LightingRebuild{}` → full light SSBO dict rebuild
+  - `SceneModified{}` → mark project dirty
+  - `RenderResetEvent{}` → reset temporal accumulation (emitted by `Mutated()` helper)
+- Editor subscribes to these EditorEvents and executes GPU uploads against
+  its `DeferredRenderer`/`UploadManager`
+- Located in `src/editor/controllers/SceneController.h` / `.cpp`
 
 ### ShaderController (Event-Driven)
 
