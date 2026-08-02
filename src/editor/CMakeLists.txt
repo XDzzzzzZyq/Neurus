@@ -5,8 +5,8 @@ add_library(neurus_editor STATIC
 	Editor.cpp
 	Input.h
 	Input.cpp
-	SelectionController.h
-	SelectionController.cpp
+	controllers/SceneController.h
+	controllers/SceneController.cpp
 	controllers/Controllers.h
 	controllers/CameraController.h
 	controllers/CameraController.cpp

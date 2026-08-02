@@ -74,10 +74,10 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	m_nameBtn->setFlat(true);
 	m_nameBtn->setCursor(Qt::PointingHandCursor);
 	m_nameBtn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-	// Lambda reads m_objectId at emission time — works after setObject
+	// Lambda reads m_object at emission time — works after setObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
 		const auto mods = Input::GetModifiers(static_cast<uint32_t>(QGuiApplication::queryKeyboardModifiers().toInt()));
-		emit objectSelected(ObjectSelected{m_objectId, mods});
+		emit objectSelected(ObjectSelected{nullptr, m_object, mods});
 	});
 	rowLayout->addWidget(m_nameBtn);
 
@@ -118,19 +118,19 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	renderFx->setEnabled(true);
 	m_renderBtn->setGraphicsEffect(renderFx);
 
-	// Connect signals — lambdas read m_objectId at emission time.
+	// Connect signals — lambdas read m_object at emission time.
 	// Each toggle records its state and applies the colorize tint.
 	QObject::connect(m_eyeBtn, &QPushButton::toggled, this,
 		[this](bool) {
 			m_eyeVisible = m_eyeBtn->isChecked();
 			setEyeBtnColor();
-			emit visibilityChanged(VisibilityChanged{m_objectId, m_eyeVisible, m_renderVisible});
+			emit visibilityChanged(VisibilityChanged{m_object, m_eyeVisible, m_renderVisible});
 		});
 	QObject::connect(m_renderBtn, &QPushButton::toggled, this,
 		[this](bool) {
 			m_renderVisible = m_renderBtn->isChecked();
 			setRenderBtnColor();
-			emit visibilityChanged(VisibilityChanged{m_objectId, m_eyeVisible, m_renderVisible});
+			emit visibilityChanged(VisibilityChanged{m_object, m_eyeVisible, m_renderVisible});
 		});
 
 	rowLayout->addWidget(m_eyeBtn);
@@ -162,18 +162,17 @@ void OutlinerRow::setRenderBtnColor()
 // =========================================================================
 
 void OutlinerRow::setObject(const QIcon& icon,
-                            const QString& name, int objectId)
+                            const QString& name, const ObjectID* object)
 {
 	// Update name text
 	m_nameBtn->setText(name);
-	if (m_objectId == objectId)
+	if (m_object == object)
 		return;
-	
-	m_objectId = objectId;
+
+	m_object = object;
 
 	m_typeLabel->setPixmap(icon.pixmap(22, 22));
 	m_typeLabel->setStyleSheet(QString());  // clear old colored-background CSS
-
 }
 
 // =========================================================================

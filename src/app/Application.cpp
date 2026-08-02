@@ -26,7 +26,7 @@
 #include "VulkanContext.h"
 #include "core/Log.h"
 #include "editor/Editor.h"
-#include "editor/events/EditorEvents.h"
+#include "editor/events/SceneEvents.h"
 #include "editor/events/ShaderEvents.h"
 #include "editor/events/UIEvents.h"
 #include "editor/events/ConfigEvents.h"
@@ -461,7 +461,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		                     // Forward to Editor; objectID=0 means background
 		                     // (handled by SelectObject → ClearSelection).
 		                     ObjectSelected selEvent {
-		                         static_cast<int>(objectID),
+		                         &app_editor->GetScene(),
+		                         app_editor->GetScene().GetObjectID(static_cast<int>(objectID)),
 		                         static_cast<int>(e.modifiers)
 		                     };
 		                     app_editor->OnUIEvent(selEvent);

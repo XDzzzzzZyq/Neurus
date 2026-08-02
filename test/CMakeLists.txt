@@ -42,7 +42,7 @@ add_executable(neurus_test
 	editor/test_input.cpp
 	editor/test_event_bus.cpp
 	editor/test_event_bus_typed.cpp
-	editor/test_selection.cpp
+	editor/test_scene_controller.cpp
 	scene/test_camera.cpp
 	scene/test_mesh.cpp
 	scene/test_uid.cpp
