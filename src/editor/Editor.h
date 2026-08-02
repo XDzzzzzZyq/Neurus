@@ -77,9 +77,6 @@ public:
 	void HandleResize(uint32_t width, uint32_t height);
 	void UploadSceneResources();
 	void UploadLighting();
-	void SelectObject(int objectId, bool increment);
-	void ChangeObjectVisibility(int objectId, bool viewportVisible, bool renderVisible);
-
 private:
 	// --- Handlers called by EventQueue subscribers in Initialize() ---
 	void OnMeshImport(const std::string& path);
@@ -87,8 +84,6 @@ private:
 	void OnLightAdd();
 	void OnSunLightAdd();
 	void OnSpotLightAdd();
-	void OnScreenshotRequested();
-	void OnScreenshotAllRequested();
 	void OnIBLLoad();
 	void GenerateIBL(const std::shared_ptr<Environment>& env);
 
