@@ -148,40 +148,21 @@ void CameraController::Init(EventQueue& bus)
 ```cpp
 void SceneController::Init(EventQueue& bus)
 {
-    bus.subscribe<ObjectSelected>([&bus](const ObjectSelected& e) { OnObjectSelected(e, bus); });
-    bus.subscribe<ObjectDeselected>([&bus](const ObjectDeselected& e) { OnObjectDeselected(e, bus); });
-    bus.subscribe<VisibilityChanged>([&bus](const VisibilityChanged& e) { OnVisibilityChanged(e, bus); });
-    bus.subscribe<PositionChanged>([&bus](const PositionChanged& e) { OnPositionChanged(e, bus); });
-    bus.subscribe<RotationChanged>([&bus](const RotationChanged& e) { OnRotationChanged(e, bus); });
-    bus.subscribe<ScaleChanged>([&bus](const ScaleChanged& e) { OnScaleChanged(e, bus); });
-    bus.subscribe<CameraTargetChanged>([&bus](const CameraTargetChanged& e) { OnCameraTargetChanged(e, bus); });
-    bus.subscribe<CameraFovChanged>([&bus](const CameraFovChanged& e) { OnCameraFovChanged(e, bus); });
-    bus.subscribe<MeshShadowChanged>([&bus](const MeshShadowChanged& e) { OnMeshShadowChanged(e, bus); });
-    bus.subscribe<MeshMaterialChanged>([&bus](const MeshMaterialChanged& e) { OnMeshMaterialChanged(e, bus); });
-    bus.subscribe<LightPowerChanged>([&bus](const LightPowerChanged& e) { OnLightPowerChanged(e, bus); });
-    bus.subscribe<LightRadiusChanged>([&bus](const LightRadiusChanged& e) { OnLightRadiusChanged(e, bus); });
-    bus.subscribe<LightShadowChanged>([&bus](const LightShadowChanged& e) { OnLightShadowChanged(e, bus); });
-    bus.subscribe<LightCutoffChanged>([&bus](const LightCutoffChanged& e) { OnLightCutoffChanged(e, bus); });
-    bus.subscribe<LightOuterCutoffChanged>([&bus](const LightOuterCutoffChanged& e) { OnLightOuterCutoffChanged(e, bus); });
-    bus.subscribe<EnvironmentIntensityChanged>([&bus](const EnvironmentIntensityChanged& e) { OnEnvironmentIntensityChanged(e, bus); });
-    bus.subscribe<EnvironmentRotationChanged>([&bus](const EnvironmentRotationChanged& e) { OnEnvironmentRotationChanged(e, bus); });
+    // Selection, visibility, transform, camera/mesh/light/env property events
+    // (17 subscriptions total; see SceneEvents.h)
 }
 ```
 
 **Design:**
 - Stateless: all handlers are free functions in an anonymous namespace
-- Handlers cast the event's `const ObjectID*` to the concrete object type
-  (`Mesh*`, `Light*`, `Camera*`, `Environment*`) in the .cpp and mutate
-  directly — no Scene lookup by ID
+- Events carry `const ObjectID*`; handlers cast to the concrete type via the
+  class static `As()` helpers (e.g. `Mesh::As(...)`) and mutate directly - no
+  Scene lookup by ID
 - Selection events (`ObjectSelected`, `ObjectDeselected`) use `const UID*`
-  cast to `Scene*` to access the Editor-owned selection system
-- GPU uploads are delegated to Editor via EditorEvents:
-  - `LightGpuChanged{object}` → single light SSBO struct update
-  - `LightingRebuild{}` → full light SSBO dict rebuild
-  - `SceneModified{}` → mark project dirty
-  - `RenderResetEvent{}` → reset temporal accumulation (emitted by `Mutated()` helper)
-- Editor subscribes to these EditorEvents and executes GPU uploads against
-  its `DeferredRenderer`/`UploadManager`
+  cast to `Scene*` via `Scene::As(...)`
+- GPU uploads delegated to Editor via EditorEvents (`LightGpuChanged`,
+  `LightingRebuild`, `SceneModified`, `RenderResetEvent`) which Editor
+  subscribes to and executes against its `DeferredRenderer`/`UploadManager`
 - Located in `src/editor/controllers/SceneController.h` / `.cpp`
 
 ### ShaderController (Event-Driven)

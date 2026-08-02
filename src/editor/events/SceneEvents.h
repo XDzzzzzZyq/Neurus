@@ -6,7 +6,7 @@
  * and destroyed after execution. They carry object/scene POINTERS instead of
  * IDs so controllers never re-fetch objects from the Scene by ID:
  * - const ObjectID* object — the scene object being mutated (cast to the
- *   concrete type in the controller .cpp, like ShaderController::AsMesh).
+ *   concrete type in the controller .cpp via the class static As() helper).
  * - const UID* scene       — the Editor-owned Scene, only for events whose
  *   handler touches scene-owned state (selection).
  *

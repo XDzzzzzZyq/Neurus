@@ -16,6 +16,18 @@ Panel Qt signal (e.g. Outliner::objectSelected)
                     └── EventQueue::Process() → subscriber handles it
 ```
 
+**Ephemeral Events - the big idea of the event system**
+
+Every event in Neurus is ephemeral: enqueued and processed within a single
+frame, then destroyed once `EventQueue::Process()` returns. Because events live
+only as long as the objects they reference, they can safely carry raw pointers
+(`const ObjectID*`, `const UID*`, and future `Shader*`, ...) instead of integer
+IDs. Controllers therefore never re-fetch objects from the Scene by ID - the
+pointer IS the object. The UI layer emits COMPLETE events, holding scene
+pointers as UI state during `Refresh()`. This ephemerality is what makes
+pointer payloads safe, and it applies to the whole event system, not just
+scene events.
+
 ## Location
 
 | File | Purpose |
@@ -89,39 +101,25 @@ struct EnvironmentRotationChanged  { const ObjectID* object; float rotation; };
 
 **Scene Events Are Ephemeral**
 
-Events carry pointers, never integer IDs. Controllers never re-fetch objects
-from the Scene by ID — the pointer IS the object. The UI layer emits COMPLETE
-events: panels hold the scene pointer as UI state (`m_scene`), set during
-`Refresh()`, and stamp it into outgoing events. `Editor::OnUIEvent` just
-enqueues them unchanged. Events are consumed within one frame and destroyed
-after `EventQueue::Process()` returns.
+Scene-domain events follow the system-wide ephemeral rule (see Overview above):
+they carry pointers, never integer IDs. Controllers cast the `const ObjectID*`
+to the concrete type via the class static `As()` helpers (e.g. `Mesh::As(...)`)
+and mutate the object directly - no Scene lookup by ID. `Editor::OnUIEvent` just
+enqueues them unchanged.
 
 ### EditorEvents.h
 
 Cross-component events only — things that involve a DIFFERENT component than
-the emitter (SceneController → Editor, Editor → Renderer). Scene-domain events
+the emitter (SceneController -> Editor, Editor -> Renderer). Scene-domain events
 live in SceneEvents.h.
 
 ```cpp
-/** @brief Emitted by SceneController after any scene mutation. Editor subscribes, marks dirty. */
-struct SceneModified {};
-
-/** @brief Emitted by SceneController when a single light's GPU SSBO needs update. */
-struct LightGpuChanged {
-    const ObjectID* object = nullptr;  ///< The changed light (Light*)
-};
-
-/** @brief Emitted by SceneController when the full light SSBO dict must be rebuilt. */
-struct LightingRebuild {};
-
-/** @brief Emitted when the active IBL environment is loaded or changed. */
-struct EnvironmentChanged {
-    int sceneId = -1;
-    int envId   = -1;
-};
-
-/** @brief Marker for temporal accumulation reset. */
-struct RenderResetEvent {};
+// Cross-component events (SceneController -> Editor, Editor -> Renderer)
+struct SceneModified {};                       // mark project dirty
+struct LightGpuChanged { const ObjectID* object; };  // single light SSBO update
+struct LightingRebuild {};                     // full light SSBO dict rebuild
+struct EnvironmentChanged { int sceneId; int envId; };  // IBL regeneration
+struct RenderResetEvent {};                    // temporal accumulation reset
 ```
 
 ### CameraEvents.h
@@ -197,7 +195,7 @@ Events are enqueued and batch-processed via `Process()`.
 ```cpp
 // Subscribe to typed events
 eventBus.subscribe<LightGpuChanged>([](const LightGpuChanged& e) {
-    uploadSingleLight(AsLight(e.object));
+    uploadSingleLight(Light::As(e.object));
 });
 
 // Enqueue events (deferred dispatch)
@@ -272,7 +270,7 @@ bus.subscribe<VisibilityChanged>([&bus](const VisibilityChanged& e) {
 
 // Editor::Initialize() — handles cross-component GPU-sync events
 ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
-    auto* light = AsLight(e.object);
+    auto* light = Light::As(e.object);
     if (!light) return;
     auto gpuStruct = ed_uploadManager->UploadLighting(*light);
     ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
@@ -346,7 +344,7 @@ Scene mutations that affect GPU resources follow a three-tier event pattern:
 
 ```
 SceneController mutation handler
-  ├── Mutates the scene object directly (via cast helpers: AsMesh, AsLight, etc.)
+  ├── Mutates the scene object directly (via class static As() helpers: Mesh::As, Light::As, etc.)
   └── Enqueues one or more EditorEvents:
         ├── SceneModified{} → Editor marks project dirty
         ├── RenderResetEvent{} → DeferredRenderer resets temporal accumulation

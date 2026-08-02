@@ -26,6 +26,8 @@
 #include "core/Log.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
+#include "scene/Light.h"
+#include "scene/Mesh.h"
 #include "scene/Scene.h"
 
 #include <QCoreApplication>
@@ -51,28 +53,6 @@ namespace {
 static QString resolveResourcePath(const char* relativePath)
 {
 	return QCoreApplication::applicationDirPath() + "/res/" + relativePath;
-}
-
-/**
- * @brief Casts a const ObjectID* to a non-const Mesh* (GPU-upload handlers).
- */
-neurus::Mesh* AsMesh(const neurus::ObjectID* obj)
-{
-	if (!obj || obj->o_type != neurus::ObjectID::GOType::GO_MESH)
-		return nullptr;
-	return static_cast<neurus::Mesh*>(const_cast<neurus::ObjectID*>(obj));
-}
-
-/**
- * @brief Casts a const ObjectID* to a non-const Light* (GPU-upload handlers).
- */
-neurus::Light* AsLight(const neurus::ObjectID* obj)
-{
-	if (!obj) return nullptr;
-	if (obj->o_type != neurus::ObjectID::GOType::GO_LIGHT &&
-	    obj->o_type != neurus::ObjectID::GOType::GO_POLYLIGHT)
-		return nullptr;
-	return static_cast<neurus::Light*>(const_cast<neurus::ObjectID*>(obj));
 }
 
 } // anonymous namespace
@@ -179,7 +159,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
-		auto* light = AsLight(e.object);
+		auto* light = Light::As(e.object);
 		if (!light) return;
 		auto gpuStruct = ed_uploadManager->UploadLighting(*light);
 		ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
