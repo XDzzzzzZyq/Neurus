@@ -140,6 +140,20 @@ void UIManager::CreateMenus()
 
 	auto* editMenu = menuBar()->addMenu("&Edit");
 
+	auto* undoAction = editMenu->addAction("&Undo");
+	undoAction->setShortcut(QKeySequence::Undo);
+	connect(undoAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestUndo();
+	});
+
+	auto* redoAction = editMenu->addAction("&Redo");
+	redoAction->setShortcut(QKeySequence::Redo);
+	connect(redoAction, &QAction::triggered, []() {
+		neurus::UIEvents::instance().requestRedo();
+	});
+
+	editMenu->addSeparator();
+
 	auto* addMenu = editMenu->addMenu("&Add");
 
 	auto* meshAction = addMenu->addAction("&Mesh...");

@@ -429,6 +429,10 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::spotLightAddRequested);
 
+	// --- Undo/redo (Edit menu + shortcuts) → Editor ---
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::undoRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::redoRequested);
+
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
