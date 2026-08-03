@@ -59,6 +59,8 @@ void ProfilingPanel::Refresh(const UIContext& ctx)
 		for (auto* row : m_rowPool)
 			row->setHidden(true);
 		m_hasProfile = false;
+		m_frameCpuMsEma = -1.0;
+		m_frameGpuMsEma = -1.0;
 		return;
 	}
 
@@ -110,6 +112,11 @@ void ProfilingPanel::Populate(const FrameProfile& profile)
 			m_frameItem->setText(col, QString());
 		for (auto* row : m_rowPool)
 			row->setHidden(true);
+		// Reset smoothing so timings reseed cleanly once data returns.
+		m_frameCpuMsEma = -1.0;
+		m_frameGpuMsEma = -1.0;
+		m_passCpuMsEma.clear();
+		m_passGpuMsEma.clear();
 		return;
 	}
 
@@ -117,9 +124,28 @@ void ProfilingPanel::Populate(const FrameProfile& profile)
 	// until then only CPU data is available.
 	const bool gpuShown = profile.gpuTimingAvailable && profile.gpuReady;
 
+	// Reset EMA state when the pass set changes so stale per-pass values don't
+	// bleed across a pipeline change. -1.0 marks each slot as "not yet seeded".
+	if (m_passCpuMsEma.size() != profile.passes.size())
+	{
+		m_passCpuMsEma.assign(profile.passes.size(), -1.0);
+		m_passGpuMsEma.assign(profile.passes.size(), -1.0);
+	}
+
+	// EMA step: a negative prev means "not yet seeded", so the first sample is
+	// taken verbatim instead of ramping up from zero (ms is always >= 0).
+	const auto ema = [](double prev, double sample)
+	{
+		return prev < 0.0 ? sample : kEmaAlpha * sample + (1.0 - kEmaAlpha) * prev;
+	};
+
+	m_frameCpuMsEma = ema(m_frameCpuMsEma, profile.cpuRecordMs);
+	if (gpuShown)
+		m_frameGpuMsEma = ema(m_frameGpuMsEma, profile.gpuTotalMs);
+
 	m_frameItem->setText(0, "Frame");
-	m_frameItem->setText(1, QString::number(profile.cpuRecordMs, 'f', 2));
-	m_frameItem->setText(2, gpuShown ? QString::number(profile.gpuTotalMs, 'f', 2) : "--");
+	m_frameItem->setText(1, QString::number(m_frameCpuMsEma, 'f', 2));
+	m_frameItem->setText(2, gpuShown ? QString::number(m_frameGpuMsEma, 'f', 2) : "--");
 	m_frameItem->setText(3, QString::number(profile.drawCalls));
 	m_frameItem->setText(4, QString::number(profile.dispatches));
 
@@ -134,10 +160,15 @@ void ProfilingPanel::Populate(const FrameProfile& profile)
 		}
 
 		const auto& pass = profile.passes[i];
+
+		m_passCpuMsEma[i] = ema(m_passCpuMsEma[i], pass.cpuMs);
+		if (gpuShown)
+			m_passGpuMsEma[i] = ema(m_passGpuMsEma[i], pass.gpuMs);
+
 		item->setHidden(false);
 		item->setText(0, QString::fromStdString(pass.name));
-		item->setText(1, QString::number(pass.cpuMs, 'f', 2));
-		item->setText(2, gpuShown ? QString::number(pass.gpuMs, 'f', 2) : "--");
+		item->setText(1, QString::number(m_passCpuMsEma[i], 'f', 2));
+		item->setText(2, gpuShown ? QString::number(m_passGpuMsEma[i], 'f', 2) : "--");
 		item->setText(3, QString::number(pass.drawCalls));
 		item->setText(4, QString::number(pass.dispatches));
 	}

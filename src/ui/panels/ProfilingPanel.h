@@ -12,6 +12,9 @@
  * - QTreeWidget with 5 columns inside a QVBoxLayout
  * - Refresh() copies the latest FrameProfile from UIContext and rebuilds the
  *   tree only when the frame totals actually changed (no per-frame churn)
+ * - Displayed timings (CPU/GPU ms) are smoothed with a per-value exponential
+ *   moving average so the numbers don't jitter frame to frame; draw/dispatch
+ *   counts are shown raw
  * - No Vulkan or Renderer headers - reads the Vulkan-free ProfilingData POD
  *   through the opaque UIContext::frameProfile pointer
  *
@@ -23,6 +26,7 @@
 #include "UIPanel.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 class QTreeWidget;
@@ -81,6 +85,19 @@ private:
 	double   m_lastCpuMs    = 0.0;
 	double   m_lastGpuMs    = 0.0;
 	uint32_t m_lastPassCount = 0;
+
+	// --- EMA smoothing of displayed timings (noise reduction) ---
+	// State persists across frames and is reseeded when the pass set changes or
+	// the profile is lost. Smaller alpha = smoother but laggier. A negative
+	// value means "not yet seeded" (ms is always >= 0), so the next sample is
+	// taken verbatim instead of ramping up from zero. GPU EMAs only advance on
+	// frames where GPU timings are actually ready.
+	static constexpr double kEmaAlpha = 0.1;
+
+	double              m_frameCpuMsEma = -1.0;
+	double              m_frameGpuMsEma = -1.0;
+	std::vector<double> m_passCpuMsEma; ///< Per-pass; -1.0 until first sample.
+	std::vector<double> m_passGpuMsEma; ///< Per-pass; -1.0 until first sample.
 };
 
 } // namespace neurus
