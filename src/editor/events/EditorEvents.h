@@ -1,77 +1,39 @@
-#pragma once
+/**
+ * @file EditorEvents.h
+ * @brief Cross-component editor events (pure data, no Qt, no Vulkan).
+ *
+ * Only events that involve a DIFFERENT component than the emitter live here:
+ * - RenderResetEvent  (Renderer temporal accumulation)
+ * - EnvironmentChanged (Renderer IBL regeneration)
+ * - SceneModified     (SceneController -> Editor dirty flag)
+ * - LightGpuChanged   (SceneController -> Editor: single light SSBO struct)
+ * - LightingRebuild   (SceneController -> Editor: full light SSBO dict)
+ *
+ * Scene-domain events live in SceneEvents.h; asset add/import events live in
+ * AssetEvents.h.
+ */
 
-#include <string>
+#pragma once
 
 namespace neurus {
 
-// ---------------------------------------------------------------------------
-// Editor Events - domain events for Editor state changes
-// ---------------------------------------------------------------------------
+class ObjectID;
 
-/** @brief Emitted when a scene object is selected by the user. */
-struct ObjectSelected
+/**
+ * @brief Emitted when the scene state changes in a way that invalidates
+ *  temporal accumulation. Subscribe to this to reset any per-frame history
+ *  (shadow accumulation, SSAO temporal, SSR temporal, etc.).
+ */
+struct RenderResetEvent
 {
-	int objectId;
-	int modifiers;  ///< Modifier key bitmask (Input::Modifiers flags).
-};
-
-/** @brief Emitted when a scene object is deselected. */
-struct ObjectDeselected
-{
-	int objectId;
-};
-
-/** @brief Emitted when a new scene object is created. */
-struct SceneObjectAdded
-{
-	int objectId;
-	std::string typeName;
-};
-
-/** @brief Emitted when a scene object is removed/deleted. */
-struct SceneObjectRemoved
-{
-	int objectId;
-};
-
-/** @brief Emitted when the active scene camera is switched.
- *  @note cameraId of -1 means no active camera. */
-struct ActiveCameraChanged
-{
-	int cameraId;
-};
-
-/** @brief Emitted when scene modification status changes.
- *  @note status is a bitfield of SceneModifStatus flags. */
-struct SceneStatusChanged
-{
-	int status;
-};
-
-/** @brief Emitted when an entity is selected in the outliner or viewport. */
-struct EntitySelected
-{
-	int entityId;
-};
-
-/** @brief Emitted when a scene file is loaded. */
-struct SceneLoaded
-{
-	std::string path;
-};
-
-/** @brief Emitted when material properties are changed. */
-struct MaterialChanged
-{
-	int materialId;
 };
 
 /**
  * @brief Emitted when the active IBL environment is loaded or changed.
  *
- * The Renderer subscribes to this event to regenerate diffuse/specular
- * cubemaps via IBLPass::Generate(). The event carries the IDs needed
- * to locate the Environment object in the Scene's env_list pool.
+ * The Editor subscribes to regenerate diffuse/specular cubemaps via
+ * GenerateIBL(). The event carries the IDs needed to locate the Environment
+ * object in the Scene's env_list pool.
  */
 struct EnvironmentChanged
 {
@@ -79,148 +41,33 @@ struct EnvironmentChanged
 	int envId   = -1; ///< ID of the Environment object (from UID::GetObjectID())
 };
 
-/** @brief Emitted when object visibility toggles change in the outliner. */
-struct VisibilityChanged
+/**
+ * @brief Emitted by SceneController after any scene mutation that constitutes
+ *  a project change (transform, property, visibility, object add).
+ *  Editor subscribes and marks the project dirty. Selection and camera
+ *  navigation do NOT emit this.
+ */
+struct SceneModified
 {
-	int  objectId;        ///< Unique object identifier.
-	bool viewportVisible; ///< Viewport (editor) visibility.
-	bool renderVisible;   ///< Render (pipeline) visibility.
 };
 
 /**
- * @brief Emitted when the position of a selected object is edited from the Property Panel.
- *
- * Rotation values are in degrees (Euler: pitch=X, yaw=Z, roll=Y).
+ * @brief Emitted by SceneController when a single light's GPU SSBO struct must
+ *  be updated (power/radius/cutoff/outerCutoff changes).
+ *  Editor subscribes, casts object to Light*, and calls
+ *  UploadLighting(*light) + RenderCache::UpdateLight(id, struct).
  */
-struct PositionChanged
+struct LightGpuChanged
 {
-	int   objectId;      ///< Target scene object identifier.
-	float posX = 0.0f;   ///< World-space X position.
-	float posY = 0.0f;   ///< World-space Y position (forward).
-	float posZ = 0.0f;   ///< World-space Z position (up).
+	const ObjectID* object = nullptr; ///< The changed light (Light*).
 };
 
-/** @brief Emitted when the rotation of a selected object is edited. */
-struct RotationChanged
-{
-	int   objectId;      ///< Target scene object identifier.
-	float rotX = 0.0f;   ///< Pitch rotation in degrees.
-	float rotY = 0.0f;   ///< Roll rotation in degrees.
-	float rotZ = 0.0f;   ///< Yaw rotation in degrees.
-};
-
-/** @brief Emitted when the scale of a selected object is edited. */
-struct ScaleChanged
-{
-	int   objectId;      ///< Target scene object identifier.
-	float sclX = 1.0f;   ///< X-axis scale.
-	float sclY = 1.0f;   ///< Y-axis scale.
-	float sclZ = 1.0f;   ///< Z-axis scale.
-};
-
-// ---------------------------------------------------------------------------
-// Camera property events
-// ---------------------------------------------------------------------------
-
-/** @brief Emitted when the camera look-at target is edited. */
-struct CameraTargetChanged
-{
-	int   objectId;
-	float targetX = 0.0f;
-	float targetY = 0.0f;
-	float targetZ = 0.0f;
-};
-
-/** @brief Emitted when the camera FOV is edited. */
-struct CameraFovChanged
-{
-	int   objectId;
-	float fov = 60.0f;
-};
-
-// ---------------------------------------------------------------------------
-// Mesh property events
-// ---------------------------------------------------------------------------
-
-/** @brief Emitted when mesh shadow casting flag is toggled. */
-struct MeshShadowChanged
-{
-	int  objectId;
-	bool enabled = true;
-};
-
-/** @brief Emitted when mesh material usage flag is toggled. */
-struct MeshMaterialChanged
-{
-	int  objectId;
-	bool enabled = true;
-};
-
-// ---------------------------------------------------------------------------
-// Light property events
-// ---------------------------------------------------------------------------
-
-/** @brief Emitted when light power/intensity is edited. */
-struct LightPowerChanged
-{
-	int   objectId;
-	float power = 10.0f;
-};
-
-/** @brief Emitted when light radius is edited. */
-struct LightRadiusChanged
-{
-	int   objectId;
-	float radius = 0.05f;
-};
-
-/** @brief Emitted when light shadow casting flag is toggled. */
-struct LightShadowChanged
-{
-	int  objectId;
-	bool enabled = true;
-};
-
-/** @brief Emitted when spot-light inner cone cutoff (cosine) is edited. */
-struct LightCutoffChanged
-{
-	int   objectId;
-	float cutoff = 0.9f;  ///< Cosine of inner cone half-angle.
-};
-
-/** @brief Emitted when spot-light outer cone cutoff (cosine) is edited. */
-struct LightOuterCutoffChanged
-{
-	int   objectId;
-	float outerCutoff = 0.8f;  ///< Cosine of outer cone half-angle.
-};
-
-// ---------------------------------------------------------------------------
-// Environment property events
-// ---------------------------------------------------------------------------
-
-/** @brief Emitted when IBL environment intensity is edited. */
-struct EnvironmentIntensityChanged
-{
-	int   objectId;
-	float intensity = 1.0f;
-};
-
-/** @brief Emitted when IBL environment rotation is edited. */
-struct EnvironmentRotationChanged
-{
-	int   objectId;
-	float rotation = 0.0f;
-};
-
-// ---------------------------------------------------------------------------
-// Render events
-// ---------------------------------------------------------------------------
-
-/** @brief Emitted when the scene state changes in a way that invalidates
- *  temporal accumulation. Subscribe to this to reset any per-frame history
- *  (shadow accumulation, SSAO temporal, SSR temporal, etc.). */
-struct RenderResetEvent
+/**
+ * @brief Emitted by SceneController when the full light SSBO dict must be
+ *  rebuilt (light transform, visibility, shadow toggle).
+ *  Editor subscribes and calls UploadLighting().
+ */
+struct LightingRebuild
 {
 };
 

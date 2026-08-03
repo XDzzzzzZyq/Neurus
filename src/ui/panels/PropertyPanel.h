@@ -1,7 +1,7 @@
 #pragma once
 
 #include "UIPanel.h"
-#include "editor/events/EditorEvents.h"
+#include "editor/events/SceneEvents.h"
 #include <QGroupBox>
 #include <QLabel>
 #include <QPushButton>
@@ -81,7 +81,7 @@ private:
 	void SetEnabled(bool enabled);
 
 	// --- State ---
-	int m_currentObjectId = -1;
+	const ObjectID* m_activeObject = nullptr;
 
 	// --- Header ---
 	QWidget* m_headerWidget = nullptr;

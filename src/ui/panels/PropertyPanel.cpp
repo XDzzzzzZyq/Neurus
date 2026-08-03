@@ -90,7 +90,7 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 	if (!scene)
 	{
 		SetEnabled(false);
-		m_currentObjectId = -1;
+		m_activeObject = nullptr;
 		return;
 	}
 
@@ -98,17 +98,17 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 	if (!activeObj)
 	{
 		SetEnabled(false);
-		m_currentObjectId = -1;
+		m_activeObject = nullptr;
 		return;
 	}
 
 	int objectId = activeObj->GetObjectID();
 
 	// --- Header: icon + name ---
-	if (m_currentObjectId != objectId){
+	if (m_activeObject != activeObj){
 		m_iconLabel->setPixmap(Icons::ObjectIcon(static_cast<int>(activeObj->o_type)).pixmap(20, 20));
 		m_nameLabel->setText(QString::fromStdString(activeObj->o_name));
-		m_currentObjectId = objectId;
+		m_activeObject = activeObj;
 	}
 
 	// --- Transform ---
@@ -250,20 +250,20 @@ void PropertyPanel::BuildTransformEditor()
 	// Each Vec3Spin emits valueChanged(x, y, z); one signal per transform component.
 	QObject::connect(m_posSpin, &Vec3Spin::valueChanged, this,
 		[this](float x, float y, float z) {
-			if (m_currentObjectId < 0) return;
-			emit positionChanged({m_currentObjectId, x, y, z});
+			if (!m_activeObject) return;
+			emit positionChanged(PositionChanged{m_activeObject, x, y, z});
 		});
 
 	QObject::connect(m_rotSpin, &Vec3Spin::valueChanged, this,
 		[this](float x, float y, float z) {
-			if (m_currentObjectId < 0) return;
-			emit rotationChanged({m_currentObjectId, x, y, z});
+			if (!m_activeObject) return;
+			emit rotationChanged(RotationChanged{m_activeObject, x, y, z});
 		});
 
 	QObject::connect(m_sclSpin, &Vec3Spin::valueChanged, this,
 		[this](float x, float y, float z) {
-			if (m_currentObjectId < 0) return;
-			emit scaleChanged({m_currentObjectId, x, y, z});
+			if (!m_activeObject) return;
+			emit scaleChanged(ScaleChanged{m_activeObject, x, y, z});
 		});
 
 	// --- Reset button ---
@@ -272,14 +272,11 @@ void PropertyPanel::BuildTransformEditor()
 		m_rotSpin->setValue(0.0, 0.0, 0.0);
 		m_sclSpin->setValue(1.0, 1.0, 1.0);
 
-		if (m_currentObjectId >= 0)
+		if (m_activeObject)
 		{
-			PositionChanged pe = {m_currentObjectId, 0, 0, 0};
-			RotationChanged re = {m_currentObjectId, 0, 0, 0};
-			ScaleChanged    se = {m_currentObjectId, 1, 1, 1};
-			emit positionChanged(pe);
-			emit rotationChanged(re);
-			emit scaleChanged(se);
+			emit positionChanged(PositionChanged{m_activeObject, 0.0f, 0.0f, 0.0f});
+			emit rotationChanged(RotationChanged{m_activeObject, 0.0f, 0.0f, 0.0f});
+			emit scaleChanged(ScaleChanged{m_activeObject, 1.0f, 1.0f, 1.0f});
 		}
 	});
 }
@@ -316,54 +313,54 @@ void PropertyPanel::BuildTypeSubpanels()
 
 	// Camera
 	QObject::connect(m_cameraProps, &CameraProperties::targetChanged, this,
-		[this](int objectId, float x, float y, float z) {
-			emit cameraTargetChanged({objectId, x, y, z});
+		[this](int /*objectId*/, float x, float y, float z) {
+			emit cameraTargetChanged(CameraTargetChanged{m_activeObject, x, y, z});
 		});
 	QObject::connect(m_cameraProps, &CameraProperties::fovChanged, this,
-		[this](int objectId, float fov) {
-			emit cameraFovChanged({objectId, fov});
+		[this](int /*objectId*/, float fov) {
+			emit cameraFovChanged(CameraFovChanged{m_activeObject, fov});
 		});
 
 	// Mesh
 	QObject::connect(m_meshProps, &MeshProperties::shadowChanged, this,
-		[this](int objectId, bool enabled) {
-			emit meshShadowChanged({objectId, enabled});
+		[this](int /*objectId*/, bool enabled) {
+			emit meshShadowChanged(MeshShadowChanged{m_activeObject, enabled});
 		});
 	QObject::connect(m_meshProps, &MeshProperties::materialChanged, this,
-		[this](int objectId, bool enabled) {
-			emit meshMaterialChanged({objectId, enabled});
+		[this](int /*objectId*/, bool enabled) {
+			emit meshMaterialChanged(MeshMaterialChanged{m_activeObject, enabled});
 		});
 
 	// Light
 	QObject::connect(m_lightProps, &LightProperties::powerChanged, this,
-		[this](int objectId, float power) {
-			emit lightPowerChanged({objectId, power});
+		[this](int /*objectId*/, float power) {
+			emit lightPowerChanged(LightPowerChanged{m_activeObject, power});
 		});
 	QObject::connect(m_lightProps, &LightProperties::radiusChanged, this,
-		[this](int objectId, float radius) {
-			emit lightRadiusChanged({objectId, radius});
+		[this](int /*objectId*/, float radius) {
+			emit lightRadiusChanged(LightRadiusChanged{m_activeObject, radius});
 		});
 	QObject::connect(m_lightProps, &LightProperties::shadowChanged, this,
-		[this](int objectId, bool enabled) {
-			emit lightShadowChanged({objectId, enabled});
+		[this](int /*objectId*/, bool enabled) {
+			emit lightShadowChanged(LightShadowChanged{m_activeObject, enabled});
 		});
 	QObject::connect(m_lightProps, &LightProperties::cutoffChanged, this,
-		[this](int objectId, float cosine) {
-			emit lightCutoffChanged({objectId, cosine});
+		[this](int /*objectId*/, float cosine) {
+			emit lightCutoffChanged(LightCutoffChanged{m_activeObject, cosine});
 		});
 	QObject::connect(m_lightProps, &LightProperties::outerCutoffChanged, this,
-		[this](int objectId, float cosine) {
-			emit lightOuterCutoffChanged({objectId, cosine});
+		[this](int /*objectId*/, float cosine) {
+			emit lightOuterCutoffChanged(LightOuterCutoffChanged{m_activeObject, cosine});
 		});
 
 	// Environment
 	QObject::connect(m_envProps, &EnvironmentProperties::intensityChanged, this,
-		[this](int objectId, float intensity) {
-			emit envIntensityChanged({objectId, intensity});
+		[this](int /*objectId*/, float intensity) {
+			emit envIntensityChanged(EnvironmentIntensityChanged{m_activeObject, intensity});
 		});
 	QObject::connect(m_envProps, &EnvironmentProperties::rotationChanged, this,
-		[this](int objectId, float rotation) {
-			emit envRotationChanged({objectId, rotation});
+		[this](int /*objectId*/, float rotation) {
+			emit envRotationChanged(EnvironmentRotationChanged{m_activeObject, rotation});
 		});
 
 	// Start with all hidden

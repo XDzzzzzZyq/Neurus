@@ -4,15 +4,15 @@
  *
  * OutlinerRow encapsulates a Blender-style outliner row: [type icon] [name]
  * [eye toggle] [monitor toggle]. It is self-contained with no scene-layer
- * dependencies — the object ID is stored as a plain int and surfaced through
+ * dependencies — the object pointer is stored directly and surfaced through
  * Qt signals.
  *
  * Architecture:
  * - Constructor creates the layout and child widgets once.
- * - setObject() binds object data (icon name, name, id); resets toggles.
+ * - setObject() binds object data (icon name, name, object*); resets toggles.
  * - setSelectionMode() / setRowIndex() apply visual state (QSS property + alternating bg).
- * - Signal lambdas read from m_objectId at emission time, so recycling
- *   a row to a new objectId is transparent — no manual rewire needed.
+ * - Signal lambdas read from m_object at emission time, so recycling
+ *   a row to a new object is transparent — no manual rewire needed.
  * - Visibility toggle buttons swap between visible/invisible icons
  *   loaded via Icons::GetIcon().
  */
@@ -22,7 +22,8 @@
 #include <QIcon>
 #include <QWidget>
 
-#include "editor/events/EditorEvents.h"
+#include "editor/events/SceneEvents.h"
+#include "scene/UID.h"
 
 #include <cstdint>
 
@@ -68,15 +69,15 @@ public:
 	/**
 	 * @brief Binds a scene object's identity data to this row.
 	 *
-	 * Updates the type icon pixmap, name text, and stored objectId.
+	 * Updates the type icon pixmap, name text, and stored object pointer.
 	 * Resets visibility toggles to checked (signals blocked to avoid
 	 * cascading events during pool recycling) and sets their icons.
 	 *
 	 * @param icon     Type icon for this object.
 	 * @param name     Display name shown in the row.
-	 * @param objectId Unique object identifier.
+	 * @param object   Scene object pointer (non-owning).
 	 */
-	void setObject(const QIcon& icon, const QString& name, int objectId);
+	void setObject(const QIcon& icon, const QString& name, const ObjectID* object);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
@@ -112,8 +113,8 @@ public:
 	 */
 	void setRowIndex(int rowIndex);
 
-	/** @brief Returns the stored object identifier. */
-	int getObjectId() const { return m_objectId; }
+	/** @brief Returns the bound object pointer (nullptr if none). */
+	const ObjectID* getObject() const { return m_object; }
 
 signals:
 	/** @brief Emitted when the name button is clicked. */
@@ -133,7 +134,7 @@ private:
 	QPushButton* m_nameBtn       = nullptr;
 	QPushButton* m_eyeBtn        = nullptr;
 	QPushButton* m_renderBtn     = nullptr;
-	int          m_objectId      = -1;
+	const ObjectID* m_object = nullptr;
 	int 		 m_mode          = -1;
 	int 		 m_idx           = -1;
 	bool         m_eyeVisible    = true;

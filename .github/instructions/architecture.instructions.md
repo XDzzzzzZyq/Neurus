@@ -60,7 +60,7 @@ are shared across layers.
 
 **Editor Layer** (`src/editor/`)
 - Contains application logic and scene mutation
-- Owns Controllers (Camera, etc.) via `src/editor/controllers/`
+- Owns Controllers (CameraController, SceneController, ShaderController) via `src/editor/controllers/`
 - Manages EditorContext (scene + editor state)
 - Owns UIEvents (Qt signals) and EventQueue (typed EventPool)
 - Communicates with Renderer via Context and typed EventQueue
@@ -98,6 +98,15 @@ are shared across layers.
 See `.github/instructions/events.instructions.md` for the complete event system
 (UIEvents, EventQueue, event structs, and the `ConnectUIEvent`/`OnUIEvent`
 template forwarding pattern).
+
+Event structs in `src/editor/events/` are split by domain:
+`SceneEvents.h` (ephemeral scene-domain events carrying `const ObjectID*` /
+`const UID*`: selection, transform, visibility, camera/mesh/light/env property
+edits), `EditorEvents.h` (cross-component events: RenderResetEvent,
+EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild), and
+`AssetEvents.h` (asset add/import: mesh/camera/light adds). Scene mutations are
+handled by `SceneController`, which emits `EditorEvents` for GPU uploads and
+dirty tracking; the Editor executes those uploads.
 
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals

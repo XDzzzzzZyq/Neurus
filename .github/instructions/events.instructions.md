@@ -16,11 +16,24 @@ Panel Qt signal (e.g. Outliner::objectSelected)
                     └── EventQueue::Process() → subscriber handles it
 ```
 
+**Ephemeral Events - the big idea of the event system**
+
+Every event in Neurus is ephemeral: enqueued and processed within a single
+frame, then destroyed once `EventQueue::Process()` returns. Because events live
+only as long as the objects they reference, they can safely carry raw pointers
+(`const ObjectID*`, `const UID*`, and future `Shader*`, ...) instead of integer
+IDs. Controllers therefore never re-fetch objects from the Scene by ID - the
+pointer IS the object. The UI layer emits COMPLETE events, holding scene
+pointers as UI state during `Refresh()`. This ephemerality is what makes
+pointer payloads safe, and it applies to the whole event system, not just
+scene events.
+
 ## Location
 
 | File | Purpose |
 |------|---------|
-| `src/editor/events/EditorEvents.h` | Editor-scope event structs (ObjectSelected, VisibilityChanged) — pure data, no Qt |
+| `src/editor/events/SceneEvents.h` | Scene-domain events (selection, transform, visibility, camera/mesh/light/env property changes) — ephemeral, carry `const ObjectID*` / `const UID*` |
+| `src/editor/events/EditorEvents.h` | Cross-component events only (RenderResetEvent, EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild) — pure data, no Qt |
 | `src/editor/events/CameraEvents.h` | Camera input events (rotate, push, slide, zoom, resize) |
 | `src/editor/events/InputEvents.h` | Viewport raw input events (mouse move, press, release, scroll) |
 | `src/editor/events/ProjectEvents.h` | Project lifecycle events (new, open, save, saveAs) |
@@ -35,19 +48,78 @@ Panel Qt signal (e.g. Outliner::objectSelected)
 All event structs live in `src/editor/events/` and carry no Qt headers.
 They are plain C++ structs passed by const reference through the system.
 
-### EditorEvents.h
+### SceneEvents.h
+
+Scene-domain events carry POINTERS (`const ObjectID*` object, `const UID*` scene)
+instead of integer IDs. Controllers cast these to the concrete type (Mesh*, Light*,
+Camera*, Environment*) in the .cpp and mutate them directly — no Scene lookup by ID.
 
 ```cpp
+// Selection
 struct ObjectSelected {
-    int       objectId;
-    Modifiers modifiers;   // shift/ctrl/alt flags captured at click time
+    const UID*   scene  = nullptr;  // Editor-owned Scene (selection state)
+    const ObjectID* object = nullptr;  // Selected object (nullptr = background click)
+    int   modifiers = 0;            // Input::Modifiers bitmask
 };
 
-struct VisibilityChanged {
-    int  objectId;
-    bool viewportVisible;
-    bool renderVisible;
+struct ObjectDeselected {
+    const UID*   scene  = nullptr;
+    const ObjectID* object = nullptr;
 };
+
+// Visibility
+struct VisibilityChanged {
+    const ObjectID* object = nullptr;
+    bool viewportVisible = true;
+    bool renderVisible   = true;
+};
+
+// Transform
+struct PositionChanged { const ObjectID* object; float posX, posY, posZ; };
+struct RotationChanged { const ObjectID* object; float rotX, rotY, rotZ; };
+struct ScaleChanged    { const ObjectID* object; float sclX, sclY, sclZ; };
+
+// Camera properties
+struct CameraTargetChanged { const ObjectID* object; float targetX, targetY, targetZ; };
+struct CameraFovChanged    { const ObjectID* object; float fov; };
+
+// Mesh properties
+struct MeshShadowChanged  { const ObjectID* object; bool enabled; };
+struct MeshMaterialChanged { const ObjectID* object; bool enabled; };
+
+// Light properties
+struct LightPowerChanged      { const ObjectID* object; float power; };
+struct LightRadiusChanged     { const ObjectID* object; float radius; };
+struct LightShadowChanged     { const ObjectID* object; bool enabled; };
+struct LightCutoffChanged     { const ObjectID* object; float cutoff; };
+struct LightOuterCutoffChanged { const ObjectID* object; float outerCutoff; };
+
+// Environment properties
+struct EnvironmentIntensityChanged { const ObjectID* object; float intensity; };
+struct EnvironmentRotationChanged  { const ObjectID* object; float rotation; };
+```
+
+**Scene Events Are Ephemeral**
+
+Scene-domain events follow the system-wide ephemeral rule (see Overview above):
+they carry pointers, never integer IDs. Controllers cast the `const ObjectID*`
+to the concrete type via the class static `As()` helpers (e.g. `Mesh::As(...)`)
+and mutate the object directly - no Scene lookup by ID. `Editor::OnUIEvent` just
+enqueues them unchanged.
+
+### EditorEvents.h
+
+Cross-component events only — things that involve a DIFFERENT component than
+the emitter (SceneController -> Editor, Editor -> Renderer). Scene-domain events
+live in SceneEvents.h.
+
+```cpp
+// Cross-component events (SceneController -> Editor, Editor -> Renderer)
+struct SceneModified {};                       // mark project dirty
+struct LightGpuChanged { const ObjectID* object; };  // single light SSBO update
+struct LightingRebuild {};                     // full light SSBO dict rebuild
+struct EnvironmentChanged { int sceneId; int envId; };  // IBL regeneration
+struct RenderResetEvent {};                    // temporal accumulation reset
 ```
 
 ### CameraEvents.h
@@ -127,12 +199,12 @@ Events are enqueued and batch-processed via `Process()`.
 
 ```cpp
 // Subscribe to typed events
-eventBus.subscribe<ObjectSelected>([](const ObjectSelected& e) {
-    inspector.showEntity(e.objectId);
+eventBus.subscribe<LightGpuChanged>([](const LightGpuChanged& e) {
+    uploadSingleLight(Light::As(e.object));
 });
 
 // Enqueue events (deferred dispatch)
-eventBus.enqueue(ObjectSelected{42, modifiers});
+eventBus.enqueue(LightGpuChanged{lightPtr});
 
 // Process all queued events (call once per frame or on input)
 eventBus.Process();
@@ -190,15 +262,29 @@ void OnUIEvent(const Event& e) {
 }
 ```
 
-### Step 4 — Editor subscribes
+### Step 4 — Controller subscribes
 
 ```cpp
-// Editor.cpp constructor
-ed_eventBus.subscribe<ObjectSelected>([this](const ObjectSelected& e) {
-    SelectObject(e.objectId, e.modifiers.shiftOrCtrl());
+// SceneController::Init() — handles scene-domain events via free-function handlers
+bus.subscribe<ObjectSelected>([&bus](const ObjectSelected& e) {
+    OnObjectSelected(e, bus);
 });
-ed_eventBus.subscribe<VisibilityChanged>([this](const VisibilityChanged& e) {
-    ChangeObjectVisibility(e.objectId, e.viewportVisible, e.renderVisible);
+bus.subscribe<VisibilityChanged>([&bus](const VisibilityChanged& e) {
+    OnVisibilityChanged(e, bus);
+});
+
+// Editor::Initialize() — handles cross-component GPU-sync events
+ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
+    auto* light = Light::As(e.object);
+    if (!light) return;
+    auto gpuStruct = ed_uploadManager->UploadLighting(*light);
+    ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
+});
+ed_eventBus.subscribe<LightingRebuild>([this](const LightingRebuild&) {
+    UploadLighting();
+});
+ed_eventBus.subscribe<SceneModified>([this](const SceneModified&) {
+    m_dirty = true;
 });
 ```
 
@@ -220,10 +306,10 @@ Editor::OnUIEvent<T>             ← generic template
 EventQueue<T>::Process()         ← batch dispatch
     │
     ▼
-Editor subscriber                ← business logic
-    ├── SelectObject()
-    ├── ChangeObjectVisibility()
-    └── SetRenderConfig()
+SceneController / Editor handlers ← business logic
+    ├── Select / Deselect (SceneController)
+    ├── SetVisible / transform setters (SceneController)
+    └── SetRenderConfig / GPU uploads (Editor)
 ```
 
 ## Adding a New Event
@@ -250,8 +336,36 @@ visibility toggle, config change, project load, asset import, environment change
 shader create/compile). Camera movement events are enqueued by `CameraController`
 after each frame handler (Zoom, Rotate, Push, Slide, Resize). Shader create and
 compile events are enqueued by `ShaderController` after the shader version bumps.
-Other scene mutations enqueue it directly from `Editor` event handlers.
+Scene mutations are handled by `SceneController`, which enqueues
+`RenderResetEvent{}` via the shared `Mutated()` helper after every mutation.
 
 **Subscribers** listen for this event to reset per-frame history:
 - `DeferredRenderer::ResetShadowAccumulation()` — zeros the shadow accumulation iteration counter.
 - Future: SSAO temporal accumulation, SSR temporal accumulation, TAA jitter reset.
+
+### SceneController GPU-Sync Flow
+
+Scene mutations that affect GPU resources follow a three-tier event pattern:
+
+```
+SceneController mutation handler
+  ├── Mutates the scene object directly (via class static As() helpers: Mesh::As, Light::As, etc.)
+  └── Enqueues one or more EditorEvents:
+        ├── SceneModified{} → Editor marks project dirty
+        ├── RenderResetEvent{} → DeferredRenderer resets temporal accumulation
+        │
+        ├── Light property change → LightGpuChanged{lightPtr}
+        │     └── Editor::LightGpuChanged handler:
+        │         casts to Light*, calls UploadLighting(*light),
+        │         calls RenderCache::UpdateLight(id, gpuStruct)
+        │         → single SSBO struct updated
+        │
+        └── Light transform/visibility/shadow toggle → LightingRebuild{}
+              └── Editor::LightingRebuild handler:
+                  calls UploadLighting() → full light SSBO dict rebuilt
+                  → all light SSBOs re-uploaded
+```
+
+The key invariant: **SceneController never touches GPU resources**. It mutates
+scene objects and emits EditorEvents. Editor handles all GPU uploads in its
+event handlers. This keeps the controller stateless and preserves the Editor→Renderer GPU upload boundary.

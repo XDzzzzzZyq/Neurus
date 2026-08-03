@@ -284,6 +284,17 @@ public:
 	// -------------------------------------------------------------------
 
 	/**
+	 * @brief Casts a const UID* to a Scene* (no type tag on UID, so just const_cast).
+	 * @param scene Base UID pointer from an event payload.
+	 * @return Non-owning Scene*, or nullptr if null.
+	 */
+	static Scene* As(const UID* scene)
+	{
+		if (!scene) return nullptr;
+		return static_cast<Scene*>(const_cast<UID*>(scene));
+	}
+
+	/**
 	 * @brief Retrieves an object by its unique ID from the master pool.
 	 * @param id Unique object identifier (from UID::GetObjectID()).
 	 * @return Non-owning pointer to ObjectID, or nullptr if not found.

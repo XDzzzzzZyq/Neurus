@@ -107,6 +107,14 @@ public:
 	void* GetMaterial() override { return o_material.get(); }
 	void* GetTransform() override { return static_cast<Transform*>(this); }
 
+	/** @brief Casts a const ObjectID* to a Mesh* if its type is GO_MESH, else nullptr. */
+	static Mesh* As(const ObjectID* obj)
+	{
+		if (!obj || obj->o_type != ObjectID::GOType::GO_MESH)
+			return nullptr;
+		return static_cast<Mesh*>(const_cast<ObjectID*>(obj));
+	}
+
 private:
 };
 

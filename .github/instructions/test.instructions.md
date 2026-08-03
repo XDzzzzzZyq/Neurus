@@ -576,6 +576,14 @@ These patterns were established during deferred PBR development and apply to all
   jitter maps to [-0.5,0.5], and results are deterministic). Test `ComputeShadowAlpha`
   for both FixedEMA (alpha=1/8) and MovingAvg (alpha=1/(frameCount+1)) modes, verifying
   frame 0 always returns alpha=1 (overwrite). Run in CI.
+- **SceneController tests** (`test/editor/test_scene_controller.cpp`): Non-GPU tests
+  that drive `SceneController` through the `EventQueue`. Cover selection (select /
+  background-clear / shift-add / deselect), visibility flags (light visibility
+  enqueues `LightingRebuild`), transform (position/scale; light transform enqueues
+  `LightingRebuild`), camera target/FOV, mesh shadow/material, light
+  power/radius/shadow/cutoff (power/radius/cutoff enqueue `LightGpuChanged`, shadow
+  enqueues `LightingRebuild`), environment intensity/rotation, and dirty semantics
+  (`SceneModified` on property changes, never on selection). Run in CI.
 
 ## Common Pitfalls Summary
 

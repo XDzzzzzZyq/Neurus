@@ -159,7 +159,31 @@ GPU (ms), Draws, Dispatches):
   draw/dispatch counts
 - `Refresh()` rebuilds the tree only when the frame totals change; GPU columns
   show `--` until timestamp readback is ready (device support + fence signal)
-- Profiling is enabled at startup by `Application`; the panel is display-only
+- Profiling is always on; the panel is display-only
+
+### Outliner and PropertyPanel (Scene-Event Panels)
+
+`Outliner` and `PropertyPanel` emit scene-domain events that carry
+`const ObjectID*` (the mutated object) and, for selection, `const UID*`
+(the Editor-owned Scene) instead of integer IDs. Both panels hold the
+scene pointer as UI state during `Refresh()` and stamp it into the
+events they emit, so the Editor enqueues COMPLETE events without any
+Scene lookup (see events.instructions.md, "Scene Events Are Ephemeral").
+
+- `Outliner::Refresh()` reads the object list from `UIContext`, caches
+  the scene as `m_scene`, and reconfigures pooled `OutlinerRow`s via
+  `setObject()` / `setVisibilities()` / `setSelectionMode()`. Rows emit
+  `ObjectSelected` / `VisibilityChanged`; the Outliner re-stamps the
+  scene pointer into `ObjectSelected` before forwarding
+  (`ObjectSelected{m_scene, e.object, e.modifiers}`).
+- `OutlinerRow` emits `ObjectSelected{nullptr, m_object, mods}` and
+  `VisibilityChanged{m_object, viewportVisible, renderVisible}`; signal
+  lambdas read the row's `m_object` at emission time, so pooled rows
+  stay correct when recycled to a different object.
+- `PropertyPanel::Refresh()` reads `scene->selections.GetActiveObject()`
+  and emits transform events (`PositionChanged`, `RotationChanged`,
+  `ScaleChanged`) plus camera/mesh/light/environment property events,
+  all carrying the active object's `const ObjectID*`.
 
 ### ShaderEditorPanel
 

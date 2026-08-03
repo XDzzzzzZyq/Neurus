@@ -236,6 +236,16 @@ public:
 	{
 		return GetTransformPtr();
 	}
+
+	/** @brief Casts a const ObjectID* to a Light* if its type is GO_LIGHT/GO_POLYLIGHT, else nullptr. */
+	static Light* As(const ObjectID* obj)
+	{
+		if (!obj) return nullptr;
+		if (obj->o_type != ObjectID::GOType::GO_LIGHT &&
+		    obj->o_type != ObjectID::GOType::GO_POLYLIGHT)
+			return nullptr;
+		return static_cast<Light*>(const_cast<ObjectID*>(obj));
+	}
 };
 
 } // namespace neurus

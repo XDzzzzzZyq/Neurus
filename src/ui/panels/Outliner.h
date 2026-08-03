@@ -11,7 +11,7 @@
  * - Rows are OutlinerRow widgets managed via a pool
  * - Pool grows as needed; extra rows are hidden (not destroyed)
  * - Each recycled row calls setObject() — signal lambdas read the current
- *   m_objectId at emission time, so no manual rewire needed
+ *   m_object at emission time, so no manual rewire needed
  * - Row signals forwarded via Outliner::objectSelected / visibilityChanged
  * - Reads scene data via UIContext — no Renderer or Vulkan headers
  */
@@ -20,7 +20,7 @@
 
 #include "UIPanel.h"
 
-#include "editor/events/EditorEvents.h"
+#include "editor/events/SceneEvents.h"
 
 #include <cstddef>
 #include <vector>
@@ -33,6 +33,7 @@ namespace neurus
 {
 
 class OutlinerRow;
+class Scene;
 
 class Outliner : public UIPanel
 {
@@ -89,6 +90,9 @@ private:
 
 	/// Row pool — grows as needed, never shrinks.
 	std::vector<OutlinerRow*> m_rowPool;
+
+	/// Scene pointer held as UI state (set each Refresh) for stamping ObjectSelected.
+	const Scene* m_scene = nullptr;
 };
 
 } // namespace neurus

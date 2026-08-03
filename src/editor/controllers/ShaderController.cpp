@@ -36,25 +36,6 @@
 namespace {
 
 // ---------------------------------------------------------------------------
-// Helper: resolve ObjectID* -> Mesh* (the only shader-owning object type)
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Casts a const ObjectID* to a non-const Mesh*.
- *
- * The ShaderEditorPanel only emits events for GO_MESH objects (checked
- * in Refresh), so this cast is safe. The const_cast is needed because
- * Selections stores const ObjectID* but the underlying objects are
- * mutable (owned by Scene's shared_ptr maps).
- */
-neurus::Mesh* AsMesh(const neurus::ObjectID* obj)
-{
-	if (!obj || obj->o_type != neurus::ObjectID::GOType::GO_MESH)
-		return nullptr;
-	return static_cast<neurus::Mesh*>(const_cast<neurus::ObjectID*>(obj));
-}
-
-// ---------------------------------------------------------------------------
 // Event handlers
 // ---------------------------------------------------------------------------
 
@@ -70,7 +51,7 @@ neurus::Mesh* AsMesh(const neurus::ObjectID* obj)
  */
 void OnCreateShader(const neurus::ShaderCreateRequested& e)
 {
-	auto* mesh = AsMesh(e.object);
+	auto* mesh = neurus::Mesh::As(e.object);
 	if (!mesh)
 	{
 		NEURUS_ERR("[ShaderController] OnCreateShader: not a mesh");
@@ -137,7 +118,7 @@ void OnCreateShader(const neurus::ShaderCreateRequested& e)
  */
 void OnCodeEdited(const neurus::ShaderCodeEdited& e)
 {
-	auto* mesh = AsMesh(e.object);
+	auto* mesh = neurus::Mesh::As(e.object);
 	if (!mesh || !mesh->o_shader) return;
 
 	auto& shader = *mesh->o_shader;
@@ -165,7 +146,7 @@ void OnCodeEdited(const neurus::ShaderCodeEdited& e)
  */
 void OnCompileShader(const neurus::ShaderCompileRequested& e)
 {
-	auto* mesh = AsMesh(e.object);
+	auto* mesh = neurus::Mesh::As(e.object);
 	if (!mesh || !mesh->o_shader)
 	{
 		NEURUS_ERR("[ShaderController] OnCompileShader: no shader on mesh");
@@ -221,7 +202,7 @@ void OnCompileShader(const neurus::ShaderCompileRequested& e)
  */
 void OnStructEdited(const neurus::ShaderStructEdited& e)
 {
-	auto* mesh = AsMesh(e.object);
+	auto* mesh = neurus::Mesh::As(e.object);
 	if (!mesh || !mesh->o_shader) return;
 
 	auto& shader = *mesh->o_shader;
@@ -355,7 +336,7 @@ std::string UniqueName(const std::string& base, const std::vector<std::string>& 
  */
 void OnFieldAdded(const neurus::ShaderFieldAdded& e)
 {
-	auto* mesh = AsMesh(e.object);
+	auto* mesh = neurus::Mesh::As(e.object);
 	if (!mesh || !mesh->o_shader) return;
 
 	auto& shader = *mesh->o_shader;
