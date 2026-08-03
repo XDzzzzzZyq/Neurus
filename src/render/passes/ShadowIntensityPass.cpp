@@ -411,8 +411,10 @@ void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D ex
 // Record
 // ---------------------------------------------------------------------------
 
-void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
@@ -420,7 +422,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 	if (!ctx.scene)
 	{
 		NEURUS_LOG("[ShadowIntensityPass] No scene, skipping");
-		return;
+		return stats;
 	}
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
@@ -531,7 +533,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		// --- Dispatch ---
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
-		++m_dispatches;
+		++stats.dispatches;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 		++lightIndex;
@@ -625,7 +627,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		// --- Dispatch ---
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
-		++m_dispatches;
+		++stats.dispatches;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 		++sunLightIndex;
@@ -636,6 +638,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		auto& shadowArray = cache.GetShadowIntensityArray(renderExtent);
 		Barrier::Transition(cmdBuf, shadowArray, ImageState::ColorShaderRead);
 	}
+
+	return stats;
 }
 
 PassIO ShadowIntensityPass::GetIO() const

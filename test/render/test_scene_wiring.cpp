@@ -351,11 +351,7 @@ TEST_F(SceneWiringTest, ProfilingEnabled_PopulatesFrameProfile)
 	light->SetPosition(glm::vec3(2.0f, 2.0f, 5.0f));
 	scene.UseLight(light);
 
-	// Profiling is opt-in and off by default.
-	EXPECT_FALSE(m_renderer->IsProfilingEnabled());
-
-	m_renderer->SetProfilingEnabled(true);
-	EXPECT_TRUE(m_renderer->IsProfilingEnabled());
+	// Profiling is always on; every frame produces per-pass CPU timers + counters.
 
 	// Frame 1: per-pass CPU timers + counters are recorded; GPU timestamp
 	// readback for this slot happens at the start of frame 2 (fence-based).
@@ -393,15 +389,6 @@ TEST_F(SceneWiringTest, ProfilingEnabled_PopulatesFrameProfile)
 			for (const auto& pass : profile.passes)
 				EXPECT_GE(pass.gpuMs, 0.0);
 		}
-	}
-
-	// Toggling off resets the profile; later frames leave it empty.
-	m_renderer->SetProfilingEnabled(false);
-	EXPECT_FALSE(m_renderer->IsProfilingEnabled());
-	{
-		const FrameProfile& profile = m_renderer->DrawFrame(RenderContext{.scene = &scene});
-		EXPECT_EQ(profile.passCount, 0u);
-		EXPECT_TRUE(profile.passes.empty());
 	}
 
 	m_renderer->WaitIdle();

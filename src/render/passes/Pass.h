@@ -69,6 +69,19 @@ struct PassIO
 };
 
 /**
+ * @brief CPU-side command counters returned by Pass::Record().
+ *
+ * Passes tally their own draw/dispatch calls while recording and hand them
+ * back so the caller (RenderGraph) can aggregate per-pass metrics. Keeps
+ * passes stateless with respect to profiling — no members, no reset step.
+ */
+struct PassStats
+{
+	uint32_t drawCalls  = 0;
+	uint32_t dispatches = 0;
+};
+
+/**
  * @brief Base class for a single render pass in the pipeline.
  *
  * Derived classes implement Record() to write commands into the provided
@@ -110,8 +123,9 @@ public:
 	 * @param cmdBuf   Command buffer in the recording state.
 	 * @param cache    Mutable render cache for lazy GPU resource creation.
 	 * @param ctx      Per-frame context (attachments, viewport, frame index, etc.).
+	 * @return Draw/dispatch counts recorded by this pass (for profiling).
 	 */
-	virtual void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) = 0;
+	virtual PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) = 0;
 
 	/**
 	 * @brief Declares this pass's read/write attachment dependencies.
@@ -124,17 +138,6 @@ public:
 	 * graph (or haven't been migrated yet) simply omit the override.
 	 */
 	virtual PassIO GetIO() const { return {}; }
-
-	// --- Profiling counters (collected internally, read by the renderer) ---
-
-	/** @brief Number of vkCmdDraw* calls recorded by this pass (cumulative since the last ResetCounters). */
-	uint32_t GetDrawCalls() const { return m_drawCalls; }
-
-	/** @brief Number of vkCmdDispatch calls recorded by this pass (cumulative since the last ResetCounters). */
-	uint32_t GetDispatches() const { return m_dispatches; }
-
-	/** @brief Zeros the draw/dispatch counters (called by the renderer at frame start while profiling). */
-	void ResetCounters() { m_drawCalls = 0; m_dispatches = 0; }
 
 	// --- Pass type queries (moved from RenderPassManager) ---
 
@@ -184,17 +187,6 @@ protected:
 	 * access p_pipelines[0]; multi-pipeline passes access p_pipelines[i].
 	 */
 	std::vector<Pipeline> p_pipelines;
-
-	/**
-	 * @brief Per-frame command counters, incremented inside Record().
-	 *
-	 * Passes own their profiling counters so RenderContext stays an immutable
-	 * snapshot; the renderer resets them at frame start and reads them back
-	 * per pass while profiling is enabled. Cost when disabled: two integer
-	 * increments per draw/dispatch - negligible.
-	 */
-	uint32_t m_drawCalls  = 0;
-	uint32_t m_dispatches = 0;
 
 	/**
 	 * @brief Builds all pipelines for this pass and pushes them into

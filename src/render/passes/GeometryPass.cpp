@@ -203,8 +203,10 @@ Pipeline GeometryPass::CreatePerMeshPipeline(const Shader& shader, ShaderType /*
 // Record
 // ---------------------------------------------------------------------------
 
-void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
 	const auto* scene = static_cast<const Scene*>(ctx.scene);
 
@@ -338,13 +340,15 @@ void GeometryPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 			const vk::DeviceSize vbOffset = 0;
 			cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), vbOffset);
 			cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
-			++m_drawCalls;
+			++stats.drawCalls;
 			cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 		}
 	}
 
 	// --- 6. End dynamic rendering pass ---
 	EndPass(cmdBuf);
+
+	return stats;
 }
 
 // ---------------------------------------------------------------------------

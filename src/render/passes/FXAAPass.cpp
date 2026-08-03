@@ -97,8 +97,10 @@ void FXAAPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 	ds.WriteImage(1, oi, vk::DescriptorType::eStorageImage);
 }
 
-void FXAAPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats FXAAPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D extent{ctx.width, ctx.height};
 	const uint32_t fi = ctx.frameIndex;
 	const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
@@ -128,13 +130,15 @@ void FXAAPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 
 	const uint32_t gx = (extent.width  + 15) / 16;
 	const uint32_t gy = (extent.height + 15) / 16;
-	++m_dispatches;
+	++stats.dispatches;
 	cmdBuf.dispatch(gx, gy, 1);
 
 	{
 		auto& out = cache.GetAttachment(AttachmentName::FXAAOutput, extent);
 		Barrier::Transition(cmdBuf, out, ImageState::TransferSrc);
 	}
+
+	return stats;
 }
 
 PassIO FXAAPass::GetIO() const

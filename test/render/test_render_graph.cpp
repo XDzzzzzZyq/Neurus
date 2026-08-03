@@ -42,7 +42,7 @@ public:
 	}
 
 	// --- Pass ---
-	void   Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override {}
+	PassStats Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override { return {}; }
 	PassIO GetIO() const override { return m_io; }
 
 private:
@@ -50,8 +50,8 @@ private:
 };
 
 // ---------------------------------------------------------------------------
-// CounterPass - mirrors real passes: it tracks draw/dispatch counts in its own
-// internal counters (Pass::m_drawCalls / m_dispatches) during Record().
+// CounterPass - mirrors real passes: it reports draw/dispatch counts by
+// returning a PassStats from Record() (passes stay stateless).
 // ---------------------------------------------------------------------------
 class CounterPass : public Pass
 {
@@ -69,11 +69,10 @@ public:
 	}
 
 	// --- Pass ---
-	void Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override
+	PassStats Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override
 	{
-		++m_drawCalls;
-		++m_drawCalls;   // simulate a pass issuing two draws
-		++m_dispatches;
+		// Simulate a pass issuing two draws + one dispatch.
+		return {/*drawCalls=*/2, /*dispatches=*/1};
 	}
 	PassIO GetIO() const override { return m_io; }
 
@@ -218,7 +217,9 @@ TEST(RenderGraphTest, ExecuteThrowsIfNotCompiled)
 	// before any pass is invoked. This is a precondition-check test.
 	RenderCache*         nullCache = nullptr;
 	const RenderContext* nullCtx   = nullptr;
-	EXPECT_THROW(g.Execute(vk::CommandBuffer{}, *nullCache, *nullCtx),
+	GPUProfiler          profiler;      // default (uninitialized) — unused before throw
+	FrameProfile         frameProfile;
+	EXPECT_THROW(g.Execute(vk::CommandBuffer{}, *nullCache, *nullCtx, profiler, frameProfile),
 	             std::runtime_error);
 }
 
@@ -412,9 +413,9 @@ TEST(RenderGraphTest, CycleErrorNamesInvolvedNodes)
 }
 
 // ---------------------------------------------------------------------------
-// Pass profiling counters - passes track draw/dispatch counts internally so
-// RenderContext stays an immutable snapshot; the renderer reads them back per
-// pass while profiling is enabled (see DeferredRenderer::recordFrame).
+// Pass profiling counters - passes report draw/dispatch counts by returning a
+// PassStats from Record() so RenderContext stays an immutable snapshot; the
+// RenderGraph aggregates them per pass while profiling (see RenderGraph::Execute).
 // ---------------------------------------------------------------------------
 
 class PassCountersTest : public VulkanTestShared
@@ -423,7 +424,7 @@ protected:
 	// VulkanTestShared provides SetUp/TearDown (device, command pool).
 };
 
-TEST_F(PassCountersTest, RecordTracksInternalCounters)
+TEST_F(PassCountersTest, RecordReturnsStats)
 {
 	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
 
@@ -433,23 +434,14 @@ TEST_F(PassCountersTest, RecordTracksInternalCounters)
 	RenderContext ctx;
 	ctx.frameIndex = 0;
 
-	// Fresh pass: counters start at zero.
-	pass.ResetCounters();
-	EXPECT_EQ(pass.GetDrawCalls(), 0u);
-	EXPECT_EQ(pass.GetDispatches(), 0u);
+	// CounterPass reports two draws + one dispatch per Record().
+	const PassStats stats = pass.Record(vk::CommandBuffer{}, cache, ctx);
+	EXPECT_EQ(stats.drawCalls, 2u);
+	EXPECT_EQ(stats.dispatches, 1u);
 
-	// CounterPass issues two draws + one dispatch per Record().
-	pass.Record(vk::CommandBuffer{}, cache, ctx);
-	EXPECT_EQ(pass.GetDrawCalls(), 2u);
-	EXPECT_EQ(pass.GetDispatches(), 1u);
-
-	// A second Record accumulates (passes are recorded once per frame in the
-	// graph; the renderer resets the counters at the start of each frame).
-	pass.Record(vk::CommandBuffer{}, cache, ctx);
-	EXPECT_EQ(pass.GetDrawCalls(), 4u);
-	EXPECT_EQ(pass.GetDispatches(), 2u);
-
-	pass.ResetCounters();
-	EXPECT_EQ(pass.GetDrawCalls(), 0u);
-	EXPECT_EQ(pass.GetDispatches(), 0u);
+	// Record() is stateless: a second call returns the same stats, not an
+	// accumulation.
+	const PassStats stats2 = pass.Record(vk::CommandBuffer{}, cache, ctx);
+	EXPECT_EQ(stats2.drawCalls, 2u);
+	EXPECT_EQ(stats2.dispatches, 1u);
 }

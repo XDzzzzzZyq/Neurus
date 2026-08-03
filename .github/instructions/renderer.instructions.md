@@ -469,42 +469,43 @@ built on the generic `neurus::Graph<SData, NData>` DAG template (`src/core/Graph
 **Tests**: `test/render/test_render_graph.cpp` - socket materialization,
 connect/duplicate rejection, external inputs, linear/fan-out/diamond ordering,
 multi-resource edges, cycle detection (with named nodes), rebuild determinism,
-clear/reuse, and execute preconditions. Pass-owned profiling counters are
-covered by `PassCountersTest.RecordTracksInternalCounters` (GPU fixture).
+clear/reuse, and execute preconditions. Pass draw/dispatch reporting via the
+`PassStats` return value is covered by `PassCountersTest.RecordReturnsStats`
+(GPU fixture).
 
 ## GPU Profiling (issue #33)
 
 Per-frame profiling answers whether the renderer is **CPU-bound** (command
 recording) or **GPU-bound** before any parallel-rendering work.
 
-**Always on in the app**: `Application::InitRenderer()` calls `DeferredRenderer::
-SetProfilingEnabled(true)` at startup so the Profiling panel always shows live
-per-frame timings. The renderer's own default stays off (tests construct it
-fresh); embedded callers can still toggle collection with
-`SetProfilingEnabled(bool)`.
+**Always on**: profiling is unconditional. `DeferredRenderer` owns a
+`GPUProfiler` and a `FrameProfile` and populates them every frame — there is no
+enable/disable toggle. `Application::InitRenderer()` needs no profiling call;
+`DrawFrame()` always returns a live `FrameProfile`.
 
 **What is measured** (`FrameProfile` in `ProfilingData.h`)
-- `cpuRecordMs` - total `DeferredRenderer::recordFrame()` wall time.
-- Per pass: `cpuMs` (around `Record()` in `DeferredRenderer::recordFrame`), `gpuMs`
+- `cpuRecordMs` - total `RenderGraph::Execute()` command-recording wall time.
+- Per pass: `cpuMs` (around each `Record()` in `RenderGraph::Execute`), `gpuMs`
   (timestamp queries), `drawCalls`, `dispatches`.
 - Frame totals: `drawCalls`, `dispatches`, `passCount`, `gpuTotalMs`.
 
-**GPU timestamps** (`GPUProfiler`)
-- One `vk::QueryPool` of `kMaxFramesInFlight * (kMaxPasses + 2)` timestamps;
-  per frame slot: start@0, pass end@1+i, frame end@1+passCount.
-- `WriteFrameStart`/`WritePassEnd`/`WriteFrameEnd` are recorded into the
-  command buffer; `Collect()` reads them back non-blockingly after that frame
-  slot's fence signals (results lag CPU data by 1-2 frames by design).
+**GPU timestamps** (`GPUProfiler`, section-based)
+- One `vk::QueryPool` of `kMaxFramesInFlight * (2 + 2 * kMaxPasses)` timestamps;
+  per frame slot: frame begin@0, frame end@1, pass i begin@2+2*i, end@3+2*i.
+- The RenderGraph drives the profiler around each pass:
+  `BeginFrame` → (`BeginPass`/`EndPass`)* → `EndFrame`. Passes stay unaware of
+  GPU profiling. `Resolve()` reads back the slot about to be reused (after its
+  fence signals) non-blockingly, so results lag CPU data by 1-2 frames by design.
 - The pool is created only when `timestampComputeAndGraphics` and the graphics
   queue family's `timestampValidBits` allow it; otherwise `Available()==false`
   and the Profiling panel/log show CPU data only.
 
-**Counters**: each pass tracks its own draw/dispatch counts internally
-(`Pass::m_drawCalls` / `m_dispatches`, exposed via `GetDrawCalls()` /
-`GetDispatches()`). `RenderContext` carries no profiling data - it stays an
-immutable per-frame snapshot. When profiling is enabled,
-`DeferredRenderer::recordFrame` resets every pass's counters at frame start,
-snapshots them after each `Record()`, and sums them into the frame totals.
+**Counters**: each pass reports its own draw/dispatch counts by returning a
+`PassStats { drawCalls, dispatches }` from `Record()` — passes are stateless
+with respect to profiling (no members, no reset). `RenderContext` carries no
+profiling data - it stays an immutable per-frame snapshot. `RenderGraph::Execute`
+aggregates the returned `PassStats` into each `PassProfile` and sums them into
+the frame totals.
 
 **Surface**: `DeferredRenderer::DrawFrame()` returns the `FrameProfile`; the
 Application layer forwards it to `Editor::SetFrameProfile()`, and the Editor

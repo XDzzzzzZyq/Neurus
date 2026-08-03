@@ -22,6 +22,9 @@
 
 #include "UIPanel.h"
 
+#include <cstddef>
+#include <vector>
+
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -46,7 +49,7 @@ public:
 	/**
 	 * @brief Per-frame refresh from UIContext.
 	 *
-	 * Reads the opaque frameProfile pointer and rebuilds the tree when the
+	 * Reads the opaque frameProfile pointer and repopulates the tree when the
 	 * frame totals change. GPU timestamps lag the CPU data by 1-2 frames by
 	 * design (fence-based readback); the panel just renders what it is given.
 	 *
@@ -55,12 +58,25 @@ public:
 	void Refresh(const UIContext& ctx) override;
 
 private:
-	/** @brief Rebuilds the tree from the latest profile. */
-	void Rebuild(const FrameProfile& profile);
+	/** @brief Repopulates the tree from the latest profile, recycling rows. */
+	void Populate(const FrameProfile& profile);
 
-	QTreeWidget* m_tree = nullptr;
+	/**
+	 * @brief Ensures the pass-row pool has at least @p needed child rows,
+	 *        creating new ones under the persistent Frame item as necessary.
+	 *
+	 * Rows are recycled across frames (never destroyed), mirroring the
+	 * Outliner/OutlinerRow pool pattern — no per-frame `new QTreeWidgetItem`.
+	 */
+	void EnsureRowPool(std::size_t needed);
 
-	// --- Change detection: rebuild only when a new profile arrived ---
+	QTreeWidget*     m_tree      = nullptr;
+	QTreeWidgetItem* m_frameItem = nullptr; ///< Persistent bold "Frame" totals row.
+
+	/// Persistent per-pass child rows — grows as needed, never shrinks.
+	std::vector<QTreeWidgetItem*> m_rowPool;
+
+	// --- Change detection: repopulate only when a new profile arrived ---
 	bool     m_hasProfile   = false;
 	double   m_lastCpuMs    = 0.0;
 	double   m_lastGpuMs    = 0.0;

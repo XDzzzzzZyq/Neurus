@@ -287,8 +287,10 @@ void LightingPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rend
 // Record
 // ---------------------------------------------------------------------------
 
-void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
 	const auto* scene = static_cast<const Scene*>(ctx.scene);
 
@@ -476,7 +478,7 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
-	++m_dispatches;
+	++stats.dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition HDRColor: General → ColorShaderRead for subsequent passes ---
@@ -484,6 +486,8 @@ void LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Re
 		auto& hdrColor = cache.GetAttachment(AttachmentName::HDRColor, renderExtent);
 		Barrier::Transition(cmdBuf, hdrColor, ImageState::ColorShaderRead);
 	}
+
+	return stats;
 }
 
 PassIO LightingPass::GetIO() const

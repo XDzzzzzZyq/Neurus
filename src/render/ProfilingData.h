@@ -19,9 +19,9 @@ namespace neurus {
 /**
  * @brief One pass's CPU/GPU timing + counters for a single frame.
  *
- * Each Pass tracks its own draw/dispatch counters internally during Record()
- * (see Pass::GetDrawCalls / GetDispatches); the renderer snapshots them into
- * this struct while profiling. @c gpuMs is only meaningful when the device
+ * Each Pass reports its own draw/dispatch counts by returning a PassStats from
+ * Record(); the RenderGraph snapshots them into this struct while profiling.
+ * @c gpuMs is only meaningful when the device
  * supports timestamp queries (see FrameProfile::gpuTimingAvailable); otherwise
  * it stays 0.
  */

@@ -77,7 +77,7 @@ public:
 	 * @param cache   Render cache for attachment access.
 	 * @param ctx     Per-frame context (render extent, frame index, activeObjectId).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/**
 	 * @brief Declares the image attachments this pass reads and writes.

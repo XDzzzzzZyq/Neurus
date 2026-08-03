@@ -111,10 +111,9 @@ public:
 	 * Handles swapchain recreation on VK_ERROR_OUT_OF_DATE_KHR. Safe to
 	 * call repeatedly (fence-guarded, max kMaxFramesInFlight in flight).
 	 *
-	 * While profiling is enabled (SetProfilingEnabled), the returned profile
-	 * carries per-pass CPU times/counters from the frame just recorded and GPU
-	 * times read back from the fence that just signaled (1-2 frame lag by
-	 * design). When profiling is off, the returned profile is left untouched.
+	 * Profiling is always on: the returned profile carries per-pass CPU
+	 * times/counters from the frame just recorded and GPU times read back from
+	 * the fence that just signaled (1-2 frame lag by design).
 	 *
 	 * @param editorCtx Editor-produced context with scene set.
 	 * @return The latest frame profile (owned by the renderer; valid until the
@@ -207,16 +206,6 @@ public:
 	 * Sets the global shadow frame counter to 0, causing the next frame to overwrite (alpha=1).
 	 */
 	void ResetShadowAccumulation();
-
-	/**
-	 * @brief Enables or disables per-frame CPU/GPU profiling.
-	 * @param enabled True to record per-pass timings + draw/dispatch counters
-	 *        into the frame profile consumed by the UI overlay.
-	 */
-	void SetProfilingEnabled(bool enabled);
-
-	/** @brief Returns true when frame profiling is active. */
-	bool IsProfilingEnabled() const { return m_profilingEnabled; }
 
 private:
 	/**
@@ -331,18 +320,15 @@ private:
 	uint32_t m_haltonIndex = 0;
 	uint32_t m_iteration = 0;
 
-	// --- Per-frame profiling (enabled by Application at startup; SetProfilingEnabled toggles) ---
-	bool m_profilingEnabled = false;
+	// --- Per-frame profiling (always on; RenderGraph drives GPU sections) ---
+	// m_profiler owns the GPU timestamp query pool and per-pass sections;
+	// RenderGraph::Execute brackets each pass with BeginPass/EndPass and folds
+	// PassStats into m_frameProfile. DrawFrame calls Resolve() after the frame
+	// slot's fence signals and back-fills the resolved GPU ms into m_frameProfile
+	// once recordFrame has repopulated the pass list (1-2 frame lag by design).
 	GPUProfiler m_profiler;
 	FrameProfile m_frameProfile;
-	std::vector<double> m_passGpuMs; ///< Scratch: collected per-pass GPU ms.
-	double m_gpuTotalMs = 0.0;       ///< Scratch: collected GPU frame ms.
-	// Pass count recorded per frame slot so GPU readback stays aligned even
-	// when the graph topology changes between record and collect.
-	std::array<uint32_t, kMaxFramesInFlight> m_recordedPassCount{};
-	// True once a slot's queries were reset+written, so Collect() skips the
-	// pre-signaled first-frame readback (VUID-vkGetQueryPoolResults-None-09401).
-	std::array<bool, kMaxFramesInFlight> m_profilingQueriesWritten{};
+	bool m_gpuResolved = false; ///< Last Resolve() produced fresh GPU sections.
 
 };
 

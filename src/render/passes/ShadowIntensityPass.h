@@ -98,7 +98,7 @@ public:
 	 * @param cache   Render cache for attachment/shadow map access.
 	 * @param ctx     Per-frame context (render extent, frame index, scene).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/// Declares the Position + ShadowDepth reads and the ShadowIntensity write
 	/// for RenderGraph wiring (per-light depth maps and intensity layers are

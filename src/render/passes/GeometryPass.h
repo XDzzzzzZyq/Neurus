@@ -92,7 +92,7 @@ public:
 	 * @param cache           Render cache for MeshGPU and attachment lookups.
 	 * @param ctx             Per-frame context (scene, camera, extent).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/// Declares the G-Buffer + IDBuffer + Depth writes for RenderGraph wiring
 	/// (this pass has no image reads; camera data comes via a UBO).

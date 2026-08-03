@@ -265,9 +265,6 @@ bool Application::InitRenderer()
 		return false;
 	}
 
-	// --- GPU profiling: always collect per-frame timings for the Profiling panel ---
-	app_renderer->SetProfilingEnabled(true);
-
 	// --- Create screenshot helper (needs Vulkan handles; RenderCache passed per-call) ---
 	app_screenshot = std::make_unique<neurus::Screenshot>(
 		app_vkContext->device(),

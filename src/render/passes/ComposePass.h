@@ -85,7 +85,7 @@ public:
 	 * @param cache   Mutable render cache for attachment access.
 	 * @param ctx     Per-frame context (render extent, frame index, config).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/// Declares HDRColor + GizmoHighlight reads and the ComposedOutput write
 	/// for RenderGraph wiring.

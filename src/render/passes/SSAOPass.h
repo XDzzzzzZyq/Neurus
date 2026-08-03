@@ -145,7 +145,7 @@ public:
 	 * @param cmdBuf  Command buffer in recording state.
 	 * @param ctx     Per-frame context (render extent, frame index).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/// Declares G-Buffer reads (Position/Normal/Albedo) and the SSAO write
 	/// for RenderGraph wiring.

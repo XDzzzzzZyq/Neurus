@@ -147,8 +147,10 @@ void GizmoPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderC
 // Record
 // ---------------------------------------------------------------------------
 
-void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
@@ -195,7 +197,7 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
-	++m_dispatches;
+	++stats.dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition GizmoHighlight output: General → ShaderRead for downstream passes ---
@@ -203,6 +205,8 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 		auto& gizmoAtt = cache.GetAttachment(AttachmentName::GizmoHighlight, renderExtent);
 		Barrier::Transition(cmdBuf, gizmoAtt, ImageState::ColorShaderRead);
 	}
+
+	return stats;
 }
 
 } // namespace neurus

@@ -1,22 +1,33 @@
 /**
  * @file GPUProfiler.h
- * @brief GPU timestamp query pool for per-frame, per-pass GPU timing.
+ * @brief Section-based GPU timestamp profiler owned by the RenderGraph.
  *
- * Owns one vk::raii::QueryPool sized for kMaxFramesInFlight frames; each
- * frame slot holds kMaxPasses + 2 timestamp queries:
- *   slot[0]               frame start (written by the renderer)
- *   slot[1 + i]           end of pass i (i in [0, passCount))
- *   slot[1 + passCount]   frame end   (written by the renderer)
+ * The profiler brackets each frame and each pass with GPU timestamp queries:
+ *   BeginFrame → (BeginPass/EndPass)* → EndFrame → Resolve
  *
- * Pass timings are derived from consecutive boundary timestamps, so only
- * one timestamp per pass is needed (the command buffer executes passes
- * back-to-back). Collect() reads results non-blockingly after the frame's
- * fence signals; VK_NOT_READY (startup / skipped frames) returns false so
- * the caller keeps the previous profile.
+ * The RenderGraph drives BeginPass/EndPass around every pass->Record(), so
+ * passes stay completely unaware of GPU profiling. DeferredRenderer drives
+ * BeginFrame/EndFrame and calls Resolve() once the frame slot's fence has
+ * signaled.
+ *
+ * Query layout per frame slot (queriesPerFrame = 2 + 2 * kMaxPasses):
+ *   slotBase + 0            frame begin (eTopOfPipe)
+ *   slotBase + 1            frame end   (eBottomOfPipe)
+ *   slotBase + 2 + 2*i + 0  pass i begin
+ *   slotBase + 2 + 2*i + 1  pass i end
+ *
+ * The profiler owns its own slot cursor (advanced in EndFrame), which stays in
+ * lockstep with the renderer's frame-in-flight index because BeginFrame/
+ * EndFrame are called exactly once per successfully recorded frame. Resolve()
+ * reads the slot about to be reused this frame (its fence has already
+ * signaled), giving results a 1-2 frame lag by design. A per-slot "written"
+ * guard skips never-recorded slots so the first reads never touch an
+ * uninitialized query (VUID-vkGetQueryPoolResults-None-09401).
  *
  * Opt-in: the pool is only created when the device reports
- * `timestampComputeAndGraphics` and the graphics queue family reports
- * timestamp support.
+ * `timestampComputeAndGraphics` and the graphics queue family supports
+ * timestamps. When unavailable every method is a safe no-op and Resolve()
+ * returns false.
  */
 
 #pragma once
@@ -25,6 +36,8 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace neurus {
@@ -32,8 +45,15 @@ namespace neurus {
 class GPUProfiler
 {
 public:
-	/** @brief Upper bound on instrumented passes per frame (graph slots). */
+	/** @brief Upper bound on instrumented passes per frame slot. */
 	static constexpr uint32_t kMaxPasses = 64;
+
+	/** @brief One resolved pass timing (name + GPU ms), returned by Sections(). */
+	struct SectionTime
+	{
+		std::string name;
+		double      gpuMs = 0.0;
+	};
 
 	GPUProfiler() = default;
 	~GPUProfiler() = default;
@@ -46,7 +66,7 @@ public:
 	/**
 	 * @brief Creates the timestamp query pool.
 	 *
-	 * Safe to call once at renderer construction; no-op (Available() == false)
+	 * Safe to call once at renderer construction; leaves Available() == false
 	 * when the device or graphics queue family does not support timestamps.
 	 */
 	void Initialize(const vk::raii::Device& device,
@@ -57,47 +77,67 @@ public:
 	/** @brief True when the device supports GPU timestamp queries. */
 	bool Available() const { return m_available; }
 
-	/** @brief Timestamp period in nanoseconds (from device limits). */
-	double TimestampPeriodNs() const { return m_timestampPeriodNs; }
+	/**
+	 * @brief Begins a frame: resets the current slot's query range and writes
+	 *        the frame-begin timestamp. Clears the slot's section list.
+	 */
+	void BeginFrame(vk::CommandBuffer cmd);
 
-	/** @brief GPU-resets the current frame slot's query range. */
-	void ResetQueries(vk::CommandBuffer cmd, uint32_t frameIndex) const;
+	/** @brief Opens a pass section and writes its begin timestamp. */
+	void BeginPass(vk::CommandBuffer cmd, std::string_view name);
 
-	/** @brief Records the frame-start timestamp (before the graph executes). */
-	void WriteFrameStart(vk::CommandBuffer cmd, uint32_t frameIndex) const;
-
-	/** @brief Records the end timestamp for pass @p passIndex. */
-	void WritePassEnd(vk::CommandBuffer cmd, uint32_t frameIndex, uint32_t passIndex) const;
+	/** @brief Closes the current pass section and writes its end timestamp. */
+	void EndPass(vk::CommandBuffer cmd);
 
 	/**
-	 * @brief Records the frame-end timestamp (after the final blit).
-	 * @param passCount Number of passes recorded this frame; the frame-end
-	 *        timestamp is written at slot 1 + passCount so Collect()'s
-	 *        contiguous [0, passCount + 2) readback covers exactly the
-	 *        queries that were written.
+	 * @brief Ends a frame: writes the frame-end timestamp and advances the
+	 *        internal slot cursor to the next frame-in-flight.
 	 */
-	void WriteFrameEnd(vk::CommandBuffer cmd, uint32_t frameIndex, uint32_t passCount) const;
+	void EndFrame(vk::CommandBuffer cmd);
 
 	/**
-	 * @brief Reads back the frame slot's timestamps.
-	 * @param frameIndex Frame slot whose fence has signaled.
-	 * @param passCount  Number of passes recorded in that frame.
-	 * @param passGpuMs  Out: per-pass GPU ms (size == passCount).
-	 * @param frameGpuMs Out: total GPU ms for the frame.
-	 * @return false when the results are not available yet (keep previous).
+	 * @brief Reads back the slot about to be reused this frame.
+	 *
+	 * Must be called after that slot's fence has signaled (before BeginFrame).
+	 * Populates Sections() and FrameGpuMs() on success.
+	 *
+	 * @return false when results are not ready (startup / skipped slot) so the
+	 *         caller keeps the previous profile.
 	 */
-	bool Collect(uint32_t frameIndex, uint32_t passCount,
-	             std::vector<double>& passGpuMs, double& frameGpuMs) const;
+	bool Resolve();
+
+	/** @brief Per-pass GPU timings from the last successful Resolve(). */
+	const std::vector<SectionTime>& Sections() const { return m_resolved; }
+
+	/** @brief Total GPU frame time (ms) from the last successful Resolve(). */
+	double FrameGpuMs() const { return m_resolvedFrameMs; }
 
 private:
-	static uint32_t QueriesPerFrame() { return kMaxPasses + 2; }
-	uint32_t QueryOffset(uint32_t frameIndex) const { return frameIndex * QueriesPerFrame(); }
+	/** @brief One instrumented pass: its two query slots within the pool. */
+	struct Section
+	{
+		std::string name;
+		uint32_t    beginQuery = 0;
+		uint32_t    endQuery   = 0;
+	};
+
+	static uint32_t QueriesPerFrame() { return 2 + 2 * kMaxPasses; }
+	uint32_t SlotBase(uint32_t slot) const { return slot * QueriesPerFrame(); }
 
 	std::unique_ptr<vk::raii::QueryPool> m_pool;
 	bool     m_available = false;
 	double   m_timestampPeriodNs = 1.0;
 	uint32_t m_maxFramesInFlight = 2;
-	mutable std::vector<uint64_t> m_results;
+
+	uint32_t m_currentSlot = 0; ///< Slot used by the frame currently recording.
+
+	std::vector<std::vector<Section>> m_slotSections; ///< Per-slot open/closed sections.
+	std::vector<uint8_t>              m_written;       ///< Per-slot: recorded at least once.
+
+	// --- Resolve output (last successful readback) ---
+	std::vector<SectionTime> m_resolved;
+	double                   m_resolvedFrameMs = 0.0;
+	mutable std::vector<uint64_t> m_results;           ///< Scratch readback buffer.
 };
 
 } // namespace neurus

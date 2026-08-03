@@ -30,7 +30,6 @@
 #include "core/Log.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <stdexcept>
@@ -235,23 +234,12 @@ const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	}
 
 	// --- Profiling: read back this slot's GPU timestamps (fence signaled) ---
-	// GPU times are 1-2 frames behind by design (fence-based readback).
-	if (m_profilingEnabled)
-	{
-		const uint32_t recordedPasses = m_recordedPassCount[r_currentFrame];
-		// Skip slots whose queries were never reset/written yet: their fences
-		// start pre-signaled, so the first readback would hit an uninitialized
-		// query (VUID-vkGetQueryPoolResults-None-09401).
-		if (m_profilingQueriesWritten[r_currentFrame] &&
-		    m_profiler.Collect(r_currentFrame, recordedPasses, m_passGpuMs, m_gpuTotalMs))
-		{
-			const size_t n = std::min(m_passGpuMs.size(), m_frameProfile.passes.size());
-			for (size_t i = 0; i < n; ++i)
-				m_frameProfile.passes[i].gpuMs = m_passGpuMs[i];
-			m_frameProfile.gpuTotalMs = m_gpuTotalMs;
-			m_frameProfile.gpuReady = true;
-		}
-	}
+	// The profiler's slot cursor stays in lockstep with r_currentFrame because
+	// BeginFrame/EndFrame run exactly once per recorded frame. Resolve() reads
+	// the slot about to be reused; the resolved GPU ms are back-filled into
+	// m_frameProfile *after* recordFrame repopulates the pass list below (GPU
+	// data lags the CPU/counter data by 1-2 frames, by design).
+	m_gpuResolved = m_profiler.Resolve();
 
 	// --- Acquire next swapchain image ---
 	uint32_t imageIndex = 0;
@@ -292,6 +280,20 @@ const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 
 	recordFrame(r_commandBuffers[imageIndex], imageIndex, ctx);
 
+	// --- Profiling: back-fill resolved GPU ms now that passes are repopulated ---
+	// recordFrame just rewrote m_frameProfile.passes (CPU + counters, gpuMs=0).
+	// Match resolved sections to passes by index (topology is stable frame to
+	// frame; the size guard covers the rare rebuild-in-flight case).
+	if (m_gpuResolved)
+	{
+		const auto& sections = m_profiler.Sections();
+		const size_t n = std::min(sections.size(), m_frameProfile.passes.size());
+		for (size_t i = 0; i < n; ++i)
+			m_frameProfile.passes[i].gpuMs = sections[i].gpuMs;
+		m_frameProfile.gpuTotalMs = m_profiler.FrameGpuMs();
+		m_frameProfile.gpuReady = true;
+	}
+
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
 
@@ -329,21 +331,6 @@ const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 void DeferredRenderer::ResetShadowAccumulation()
 {
 	m_iteration = 0;
-}
-
-void DeferredRenderer::SetProfilingEnabled(bool enabled)
-{
-	m_profilingEnabled = enabled;
-	m_frameProfile = FrameProfile{};
-	if (m_profilingEnabled)
-	{
-		NEURUS_LOG("[DeferredRenderer] GPU profiling enabled"
-		           << (m_profiler.Available() ? " (GPU timestamps)" : " (CPU-only, no GPU timestamps)"));
-	}
-	else
-	{
-		NEURUS_LOG("[DeferredRenderer] GPU profiling disabled");
-	}
 }
 
 void DeferredRenderer::RebuildMainGraph(const PipelineSignature& sig)
@@ -518,9 +505,6 @@ void DeferredRenderer::recreateSwapchain()
 void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32_t imageIndex,
                                    const RenderContext& editorCtx)
 {
-	// --- Profiling: CPU total for the whole recordFrame body ---
-	const auto cpuFrameStart = std::chrono::steady_clock::now();
-
 	const vk::Extent2D extent = r_swapchain->extent();
 
 	// --- Reset command buffer (ensures it's not in a bad state) then begin ---
@@ -567,47 +551,12 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 			RebuildMainGraph(sig);
 	}
 
-	// --- Profiling: collect per-pass CPU times, GPU timestamps, and counters ---
-	// Passes track their own draw/dispatch counters (Pass::GetDrawCalls /
-	// GetDispatches); the renderer resets them at frame start and snapshots
-	// them per pass. RenderGraph stays a pure DAG dispatcher.
-	if (m_profilingEnabled)
-	{
-		for (auto& pass : r_passes)
-			pass->ResetCounters();
-
-		m_frameProfile.passes.clear();
-		m_profiler.ResetQueries(cmdBuf, r_currentFrame);
-		m_profiler.WriteFrameStart(cmdBuf, r_currentFrame);
-
-		const auto& order = m_mainGraph.CompiledOrder();
-		m_frameProfile.passes.reserve(order.size());
-		uint32_t passIndex = 0;
-		for (auto* node : order)
-		{
-			Pass* pass = node->data.pass;
-
-			const auto cpuStart = std::chrono::steady_clock::now();
-			pass->Record(*cmdBuf, *r_renderCache, ctx);
-			const auto cpuEnd = std::chrono::steady_clock::now();
-
-			PassProfile entry;
-			entry.name = node->data.io.name;
-			entry.cpuMs = std::chrono::duration<double, std::milli>(cpuEnd - cpuStart).count();
-			entry.drawCalls = pass->GetDrawCalls();
-			entry.dispatches = pass->GetDispatches();
-			m_frameProfile.passes.push_back(std::move(entry));
-
-			if (m_profiler.Available())
-				m_profiler.WritePassEnd(cmdBuf, r_currentFrame, passIndex);
-			++passIndex;
-		}
-		m_recordedPassCount[r_currentFrame] = static_cast<uint32_t>(m_frameProfile.passes.size());
-	}
-	else
-	{
-		m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
-	}
+	// --- Profiling: bracket the whole pipeline with GPU frame timestamps ---
+	// The RenderGraph drives per-pass GPU timestamps + CPU timing and folds the
+	// PassStats each pass returns into m_frameProfile (passes stay unaware of
+	// profiling). GPU per-pass ms are back-filled in DrawFrame after Resolve().
+	m_profiler.BeginFrame(cmdBuf);
+	m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx, m_profiler, m_frameProfile);
 
 	// --- Phase 4: Blit output → swapchain image ---
 	auto& blitSource = r_renderCache->GetAttachment(
@@ -649,34 +598,17 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
 	// --- Profiling: write the GPU frame-end timestamp (covers the final blit) ---
-	if (m_profilingEnabled)
-	{
-		m_profiler.WriteFrameEnd(cmdBuf, r_currentFrame,
-		                         static_cast<uint32_t>(m_frameProfile.passes.size()));
-		// Slot's queries are now validly reset+written; safe to read back once
-		// this frame's fence signals.
-		m_profilingQueriesWritten[r_currentFrame] = true;
-	}
+	// EndFrame also advances the profiler's slot cursor, keeping it in lockstep
+	// with r_currentFrame (both advance exactly once per recorded frame).
+	m_profiler.EndFrame(cmdBuf);
 
 	// --- End command buffer ---
 	cmdBuf.end();
 
-	// --- Profiling: finalize the CPU-side frame profile ---
-	if (m_profilingEnabled)
-	{
-		const auto cpuFrameEnd = std::chrono::steady_clock::now();
-		m_frameProfile.cpuRecordMs =
-			std::chrono::duration<double, std::milli>(cpuFrameEnd - cpuFrameStart).count();
-		m_frameProfile.drawCalls = 0;
-		m_frameProfile.dispatches = 0;
-		for (const PassProfile& pass : m_frameProfile.passes)
-		{
-			m_frameProfile.drawCalls += pass.drawCalls;
-			m_frameProfile.dispatches += pass.dispatches;
-		}
-		m_frameProfile.passCount = static_cast<uint32_t>(m_frameProfile.passes.size());
-		m_frameProfile.gpuTimingAvailable = m_profiler.Available();
-	}
+	// --- Profiling: finalize CPU-side aggregate fields ---
+	// RenderGraph::Execute already populated passes[], cpuRecordMs, drawCalls,
+	// dispatches, and passCount; only gpuTimingAvailable is renderer-owned.
+	m_frameProfile.gpuTimingAvailable = m_profiler.Available();
 }
 
 // ---------------------------------------------------------------------------

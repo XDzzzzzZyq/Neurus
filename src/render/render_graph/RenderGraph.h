@@ -12,7 +12,8 @@
  *     already rejects self-loops and duplicates).
  *   - Compile(): guarantees every declared input is wired, then produces a
  *     Kahn topological order (throws on cycle).
- *   - Execute(): iterates the compiled order and invokes `pass->Record()`.
+ *   - Execute(): iterates the compiled order and invokes `pass->Record()`,
+ *     driving GPU timestamp + per-pass CPU profiling around each call.
  *     No barrier or descriptor injection yet — those arrive in Wave 2+.
  *
  * The graph consumes passes through their `Pass` interface only: it asks
@@ -27,6 +28,8 @@
 
 #pragma once
 
+#include "../GPUProfiler.h"
+#include "../ProfilingData.h"
 #include "../RenderCache.h"
 #include "../passes/Pass.h"
 #include "core/Graph.h"
@@ -95,17 +98,29 @@ public:
 	void Compile();
 
 	/**
-	 * @brief Walk the compiled order and invoke each pass's Record().
+	 * @brief Walk the compiled order and invoke each pass's Record(), driving
+	 *        GPU + CPU profiling around every pass.
 	 *
-	 * Pure dispatch: the graph owns no profiling state. Per-pass CPU/GPU
-	 * timing and draw/dispatch counters are collected by
-	 * DeferredRenderer::recordFrame (it iterates CompiledOrder() itself while
-	 * profiling is enabled), so RenderContext stays an immutable snapshot.
+	 * For each pass the graph brackets the recording with
+	 * `profiler.BeginPass()/EndPass()` (GPU timestamps) and times the CPU-side
+	 * `Record()` call with std::chrono. The `PassStats` returned by `Record()`
+	 * (draw calls, dispatches) plus the measured CPU time are appended to
+	 * @p frameProfile.passes in execution order. GPU times stay 0 here and are
+	 * back-filled by DeferredRenderer once `GPUProfiler::Resolve()` succeeds.
+	 * Passes themselves remain completely unaware of profiling.
+	 *
+	 * @p frameProfile.passes is cleared and repopulated; the aggregate counters
+	 * (drawCalls, dispatches, passCount, cpuRecordMs) are recomputed. GPU fields
+	 * are left untouched for the caller to fill.
 	 *
 	 * @pre  Compile() has been called since the last topology change.
 	 * @throws std::runtime_error if the graph has not been compiled.
 	 */
-	void Execute(vk::CommandBuffer cmd, RenderCache& cache, const RenderContext& ctx) const;
+	void Execute(vk::CommandBuffer cmd,
+	             RenderCache& cache,
+	             const RenderContext& ctx,
+	             GPUProfiler& profiler,
+	             FrameProfile& frameProfile) const;
 
 	/** @return Number of registered passes. */
 	size_t PassCount() const { return m_graph.NodeCount(); }

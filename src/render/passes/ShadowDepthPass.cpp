@@ -270,10 +270,12 @@ void ShadowDepthPass::BuildPipeline(const vk::raii::Device& device,
 // Record
 // ===========================================================================
 
-void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	// Guard: skip if no scene
-	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return; }
+	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return stats; }
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
 	const auto* scene = static_cast<const Scene*>(ctx.scene);
@@ -396,7 +398,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 				    kModelPushOffset, model);
 				cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), {vk::DeviceSize{0}});
 				cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
-				++m_drawCalls;
+				++stats.drawCalls;
 				cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 			}
 		}
@@ -508,7 +510,7 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 
 					cmdBuf.bindVertexBuffers(0, gpuPtr->vertexBuffer->buffer(), {vk::DeviceSize{0}});
 					cmdBuf.bindIndexBuffer(gpuPtr->indexBuffer->buffer(), 0, vk::IndexType::eUint32);
-					++m_drawCalls;
+					++stats.drawCalls;
 					cmdBuf.drawIndexed(gpuPtr->indexCount, 1, 0, 0, 0);
 				}
 			}
@@ -519,6 +521,8 @@ void ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const
 			Barrier::Transition(cmdBuf, sunImage, ImageState::DepthShaderRead);
 		}
 	}
+
+	return stats;
 }
 
 PassIO ShadowDepthPass::GetIO() const
