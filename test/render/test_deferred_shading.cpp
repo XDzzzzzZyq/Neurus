@@ -152,7 +152,7 @@ TEST_F(DeferredShadingTest, GbufferAttachments_MatchReferenceImages)
 	RenderContext ctx{
 			.width = kRenderWidth, .height = kRenderHeight,
 		.frameIndex = 0,
-		.scene = resources.scene.get(),
+		.editor = { .scene = resources.scene.get() },
 	};
 
 	// --- Record geometry pass ---

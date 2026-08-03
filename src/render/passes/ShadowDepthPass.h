@@ -66,7 +66,7 @@ public:
 	ShadowDepthPass(ShadowDepthPass&&) noexcept = default;
 	ShadowDepthPass& operator=(ShadowDepthPass&&) noexcept = default;
 
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& /*cache*/, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& /*cache*/, const RenderContext& ctx) override;
 
 	/// Declares the ShadowDepthBundle write for RenderGraph wiring. Per-light
 	/// depth maps live in LightGPU; the bundle is a single ordering token.

@@ -25,7 +25,7 @@
 
 #include <glm/glm.hpp>
 
-#include "scene/UID.h"
+#include "scene/EditorContext.h"
 
 namespace neurus
 {
@@ -47,14 +47,10 @@ struct RenderContext
 	/// @brief Ring-buffer slot index for per-frame descriptor pools / UBOs.
 	uint32_t frameIndex = 0;
 
-	/// @brief Scene reference for mesh, light, and camera access (nullable).
-	/// Passes cast to Scene* via static_cast<const Scene*>(ctx.scene) to access
-	/// GetActiveCamera(), mesh_list, light_list, and env_list.
-	const UID* scene = nullptr;
-
-	/// @brief Opaque pointer to RenderConfig (lifetime managed by Editor/UI layer).
-	/// Passes cast to const RenderConfig* to read quality/feature flags set by the user.
-	const void* config = nullptr;
+	/// @brief Editor-owned scene + render config snapshot (shared with UIContext).
+	/// Passes cast editor.scene to const Scene* and editor.config to
+	/// const RenderConfig* to access camera/mesh/light data and quality flags.
+	EditorContext editor;
 
 	/// @brief Per-frame random 3D direction for shadow jitter (normalized unit-ball vector).
 	/// Point lights use: pos_jittered = pos + light.radius * jitter
@@ -64,9 +60,6 @@ struct RenderContext
 	/// @brief Per-frame iteration counter (incremented each frame, reset by Editor on scene changes).
 	uint32_t iteration{0};
 
-	/// @brief True when the scene has changed and accumulation history should be discarded.
-	/// Set by Editor, consumed by DeferredRenderer each frame.
-	bool iterationReset{false};
 };
 
 } // namespace neurus

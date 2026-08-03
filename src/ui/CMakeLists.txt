@@ -36,6 +36,8 @@ add_library(neurus_ui STATIC
 	panels/Outliner.cpp
 	panels/PropertyPanel.h
 	panels/PropertyPanel.cpp
+	panels/ProfilingPanel.h
+	panels/ProfilingPanel.cpp
 	panels/RenderConfigPanel.h
 	panels/RenderConfigPanel.cpp
 	panels/Viewport.h

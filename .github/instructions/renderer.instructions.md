@@ -13,6 +13,8 @@ renders frames. It must remain stateless with respect to application logic.
 - `src/render/Barrier.h/cpp` - Centralized image barrier management (ImageState → Vulkan layout/stage/access)
 - `src/render/RenderConfig.h` - User-settable render config: algorithms, quality params, shadow bias
 - `src/render/RenderContext.h` - Per-frame immutable scene snapshot with opaque config pointer.
+- `src/render/ProfilingData.h` - Vulkan-free profiling POD (PassProfile, FrameProfile)
+- `src/render/GPUProfiler.h/cpp` - GPU timestamp query pool (per-frame, per-pass)
 - `src/render/shaders/Shader.h/cpp` - Per-mesh shader container (multi-stage, owns ShaderUnits)
 - `src/render/shaders/ShaderUnit.h` - Per-stage shader state: code text, parsed IR (`ShaderStruct`), SPIR-V, version
 - `src/render/shaders/ShaderLibrary.h/cpp` - Load/parse/generate/compile service for shaders
@@ -298,7 +300,7 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Shadow map resolution**: 2048×2048, `VK_FORMAT_D32_SFLOAT`
 - **PCF**: Percentage-closer filtering via `sampler2DShadow` with UV offset kernel, ortho depth comparison
 - **Shadow intensity**: Written to per-light layer in `ShadowIntensity` 2D array via `SunShadowIntensityEval` compute shader
-- **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.02) via `ctx.config`.
+- **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.02) via `ctx.editor.config`.
 - **Shadow mode**: Supports `HARD`, `SOFT_PCF_16`, `SOFT_PCF_64` modes matching point light shadow pipeline
 
 ### Temporal Shadow Accumulation Convention
@@ -336,13 +338,13 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 ### RenderConfig Convention
 
 `RenderConfig` (`src/render/RenderConfig.h`) is user-facing config owned by Editor,
-passed to passes through `RenderContext::config` (opaque `void*`):
+passed to passes through `RenderContext::editor.config` (opaque `void*`):
 
 - **Algorithm selection**: `r_pipeline` (Forward/Deferred), `r_aa`, `r_ao`, `r_shadow`, `r_ssr`
 - **Quality parameters**: `r_gamma`, `r_ao_ksize`, `r_ao_radius`, `r_shadow_bias` (0.02), `r_sample_pf`
 - **Serialized** via cereal for project save/load
-- **Live-update**: passes cast `static_cast<const RenderConfig*>(ctx.config)` each frame; scalar param changes take effect on next `DrawFrame()`
-- **Shadow bias flow**: `RenderConfigPanel` slider → `configValueChanged` → `Editor::SetRenderConfig` → `RenderContext::config` → `ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
+- **Live-update**: passes cast `static_cast<const RenderConfig*>(ctx.editor.config)` each frame; scalar param changes take effect on next `DrawFrame()`
+- **Shadow bias flow**: `RenderConfigPanel` slider → `configValueChanged` → `Editor::SetRenderConfig` → `RenderContext::editor.config` → `ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
 
 ### Attachment Formats
 
@@ -437,7 +439,11 @@ built on the generic `neurus::Graph<SData, NData>` DAG template (`src/core/Graph
 - `Compile()` — Kahn topological sort. Inputs with no in-graph producer are
   **external** (produced by a RenderCache attachment) and are allowed. A cycle
   throws `std::runtime_error` naming the involved passes.
-- `Execute(cmd, cache, ctx)` — invokes each pass's `Record()` in compiled order.
+- `Execute(cmd, cache, ctx)` - invokes each pass's `Record()` in compiled order.
+  Pure dispatch: the graph owns no profiling state. Per-pass CPU/GPU timing and
+  draw/dispatch counters are collected by `DeferredRenderer::recordFrame`, which
+  iterates `CompiledOrder()` itself while profiling is enabled - so
+  `RenderContext` stays an immutable snapshot.
 - `Clear()` — drops all nodes so the graph can be rebuilt.
 
 **Config-driven topology (single source of truth = RenderConfig)**
@@ -460,10 +466,52 @@ built on the generic `neurus::Graph<SData, NData>` DAG template (`src/core/Graph
   ownership into the graph (and enabling transient aliasing + custom passes) is
   tracked in issue #32; parallel execution built on it in #33–#37.
 
-**Tests**: `test/render/test_render_graph.cpp` — socket materialization,
+**Tests**: `test/render/test_render_graph.cpp` - socket materialization,
 connect/duplicate rejection, external inputs, linear/fan-out/diamond ordering,
 multi-resource edges, cycle detection (with named nodes), rebuild determinism,
-clear/reuse, execute preconditions.
+clear/reuse, and execute preconditions. Pass draw/dispatch reporting via the
+`PassStats` return value is covered by `PassCountersTest.RecordReturnsStats`
+(GPU fixture).
+
+## GPU Profiling (issue #33)
+
+Per-frame profiling answers whether the renderer is **CPU-bound** (command
+recording) or **GPU-bound** before any parallel-rendering work.
+
+**Always on**: profiling is unconditional. `DeferredRenderer` owns a
+`GPUProfiler` and a `FrameProfile` and populates them every frame — there is no
+enable/disable toggle. `Application::InitRenderer()` needs no profiling call;
+`DrawFrame()` always returns a live `FrameProfile`.
+
+**What is measured** (`FrameProfile` in `ProfilingData.h`)
+- `cpuRecordMs` - total `RenderGraph::Execute()` command-recording wall time.
+- Per pass: `cpuMs` (around each `Record()` in `RenderGraph::Execute`), `gpuMs`
+  (timestamp queries), `drawCalls`, `dispatches`.
+- Frame totals: `drawCalls`, `dispatches`, `passCount`, `gpuTotalMs`.
+
+**GPU timestamps** (`GPUProfiler`, section-based)
+- One `vk::QueryPool` of `kMaxFramesInFlight * (2 + 2 * kMaxPasses)` timestamps;
+  per frame slot: frame begin@0, frame end@1, pass i begin@2+2*i, end@3+2*i.
+- The RenderGraph drives the profiler around each pass:
+  `BeginFrame` → (`BeginPass`/`EndPass`)* → `EndFrame`. Passes stay unaware of
+  GPU profiling. `Resolve()` reads back the slot about to be reused (after its
+  fence signals) non-blockingly, so results lag CPU data by 1-2 frames by design.
+- The pool is created only when `timestampComputeAndGraphics` and the graphics
+  queue family's `timestampValidBits` allow it; otherwise `Available()==false`
+  and the Profiling panel/log show CPU data only.
+
+**Counters**: each pass reports its own draw/dispatch counts by returning a
+`PassStats { drawCalls, dispatches }` from `Record()` — passes are stateless
+with respect to profiling (no members, no reset). `RenderContext` carries no
+profiling data - it stays an immutable per-frame snapshot. `RenderGraph::Execute`
+aggregates the returned `PassStats` into each `PassProfile` and sums them into
+the frame totals.
+
+**Surface**: `DeferredRenderer::DrawFrame()` returns the `FrameProfile`; the
+Application layer assembles the `UIContext` each frame (the Editor never produces
+it) and sets `UIContext::profile` to the returned profile (opaque `const void*`).
+The ProfilingPanel casts it back and renders the per-pass timings as a tree
+(Frame totals + per-pass rows). See ui-system.instructions.md.
 
 ## Future Evolution
 

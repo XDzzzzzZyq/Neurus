@@ -179,6 +179,12 @@ public:
     static UIEvents& instance();
 };
 
+// Profiling is always collected while the app runs: DeferredRenderer populates
+// a FrameProfile every frame (no toggle) and DrawFrame() returns it. Application
+// assembles the UIContext each frame (Editor never produces it), setting
+// UIContext::profile to the returned FrameProfile (no UIEvents signal, no Editor
+// copy).
+//
 // Panel signals (defined on the panel itself, not UIEvents):
 //   Outliner::objectSelected(const ObjectSelected& e)
 //   Outliner::visibilityChanged(const VisibilityChanged& e)

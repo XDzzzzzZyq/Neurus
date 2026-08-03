@@ -174,7 +174,7 @@ TEST_F(GeometryPassTest, Record_SingleTriangle_NoValidationError)
 
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.width = kRenderWidth, .height = kRenderHeight,
-			.scene = &testScene,
+			.editor = { .scene = &testScene },
 		});
 
 		EndSubmitWait(cmd);
@@ -222,7 +222,7 @@ TEST_F(GeometryPassTest, Record_MultipleItems_NoValidationError)
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.width = kRenderWidth, .height = kRenderHeight,
-			.scene = &testScene,
+			.editor = { .scene = &testScene },
 		});
 		EndSubmitWait(cmd);
 	}
@@ -251,7 +251,7 @@ TEST_F(GeometryPassTest, Record_EmptyRenderItems_NoCrash)
 		auto& cmd = BeginCmd();
 		m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 			.width = kRenderWidth, .height = kRenderHeight,
-			.scene = &testScene,  // Scene has camera but no meshes → no geometry drawn (should not crash)
+			.editor = { .scene = &testScene },  // Scene has camera but no meshes → no geometry drawn (should not crash)
 		});
 		EndSubmitWait(cmd);
 	}

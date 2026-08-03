@@ -35,7 +35,7 @@ Viewport::~Viewport() = default;
 
 void Viewport::Refresh(const UIContext& /*ctx*/)
 {
-	// Viewport is event-driven — input forwarding and Vulkan rendering
+	// Viewport is event-driven: input forwarding and Vulkan rendering
 	// are handled outside the Qt widget refresh cycle.
 }
 

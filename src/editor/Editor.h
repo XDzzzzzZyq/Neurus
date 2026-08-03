@@ -8,8 +8,7 @@
 #include "controllers/Controllers.h"
 #include "editor/events/EventBus.h"
 #include "render/RenderConfig.h"
-#include "render/RenderContext.h"
-#include "ui/UIContext.h"
+#include "scene/EditorContext.h"
 
 // Forward declarations (no render headers!)
 namespace neurus {
@@ -56,8 +55,14 @@ public:
 	void ClearDirty() { m_dirty = false; }
 	void SetAssetDir(const std::string& dir) { m_assetDir = dir; }
 
-	RenderContext GetRenderContext() const;
-	UIContext GetUIContext() const;
+	/**
+	 * @brief Returns the shared editor state (scene + render config).
+	 *
+	 * The Application embeds this into both RenderContext and UIContext each
+	 * frame, so the Editor is the single source of truth for scene/config and
+	 * never builds a RenderContext or UIContext itself.
+	 */
+	EditorContext GetContext() const;
 
 	template<typename T>
 	void RegisterController()

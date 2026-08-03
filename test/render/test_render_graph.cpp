@@ -13,6 +13,7 @@
 #include "render/render_graph/RenderGraph.h"
 #include "render/passes/Pass.h"
 #include "render/RenderCache.h"
+#include "shared/TestVulkanShared.h"
 
 #include <cstdint>
 #include <string>
@@ -41,7 +42,38 @@ public:
 	}
 
 	// --- Pass ---
-	void   Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override {}
+	PassStats Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override { return {}; }
+	PassIO GetIO() const override { return m_io; }
+
+private:
+	PassIO m_io;
+};
+
+// ---------------------------------------------------------------------------
+// CounterPass - mirrors real passes: it reports draw/dispatch counts by
+// returning a PassStats from Record() (passes stay stateless).
+// ---------------------------------------------------------------------------
+class CounterPass : public Pass
+{
+public:
+	CounterPass(std::string name,
+	            std::vector<AttachmentName> reads,
+	            std::vector<AttachmentName> writes)
+	    : Pass()
+	{
+		m_io.name = std::move(name);
+		uint32_t binding = 0;
+		for (auto r : reads)  m_io.reads .push_back({r, binding++});
+		binding = 0;
+		for (auto w : writes) m_io.writes.push_back({w, binding++});
+	}
+
+	// --- Pass ---
+	PassStats Record(vk::CommandBuffer, RenderCache&, const RenderContext&) override
+	{
+		// Simulate a pass issuing two draws + one dispatch.
+		return {/*drawCalls=*/2, /*dispatches=*/1};
+	}
 	PassIO GetIO() const override { return m_io; }
 
 private:
@@ -185,7 +217,9 @@ TEST(RenderGraphTest, ExecuteThrowsIfNotCompiled)
 	// before any pass is invoked. This is a precondition-check test.
 	RenderCache*         nullCache = nullptr;
 	const RenderContext* nullCtx   = nullptr;
-	EXPECT_THROW(g.Execute(vk::CommandBuffer{}, *nullCache, *nullCtx),
+	GPUProfiler          profiler;      // default (uninitialized) — unused before throw
+	FrameProfile         frameProfile;
+	EXPECT_THROW(g.Execute(vk::CommandBuffer{}, *nullCache, *nullCtx, profiler, frameProfile),
 	             std::runtime_error);
 }
 
@@ -376,4 +410,38 @@ TEST(RenderGraphTest, CycleErrorNamesInvolvedNodes)
 		EXPECT_NE(msg.find("AlphaPass"), std::string::npos) << msg;
 		EXPECT_NE(msg.find("BetaPass"),  std::string::npos) << msg;
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Pass profiling counters - passes report draw/dispatch counts by returning a
+// PassStats from Record() so RenderContext stays an immutable snapshot; the
+// RenderGraph aggregates them per pass while profiling (see RenderGraph::Execute).
+// ---------------------------------------------------------------------------
+
+class PassCountersTest : public VulkanTestShared
+{
+protected:
+	// VulkanTestShared provides SetUp/TearDown (device, command pool).
+};
+
+TEST_F(PassCountersTest, RecordReturnsStats)
+{
+	if (!m_hasVulkan) GTEST_SKIP() << "No Vulkan-capable GPU found.";
+
+	CounterPass pass("A", {}, {AttachmentName::Position});
+
+	RenderCache cache(*m_device, PhysicalDevice());
+	RenderContext ctx;
+	ctx.frameIndex = 0;
+
+	// CounterPass reports two draws + one dispatch per Record().
+	const PassStats stats = pass.Record(vk::CommandBuffer{}, cache, ctx);
+	EXPECT_EQ(stats.drawCalls, 2u);
+	EXPECT_EQ(stats.dispatches, 1u);
+
+	// Record() is stateless: a second call returns the same stats, not an
+	// accumulation.
+	const PassStats stats2 = pass.Record(vk::CommandBuffer{}, cache, ctx);
+	EXPECT_EQ(stats2.drawCalls, 2u);
+	EXPECT_EQ(stats2.dispatches, 1u);
 }

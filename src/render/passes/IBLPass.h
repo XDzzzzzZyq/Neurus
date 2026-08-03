@@ -75,11 +75,12 @@ public:
 	~IBLPass();
 
 	/** @brief No-op — IBL generation is one-shot via Generate(), not per-frame. */
-	void Record(vk::CommandBuffer cmd, RenderCache& cache, const RenderContext& ctx) override
+	PassStats Record(vk::CommandBuffer cmd, RenderCache& cache, const RenderContext& ctx) override
 	{
 		(void)cmd;
 		(void)cache;
 		(void)ctx;
+		return {};
 	}
 
 	/** @brief No-op — IBLPass manages its own descriptor writes via Generate(). */

@@ -282,7 +282,7 @@ void RenderConfigPanel::ConnectAllSignals()
 
 void RenderConfigPanel::Refresh(const UIContext& ctx)
 {
-	const auto* config = static_cast<const RenderConfig*>(ctx.renderConfig);
+	const auto* config = static_cast<const RenderConfig*>(ctx.editor.config);
 	if (!config) return;
 
 	// --- Shadows ---

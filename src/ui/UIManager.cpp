@@ -1,6 +1,7 @@
 #include "UIManager.h"
 #include "Icons.h"
 #include "panels/Outliner.h"
+#include "panels/ProfilingPanel.h"
 #include "panels/PropertyPanel.h"
 #include "panels/RenderConfigPanel.h"
 #include "panels/ShaderEditorPanel.h"
@@ -271,6 +272,16 @@ void UIManager::CreateDocks()
 	win_dockManager->addDockWidget(ads::RightDockWidgetArea, configDock, outlinerDock->dockAreaWidget());
 	m_panels[PanelType::RenderConfig] = renderConfigPanel.release();
 	m_docks[PanelType::RenderConfig] = configDock;
+
+	// --- Bottom: Profiling ---
+	auto profilingPanel = std::make_unique<ProfilingPanel>();
+	auto* profilingDock = new ads::CDockWidget(win_dockManager, profilingPanel->PanelName());
+	profilingDock->setWidget(profilingPanel.get(), ads::CDockWidget::ForceNoScrollArea);
+	profilingDock->resize(640, 220);
+	profilingDock->setMinimumSize(320, 140);
+	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, profilingDock);
+	m_panels[PanelType::Profiling] = profilingPanel.release();
+	m_docks[PanelType::Profiling] = profilingDock;
 
 	// --- Bottom: Texture Viewer (placeholder, not a UIPanel) ---
 	auto* textureDock = new ads::CDockWidget(win_dockManager, "Texture Viewer");

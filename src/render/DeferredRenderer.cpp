@@ -55,6 +55,9 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 	, r_queueFamilyIndex(queueFamilyIndex)
 	, r_commandPool(createCommandPool(device, queueFamilyIndex))
 {
+	// --- 0. Create the optional GPU timestamp query pool (no-op if unsupported) ---
+	m_profiler.Initialize(device, physicalDevice, queueFamilyIndex, kMaxFramesInFlight);
+
 	// --- 1. Create swapchain ---
 	r_swapchain = std::make_unique<Swapchain>(physicalDevice, device, surface, width, height);
 	const auto extent = r_swapchain->extent();
@@ -219,7 +222,7 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 // DrawFrame - main render loop entry point
 // ---------------------------------------------------------------------------
 
-void DeferredRenderer::DrawFrame(const RenderContext& ctx)
+const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 {
 	auto& fence = r_inFlightFences[r_currentFrame];
 	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
@@ -227,8 +230,16 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	// --- Wait for this frame slot's fence ---
 	if (r_device.waitForFences(*fence, VK_TRUE, kFenceTimeoutNs) != vk::Result::eSuccess)
 	{
-		return;  // Timeout - skip this frame
+		return m_frameProfile;  // Timeout - skip this frame
 	}
+
+	// --- Profiling: read back this slot's GPU timestamps (fence signaled) ---
+	// The profiler's slot cursor stays in lockstep with r_currentFrame because
+	// BeginFrame/EndFrame run exactly once per recorded frame. Resolve() reads
+	// the slot about to be reused; the resolved GPU ms are back-filled into
+	// m_frameProfile *after* recordFrame repopulates the pass list below (GPU
+	// data lags the CPU/counter data by 1-2 frames, by design).
+	m_gpuResolved = m_profiler.Resolve();
 
 	// --- Acquire next swapchain image ---
 	uint32_t imageIndex = 0;
@@ -258,7 +269,7 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 
 	if (skipFrame)
 	{
-		return;
+		return m_frameProfile;
 	}
 
 	// Only reset fence after successful acquire
@@ -268,6 +279,20 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	vk::CommandBuffer cmdBufRaw = *r_commandBuffers[imageIndex];
 
 	recordFrame(r_commandBuffers[imageIndex], imageIndex, ctx);
+
+	// --- Profiling: back-fill resolved GPU ms now that passes are repopulated ---
+	// recordFrame just rewrote m_frameProfile.passes (CPU + counters, gpuMs=0).
+	// Match resolved sections to passes by index (topology is stable frame to
+	// frame; the size guard covers the rare rebuild-in-flight case).
+	if (m_gpuResolved)
+	{
+		const auto& sections = m_profiler.Sections();
+		const size_t n = std::min(sections.size(), m_frameProfile.passes.size());
+		for (size_t i = 0; i < n; ++i)
+			m_frameProfile.passes[i].gpuMs = sections[i].gpuMs;
+		m_frameProfile.gpuTotalMs = m_profiler.FrameGpuMs();
+		m_frameProfile.gpuReady = true;
+	}
 
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
 	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -296,10 +321,11 @@ void DeferredRenderer::DrawFrame(const RenderContext& ctx)
 
 	if (presentFailed)
 	{
-		return;
+		return m_frameProfile;
 	}
 
 	r_currentFrame = (r_currentFrame + 1) % kMaxFramesInFlight;
+	return m_frameProfile;
 }
 
 void DeferredRenderer::ResetShadowAccumulation()
@@ -512,20 +538,25 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Pipeline: Geometry → Shadows → SSAO → Lighting → Gizmo → Compose → [FXAA] ---
 	// The whole deferred pipeline runs through one RenderGraph. FXAA is
 	// optional; useFXAA also selects the blit source below.
-	const bool useFXAA = ctx.config &&
-		static_cast<const RenderConfig*>(ctx.config)->RequiresFXAA();
+	const bool useFXAA = ctx.editor.config &&
+		static_cast<const RenderConfig*>(ctx.editor.config)->RequiresFXAA();
 
 	// Rebuild the graph only when the config-derived signature changes (single
 	// source of truth is RenderConfig; the graph is its projection — currently
 	// just FXAA presence).
-	if (const auto* cfg = static_cast<const RenderConfig*>(ctx.config))
+	if (const auto* cfg = static_cast<const RenderConfig*>(ctx.editor.config))
 	{
 		const PipelineSignature sig = PipelineSignature::From(*cfg);
 		if (!(sig == m_builtSignature))
 			RebuildMainGraph(sig);
 	}
 
-	m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx);
+	// --- Profiling: bracket the whole pipeline with GPU frame timestamps ---
+	// The RenderGraph drives per-pass GPU timestamps + CPU timing and folds the
+	// PassStats each pass returns into m_frameProfile (passes stay unaware of
+	// profiling). GPU per-pass ms are back-filled in DrawFrame after Resolve().
+	m_profiler.BeginFrame(cmdBuf);
+	m_mainGraph.Execute(cmdBuf, *r_renderCache, ctx, m_profiler, m_frameProfile);
 
 	// --- Phase 4: Blit output → swapchain image ---
 	auto& blitSource = r_renderCache->GetAttachment(
@@ -566,8 +597,18 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 		ImageState::TransferDst, ImageState::Present,
 		vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1));
 
+	// --- Profiling: write the GPU frame-end timestamp (covers the final blit) ---
+	// EndFrame also advances the profiler's slot cursor, keeping it in lockstep
+	// with r_currentFrame (both advance exactly once per recorded frame).
+	m_profiler.EndFrame(cmdBuf);
+
 	// --- End command buffer ---
 	cmdBuf.end();
+
+	// --- Profiling: finalize CPU-side aggregate fields ---
+	// RenderGraph::Execute already populated passes[], cpuRecordMs, drawCalls,
+	// dispatches, and passCount; only gpuTimingAvailable is renderer-owned.
+	m_frameProfile.gpuTimingAvailable = m_profiler.Available();
 }
 
 // ---------------------------------------------------------------------------

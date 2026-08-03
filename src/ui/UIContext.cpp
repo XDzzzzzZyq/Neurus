@@ -17,12 +17,12 @@ namespace neurus
 std::vector<const ObjectID*> UIContext::GetObjectIDs() const
 {
 	std::vector<const ObjectID*> result;
-	if (!scene)
+	if (!editor.scene)
 	{
 		return result;
 	}
 
-	const Scene* s = static_cast<const Scene*>(scene);
+	const Scene* s = static_cast<const Scene*>(editor.scene);
 	result.reserve(s->obj_list.size());
 	for (const auto& [id, obj] : s->obj_list)
 	{

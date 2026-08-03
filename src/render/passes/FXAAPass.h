@@ -18,7 +18,7 @@ public:
 	FXAAPass(const vk::raii::Device& device,
 	         const vk::raii::PhysicalDevice& physicalDevice,
 	         uint32_t numSets);
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/// Declares the ComposedOutput read and FXAAOutput write for RenderGraph
 	/// wiring.

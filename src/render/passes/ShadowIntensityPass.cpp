@@ -411,21 +411,23 @@ void ShadowIntensityPass::WriteSunDescriptors(uint32_t setIndex, vk::Extent2D ex
 // Record
 // ---------------------------------------------------------------------------
 
-void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Early out: no scene ---
-	if (!ctx.scene)
+	if (!ctx.editor.scene)
 	{
 		NEURUS_LOG("[ShadowIntensityPass] No scene, skipping");
-		return;
+		return stats;
 	}
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
-	const auto* scene = static_cast<const Scene*>(ctx.scene);
-	const auto* config = static_cast<const RenderConfig*>(ctx.config);
+	const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
+	const auto* config = static_cast<const RenderConfig*>(ctx.editor.config);
 	const float shadowBias = config ? config->r_shadow_bias : 0.0005f;
 
 	{
@@ -499,9 +501,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 			// Read alpha mode from config
 			ShadowAlphaMode alphaMode = ShadowAlphaMode::MovingAvg;
-			if (ctx.config)
+			if (ctx.editor.config)
 			{
-				const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+				const auto* cfg = static_cast<const RenderConfig*>(ctx.editor.config);
 				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_sampling_mode);
 			}
 
@@ -531,6 +533,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		// --- Dispatch ---
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+		++stats.dispatches;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 		++lightIndex;
@@ -597,9 +600,9 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 
 			// Read alpha mode from config
 			ShadowAlphaMode alphaMode = ShadowAlphaMode::MovingAvg;
-			if (ctx.config)
+			if (ctx.editor.config)
 			{
-				const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+				const auto* cfg = static_cast<const RenderConfig*>(ctx.editor.config);
 				alphaMode = static_cast<ShadowAlphaMode>(cfg->r_sampling_mode);
 			}
 
@@ -624,6 +627,7 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		// --- Dispatch ---
 		const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 		const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+		++stats.dispatches;
 		cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 		++sunLightIndex;
@@ -634,6 +638,8 @@ void ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, c
 		auto& shadowArray = cache.GetShadowIntensityArray(renderExtent);
 		Barrier::Transition(cmdBuf, shadowArray, ImageState::ColorShaderRead);
 	}
+
+	return stats;
 }
 
 PassIO ShadowIntensityPass::GetIO() const

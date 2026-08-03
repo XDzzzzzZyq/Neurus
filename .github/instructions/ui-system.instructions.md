@@ -16,6 +16,7 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/Outliner.h/cpp` | Scene object hierarchy tree (Outliner dock) |
 | `src/ui/panels/PropertyPanel.h/cpp` | Object property inspector with GOType-aware subpanels (Property dock) |
 | `src/ui/panels/RenderConfigPanel.h/cpp` | Live render config controls (Render Config dock) |
+| `src/ui/panels/ProfilingPanel.h/cpp` | Real-time GPU profiling tree (Profiling dock) |
 | `src/ui/panels/ShaderEditorPanel.h/cpp` | Shader editor dock — Code mode + Structure mode (tree-based Struct Editor) |
 | `src/ui/items/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
 | `src/ui/items/ShaderFieldDelegate.h/cpp` | Delegate with QComboBox (type) / QLineEdit (name) editors for struct field rows |
@@ -73,7 +74,7 @@ ads::CDockManager
 ├── CenterDockWidgetArea: Viewport (QVulkanWindow via QWidget::createWindowContainer)
 ├── LeftDockWidgetArea:   Shader Editor
 ├── RightDockWidgetArea:  Outliner | Property Editor | Render Config (tabbed)
-└── BottomDockWidgetArea: Texture Viewer
+└── BottomDockWidgetArea: Profiling | Texture Viewer (tabbed)
 ```
 
 ### Viewport Embedding
@@ -128,7 +129,15 @@ target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 - `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig)
 - `virtual void Refresh(const UIContext& ctx)` — called per-frame to sync panel UI with application state
-- `UIContext` carries a `const void* renderConfig` pointer; panels cast to `const RenderConfig*`
+- `UIContext` embeds an `EditorContext editor` (from `Editor::GetContext()`) with
+  `editor.scene` (opaque `const UID*`, cast to `const Scene*`) and `editor.config`
+  (opaque `const void*`, cast to `const RenderConfig*`)
+- `UIContext` also carries a `const void* profile` pointer to the `FrameProfile`
+  returned by `DeferredRenderer::DrawFrame()`. The Application assembles the
+  UIContext each frame (the Editor never produces it) and the ProfilingPanel casts
+  `profile` to `const FrameProfile*` to render a real-time per-pass tree (Frame
+  totals + per-pass rows). Collection is always active while the app runs
+  (`Application::InitRenderer` enables it)
 - `UIManager` stores panels in `std::map<PanelType, ads::CDockWidget*> m_panelDocks`
 
 ### RenderConfigPanel
@@ -141,6 +150,19 @@ All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 - **Pipeline**: Pipeline type (Forward/Deferred), SSR mode, samples per frame
 
 Each control change emits `configValueChanged(RenderConfig cfg)`, wired by `Application` to `Editor::SetRenderConfig(cfg)`.
+
+### ProfilingPanel
+
+`ProfilingPanel` (Bottom dock) shows the per-frame GPU/CPU profile returned by
+`DeferredRenderer::DrawFrame()` as a `QTreeWidget` (columns: Pass, CPU (ms),
+GPU (ms), Draws, Dispatches):
+- A bold **Frame** root row summarizes the whole frame (CPU record ms, GPU frame
+  ms, total draws/dispatches)
+- One child row per pass (`PassProfile`) shows that pass's CPU/GPU ms and
+  draw/dispatch counts
+- `Refresh()` rebuilds the tree only when the frame totals change; GPU columns
+  show `--` until timestamp readback is ready (device support + fence signal)
+- Profiling is always on; the panel is display-only
 
 ### Outliner and PropertyPanel (Scene-Event Panels)
 

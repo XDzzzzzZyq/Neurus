@@ -162,13 +162,15 @@ void ComposePass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, Rende
 // Record
 // ---------------------------------------------------------------------------
 
-void ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Read gamma from config ---
-	const auto* config = static_cast<const RenderConfig*>(ctx.config);
+	const auto* config = static_cast<const RenderConfig*>(ctx.editor.config);
 	const float gamma = config ? config->r_gamma : 1.0f;
 
 	// --- 1. Write descriptor set for this frame slot ---
@@ -209,6 +211,7 @@ void ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Ren
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+	++stats.dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition ComposedOutput: General → TransferSrc (ready for swapchain blit) ---
@@ -216,6 +219,8 @@ void ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Ren
 		auto& compAtt = cache.GetAttachment(AttachmentName::ComposedOutput, renderExtent);
 		Barrier::Transition(cmdBuf, compAtt, ImageState::TransferSrc);
 	}
+
+	return stats;
 }
 
 PassIO ComposePass::GetIO() const

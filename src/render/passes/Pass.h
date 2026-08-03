@@ -69,6 +69,19 @@ struct PassIO
 };
 
 /**
+ * @brief CPU-side command counters returned by Pass::Record().
+ *
+ * Passes tally their own draw/dispatch calls while recording and hand them
+ * back so the caller (RenderGraph) can aggregate per-pass metrics. Keeps
+ * passes stateless with respect to profiling — no members, no reset step.
+ */
+struct PassStats
+{
+	uint32_t drawCalls  = 0;
+	uint32_t dispatches = 0;
+};
+
+/**
  * @brief Base class for a single render pass in the pipeline.
  *
  * Derived classes implement Record() to write commands into the provided
@@ -110,8 +123,9 @@ public:
 	 * @param cmdBuf   Command buffer in the recording state.
 	 * @param cache    Mutable render cache for lazy GPU resource creation.
 	 * @param ctx      Per-frame context (attachments, viewport, frame index, etc.).
+	 * @return Draw/dispatch counts recorded by this pass (for profiling).
 	 */
-	virtual void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) = 0;
+	virtual PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) = 0;
 
 	/**
 	 * @brief Declares this pass's read/write attachment dependencies.

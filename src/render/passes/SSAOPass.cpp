@@ -323,13 +323,15 @@ void SSAOPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderCa
 // Record
 // ---------------------------------------------------------------------------
 
-void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
-	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 
 	// --- 0. Update per-frame SSAO params UBO (camera matrices + kernel) ---
 	{
@@ -411,6 +413,7 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+	++stats.dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition SSAO output: General → ShaderRead for lighting pass ---
@@ -418,6 +421,8 @@ void SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Render
 		auto& ssaoAtt = cache.GetAttachment(AttachmentName::SSAO, renderExtent);
 		Barrier::Transition(cmdBuf, ssaoAtt, ImageState::ColorShaderRead);
 	}
+
+	return stats;
 }
 
 PassIO SSAOPass::GetIO() const

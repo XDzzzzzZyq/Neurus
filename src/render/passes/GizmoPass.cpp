@@ -147,8 +147,10 @@ void GizmoPass::WriteDescriptors(uint32_t setIndex, vk::Extent2D extent, RenderC
 // Record
 // ---------------------------------------------------------------------------
 
-void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
+PassStats GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx)
 {
+	PassStats stats{};
+
 	const vk::Extent2D renderExtent{ctx.width, ctx.height};
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
@@ -180,7 +182,7 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 	{
 		// Query the active selection from the scene (avoids redundant field in RenderContext)
 		uint32_t activeObjectId = 0;
-		const auto* scene = static_cast<const Scene*>(ctx.scene);
+		const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 		const auto* activeObj = scene->selections.GetActiveObject();
 		if (activeObj)
 			activeObjectId = static_cast<uint32_t>(activeObj->GetObjectID());
@@ -195,6 +197,7 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 	// --- 6. Dispatch ---
 	const uint32_t groupCountX = (renderExtent.width  + 15) / 16;
 	const uint32_t groupCountY = (renderExtent.height + 15) / 16;
+	++stats.dispatches;
 	cmdBuf.dispatch(groupCountX, groupCountY, 1);
 
 	// --- 7. Transition GizmoHighlight output: General → ShaderRead for downstream passes ---
@@ -202,6 +205,8 @@ void GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const Rende
 		auto& gizmoAtt = cache.GetAttachment(AttachmentName::GizmoHighlight, renderExtent);
 		Barrier::Transition(cmdBuf, gizmoAtt, ImageState::ColorShaderRead);
 	}
+
+	return stats;
 }
 
 } // namespace neurus

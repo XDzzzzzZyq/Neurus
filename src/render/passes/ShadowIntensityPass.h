@@ -80,7 +80,7 @@ public:
 	 *   3. Transitions G-Buffer Position to ColorShaderRead.
 	 *   4. Transitions the shadow cubemap to DepthShaderRead.
 	 *   5. Transitions ShadowIntensity to ShaderWrite.
-	 *   6. Looks up the light world position from ctx.scene->light_list.
+	 *   6. Looks up the light world position from ctx.editor.scene->light_list.
 	 *   7. Binds cubemap pipeline, descriptor set, push constants (24 bytes).
 	 *   8. Dispatches ceil(width/16) x ceil(height/16) x 1 thread groups.
 	 *
@@ -92,13 +92,13 @@ public:
 	 *
 	 *   Finally transitions ShadowIntensity to ColorShaderRead for lighting pass.
 	 *
-	 * Early-returns when ctx.scene is nullptr (no scene).
+	 * Early-returns when ctx.editor.scene is nullptr (no scene).
 	 *
 	 * @param cmdBuf  Command buffer in recording state.
 	 * @param cache   Render cache for attachment/shadow map access.
 	 * @param ctx     Per-frame context (render extent, frame index, scene).
 	 */
-	void Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
+	PassStats Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const RenderContext& ctx) override;
 
 	/// Declares the Position + ShadowDepth reads and the ShadowIntensity write
 	/// for RenderGraph wiring (per-light depth maps and intensity layers are

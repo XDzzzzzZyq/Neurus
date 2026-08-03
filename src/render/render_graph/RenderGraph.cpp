@@ -10,6 +10,7 @@
 
 #include "../RenderContext.h"
 
+#include <chrono>
 #include <stdexcept>
 #include <string>
 
@@ -97,15 +98,55 @@ void RenderGraph::Compile()
 	m_isCompiled = true;
 }
 
-void RenderGraph::Execute(vk::CommandBuffer cmd, RenderCache& cache, const RenderContext& ctx) const
+void RenderGraph::Execute(vk::CommandBuffer cmd,
+                          RenderCache& cache,
+                          const RenderContext& ctx,
+                          GPUProfiler& profiler,
+                          FrameProfile& frameProfile) const
 {
 	if (!m_isCompiled)
 		throw std::runtime_error("RenderGraph::Execute: graph not compiled");
 
+	// The graph drives profiling but stays a pure DAG executor: it brackets
+	// each pass with GPU timestamps (profiler.BeginPass/EndPass), times the
+	// CPU-side Record() call, and folds the PassStats the pass returns into the
+	// per-frame profile. Passes remain unaware of profiling entirely.
+	frameProfile.passes.clear();
+	frameProfile.passes.reserve(m_compiled.size());
+	frameProfile.drawCalls  = 0;
+	frameProfile.dispatches = 0;
+
+	double cpuRecordMs = 0.0;
 	for (auto* node : m_compiled)
 	{
-		node->data.pass->Record(cmd, cache, ctx);
+		const std::string& name = node->data.io.name;
+
+		profiler.BeginPass(cmd, name);
+		const auto cpuBegin = std::chrono::steady_clock::now();
+
+		const PassStats stats = node->data.pass->Record(cmd, cache, ctx);
+
+		const auto cpuEnd = std::chrono::steady_clock::now();
+		profiler.EndPass(cmd);
+
+		const double passCpuMs =
+			std::chrono::duration<double, std::milli>(cpuEnd - cpuBegin).count();
+		cpuRecordMs += passCpuMs;
+
+		PassProfile profile;
+		profile.name       = name;
+		profile.cpuMs      = passCpuMs;
+		profile.gpuMs      = 0.0; // Back-filled by DeferredRenderer after Resolve().
+		profile.drawCalls  = stats.drawCalls;
+		profile.dispatches = stats.dispatches;
+		frameProfile.passes.push_back(std::move(profile));
+
+		frameProfile.drawCalls  += stats.drawCalls;
+		frameProfile.dispatches += stats.dispatches;
 	}
+
+	frameProfile.passCount   = static_cast<uint32_t>(frameProfile.passes.size());
+	frameProfile.cpuRecordMs = cpuRecordMs;
 }
 
 void RenderGraph::Clear()

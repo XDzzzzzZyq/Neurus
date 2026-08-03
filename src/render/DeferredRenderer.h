@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "GPUProfiler.h"
+#include "ProfilingData.h"
 #include "passes/Pass.h"
 #include "RenderConfig.h"
 #include "RenderContext.h"
@@ -27,6 +29,7 @@
 #include <vulkan/vulkan_raii.hpp>
 
 #include <glm/glm.hpp>
+#include <array>
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -108,9 +111,15 @@ public:
 	 * Handles swapchain recreation on VK_ERROR_OUT_OF_DATE_KHR. Safe to
 	 * call repeatedly (fence-guarded, max kMaxFramesInFlight in flight).
 	 *
+	 * Profiling is always on: the returned profile carries per-pass CPU
+	 * times/counters from the frame just recorded and GPU times read back from
+	 * the fence that just signaled (1-2 frame lag by design).
+	 *
 	 * @param editorCtx Editor-produced context with scene set.
+	 * @return The latest frame profile (owned by the renderer; valid until the
+	 *         next DrawFrame call).
 	 */
-	void DrawFrame(const RenderContext& ctx);
+	const FrameProfile& DrawFrame(const RenderContext& ctx);
 
 	/** @brief Blocks until all GPU work completes. */
 	void WaitIdle();
@@ -310,6 +319,16 @@ private:
 	// --- Temporal shadow accumulation state ---
 	uint32_t m_haltonIndex = 0;
 	uint32_t m_iteration = 0;
+
+	// --- Per-frame profiling (always on; RenderGraph drives GPU sections) ---
+	// m_profiler owns the GPU timestamp query pool and per-pass sections;
+	// RenderGraph::Execute brackets each pass with BeginPass/EndPass and folds
+	// PassStats into m_frameProfile. DrawFrame calls Resolve() after the frame
+	// slot's fence signals and back-fills the resolved GPU ms into m_frameProfile
+	// once recordFrame has repopulated the pass list (1-2 frame lag by design).
+	GPUProfiler m_profiler;
+	FrameProfile m_frameProfile;
+	bool m_gpuResolved = false; ///< Last Resolve() produced fresh GPU sections.
 
 };
 

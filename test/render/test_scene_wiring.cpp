@@ -268,7 +268,7 @@ TEST_F(SceneWiringTest, DrawFrame_EmptyScene_NoCrash)
 	auto cam = CreateDefaultCamera();
 	scene.UseCamera(cam);
 
-	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}}));
 	m_renderer->WaitIdle();
 }
 
@@ -291,7 +291,7 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithOnlyCamera_NoCrash)
 
 	ASSERT_NE(scene.GetActiveCamera(), nullptr);
 
-	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}}));
 	m_renderer->WaitIdle();
 }
 
@@ -321,8 +321,75 @@ TEST_F(SceneWiringTest, DrawFrame_SceneWithCameraAndMesh_RendersFrame)
 	light->SetPosition(glm::vec3(2.0f, 2.0f, 5.0f));
 	scene.UseLight(light);
 
-	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
-	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.scene = &scene}));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}}));
+	EXPECT_NO_THROW(m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}}));
+
+	m_renderer->WaitIdle();
+}
+
+// ---------------------------------------------------------------------------
+// 4. Profiling enabled: DrawFrame returns a populated per-frame profile;
+//    toggling profiling off leaves the profile untouched (empty).
+// ---------------------------------------------------------------------------
+
+TEST_F(SceneWiringTest, ProfilingEnabled_PopulatesFrameProfile)
+{
+	if (!m_hasVulkan)
+	{
+		GTEST_SKIP() << "No Vulkan-capable GPU found.";
+	}
+
+	ASSERT_NO_FATAL_FAILURE(CreateRenderer(kRenderWidth, kRenderHeight));
+
+	Scene scene;
+	auto cam = CreateDefaultCamera();
+	scene.UseCamera(cam);
+	auto mesh = CreateAndUploadTriangleMesh();
+	ASSERT_NE(mesh, nullptr);
+	scene.UseMesh(mesh);
+	auto light = std::make_shared<Light>(LightType::POINTLIGHT, 30.0f, glm::vec3(1.0f));
+	light->SetPosition(glm::vec3(2.0f, 2.0f, 5.0f));
+	scene.UseLight(light);
+
+	// Profiling is always on; every frame produces per-pass CPU timers + counters.
+
+	// Frame 1: per-pass CPU timers + counters are recorded; GPU timestamp
+	// readback for this slot happens at the start of frame 2 (fence-based).
+	{
+		const FrameProfile& profile = m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}});
+		EXPECT_GT(profile.passCount, 0u);
+		EXPECT_FALSE(profile.passes.empty());
+		for (const auto& pass : profile.passes)
+		{
+			EXPECT_FALSE(pass.name.empty());
+			EXPECT_GE(pass.cpuMs, 0.0);
+			EXPECT_GE(pass.drawCalls, 0u);
+			EXPECT_GE(pass.dispatches, 0u);
+		}
+		EXPECT_GE(profile.cpuRecordMs, 0.0);
+		EXPECT_GE(profile.drawCalls, 0u);
+	}
+
+	// Frame 2: exercises the GPU timestamp readback path for frame 1's slot.
+	{
+		const FrameProfile& profile = m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}});
+		EXPECT_GT(profile.passCount, 0u);
+	}
+
+	// Frame 3: the slot recorded in frame 1 is read back. The readback is
+	// guarded so pre-signaled, never-written slots are skipped on startup
+	// (VUID-vkGetQueryPoolResults-None-09401).
+	{
+		const FrameProfile& profile = m_renderer->DrawFrame(RenderContext{.editor = {.scene = &scene}});
+		EXPECT_GT(profile.passCount, 0u);
+		if (profile.gpuTimingAvailable)
+		{
+			EXPECT_TRUE(profile.gpuReady);
+			EXPECT_GE(profile.gpuTotalMs, 0.0);
+			for (const auto& pass : profile.passes)
+				EXPECT_GE(pass.gpuMs, 0.0);
+		}
+	}
 
 	m_renderer->WaitIdle();
 }
