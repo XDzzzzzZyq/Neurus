@@ -21,10 +21,11 @@
 
 #include <memory>
 #include <string>
+#include <utility>
+
+#include "editor/operations/OperationContext.h"
 
 namespace neurus {
-
-struct OperationContext;
 
 /**
  * @brief Base class for all undoable operations.
@@ -52,6 +53,59 @@ public:
 	 * @brief Human-readable label (for Edit menu / debugging).
 	 */
 	virtual std::string Label() const = 0;
+};
+
+/**
+ * @brief Generic base for "absolute set" edits, shared by concrete operations.
+ *
+ * An absolute-set operation stores a target object's UID plus the absolute
+ * before/after values, and replays by dispatching the scene event the UI would
+ * emit — keeping mutation on the single controller path and making inversion a
+ * value swap. This base carries all the shared logic; a concrete subclass only
+ * declares how a stored value becomes its event via a `MakeEvent()` member and
+ * a static `kLabel`.
+ *
+ * CRTP (Curiously Recurring Template Pattern) lets Inverse() reconstruct the
+ * *concrete* subclass with swapped values, so an operation on the redo stack
+ * has the same type — and, in the future, the same serialized identity — as a
+ * freshly recorded one. The only per-operation state is {uid, before, after};
+ * there is no stored function object, so an operation is trivially serializable.
+ *
+ * @tparam Derived Concrete subclass (CRTP); must provide
+ *                 `TEvent MakeEvent(const ObjectID*, const Value&) const` and
+ *                 `static constexpr const char* kLabel`.
+ * @tparam TEvent  Scene event struct dispatched on replay.
+ * @tparam Value   Stored value type (float, bool, glm::vec3, ...).
+ */
+template<typename Derived, typename TEvent, typename Value>
+class AbsoluteSetOperation : public Operation
+{
+public:
+	AbsoluteSetOperation(int uid, Value before, Value after)
+		: m_uid(uid)
+		, m_before(std::move(before))
+		, m_after(std::move(after))
+	{}
+
+	void Emit(OperationContext& ctx) override
+	{
+		const ObjectID* obj = ctx.Resolve(m_uid);
+		if (!obj) return; // Stale identity: object gone, safe no-op.
+		ctx.bus.EmitNow(static_cast<const Derived*>(this)->MakeEvent(obj, m_after));
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		// Swap before/after and rebuild the concrete type — involution holds.
+		return std::make_unique<Derived>(m_uid, m_after, m_before);
+	}
+
+	std::string Label() const override { return Derived::kLabel; }
+
+protected:
+	int m_uid;      ///< Target object UID (serialized).
+	Value m_before; ///< Value before the edit (serialized).
+	Value m_after;  ///< Value after the edit (serialized).
 };
 
 } // namespace neurus

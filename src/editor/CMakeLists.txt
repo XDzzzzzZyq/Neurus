@@ -15,6 +15,7 @@ add_library(neurus_editor STATIC
 	operations/IOperationSink.h
 	operations/Operation.h
 	operations/OperationContext.h
+	operations/OperationContext.cpp
 	operations/OperationManager.h
 	operations/OperationManager.cpp
 	operations/SceneOperations.h

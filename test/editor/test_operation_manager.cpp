@@ -129,7 +129,7 @@ TEST_F(OperationManagerTest, NewForwardOperation_ClearsRedo)
 
 TEST_F(OperationManagerTest, Inverse_IsInvolution)
 {
-	auto op = MakeSetPower(m_light->GetObjectID(), 3.0f, 77.0f);
+	auto op = std::make_unique<SetLightPowerOp>(m_light->GetObjectID(), 3.0f, 77.0f);
 	auto twice = op->Inverse()->Inverse();
 
 	// (g⁻¹)⁻¹ must reproduce the original forward effect.
@@ -143,7 +143,7 @@ TEST_F(OperationManagerTest, Inverse_IsInvolution)
 TEST_F(OperationManagerTest, Inverse_SwapsBeforeAfter)
 {
 	m_light->SetPower(10.0f);
-	auto op = MakeSetPower(m_light->GetObjectID(), 10.0f, 90.0f);
+	auto op = std::make_unique<SetLightPowerOp>(m_light->GetObjectID(), 10.0f, 90.0f);
 	auto inv = op->Inverse();
 
 	OperationContext ctx{ m_scene, m_eventBus };
@@ -156,7 +156,7 @@ TEST_F(OperationManagerTest, Inverse_SwapsBeforeAfter)
 TEST_F(OperationManagerTest, Emit_UnknownUid_IsNoOp)
 {
 	const float before = m_light->light_power;
-	auto op = MakeSetPower(999999, 1.0f, 2.0f); // no object with this UID
+	auto op = std::make_unique<SetLightPowerOp>(999999, 1.0f, 2.0f); // no object with this UID
 
 	OperationContext ctx{ m_scene, m_eventBus };
 	op->Emit(ctx); // Resolve() -> nullptr -> safe no-op, must not crash.

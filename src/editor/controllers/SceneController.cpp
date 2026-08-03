@@ -125,7 +125,7 @@ void OnPositionChanged(const neurus::PositionChanged& e, neurus::EventQueue& bus
 	const glm::vec3 before = transform->GetPosition();
 	const glm::vec3 after(e.posX, e.posY, e.posZ);
 	transform->SetPosition(after);
-	ops.Submit(neurus::MakeSetPosition(obj->GetObjectID(), before, after));
+	ops.Submit(std::make_unique<neurus::SetPositionOp>(obj->GetObjectID(), before, after));
 
 	if (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT ||
 	    obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT)
@@ -145,7 +145,7 @@ void OnRotationChanged(const neurus::RotationChanged& e, neurus::EventQueue& bus
 	const glm::vec3 before = transform->GetRotation();
 	const glm::vec3 after(e.rotX, e.rotY, e.rotZ);
 	transform->SetRotation(after);
-	ops.Submit(neurus::MakeSetRotation(obj->GetObjectID(), before, after));
+	ops.Submit(std::make_unique<neurus::SetRotationOp>(obj->GetObjectID(), before, after));
 
 	if (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT ||
 	    obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT)
@@ -165,7 +165,7 @@ void OnScaleChanged(const neurus::ScaleChanged& e, neurus::EventQueue& bus, neur
 	const glm::vec3 before = transform->GetScale();
 	const glm::vec3 after(e.sclX, e.sclY, e.sclZ);
 	transform->SetScale(after);
-	ops.Submit(neurus::MakeSetScale(obj->GetObjectID(), before, after));
+	ops.Submit(std::make_unique<neurus::SetScaleOp>(obj->GetObjectID(), before, after));
 
 	if (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT ||
 	    obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT)
@@ -224,7 +224,7 @@ void OnLightPowerChanged(const neurus::LightPowerChanged& e, neurus::EventQueue&
 	if (!light) return;
 	const float before = light->light_power;
 	light->SetPower(e.power);
-	ops.Submit(neurus::MakeSetPower(light->GetObjectID(), before, e.power));
+	ops.Submit(std::make_unique<neurus::SetLightPowerOp>(light->GetObjectID(), before, e.power));
 	LightStructChanged(e.object, bus);
 }
 
@@ -235,7 +235,7 @@ void OnLightColorChanged(const neurus::LightColorChanged& e, neurus::EventQueue&
 	const glm::vec3 before = light->light_color;
 	const glm::vec3 after(e.r, e.g, e.b);
 	light->SetColor(after);
-	ops.Submit(neurus::MakeSetColor(light->GetObjectID(), before, after));
+	ops.Submit(std::make_unique<neurus::SetLightColorOp>(light->GetObjectID(), before, after));
 	LightStructChanged(e.object, bus);
 }
 
@@ -253,7 +253,7 @@ void OnLightShadowChanged(const neurus::LightShadowChanged& e, neurus::EventQueu
 	if (!light) return;
 	const bool before = light->use_shadow;
 	light->SetShadow(e.enabled);
-	ops.Submit(neurus::MakeSetShadow(light->GetObjectID(), before, e.enabled));
+	ops.Submit(std::make_unique<neurus::SetLightShadowOp>(light->GetObjectID(), before, e.enabled));
 	LightingRebuilt(bus);
 }
 

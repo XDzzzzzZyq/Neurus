@@ -6,12 +6,15 @@
  * current object) and the EventQueue used to replay the operation's event.
  * Constructed fresh by OperationManager on each Undo/Redo, so it always
  * references the current scene even after a scene swap (New/Load).
+ *
+ * Following EditorContext, `scene` is held as its `UID` base so this header does
+ * not pull in the heavier scene/Scene.h; the UID -> object resolution downcast
+ * lives in OperationContext.cpp.
  */
 
 #pragma once
 
 #include "editor/events/EventBus.h"
-#include "scene/Scene.h"
 #include "scene/UID.h"
 
 namespace neurus {
@@ -21,15 +24,15 @@ namespace neurus {
  */
 struct OperationContext
 {
-	Scene& scene;    ///< Live scene, for UID -> object resolution.
-	EventQueue& bus; ///< Queue the operation replays its event on (via emit).
+	UID& scene;      ///< Live scene (upcast to UID base), for UID -> object resolution.
+	EventQueue& bus; ///< Queue the operation replays its event on (via EmitNow).
 
 	/**
 	 * @brief Resolves a stored UID to the current scene object.
 	 * @param uid Object UID captured when the operation was recorded.
 	 * @return Non-owning object pointer, or nullptr if no longer present.
 	 */
-	ObjectID* Resolve(int uid) const { return scene.GetObjectID(uid); }
+	ObjectID* Resolve(int uid) const;
 };
 
 } // namespace neurus
