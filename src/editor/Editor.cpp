@@ -60,9 +60,10 @@ static QString resolveResourcePath(const char* relativePath)
 namespace neurus {
 
 Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
-	: ed_renderer(renderer)
+	: m_scene(std::make_unique<Scene>())
+	, ed_operations(ed_eventBus, [this]() -> Scene* { return m_scene.get(); })
+	, ed_renderer(renderer)
 	, ed_uploadManager(uploadManager)
-	, m_scene(std::make_unique<Scene>())
 {}
 
 Editor::~Editor()
@@ -95,6 +96,15 @@ void Editor::Initialize()
 	ed_eventBus.subscribe<SpotLightAddEvent>([this](const SpotLightAddEvent&) {
 		ed_eventBus.enqueue(RenderResetEvent{});
 		OnSpotLightAdd();
+	});
+
+	// Undo/redo replay their inverse events synchronously (never queued), so
+	// the mutation applies in-place and cannot reorder against live input.
+	ed_eventBus.subscribe<UndoRequested>([this](const UndoRequested&) {
+		ed_operations.Undo();
+	});
+	ed_eventBus.subscribe<RedoRequested>([this](const RedoRequested&) {
+		ed_operations.Redo();
 	});
 
 	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
@@ -231,6 +241,7 @@ void Editor::NewScene()
 		m_scene = std::make_unique<Scene>();
 		m_config = RenderConfig{};
 		m_dirty = false;
+		ed_operations.Clear(); // History does not span scenes.
 		NEURUS_LOG("[Editor] Created new scene.");
 
 		UploadSceneResources();
@@ -252,6 +263,7 @@ void Editor::BeginLoad()
 
 	m_scene = std::make_unique<Scene>();
 	m_config = RenderConfig{};
+	ed_operations.Clear(); // History does not span scenes.
 	// Application deserializes into GetScene()/GetRenderConfig() before FinishLoad().
 }
 

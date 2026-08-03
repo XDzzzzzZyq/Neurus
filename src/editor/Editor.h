@@ -7,6 +7,7 @@
 
 #include "controllers/Controllers.h"
 #include "editor/events/EventBus.h"
+#include "editor/operations/OperationManager.h"
 #include "render/RenderConfig.h"
 #include "scene/EditorContext.h"
 
@@ -68,7 +69,7 @@ public:
 	void RegisterController()
 	{
 		auto ctrl = std::make_unique<T>();
-		ctrl->Init(ed_eventBus);
+		ctrl->Init(ed_eventBus, ed_operations);
 		ed_controllers.push_back(std::move(ctrl));
 	}
 
@@ -100,6 +101,7 @@ private:
 
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
+	OperationManager ed_operations;                ///< Undo/redo history over event-replay ops.
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---

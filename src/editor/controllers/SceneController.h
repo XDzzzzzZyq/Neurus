@@ -39,12 +39,14 @@ public:
 	 * @brief Subscribes to scene events on the given EventQueue.
 	 *
 	 * Registers lambda handlers that forward each event to the corresponding
-	 * free-function handler. Must be called once during initialization,
-	 * before any events are enqueued.
+	 * free-function handler. Property/transform handlers capture the before
+	 * value, mutate, then record a forward operation via the sink. Must be
+	 * called once during initialization, before any events are enqueued.
 	 *
 	 * @param bus EventQueue to subscribe to.
+	 * @param ops Sink for recording undoable operations.
 	 */
-	void Init(EventQueue& bus) override;
+	void Init(EventQueue& bus, IOperationSink& ops) override;
 };
 
 } // namespace neurus

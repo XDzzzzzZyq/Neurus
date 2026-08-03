@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file test_camera_controller.cpp
  * @brief Tests for CameraController event-driven navigation (orbit, dolly, pan, zoom).
  *
@@ -25,6 +25,7 @@
 
 #include "editor/controllers/CameraController.h"
 #include "editor/events/CameraEvents.h"
+#include "editor/operations/OperationManager.h"
 #include "scene/Camera.h"
 
 using namespace neurus;
@@ -52,7 +53,7 @@ class CameraControllerTest : public ::testing::Test
 	{
 		m_camera = std::make_unique<Camera>();
 		m_controller = std::make_unique<CameraController>();
-		m_controller->Init(m_eventBus);
+		m_controller->Init(m_eventBus, m_operations);
 	}
 
 	void TearDown() override
@@ -61,6 +62,7 @@ class CameraControllerTest : public ::testing::Test
 	}
 
 	EventQueue m_eventBus;
+	OperationManager m_operations{ m_eventBus, []() -> Scene* { return nullptr; } };
 	std::unique_ptr<Camera> m_camera;
 	std::unique_ptr<CameraController> m_controller;
 };

@@ -43,8 +43,9 @@ public:
 	 * initialization, before any events are enqueued.
 	 *
 	 * @param bus EventQueue to subscribe to.
+	 * @param ops Operation sink (unused; shader edits are not yet undoable).
 	 */
-	void Init(EventQueue& bus) override;
+	void Init(EventQueue& bus, IOperationSink& ops) override;
 };
 
 } // namespace neurus

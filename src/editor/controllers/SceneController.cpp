@@ -19,6 +19,8 @@
 
 #include "editor/events/SceneEvents.h"
 #include "editor/events/EditorEvents.h"
+#include "editor/operations/IOperationSink.h"
+#include "editor/operations/SceneOperations.h"
 #include "editor/Input.h"
 
 #include "scene/Camera.h"
@@ -112,13 +114,18 @@ void OnVisibilityChanged(const neurus::VisibilityChanged& e, neurus::EventQueue&
 // Transform
 // ---------------------------------------------------------------------------
 
-void OnPositionChanged(const neurus::PositionChanged& e, neurus::EventQueue& bus)
+void OnPositionChanged(const neurus::PositionChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
 	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
 	if (!obj) return;
 	void* transformPtr = obj->GetTransform();
 	if (!transformPtr) return;
-	static_cast<neurus::Transform3D*>(transformPtr)->SetPosition(glm::vec3(e.posX, e.posY, e.posZ));
+	auto* transform = static_cast<neurus::Transform3D*>(transformPtr);
+
+	const glm::vec3 before = transform->GetPosition();
+	const glm::vec3 after(e.posX, e.posY, e.posZ);
+	transform->SetPosition(after);
+	ops.Submit(neurus::MakeSetPosition(obj->GetObjectID(), before, after));
 
 	if (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT ||
 	    obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT)
@@ -127,13 +134,18 @@ void OnPositionChanged(const neurus::PositionChanged& e, neurus::EventQueue& bus
 		Mutated(bus);
 }
 
-void OnRotationChanged(const neurus::RotationChanged& e, neurus::EventQueue& bus)
+void OnRotationChanged(const neurus::RotationChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
 	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
 	if (!obj) return;
 	void* transformPtr = obj->GetTransform();
 	if (!transformPtr) return;
-	static_cast<neurus::Transform3D*>(transformPtr)->SetRotation(glm::vec3(e.rotX, e.rotY, e.rotZ));
+	auto* transform = static_cast<neurus::Transform3D*>(transformPtr);
+
+	const glm::vec3 before = transform->GetRotation();
+	const glm::vec3 after(e.rotX, e.rotY, e.rotZ);
+	transform->SetRotation(after);
+	ops.Submit(neurus::MakeSetRotation(obj->GetObjectID(), before, after));
 
 	if (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT ||
 	    obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT)
@@ -142,13 +154,18 @@ void OnRotationChanged(const neurus::RotationChanged& e, neurus::EventQueue& bus
 		Mutated(bus);
 }
 
-void OnScaleChanged(const neurus::ScaleChanged& e, neurus::EventQueue& bus)
+void OnScaleChanged(const neurus::ScaleChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
 	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
 	if (!obj) return;
 	void* transformPtr = obj->GetTransform();
 	if (!transformPtr) return;
-	static_cast<neurus::Transform3D*>(transformPtr)->SetScale(glm::vec3(e.sclX, e.sclY, e.sclZ));
+	auto* transform = static_cast<neurus::Transform3D*>(transformPtr);
+
+	const glm::vec3 before = transform->GetScale();
+	const glm::vec3 after(e.sclX, e.sclY, e.sclZ);
+	transform->SetScale(after);
+	ops.Submit(neurus::MakeSetScale(obj->GetObjectID(), before, after));
 
 	if (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT ||
 	    obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT)
@@ -201,11 +218,24 @@ void OnMeshMaterialChanged(const neurus::MeshMaterialChanged& e, neurus::EventQu
 // Light properties
 // ---------------------------------------------------------------------------
 
-void OnLightPowerChanged(const neurus::LightPowerChanged& e, neurus::EventQueue& bus)
+void OnLightPowerChanged(const neurus::LightPowerChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
 	neurus::Light* light = neurus::Light::As(e.object);
 	if (!light) return;
+	const float before = light->light_power;
 	light->SetPower(e.power);
+	ops.Submit(neurus::MakeSetPower(light->GetObjectID(), before, e.power));
+	LightStructChanged(e.object, bus);
+}
+
+void OnLightColorChanged(const neurus::LightColorChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
+{
+	neurus::Light* light = neurus::Light::As(e.object);
+	if (!light) return;
+	const glm::vec3 before = light->light_color;
+	const glm::vec3 after(e.r, e.g, e.b);
+	light->SetColor(after);
+	ops.Submit(neurus::MakeSetColor(light->GetObjectID(), before, after));
 	LightStructChanged(e.object, bus);
 }
 
@@ -217,11 +247,13 @@ void OnLightRadiusChanged(const neurus::LightRadiusChanged& e, neurus::EventQueu
 	LightStructChanged(e.object, bus);
 }
 
-void OnLightShadowChanged(const neurus::LightShadowChanged& e, neurus::EventQueue& bus)
+void OnLightShadowChanged(const neurus::LightShadowChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
 	neurus::Light* light = neurus::Light::As(e.object);
 	if (!light) return;
+	const bool before = light->use_shadow;
 	light->SetShadow(e.enabled);
+	ops.Submit(neurus::MakeSetShadow(light->GetObjectID(), before, e.enabled));
 	LightingRebuilt(bus);
 }
 
@@ -265,21 +297,22 @@ void OnEnvironmentRotationChanged(const neurus::EnvironmentRotationChanged& e, n
 
 namespace neurus {
 
-void SceneController::Init(EventQueue& bus)
+void SceneController::Init(EventQueue& bus, IOperationSink& ops)
 {
 	bus.subscribe<ObjectSelected>([&bus](const ObjectSelected& e) { OnObjectSelected(e, bus); });
 	bus.subscribe<ObjectDeselected>([&bus](const ObjectDeselected& e) { OnObjectDeselected(e, bus); });
 	bus.subscribe<VisibilityChanged>([&bus](const VisibilityChanged& e) { OnVisibilityChanged(e, bus); });
-	bus.subscribe<PositionChanged>([&bus](const PositionChanged& e) { OnPositionChanged(e, bus); });
-	bus.subscribe<RotationChanged>([&bus](const RotationChanged& e) { OnRotationChanged(e, bus); });
-	bus.subscribe<ScaleChanged>([&bus](const ScaleChanged& e) { OnScaleChanged(e, bus); });
+	bus.subscribe<PositionChanged>([&bus, &ops](const PositionChanged& e) { OnPositionChanged(e, bus, ops); });
+	bus.subscribe<RotationChanged>([&bus, &ops](const RotationChanged& e) { OnRotationChanged(e, bus, ops); });
+	bus.subscribe<ScaleChanged>([&bus, &ops](const ScaleChanged& e) { OnScaleChanged(e, bus, ops); });
 	bus.subscribe<CameraTargetChanged>([&bus](const CameraTargetChanged& e) { OnCameraTargetChanged(e, bus); });
 	bus.subscribe<CameraFovChanged>([&bus](const CameraFovChanged& e) { OnCameraFovChanged(e, bus); });
 	bus.subscribe<MeshShadowChanged>([&bus](const MeshShadowChanged& e) { OnMeshShadowChanged(e, bus); });
 	bus.subscribe<MeshMaterialChanged>([&bus](const MeshMaterialChanged& e) { OnMeshMaterialChanged(e, bus); });
-	bus.subscribe<LightPowerChanged>([&bus](const LightPowerChanged& e) { OnLightPowerChanged(e, bus); });
+	bus.subscribe<LightPowerChanged>([&bus, &ops](const LightPowerChanged& e) { OnLightPowerChanged(e, bus, ops); });
+	bus.subscribe<LightColorChanged>([&bus, &ops](const LightColorChanged& e) { OnLightColorChanged(e, bus, ops); });
 	bus.subscribe<LightRadiusChanged>([&bus](const LightRadiusChanged& e) { OnLightRadiusChanged(e, bus); });
-	bus.subscribe<LightShadowChanged>([&bus](const LightShadowChanged& e) { OnLightShadowChanged(e, bus); });
+	bus.subscribe<LightShadowChanged>([&bus, &ops](const LightShadowChanged& e) { OnLightShadowChanged(e, bus, ops); });
 	bus.subscribe<LightCutoffChanged>([&bus](const LightCutoffChanged& e) { OnLightCutoffChanged(e, bus); });
 	bus.subscribe<LightOuterCutoffChanged>([&bus](const LightOuterCutoffChanged& e) { OnLightOuterCutoffChanged(e, bus); });
 	bus.subscribe<EnvironmentIntensityChanged>([&bus](const EnvironmentIntensityChanged& e) { OnEnvironmentIntensityChanged(e, bus); });

@@ -67,8 +67,10 @@ public:
 	 * initialization, before any events are enqueued.
 	 *
 	 * @param bus EventQueue to subscribe to.
+	 * @param ops Operation sink (unused for now; camera gesture ops land in a
+	 *        later Phase 1 step).
 	 */
-	void Init(EventQueue& bus) override;
+	void Init(EventQueue& bus, IOperationSink& ops) override;
 
 };
 

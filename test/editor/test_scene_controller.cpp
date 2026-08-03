@@ -5,6 +5,7 @@
 #include "editor/controllers/SceneController.h"
 #include "editor/events/SceneEvents.h"
 #include "editor/events/EditorEvents.h"
+#include "editor/operations/OperationManager.h"
 #include "editor/Input.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
@@ -20,7 +21,7 @@ class SceneControllerTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_controller.Init(m_eventBus);
+		m_controller.Init(m_eventBus, m_operations);
 
 		m_camera = std::make_shared<Camera>();
 		m_mesh   = std::make_shared<Mesh>();
@@ -35,8 +36,9 @@ protected:
 	void Process() { m_eventBus.Process(); }
 
 	EventQueue m_eventBus;
-	SceneController m_controller;
 	Scene m_scene;
+	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	SceneController m_controller;
 	std::shared_ptr<Camera> m_camera;
 	std::shared_ptr<Mesh> m_mesh;
 	std::shared_ptr<Light> m_light;

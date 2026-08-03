@@ -206,7 +206,7 @@ namespace neurus {
 // Init — subscribe to camera events
 // ---------------------------------------------------------------------------
 
-void CameraController::Init(EventQueue& bus)
+void CameraController::Init(EventQueue& bus, IOperationSink& /*ops*/)
 {
 	bus.subscribe<CameraZoomEvent>([&bus](const CameraZoomEvent& e) {
 		OnCameraZoom(e);

@@ -429,7 +429,7 @@ namespace neurus {
 // Init — subscribe to shader events
 // ---------------------------------------------------------------------------
 
-void ShaderController::Init(EventQueue& bus)
+void ShaderController::Init(EventQueue& bus, IOperationSink& /*ops*/)
 {
 	// Create/Compile bump the shader version -> pipeline rebuilds on the next
 	// frame, so temporal accumulation (shadow intensity) must reset. Code/struct
