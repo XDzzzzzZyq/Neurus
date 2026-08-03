@@ -86,7 +86,7 @@ void PropertyPanel::BuildHeader()
 
 void PropertyPanel::Refresh(const UIContext& ctx)
 {
-	const Scene* scene = static_cast<const Scene*>(ctx.scene);
+	const Scene* scene = static_cast<const Scene*>(ctx.editor.scene);
 	if (!scene)
 	{
 		SetEnabled(false);

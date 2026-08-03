@@ -331,7 +331,7 @@ PassStats SSAOPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const R
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
-	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 
 	// --- 0. Update per-frame SSAO params UBO (camera matrices + kernel) ---
 	{

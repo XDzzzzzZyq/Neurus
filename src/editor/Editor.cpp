@@ -177,24 +177,15 @@ Scene& Editor::GetScene()
 	return *m_scene;
 }
 
-RenderContext Editor::GetRenderContext() const
+// =========================================================================
+// GetContext – shared editor state (scene + config) for Render/UI contexts
+// =========================================================================
+
+EditorContext Editor::GetContext() const
 {
-	RenderContext ctx;
+	EditorContext ctx;
 	ctx.scene = m_scene.get();
 	ctx.config = &m_config;
-	return ctx;
-}
-
-// =========================================================================
-// GetUIContext – build UI context from Editor state
-// =========================================================================
-
-UIContext Editor::GetUIContext() const
-{
-	UIContext ctx;
-	ctx.renderConfig = &m_config;
-	ctx.scene = m_scene.get();
-	ctx.frameProfile = &m_frameProfile;
 	return ctx;
 }
 

@@ -116,7 +116,7 @@ TEST_F(SSAOTest, SSAOAttachment_MatchesReferenceImage)
 
 	RenderContext ctx{
 			.width = kRenderWidth, .height = kRenderHeight,
-		.scene = cb.scene.get(),
+		.editor = { .scene = cb.scene.get() },
 	};
 
 	// --- Record geometry pass ---

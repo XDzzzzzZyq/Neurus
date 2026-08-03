@@ -50,7 +50,7 @@ ProfilingPanel::ProfilingPanel(QWidget* parent)
 
 void ProfilingPanel::Refresh(const UIContext& ctx)
 {
-	const auto* profile = static_cast<const FrameProfile*>(ctx.frameProfile);
+	const auto* profile = static_cast<const FrameProfile*>(ctx.profile);
 	if (!profile)
 	{
 		// No renderer profile yet: hide every pooled row and reset detection.

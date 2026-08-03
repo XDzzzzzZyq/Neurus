@@ -538,13 +538,13 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	// --- Pipeline: Geometry → Shadows → SSAO → Lighting → Gizmo → Compose → [FXAA] ---
 	// The whole deferred pipeline runs through one RenderGraph. FXAA is
 	// optional; useFXAA also selects the blit source below.
-	const bool useFXAA = ctx.config &&
-		static_cast<const RenderConfig*>(ctx.config)->RequiresFXAA();
+	const bool useFXAA = ctx.editor.config &&
+		static_cast<const RenderConfig*>(ctx.editor.config)->RequiresFXAA();
 
 	// Rebuild the graph only when the config-derived signature changes (single
 	// source of truth is RenderConfig; the graph is its projection — currently
 	// just FXAA presence).
-	if (const auto* cfg = static_cast<const RenderConfig*>(ctx.config))
+	if (const auto* cfg = static_cast<const RenderConfig*>(ctx.editor.config))
 	{
 		const PipelineSignature sig = PipelineSignature::From(*cfg);
 		if (!(sig == m_builtSignature))

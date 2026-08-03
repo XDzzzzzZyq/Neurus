@@ -129,12 +129,15 @@ target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
 - `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig)
 - `virtual void Refresh(const UIContext& ctx)` — called per-frame to sync panel UI with application state
-- `UIContext` carries a `const void* renderConfig` pointer; panels cast to `const RenderConfig*`
-- `UIContext` also carries a `const void* frameProfile` pointer to the Editor's copy
-  of the profile returned by `DeferredRenderer::DrawFrame()` (via
-  `Editor::SetFrameProfile`); the ProfilingPanel casts it to `const FrameProfile*`
-  and renders a real-time per-pass tree (Frame totals + per-pass rows). Collection
-  is always active while the app runs (`Application::InitRenderer` enables it)
+- `UIContext` embeds an `EditorContext editor` (from `Editor::GetContext()`) with
+  `editor.scene` (opaque `const UID*`, cast to `const Scene*`) and `editor.config`
+  (opaque `const void*`, cast to `const RenderConfig*`)
+- `UIContext` also carries a `const void* profile` pointer to the `FrameProfile`
+  returned by `DeferredRenderer::DrawFrame()`. The Application assembles the
+  UIContext each frame (the Editor never produces it) and the ProfilingPanel casts
+  `profile` to `const FrameProfile*` to render a real-time per-pass tree (Frame
+  totals + per-pass rows). Collection is always active while the app runs
+  (`Application::InitRenderer` enables it)
 - `UIManager` stores panels in `std::map<PanelType, ads::CDockWidget*> m_panelDocks`
 
 ### RenderConfigPanel

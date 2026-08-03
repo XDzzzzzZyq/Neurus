@@ -300,7 +300,7 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 - **Shadow map resolution**: 2048×2048, `VK_FORMAT_D32_SFLOAT`
 - **PCF**: Percentage-closer filtering via `sampler2DShadow` with UV offset kernel, ortho depth comparison
 - **Shadow intensity**: Written to per-light layer in `ShadowIntensity` 2D array via `SunShadowIntensityEval` compute shader
-- **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.02) via `ctx.config`.
+- **Shadow bias**: Depth bias read from `RenderConfig::r_shadow_bias` (default 0.02) via `ctx.editor.config`.
 - **Shadow mode**: Supports `HARD`, `SOFT_PCF_16`, `SOFT_PCF_64` modes matching point light shadow pipeline
 
 ### Temporal Shadow Accumulation Convention
@@ -338,13 +338,13 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 ### RenderConfig Convention
 
 `RenderConfig` (`src/render/RenderConfig.h`) is user-facing config owned by Editor,
-passed to passes through `RenderContext::config` (opaque `void*`):
+passed to passes through `RenderContext::editor.config` (opaque `void*`):
 
 - **Algorithm selection**: `r_pipeline` (Forward/Deferred), `r_aa`, `r_ao`, `r_shadow`, `r_ssr`
 - **Quality parameters**: `r_gamma`, `r_ao_ksize`, `r_ao_radius`, `r_shadow_bias` (0.02), `r_sample_pf`
 - **Serialized** via cereal for project save/load
-- **Live-update**: passes cast `static_cast<const RenderConfig*>(ctx.config)` each frame; scalar param changes take effect on next `DrawFrame()`
-- **Shadow bias flow**: `RenderConfigPanel` slider → `configValueChanged` → `Editor::SetRenderConfig` → `RenderContext::config` → `ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
+- **Live-update**: passes cast `static_cast<const RenderConfig*>(ctx.editor.config)` each frame; scalar param changes take effect on next `DrawFrame()`
+- **Shadow bias flow**: `RenderConfigPanel` slider → `configValueChanged` → `Editor::SetRenderConfig` → `RenderContext::editor.config` → `ShadowIntensityPass` casts to `RenderConfig*`, reads `r_shadow_bias`
 
 ### Attachment Formats
 
@@ -508,8 +508,8 @@ aggregates the returned `PassStats` into each `PassProfile` and sums them into
 the frame totals.
 
 **Surface**: `DeferredRenderer::DrawFrame()` returns the `FrameProfile`; the
-Application layer forwards it to `Editor::SetFrameProfile()`, and the Editor
-exposes its copy through `UIContext::frameProfile` (opaque `const void*`).
+Application layer assembles the `UIContext` each frame (the Editor never produces
+it) and sets `UIContext::profile` to the returned profile (opaque `const void*`).
 The ProfilingPanel casts it back and renders the per-pass timings as a tree
 (Frame totals + per-pass rows). See ui-system.instructions.md.
 

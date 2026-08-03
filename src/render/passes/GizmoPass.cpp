@@ -182,7 +182,7 @@ PassStats GizmoPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const 
 	{
 		// Query the active selection from the scene (avoids redundant field in RenderContext)
 		uint32_t activeObjectId = 0;
-		const auto* scene = static_cast<const Scene*>(ctx.scene);
+		const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 		const auto* activeObj = scene->selections.GetActiveObject();
 		if (activeObj)
 			activeObjectId = static_cast<uint32_t>(activeObj->GetObjectID());

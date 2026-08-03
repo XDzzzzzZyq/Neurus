@@ -292,7 +292,7 @@ PassStats LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, con
 	PassStats stats{};
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
-	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 
 	const Camera* cam = scene->GetActiveCamera();
 	const glm::vec3 cameraPos = cam->GetPosition();
@@ -455,9 +455,9 @@ PassStats LightingPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, con
 		pc.iblEnabled = !scene->env_list.empty() ? 1 : 0;
 
 		// Transparent background (checkerboard) from RenderConfig
-		if (ctx.config)
+		if (ctx.editor.config)
 		{
-			const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+			const auto* cfg = static_cast<const RenderConfig*>(ctx.editor.config);
 			pc.transEnabled = cfg->r_transparent ? 1 : 0;
 		}
 

@@ -38,6 +38,7 @@
 #include "scene/Scene.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
+#include "render/RenderContext.h"
 #include "render/Screenshot.h"
 #include "render/Texture.h"
 #include "render/shaders/ShaderLibrary.h"
@@ -383,12 +384,19 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 	                     if (app_renderer && app_editor)
 	                     {
 	                         app_editor->Edit();  // Process all enqueued events (camera, etc.)
-	                         // Renderer -> Editor: DrawFrame returns the per-frame
-	                         // profile; the Editor stores it and exposes it through
-	                         // UIContext (opaque pointer) for the Viewport overlay.
-	                         app_editor->SetFrameProfile(
-	                             app_renderer->DrawFrame(app_editor->GetRenderContext()));
-	                         neurus::UIContext ctx = app_editor->GetUIContext();
+	                         // The Application assembles both contexts from the Editor's
+	                         // shared state; the Editor never builds a RenderContext or
+	                         // UIContext itself. DrawFrame returns the per-frame profile,
+	                         // which the UIContext carries to the panels.
+	                         const neurus::EditorContext editor = app_editor->GetContext();
+
+	                         neurus::RenderContext rctx;
+	                         rctx.editor = editor;
+	                         auto profile = app_renderer->DrawFrame(rctx);
+
+	                         neurus::UIContext ctx;
+	                         ctx.editor = editor;
+	                         ctx.profile = &profile;
 	                         app_mainWindow->Refresh(ctx);
 	                     }
 	                 });

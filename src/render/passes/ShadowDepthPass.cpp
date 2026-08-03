@@ -275,10 +275,10 @@ PassStats ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, 
 	PassStats stats{};
 
 	// Guard: skip if no scene
-	if (!ctx.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return stats; }
+	if (!ctx.editor.scene) { NEURUS_LOG("[ShadowDepthPass] No scene, skipping"); return stats; }
 
 	// --- Cast scene UID to Scene* for access to Scene-specific members ---
-	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 
 	const vk::Viewport viewport(0.f, 0.f,
 	                            static_cast<float>(p_resolution),

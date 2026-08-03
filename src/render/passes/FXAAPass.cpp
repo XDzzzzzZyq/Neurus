@@ -103,7 +103,7 @@ PassStats FXAAPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, const R
 
 	const vk::Extent2D extent{ctx.width, ctx.height};
 	const uint32_t fi = ctx.frameIndex;
-	const auto* cfg = static_cast<const RenderConfig*>(ctx.config);
+	const auto* cfg = static_cast<const RenderConfig*>(ctx.editor.config);
 
 	WriteDescriptors(fi, extent, cache);
 

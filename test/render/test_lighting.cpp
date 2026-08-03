@@ -128,7 +128,7 @@ protected:
 			auto& cmd = BeginCmd();
 			m_geometryPass->Record(*cmd, *m_renderCache, RenderContext{
 				.width = kRenderWidth, .height = kRenderHeight,
-				.scene = &testScene,
+			.editor = { .scene = &testScene },
 			});
 			EndSubmitWait(cmd);
 		}
@@ -242,7 +242,7 @@ TEST_F(LightingPassTest, SinglePointLight_ProducesNonZeroOutput)
 		m_lightingPass->Record(*cmd, *m_renderCache, RenderContext{
 			.width = kRenderWidth, .height = kRenderHeight,
 			.frameIndex = 0,
-			.scene = &scene,
+			.editor = { .scene = &scene },
 		});
 
 		EndSubmitWait(cmd);
@@ -318,7 +318,7 @@ TEST_F(LightingPassTest, ZeroLights_PartiallyBoundDescriptor)
 		RenderContext ctx{
 			.width = kRenderWidth, .height = kRenderHeight,
 			.frameIndex = 0,
-			.scene = &scene,
+			.editor = { .scene = &scene },
 		};
 		m_lightingPass->Record(*cmd, *m_renderCache, ctx);
 		EndSubmitWait(cmd);

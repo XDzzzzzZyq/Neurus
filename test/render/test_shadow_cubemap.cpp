@@ -295,7 +295,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 
 		RenderContext ctx{};
 		ctx.width = kRes; ctx.height = kRes;
-		ctx.scene        = shadowRes.scene.get();
+		ctx.editor.scene = shadowRes.scene.get();
 		m_shadowDepthPass->Record(*cmd, *m_renderCache, ctx);
 
 		EndSubmitWait(cmd);

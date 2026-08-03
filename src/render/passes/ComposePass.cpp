@@ -170,7 +170,7 @@ PassStats ComposePass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, cons
 	const uint32_t    frameIndex   = ctx.frameIndex;
 
 	// --- Read gamma from config ---
-	const auto* config = static_cast<const RenderConfig*>(ctx.config);
+	const auto* config = static_cast<const RenderConfig*>(ctx.editor.config);
 	const float gamma = config ? config->r_gamma : 1.0f;
 
 	// --- 1. Write descriptor set for this frame slot ---

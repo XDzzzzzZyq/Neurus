@@ -7,10 +7,8 @@
 
 #include "controllers/Controllers.h"
 #include "editor/events/EventBus.h"
-#include "render/ProfilingData.h"
 #include "render/RenderConfig.h"
-#include "render/RenderContext.h"
-#include "ui/UIContext.h"
+#include "scene/EditorContext.h"
 
 // Forward declarations (no render headers!)
 namespace neurus {
@@ -57,17 +55,14 @@ public:
 	void ClearDirty() { m_dirty = false; }
 	void SetAssetDir(const std::string& dir) { m_assetDir = dir; }
 
-	RenderContext GetRenderContext() const;
-	UIContext GetUIContext() const;
-
 	/**
-	 * @brief Stores the renderer's latest per-frame profile.
+	 * @brief Returns the shared editor state (scene + render config).
 	 *
-	 * Called by the Application layer right after DeferredRenderer::DrawFrame()
-	 * returns the profile; GetUIContext() exposes it to panels (opaque
-	 * `const void*` in UIContext::frameProfile).
+	 * The Application embeds this into both RenderContext and UIContext each
+	 * frame, so the Editor is the single source of truth for scene/config and
+	 * never builds a RenderContext or UIContext itself.
 	 */
-	void SetFrameProfile(const FrameProfile& profile) { m_frameProfile = profile; }
+	EditorContext GetContext() const;
 
 	template<typename T>
 	void RegisterController()
@@ -102,9 +97,6 @@ private:
 	RenderConfig          m_config;
 	std::string           m_assetDir;
 	bool                  m_dirty = false;
-
-	// Latest per-frame render profile (Renderer -> Editor, via SetFrameProfile).
-	FrameProfile          m_frameProfile;
 
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.

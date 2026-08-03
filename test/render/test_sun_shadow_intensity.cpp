@@ -143,7 +143,7 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_VerifyNonZero)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Step 3: Run ShadowDepth -> Geometry -> ShadowIntensity (no LightingPass)
@@ -262,7 +262,7 @@ TEST_F(SunShadowIntensityTest, SunMultiShadowIntensity_ReferenceImage)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Step 3: Record passes

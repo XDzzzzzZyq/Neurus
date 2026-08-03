@@ -177,7 +177,7 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 	// -------------------------------------------------------------------
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Step 3: Record all passes in a single command buffer

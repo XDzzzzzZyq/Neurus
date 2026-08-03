@@ -257,7 +257,7 @@ TEST_F(ModelRenderTest, SphereMeshWithPBR_ProducesNonZeroOutput)
 	RenderContext ctx{
 			.width = kRenderWidth, .height = kRenderHeight,
 		.frameIndex = 0,
-		.scene = &scene,
+		.editor = { .scene = &scene },
 	};
 
 	{

@@ -242,7 +242,7 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 
 void ShaderEditorPanel::Refresh(const UIContext& ctx)
 {
-	const auto* scene = static_cast<const Scene*>(ctx.scene);
+	const auto* scene = static_cast<const Scene*>(ctx.editor.scene);
 	if (!scene)
 	{
 		setShowEmptyState(true);

@@ -130,7 +130,7 @@ TEST_F(FXAATest, StairPattern_MatchesAnalyticalGradient)
 
 	RenderContext ctx;
 	ctx.width = kW; ctx.height = kH; ctx.frameIndex = 0;
-	ctx.config = &cfg; ctx.scene = nullptr;
+	ctx.editor.config = &cfg; ctx.editor.scene = nullptr;
 
 	auto& c = BeginCmd();
 	m_fxaaPass->Record(*c, *m_cache, ctx);

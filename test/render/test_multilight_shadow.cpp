@@ -160,7 +160,7 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Step 3: Transition G-Buffer to renderable layouts
@@ -254,7 +254,7 @@ TEST_F(MultiLightShadowTest, TwoLights_NoVUID)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Transition + upload + record
@@ -321,7 +321,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityReadback_VerifyNonZero)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Transition G-Buffer
@@ -452,7 +452,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 	RenderContext ctx{};
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Transition G-Buffer
@@ -645,7 +645,7 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	ctx.width = renderExtent.width; ctx.height = renderExtent.height;
 	ctx.frameIndex   = 0;
 	// renderItems removed — ShadowDepthPass iterates scene.mesh_list directly
-	ctx.scene        = shadowRes.scene.get();
+	ctx.editor.scene = shadowRes.scene.get();
 
 	// -------------------------------------------------------------------
 	// Step 3: Transition G-Buffer to renderable layouts

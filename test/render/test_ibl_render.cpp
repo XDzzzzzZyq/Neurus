@@ -322,7 +322,7 @@ TEST_F(IBLRenderTest, IBLRender_MatchesReferenceImage)
 		.width = kRenderWidth,
 		.height = kRenderHeight,
 		.frameIndex = 0,
-		.scene = &scene,
+		.editor = { .scene = &scene },
 	};
 
 	// --- Record geometry pass ---
@@ -439,7 +439,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 			RenderContext ctx{
 				.width = kRenderWidth, .height = kRenderHeight,
 				.frameIndex = 0,
-				.scene = &scene,
+				.editor = { .scene = &scene },
 			};
 
 		auto& cmd = BeginCmd();
@@ -584,7 +584,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 			RenderContext ctx{
 				.width = kRenderWidth, .height = kRenderHeight,
 				.frameIndex = 0,
-				.scene = &scene,
+				.editor = { .scene = &scene },
 			};
 
 		auto& cmd = BeginCmd();
