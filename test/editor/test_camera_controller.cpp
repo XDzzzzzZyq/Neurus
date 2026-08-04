@@ -402,3 +402,129 @@ TEST_F(CameraControllerTest, Edge_ModifierConflict_CtrlWins)
 	// Camera should have moved (dolly along forward, Y in Z-up)
 	EXPECT_NE(m_camera->GetPosition().y, 5.0f);
 }
+
+// ===========================================================================
+// Drag gesture undo bounding (CameraDragBegin/End brackets one undo entry)
+// ===========================================================================
+//
+// Continuous orbit/pan/dolly drags mutate the camera live during the drag
+// WITHOUT recording; the whole gesture collapses to one CameraTransformOp
+// committed on CameraDragEnd. The fixture's OperationManager has a null scene
+// provider, so Undo/Redo replay is a no-op on the camera — but the undo-stack
+// bookkeeping (Submit / pop) is scene-independent, so it faithfully proves how
+// many entries a gesture records.
+
+/**
+ * @test DragGesture_RecordsSingleUndoEntry
+ *
+ * Begin → two orbit moves → End should record exactly one undo entry, no
+ * matter how many intermediate moves the drag contained.
+ */
+TEST_F(CameraControllerTest, DragGesture_RecordsSingleUndoEntry)
+{
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	m_eventBus.enqueue(CameraDragBegin{m_camera.get()});
+	m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraDragEnd{m_camera.get()});
+	m_eventBus.Process();
+
+	ASSERT_TRUE(m_operations.CanUndo());
+
+	// Exactly one entry: a single undo empties the stack (moves it to redo).
+	m_operations.Undo();
+	EXPECT_FALSE(m_operations.CanUndo());
+	EXPECT_TRUE(m_operations.CanRedo());
+}
+
+/**
+ * @test ThreeDragGestures_RecordThreeSeparateEntries
+ *
+ * Regression for the drag-merge bug: three separate MMB drags on the same
+ * camera must produce THREE distinct undo entries, not one. CameraTransformOp
+ * is non-mergeable, so consecutive gesture commits never coalesce.
+ */
+TEST_F(CameraControllerTest, ThreeDragGestures_RecordThreeSeparateEntries)
+{
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	for (int i = 0; i < 3; ++i)
+	{
+		m_eventBus.enqueue(CameraDragBegin{m_camera.get()});
+		m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
+		m_eventBus.enqueue(CameraDragEnd{m_camera.get()});
+		m_eventBus.Process();
+	}
+
+	// Three separate entries: three undos exhaust the stack.
+	EXPECT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
+	EXPECT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
+	EXPECT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+/**
+ * @test DragMoves_WithoutGesture_RecordNothing
+ *
+ * Orbit moves that arrive outside a begin/end bracket mutate the camera live
+ * but must NOT record — otherwise every intermediate drag frame would pollute
+ * the history.
+ */
+TEST_F(CameraControllerTest, DragMoves_WithoutGesture_RecordNothing)
+{
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+	const glm::vec3 posBefore = m_camera->GetPosition();
+
+	m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraSlideEvent{m_camera.get(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraPushEvent{m_camera.get(), 0.0f, 10.0f});
+	m_eventBus.Process();
+
+	// Camera moved live...
+	EXPECT_NE(m_camera->GetPosition(), posBefore);
+	// ...but nothing was recorded.
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+/**
+ * @test DragGesture_NoMovement_RecordsNothing
+ *
+ * A begin/end bracket with no intervening move (e.g. a click that didn't drag)
+ * leaves the pose unchanged, so no undo entry is recorded.
+ */
+TEST_F(CameraControllerTest, DragGesture_NoMovement_RecordsNothing)
+{
+	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
+	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	m_eventBus.enqueue(CameraDragBegin{m_camera.get()});
+	m_eventBus.enqueue(CameraDragEnd{m_camera.get()});
+	m_eventBus.Process();
+
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+/**
+ * @test ScrollZoom_RecordsPerEvent_WithoutGesture
+ *
+ * Scroll zoom has no press/release, so it keeps recording per-event as a
+ * CameraZoomOp (coalesced by MergeKey at the OperationManager level). A single
+ * zoom records one entry even with no drag gesture around it.
+ */
+TEST_F(CameraControllerTest, ScrollZoom_RecordsPerEvent_WithoutGesture)
+{
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), 1.0f});
+	m_eventBus.Process();
+
+	EXPECT_TRUE(m_operations.CanUndo());
+}

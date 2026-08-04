@@ -6,13 +6,21 @@
  * into camera transform updates. All navigation logic is triggered by events
  * enqueued from the Editor layer (which reads raw input and normalizes it).
  *
- * Stateless — all handler logic lives as free functions in the .cpp file.
+ * Continuous drags (orbit / pan / dolly) are bounded by a controller-owned
+ * gesture: CameraDragBegin captures the "before" pose, the drag handlers mutate
+ * the camera live WITHOUT recording, and CameraDragEnd submits a single
+ * CameraTransformOp for the whole gesture. CameraTransformOp is non-mergeable,
+ * so each drag is its own undo entry. Scroll zoom has no press/release, so it
+ * keeps recording per-event as a separate CameraZoomOp type, which is mergeable
+ * (keyed per camera) and coalesces the scroll burst into one undo entry.
  *
  * Event Mapping:
- *   - CameraZoomEvent   → Zoom  (scroll wheel)
- *   - CameraRotateEvent → Orbit (rotate around target)
- *   - CameraPushEvent   → Dolly (move camera forward/back along view direction)
- *   - CameraSlideEvent  → Pan   (translate camera parallel to view plane)
+ *   - CameraDragBegin   → capture before pose (mouse press)
+ *   - CameraDragEnd     → record one CameraTransformOp (mouse release)
+ *   - CameraZoomEvent   → Zoom  (scroll wheel; recorded as CameraZoomOp, merged)
+ *   - CameraRotateEvent → Orbit (live mutate during drag)
+ *   - CameraPushEvent   → Dolly (live mutate during drag)
+ *   - CameraSlideEvent  → Pan   (live mutate during drag)
  *   - CameraResizeEvent → Resize (update aspect ratio on viewport resize)
  *
  * Coordinate System:
@@ -30,8 +38,11 @@
 
 #include "editor/controllers/Controllers.h"
 #include "editor/events/EventBus.h"
+#include "editor/operations/SceneOperations.h"
 
 namespace neurus {
+
+class Camera;
 
 // ---------------------------------------------------------------------------
 // CameraController
@@ -40,13 +51,15 @@ namespace neurus {
 /**
  * @brief Event-driven camera manipulation controller.
  *
- * Stateless — subscribes to camera events on an EventQueue and dispatches
- * to free-function handlers defined in CameraController.cpp.
+ * Holds a small gesture state (the pose captured at drag start + the target
+ * camera) so a continuous orbit/pan/dolly collapses to one undo entry. Handler
+ * math lives in free functions in CameraController.cpp; the gesture bookkeeping
+ * lives here.
  *
  * Usage:
  * @code
  *   CameraController controller;
- *   controller.Init(eventQueue());
+ *   controller.Init(eventQueue(), operationSink());
  *   // Editor enqueues events, EventQueue::Process() dispatches them
  * @endcode
  *
@@ -62,16 +75,21 @@ public:
 	/**
 	 * @brief Subscribes to camera events on the given EventQueue.
 	 *
-	 * Registers lambda handlers that forward each event to the
-	 * corresponding free-function handler. Must be called once during
-	 * initialization, before any events are enqueued.
+	 * Registers handlers for the drag gesture (begin/end), the continuous drag
+	 * moves (rotate/push/slide), scroll zoom, and resize. Must be called once
+	 * during initialization, before any events are enqueued.
 	 *
 	 * @param bus EventQueue to subscribe to.
-	 * @param ops Operation sink; navigation records a coarse-grained
-	 *        CameraTransformOp (coalesced per camera) for undo/redo.
+	 * @param ops Operation sink; a drag gesture records one coarse-grained
+	 *        CameraTransformOp on release, scroll zoom records a CameraZoomOp
+	 *        per-event (merged into one undo entry).
 	 */
 	void Init(EventQueue& bus, IOperationSink& ops) override;
 
+private:
+	bool m_dragging = false;   ///< True between CameraDragBegin and CameraDragEnd.
+	Camera* m_cam = nullptr;   ///< Camera captured at drag start (non-owning).
+	CameraPose m_before{};     ///< Pose captured at drag start (undo endpoint).
 };
 
 } // namespace neurus

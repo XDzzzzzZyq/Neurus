@@ -136,12 +136,25 @@ struct RenderResetEvent {};                    // temporal accumulation reset
 ### CameraEvents.h
 
 ```cpp
-struct CameraRotateEvent  { Camera* camera; float dx; float dy; };
-struct CameraZoomEvent    { Camera* camera; float delta; };
-struct CameraPushEvent    { Camera* camera; float delta; };
-struct CameraSlideEvent   { Camera* camera; float dx; float dy; };
-struct CameraResizeEvent  { Camera* camera; int w; int h; };
+struct CameraRotateEvent  { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraZoomEvent    { Camera* cam; float scroll_dir; };
+struct CameraPushEvent    { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraSlideEvent   { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraSpinEvent    { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraResizeEvent  { Camera* cam; int width; int height; };
+
+// Drag-gesture boundaries — bracket a continuous orbit/pan/dolly manipulation
+// so it collapses to ONE undo entry (controller-owned gesture, see
+// editor.instructions.md → Undo/Redo). CameraController captures the "before"
+// pose on begin, mutates live during the drag WITHOUT recording, and records
+// one CameraTransformOp on end.
+struct CameraDragBegin { Camera* cam; };
+struct CameraDragEnd   { Camera* cam; };
 ```
+
+Scroll zoom has no press/release, so it is NOT bracketed: `CameraZoomEvent`
+records per-event and relies on `CameraTransformOp::MergeKey()` to coalesce a
+scroll burst into one undo step.
 
 ### InputEvents.h
 
@@ -150,6 +163,21 @@ struct MouseMoveEvent   { int x, y; float dx, dy; Modifiers mods; };
 struct MousePressEvent  { int x, y; MouseButton btn; Modifiers mods; };
 struct MouseReleaseEvent{ int x, y; MouseButton btn; Modifiers mods; };
 struct MouseScrollEvent { int x, y; float delta; Modifiers mods; };
+```
+
+### ConfigEvents.h
+
+```cpp
+// Whole-config change (UI panel emits it; SetRenderConfigOp replays it).
+struct RenderConfigChangedEvent { RenderConfig config; };
+
+// Slider-drag boundaries — same controller-owned gesture pattern as the camera
+// drag (see editor.instructions.md → Undo/Redo). RenderConfigController captures
+// the "before" config on begin, applies intermediate values live WITHOUT
+// recording, and records one SetRenderConfigOp on end. Discrete edits (checkbox,
+// combo box) arrive with no gesture and are recorded immediately, one op each.
+struct ConfigEditBegin {};
+struct ConfigEditEnd   {};
 ```
 
 ### ShaderEvents.h

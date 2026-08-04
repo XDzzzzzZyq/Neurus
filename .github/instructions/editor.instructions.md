@@ -285,3 +285,39 @@ scene directly: `Emit()` re-dispatches the originating scene event via
   because ops are absolute. Selection is scene-level SET state, so it replays via
   the absolute `SelectionChanged` event + `Selections::RestoreState`.
 
+### Coalescing gestures into one undo entry
+
+A continuous manipulation (a slider drag, a camera orbit) fires a *stream* of
+value changes but must collapse to a single undo entry. Two strategies exist:
+
+- **Implicit merge (MergeKey):** the op declares a non-empty `MergeKey()`;
+  `OperationManager::Submit` folds a same-key edit into the undo-stack top.
+  Used where there is no natural press/release boundary — **scroll zoom**
+  (`CameraZoomOp`, keyed `camera_zoom:<uid>`) records per-event and merges.
+- **Controller-owned gesture (explicit begin/end):** the controller holds a
+  small gesture state, captures the "before" endpoint on a begin event, mutates
+  live during the drag WITHOUT recording, and records ONE op on the end event.
+  Used where the UI has a real press/release boundary. This needs NO changes to
+  `OperationManager` or `IOperationSink` — the boundaries are ordinary typed
+  events flowing through the same controller chain.
+
+Two controllers use the gesture pattern:
+
+- **`CameraController`** — `CameraDragBegin` captures the pose, `CameraRotate/
+  Push/Slide` mutate live, `CameraDragEnd` records one `CameraTransformOp`
+  (no-op if the pose is unchanged). `CameraTransformOp` is deliberately
+  non-mergeable (empty `MergeKey`) so each drag is its own undo entry. Scroll
+  zoom has no press/release boundary, so it stays on the implicit-merge path
+  via the separate `CameraZoomOp` type (mergeable, keyed `camera_zoom:<uid>`).
+  Two op types instead of one boolean flag: the gesture boundary vs. burst
+  coalescing are distinct behaviors that belong to distinct ops.
+- **`RenderConfigController`** — the single mutation path for the Editor-owned
+  `RenderConfig`, reached through a `std::function<RenderConfig*()>` provider so
+  it never includes Editor internals (constructed manually in `Editor`, not via
+  `RegisterController<T>`). `ConfigEditBegin` captures the config,
+  `RenderConfigChangedEvent` applies live, `ConfigEditEnd` records one
+  `SetRenderConfigOp`. Discrete edits (checkbox/combo) arrive without a gesture
+  and record immediately. No-op writes (`before == after`, via `RenderConfig`'s
+  defaulted `operator==`) are never recorded. `SetRenderConfigOp` is scene-level
+  (not UID-based) and deliberately non-mergeable (empty `MergeKey`).
+

@@ -224,11 +224,16 @@ public:
 /**
  * @brief Absolute camera pose edit (position + target), coarse-grained.
  *
- * Records the coupled camera transform for viewport navigation (orbit / pan /
- * dolly / zoom) and panel target edits. A non-empty, per-camera MergeKey folds
- * a continuous manipulation into one undo step. Camera *position* edited via the
- * property panel reuses the generic SetPositionOp, so there is no separate
- * camera-position op to overlap with the object transform path.
+ * Records the coupled camera transform for an orbit / pan / dolly drag and for
+ * panel target edits. Non-mergeable (empty MergeKey): each recorded op is its
+ * own undo entry. This is correct because a viewport drag is already bounded by
+ * a controller gesture (CameraDragBegin/End) that commits exactly ONE op on
+ * release — so consecutive separate drags must stay separate undo entries.
+ *
+ * Scroll zoom, which has no press/release boundary, uses the mergeable sibling
+ * CameraZoomOp instead. Camera *position* edited via the property panel reuses
+ * the generic SetPositionOp, so there is no separate camera-position op to
+ * overlap with the object transform path.
  */
 class CameraTransformOp : public TransitionOp<CameraTransformOp, CameraPoseChanged, CameraPose>
 {
@@ -236,7 +241,31 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Camera Transform";
 
-	std::string MergeKey() const override { return "camera_pose:" + std::to_string(m_uid); }
+	CameraPoseChanged MakeEvent(const ObjectID* o, const CameraPose& v) const
+	{
+		return CameraPoseChanged{ o,
+			v.position.x, v.position.y, v.position.z,
+			v.target.x, v.target.y, v.target.z };
+	}
+};
+
+/**
+ * @brief Absolute camera pose edit produced by scroll zoom — mergeable.
+ *
+ * Identical replay semantics to CameraTransformOp (same absolute CameraPose,
+ * same CameraPoseChanged event), but exposes a per-camera MergeKey so a scroll
+ * burst — which fires one op per notch with no gesture boundary — coalesces
+ * into a single undo entry. Kept a separate type (rather than a flag on
+ * CameraTransformOp) so the mergeable-vs-standalone intent is encoded in the
+ * type, not decided at each call site.
+ */
+class CameraZoomOp : public TransitionOp<CameraZoomOp, CameraPoseChanged, CameraPose>
+{
+public:
+	using TransitionOp::TransitionOp;
+	static constexpr const char* kLabel = "Camera Zoom";
+
+	std::string MergeKey() const override { return "camera_zoom:" + std::to_string(m_uid); }
 
 	CameraPoseChanged MakeEvent(const ObjectID* o, const CameraPose& v) const
 	{

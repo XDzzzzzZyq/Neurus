@@ -229,6 +229,14 @@ void RenderConfigPanel::ConnectAllSignals()
 		emit configValueChanged(RenderConfigChangedEvent{Save()}); 
 		};
 
+	// --- Slider gesture boundaries: press begins one undo entry, release ends it ---
+	auto bindGesture = [this](ScalarSlider* s) {
+		connect(s, &ScalarSlider::pressed, this,
+			[this]() { emit editBegin(ConfigEditBegin{}); });
+		connect(s, &ScalarSlider::released, this,
+			[this]() { emit editEnd(ConfigEditEnd{}); });
+	};
+
 	// --- Shadows ---
 	connect(m_shadowsGroup, &QGroupBox::toggled, this, emitCfg);
 	connect(m_shadowAlgCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
@@ -237,6 +245,7 @@ void RenderConfigPanel::ConnectAllSignals()
 		this, emitCfg);
 	connect(m_shadowBiasSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_shadowBiasSlider);
 	connect(m_samplingModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 		this, emitCfg);
 
@@ -248,24 +257,30 @@ void RenderConfigPanel::ConnectAllSignals()
 		this, emitCfg);
 	connect(m_aoRadiusSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_aoRadiusSlider);
 
 	// --- Lighting ---
 	connect(m_iblCheckBox, &QCheckBox::toggled, this, emitCfg);
 	connect(m_transCheckBox, &QCheckBox::toggled, this, emitCfg);
 	connect(m_exposureSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_exposureSlider);
 
 	// --- Post-Processing ---
 	connect(m_aaCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 		this, emitCfg);
 	connect(m_gammaSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_gammaSlider);
 	connect(m_fxaaSubpixSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_fxaaSubpixSlider);
 	connect(m_fxaaEdgeSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_fxaaEdgeSlider);
 	connect(m_fxaaEdgeMinSlider, &ScalarSlider::valueChanged,
 		this, emitCfg);
+	bindGesture(m_fxaaEdgeMinSlider);
 
 	// --- Pipeline ---
 	connect(m_pipelineCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),

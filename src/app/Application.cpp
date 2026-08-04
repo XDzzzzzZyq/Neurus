@@ -455,6 +455,13 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		// Forward mouse scroll to Editor for camera zoom
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseScrolled);
 
+		// Forward mouse press/release to Editor so it can bound the camera
+		// drag gesture (middle-button orbit/pan/dolly → one undo entry). The
+		// selection lambda below also listens to mousePressed (Left button);
+		// both connections coexist.
+		ConnectUIEvent(viewport, &neurus::Viewport::mousePressed);
+		ConnectUIEvent(viewport, &neurus::Viewport::mouseReleased);
+
 		// Handle left-click for pixel-perfect object selection via IDBuffer
 		QObject::connect(viewport, &neurus::Viewport::mousePressed,
 		                 [this, viewport](const neurus::MousePressEvent& e) {
@@ -490,6 +497,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
 		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
+		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::editBegin);
+		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::editEnd);
 	}
 
 	// --- Shader Editor signals → Editor ---

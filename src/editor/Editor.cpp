@@ -9,6 +9,7 @@
 #include "editor/events/SceneEvents.h"
 
 #include "editor/controllers/CameraController.h"
+#include "editor/controllers/RenderConfigController.h"
 #include "editor/controllers/ShaderController.h"
 #include "editor/controllers/SceneController.h"
 #include "editor/events/EventBus.h"
@@ -107,11 +108,6 @@ void Editor::Initialize()
 		ed_operations.Redo();
 	});
 
-	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		m_config = e.config;
-	});
-
 	// Load IBL environment now that the scene is available
 	OnIBLLoad();
 
@@ -119,6 +115,17 @@ void Editor::Initialize()
 	RegisterController<CameraController>();
 	RegisterController<ShaderController>();
 	RegisterController<SceneController>();
+
+	// RenderConfigController needs the Editor-owned RenderConfig, which
+	// RegisterController<T>() can't supply — construct it manually with a
+	// provider. It applies + records config edits (the single mutation path),
+	// replacing the inline RenderConfigChangedEvent handler removed above.
+	{
+		auto cfgCtrl = std::make_unique<RenderConfigController>(
+			[this]() -> RenderConfig* { return &m_config; });
+		cfgCtrl->Init(ed_eventBus, ed_operations);
+		ed_controllers.push_back(std::move(cfgCtrl));
+	}
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
@@ -147,6 +154,20 @@ void Editor::Initialize()
 			else
 				ed_eventBus.enqueue(CameraRotateEvent{cam, e.delta.x, e.delta.y});
 		}
+	});
+
+	// Middle-button press/release bound the orbit/pan/dolly drag gesture so it
+	// collapses to one undo entry. The typed drag events flow through the same
+	// controller chain as the camera moves themselves (no direct handling here).
+	ed_eventBus.subscribe<MousePressEvent>([this](const MousePressEvent& e) {
+		if (e.button != Input::Middle) return;
+		if (auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera()))
+			ed_eventBus.enqueue(CameraDragBegin{cam});
+	});
+	ed_eventBus.subscribe<MouseReleaseEvent>([this](const MouseReleaseEvent& e) {
+		if (e.button != Input::Middle) return;
+		if (auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera()))
+			ed_eventBus.enqueue(CameraDragEnd{cam});
 	});
 
 	ed_eventBus.subscribe<MouseScrollEvent>([this](const MouseScrollEvent& e) {

@@ -127,6 +127,9 @@ public:
 public:
 	RenderConfig() = default;
 
+	/** @brief Value equality across all settings (used to skip no-op undo entries). */
+	bool operator==(const RenderConfig&) const = default;
+
 	// --- Cereal serialization ---
 
 	template<class Archive>

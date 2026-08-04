@@ -1,0 +1,57 @@
+/**
+ * @file ConfigOperations.h
+ * @brief Undoable operation for whole-RenderConfig edits.
+ *
+ * RenderConfig is scene-level (not per-object) state, so it does not fit the
+ * UID-based TransitionOp. SetRenderConfigOp stores the absolute before/after
+ * config values and replays by dispatching the same RenderConfigChangedEvent
+ * the UI panel emits, keeping mutation on the single controller path.
+ *
+ * Unlike the camera/light transition ops, config edits are deliberately NOT
+ * mergeable: the empty (default) MergeKey means each recorded op is its own
+ * undo entry. Continuous slider drags are instead bounded by the controller's
+ * ConfigEditBegin/ConfigEditEnd gesture (see RenderConfigController), collapsing
+ * one drag to a single op recorded on release.
+ */
+
+#pragma once
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "editor/events/ConfigEvents.h"
+#include "editor/operations/Operation.h"
+#include "render/RenderConfig.h"
+
+namespace neurus {
+
+/**
+ * @brief Absolute whole-RenderConfig edit (before -> after), non-mergeable.
+ */
+class SetRenderConfigOp : public Operation
+{
+public:
+	SetRenderConfigOp(RenderConfig before, RenderConfig after)
+		: m_before(std::move(before))
+		, m_after(std::move(after))
+	{}
+
+	void Emit(OperationContext& ctx) override
+	{
+		ctx.bus.EmitNow(RenderConfigChangedEvent{ m_after });
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		return std::make_unique<SetRenderConfigOp>(m_after, m_before);
+	}
+
+	std::string Label() const override { return "Render Config"; }
+
+private:
+	RenderConfig m_before;
+	RenderConfig m_after;
+};
+
+} // namespace neurus

@@ -54,14 +54,17 @@ void NotifyCameraChanged(const neurus::Camera& camera)
 
 /**
  * @brief Records the coupled camera pose transition for undo/redo.
+ * @tparam Op Concrete op type: CameraTransformOp (drag, non-mergeable) or
+ *         CameraZoomOp (scroll, mergeable).
  * @param ops Operation sink.
  * @param camera Camera after the navigation math ran.
  * @param beforePos Camera position captured before the edit.
  * @param beforeTar Look-at target captured before the edit.
  * @note No-op if the pose did not change (degenerate/clamped moves), so the
- *       history is not polluted. The CameraTransformOp's per-camera MergeKey
- *       coalesces a continuous manipulation (orbit/pan/dolly/zoom) into one step.
+ *       history is not polluted. The op type — not a flag — decides whether
+ *       consecutive same-camera edits coalesce.
  */
+template<typename Op>
 void RecordCameraPose(neurus::IOperationSink& ops, const neurus::Camera& camera,
                       const glm::vec3& beforePos, const glm::vec3& beforeTar)
 {
@@ -69,7 +72,7 @@ void RecordCameraPose(neurus::IOperationSink& ops, const neurus::Camera& camera,
 	const glm::vec3 afterTar = camera.cam_tar;
 	if (afterPos == beforePos && afterTar == beforeTar) return;
 
-	ops.Submit(std::make_unique<neurus::CameraTransformOp>(
+	ops.Submit(std::make_unique<Op>(
 		camera.GetObjectID(),
 		neurus::CameraPose{ beforePos, beforeTar },
 		neurus::CameraPose{ afterPos, afterTar }));
@@ -234,34 +237,46 @@ namespace neurus {
 
 void CameraController::Init(EventQueue& bus, IOperationSink& ops)
 {
+	// --- Gesture boundaries: bound a continuous orbit/pan/dolly drag ---
+	bus.subscribe<CameraDragBegin>([this](const CameraDragBegin& e) {
+		m_dragging = true;
+		m_cam = e.cam;
+		m_before = CameraPose{ e.cam->GetPosition(), e.cam->cam_tar };
+	});
+	bus.subscribe<CameraDragEnd>([this, &ops](const CameraDragEnd& e) {
+		if (m_dragging && m_cam == e.cam)
+		{
+			// One op per gesture, non-mergeable: a following separate drag on
+			// the same camera stays its own undo entry.
+			RecordCameraPose<CameraTransformOp>(ops, *e.cam, m_before.position, m_before.target);
+		}
+		m_dragging = false;
+		m_cam = nullptr;
+	});
+
+	// --- Continuous drag moves: mutate live, DO NOT record (bounded above) ---
+	bus.subscribe<CameraRotateEvent>([&bus](const CameraRotateEvent& e) {
+		OnCameraRotate(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+	bus.subscribe<CameraPushEvent>([&bus](const CameraPushEvent& e) {
+		OnCameraPush(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+	bus.subscribe<CameraSlideEvent>([&bus](const CameraSlideEvent& e) {
+		OnCameraSlide(e);
+		bus.enqueue(RenderResetEvent{});
+	});
+
+	// --- Scroll zoom: no press/release, record per-event and merge via MergeKey ---
 	bus.subscribe<CameraZoomEvent>([&bus, &ops](const CameraZoomEvent& e) {
 		const glm::vec3 bp = e.cam->GetPosition();
 		const glm::vec3 bt = e.cam->cam_tar;
 		OnCameraZoom(e);
-		RecordCameraPose(ops, *e.cam, bp, bt);
+		RecordCameraPose<CameraZoomOp>(ops, *e.cam, bp, bt);
 		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraRotateEvent>([&bus, &ops](const CameraRotateEvent& e) {
-		const glm::vec3 bp = e.cam->GetPosition();
-		const glm::vec3 bt = e.cam->cam_tar;
-		OnCameraRotate(e);
-		RecordCameraPose(ops, *e.cam, bp, bt);
-		bus.enqueue(RenderResetEvent{});
-	});
-	bus.subscribe<CameraPushEvent>([&bus, &ops](const CameraPushEvent& e) {
-		const glm::vec3 bp = e.cam->GetPosition();
-		const glm::vec3 bt = e.cam->cam_tar;
-		OnCameraPush(e);
-		RecordCameraPose(ops, *e.cam, bp, bt);
-		bus.enqueue(RenderResetEvent{});
-	});
-	bus.subscribe<CameraSlideEvent>([&bus, &ops](const CameraSlideEvent& e) {
-		const glm::vec3 bp = e.cam->GetPosition();
-		const glm::vec3 bt = e.cam->cam_tar;
-		OnCameraSlide(e);
-		RecordCameraPose(ops, *e.cam, bp, bt);
-		bus.enqueue(RenderResetEvent{});
-	});
+
 	// Resize is viewport-driven (aspect ratio), not a user edit — not recorded.
 	bus.subscribe<CameraResizeEvent>([&bus](const CameraResizeEvent& e) {
 		OnCameraResize(e);
