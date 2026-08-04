@@ -17,6 +17,8 @@
 
 #include "editor/controllers/SceneController.h"
 
+#include <vector>
+
 #include "editor/events/SceneEvents.h"
 #include "editor/events/EditorEvents.h"
 #include "editor/operations/IOperationSink.h"
@@ -64,28 +66,76 @@ void LightingRebuilt(neurus::EventQueue& bus)
 // Selection
 // ---------------------------------------------------------------------------
 
-void OnObjectSelected(const neurus::ObjectSelected& e, neurus::EventQueue&)
+/** @brief Captures the current selection set as an absolute UID endpoint. */
+neurus::SelectionState SnapshotSelection(const neurus::Scene& scene)
+{
+	neurus::SelectionState state;
+	const auto& list = scene.selections.GetSelectedList();
+	state.selectedUids.reserve(list.size());
+	for (const neurus::ObjectID* obj : list)
+		if (obj) state.selectedUids.push_back(obj->GetObjectID());
+
+	const neurus::ObjectID* active = scene.selections.GetActiveObject();
+	state.activeUid = active ? active->GetObjectID() : 0;
+	return state;
+}
+
+/** @brief Records a selection edit if it changed the set (keeps redo intact). */
+void RecordSelection(neurus::Scene& scene, neurus::SelectionState before, neurus::IOperationSink& ops)
+{
+	neurus::SelectionState after = SnapshotSelection(scene);
+	if (before.selectedUids == after.selectedUids && before.activeUid == after.activeUid)
+		return; // No-op edit (e.g. re-select active object): nothing to record.
+	ops.Submit(std::make_unique<neurus::SetSelectionOp>(std::move(before), std::move(after)));
+}
+
+void OnObjectSelected(const neurus::ObjectSelected& e, neurus::EventQueue&, neurus::IOperationSink& ops)
 {
 	neurus::Scene* scene = neurus::Scene::As(e.scene);
 	if (!scene) return;
 
 	const bool increment = (e.modifiers & (neurus::Input::Mod_Shift | neurus::Input::Mod_Ctrl)) != 0;
 
+	neurus::SelectionState before = SnapshotSelection(*scene);
+
 	if (!e.object)
 	{
 		// Background click (objectId 0) -> clear selection
 		if (!increment) scene->selections.ClearSelection();
-		return;
+	}
+	else
+	{
+		scene->selections.Select(e.object, increment);
 	}
 
-	scene->selections.Select(e.object, increment);
+	RecordSelection(*scene, std::move(before), ops);
 }
 
-void OnObjectDeselected(const neurus::ObjectDeselected& e, neurus::EventQueue&)
+void OnObjectDeselected(const neurus::ObjectDeselected& e, neurus::EventQueue&, neurus::IOperationSink& ops)
 {
 	neurus::Scene* scene = neurus::Scene::As(e.scene);
 	if (!scene || !e.object) return;
+
+	neurus::SelectionState before = SnapshotSelection(*scene);
 	scene->selections.Deselect(e.object, false);
+	RecordSelection(*scene, std::move(before), ops);
+}
+
+void OnSelectionChanged(const neurus::SelectionChanged& e, neurus::EventQueue&)
+{
+	neurus::Scene* scene = neurus::Scene::As(e.scene);
+	if (!scene) return;
+
+	// Replay path for SetSelectionOp: resolve stored UIDs to live objects and
+	// restore the whole set at once. Skip stale UIDs (object gone).
+	std::vector<const neurus::ObjectID*> list;
+	list.reserve(e.selectedUids.size());
+	for (int uid : e.selectedUids)
+		if (const neurus::ObjectID* obj = scene->GetObjectID(uid))
+			list.push_back(obj);
+
+	const neurus::ObjectID* active = e.activeUid != 0 ? scene->GetObjectID(e.activeUid) : nullptr;
+	scene->selections.RestoreState(std::move(list), active);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,8 +388,9 @@ namespace neurus {
 
 void SceneController::Init(EventQueue& bus, IOperationSink& ops)
 {
-	bus.subscribe<ObjectSelected>([&bus](const ObjectSelected& e) { OnObjectSelected(e, bus); });
-	bus.subscribe<ObjectDeselected>([&bus](const ObjectDeselected& e) { OnObjectDeselected(e, bus); });
+	bus.subscribe<ObjectSelected>([&bus, &ops](const ObjectSelected& e) { OnObjectSelected(e, bus, ops); });
+	bus.subscribe<ObjectDeselected>([&bus, &ops](const ObjectDeselected& e) { OnObjectDeselected(e, bus, ops); });
+	bus.subscribe<SelectionChanged>([&bus](const SelectionChanged& e) { OnSelectionChanged(e, bus); });
 	bus.subscribe<VisibilityChanged>([&bus, &ops](const VisibilityChanged& e) { OnVisibilityChanged(e, bus, ops); });
 	bus.subscribe<PositionChanged>([&bus, &ops](const PositionChanged& e) { OnPositionChanged(e, bus, ops); });
 	bus.subscribe<RotationChanged>([&bus, &ops](const RotationChanged& e) { OnRotationChanged(e, bus, ops); });

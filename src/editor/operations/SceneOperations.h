@@ -13,7 +13,10 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "glm/glm.hpp"
 
@@ -256,6 +259,52 @@ public:
 	{
 		return CameraFovChanged{ o, v };
 	}
+};
+
+/** @brief Absolute selection-set endpoint: ordered selected UIDs + active UID. */
+struct SelectionState
+{
+	std::vector<int> selectedUids; ///< Ordered selected object UIDs.
+	int activeUid = 0;             ///< Active object UID (0 = none).
+};
+
+/**
+ * @brief Absolute selection-set edit (select / multi-select / deselect / clear).
+ *
+ * Selection is scene-level SET state (Scene::selections), not a per-object
+ * flag, so it does not fit TransitionOp: the op stores the full before/after
+ * UID lists and replays by dispatching a single SelectionChanged event.
+ *
+ * PreservesRedo() is true so navigating the selection does NOT discard a
+ * pending redo chain. This is safe because every operation is an absolute
+ * state-set: a preserved redo op restores its stored end state regardless of
+ * selection changes recorded in between.
+ */
+class SetSelectionOp : public Operation
+{
+public:
+	SetSelectionOp(SelectionState before, SelectionState after)
+		: m_before(std::move(before))
+		, m_after(std::move(after))
+	{}
+
+	void Emit(OperationContext& ctx) override
+	{
+		ctx.bus.EmitNow(SelectionChanged{ &ctx.scene, m_after.selectedUids, m_after.activeUid });
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		return std::make_unique<SetSelectionOp>(m_after, m_before);
+	}
+
+	std::string Label() const override { return "Select"; }
+
+	bool PreservesRedo() const override { return true; }
+
+private:
+	SelectionState m_before;
+	SelectionState m_after;
 };
 
 } // namespace neurus

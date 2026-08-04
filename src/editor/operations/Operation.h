@@ -72,6 +72,19 @@ public:
 	 *       does nothing; TransitionOp adopts the newer "after" value.
 	 */
 	virtual void MergeFrom(const Operation& newer) { (void)newer; }
+
+	/**
+	 * @brief Whether recording this op should keep the redo stack intact.
+	 * @return false (default) for edits that branch history and clear redo;
+	 *         true for "transparent" ops that append to undo without discarding
+	 *         a pending redo chain.
+	 * @note Safe only because operations are absolute state-sets (before/after
+	 *       endpoints by UID), not deltas: a preserved redo op replays to its
+	 *       stored end state correctly regardless of any transparent ops recorded
+	 *       in between. Selection changes use this so navigating the selection
+	 *       does not throw away an undone edit the user may still redo.
+	 */
+	virtual bool PreservesRedo() const { return false; }
 };
 
 /**

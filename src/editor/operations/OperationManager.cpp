@@ -34,9 +34,12 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 		return;
 	}
 
+	// A new forward edit normally invalidates the redo timeline. Transparent
+	// ops (e.g. selection) preserve it: because operations are absolute
+	// state-sets, a pending redo still replays correctly after them.
+	const bool preservesRedo = op->PreservesRedo();
 	m_undo.push_back(std::move(op));
-	// A new forward edit invalidates the redo timeline.
-	m_redo.clear();
+	if (!preservesRedo) m_redo.clear();
 }
 
 void OperationManager::Undo()

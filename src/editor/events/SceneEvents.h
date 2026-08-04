@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace neurus {
 
@@ -40,6 +41,21 @@ struct ObjectDeselected
 {
 	const UID* scene = nullptr;
 	const ObjectID* object = nullptr;
+};
+
+/**
+ * @brief Absolute selection-set state applied to the scene.
+ *
+ * Emitted only when replaying a SetSelectionOp: live selection events
+ * (ObjectSelected/ObjectDeselected) mutate the set incrementally, so the
+ * undoable operation stores the absolute selected-UID list plus the active
+ * UID and dispatches this to restore the whole set at once.
+ */
+struct SelectionChanged
+{
+	const UID* scene = nullptr;       ///< Editor-owned Scene (selection state).
+	std::vector<int> selectedUids;    ///< Ordered selected object UIDs.
+	int activeUid = 0;                ///< Active object UID (0 = none).
 };
 
 // ---------------------------------------------------------------------------

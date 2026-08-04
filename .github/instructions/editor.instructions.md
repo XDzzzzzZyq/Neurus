@@ -263,7 +263,25 @@ UIEvents::newFrame() → Editor::Edit(input) → Renderer::DrawFrame(scene)
 
 ## Future Enhancements
 
-- SelectionManager (object picking, multi-select)
-- Undo/redo system (Command pattern)
 - Scene loading/saving orchestration
 - Transform gizmo interaction
+
+## Undo/Redo (`src/editor/operations/`)
+
+Event-replay undo/redo (Design B, group-theoretic). Operations never mutate the
+scene directly: `Emit()` re-dispatches the originating scene event via
+`EventQueue::EmitNow`, so the existing controller handler performs the mutation
+(single mutation path). A `Phase::Replaying` guard in `OperationManager` makes
+`Submit()` a no-op during replay so playback does not re-record.
+
+- Operations are **absolute state-sets** (before/after endpoints by UID), not
+  deltas — safe to replay across intervening changes and to no-op on stale UIDs.
+- `TransitionOp<Derived, TEvent, Value>` (CRTP) covers per-object value edits;
+  `Inverse()` swaps before/after. `MergeKey()`/`MergeFrom()` coalesce a
+  continuous manipulation (e.g. camera drag) into one undo entry.
+- `Operation::PreservesRedo()` (default false): a branching edit clears the redo
+  stack. **Selection** ops (`SetSelectionOp`) override it to `true` so navigating
+  the selection appends to undo *without* discarding a pending redo — safe
+  because ops are absolute. Selection is scene-level SET state, so it replays via
+  the absolute `SelectionChanged` event + `Selections::RestoreState`.
+

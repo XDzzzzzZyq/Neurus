@@ -18,6 +18,7 @@
 #include "editor/controllers/SceneController.h"
 #include "editor/events/EventBus.h"
 #include "editor/events/SceneEvents.h"
+#include "editor/Input.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/SceneOperations.h"
@@ -315,3 +316,104 @@ TEST_F(OperationManagerTest, CameraTransform_Inverse_IsInvolution)
 	EXPECT_EQ(m_camera->GetPosition(), pos);
 	EXPECT_EQ(m_camera->cam_tar, tar);
 }
+
+// --- Selection undo/redo ----------------------------------------------------
+
+TEST_F(OperationManagerTest, Selection_RoundTrip)
+{
+	// Select the mesh.
+	m_eventBus.enqueue(ObjectSelected{ &m_scene, m_mesh.get(), 0 });
+	Process();
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_mesh.get());
+	ASSERT_TRUE(m_operations.CanUndo());
+
+	// Undo clears the selection.
+	m_operations.Undo();
+	EXPECT_FALSE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
+
+	// Redo restores it.
+	m_operations.Redo();
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_mesh.get());
+}
+
+TEST_F(OperationManagerTest, Selection_MultiSelect_RoundTrip)
+{
+	// Select mesh, then shift-add the light.
+	m_eventBus.enqueue(ObjectSelected{ &m_scene, m_mesh.get(), 0 });
+	Process();
+	m_eventBus.enqueue(ObjectSelected{ &m_scene, m_light.get(), Input::Mod_Shift });
+	Process();
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 2u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_light.get()));
+
+	// Undo removes only the multi-select step (back to mesh only).
+	m_operations.Undo();
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 1u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_FALSE(m_scene.selections.IsSelected(m_light.get()));
+
+	// Redo re-adds the light.
+	m_operations.Redo();
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 2u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_light.get()));
+}
+
+TEST_F(OperationManagerTest, Selection_DoesNotClearRedo)
+{
+	// Record a real edit, then undo it so a redo is pending.
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 42.0f });
+	Process();
+	m_operations.Undo();
+	EXPECT_FLOAT_EQ(m_light->light_power, 10.0f);
+	ASSERT_TRUE(m_operations.CanRedo());
+
+	// A selection change is transparent: it appends to undo but MUST keep the
+	// pending redo intact (the key property of PreservesRedo()).
+	m_eventBus.enqueue(ObjectSelected{ &m_scene, m_mesh.get(), 0 });
+	Process();
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	ASSERT_TRUE(m_operations.CanRedo());
+
+	// Redo still restores the undone edit.
+	m_operations.Redo();
+	EXPECT_FLOAT_EQ(m_light->light_power, 42.0f);
+}
+
+TEST_F(OperationManagerTest, RealEdit_ClearsRedo_AfterSelection)
+{
+	// Undo a real edit (redo pending), interleave a selection, then a real edit.
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 42.0f });
+	Process();
+	m_operations.Undo();
+	ASSERT_TRUE(m_operations.CanRedo());
+
+	m_eventBus.enqueue(ObjectSelected{ &m_scene, m_mesh.get(), 0 });
+	Process();
+	ASSERT_TRUE(m_operations.CanRedo()); // selection preserved redo
+
+	// A branching edit still discards the redo timeline.
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 88.0f });
+	Process();
+	EXPECT_FALSE(m_operations.CanRedo());
+}
+
+TEST_F(OperationManagerTest, SetSelectionOp_Inverse_IsInvolution)
+{
+	SelectionState before{ {}, 0 };
+	SelectionState after{ { m_mesh->GetObjectID() }, m_mesh->GetObjectID() };
+	auto op = std::make_unique<SetSelectionOp>(before, after);
+	auto twice = op->Inverse()->Inverse();
+
+	EXPECT_EQ(twice->Label(), op->Label());
+	EXPECT_TRUE(twice->PreservesRedo());
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	twice->Emit(ctx); // reproduces the original "after" selection.
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_mesh.get());
+}
+

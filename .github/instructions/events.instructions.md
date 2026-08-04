@@ -67,6 +67,14 @@ struct ObjectDeselected {
     const ObjectID* object = nullptr;
 };
 
+// Selection replay (dispatched only by SetSelectionOp on undo/redo): absolute
+// selection-set restore by UID. Live selection uses the incremental events above.
+struct SelectionChanged {
+    const UID*       scene = nullptr;   // Editor-owned Scene (selection state)
+    std::vector<int> selectedUids;      // Ordered selected object UIDs
+    int              activeUid = 0;     // Active object UID (0 = none)
+};
+
 // Visibility
 struct VisibilityChanged {
     const ObjectID* object = nullptr;
@@ -82,6 +90,9 @@ struct ScaleChanged    { const ObjectID* object; float sclX, sclY, sclZ; };
 // Camera properties
 struct CameraTargetChanged { const ObjectID* object; float targetX, targetY, targetZ; };
 struct CameraFovChanged    { const ObjectID* object; float fov; };
+// Absolute camera pose (position + target) — replay only, dispatched by
+// CameraTransformOp on undo/redo (live navigation carries relative deltas).
+struct CameraPoseChanged   { const ObjectID* object; float posX, posY, posZ, tarX, tarY, tarZ; };
 
 // Mesh properties
 struct MeshShadowChanged  { const ObjectID* object; bool enabled; };
