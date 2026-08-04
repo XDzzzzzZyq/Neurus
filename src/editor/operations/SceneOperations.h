@@ -2,7 +2,7 @@
  * @file SceneOperations.h
  * @brief Concrete undoable operations for scene property/transform edits.
  *
- * Each edit is an "absolute set" operation built on AbsoluteSetOperation
+ * Each edit is a reversible before→after transition built on TransitionOp
  * (see Operation.h): it stores the target object's UID plus absolute
  * before/after values, and replays by dispatching the same scene event the UI
  * would emit. A concrete class supplies only two things — a MakeEvent() that
@@ -21,10 +21,10 @@
 namespace neurus {
 
 /** @brief Absolute light-power edit. */
-class SetLightPowerOp : public AbsoluteSetOperation<SetLightPowerOp, LightPowerChanged, float>
+class SetLightPowerOp : public TransitionOp<SetLightPowerOp, LightPowerChanged, float>
 {
 public:
-	using AbsoluteSetOperation::AbsoluteSetOperation;
+	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Power";
 
 	LightPowerChanged MakeEvent(const ObjectID* o, const float& v) const
@@ -34,10 +34,10 @@ public:
 };
 
 /** @brief Absolute light-color edit. */
-class SetLightColorOp : public AbsoluteSetOperation<SetLightColorOp, LightColorChanged, glm::vec3>
+class SetLightColorOp : public TransitionOp<SetLightColorOp, LightColorChanged, glm::vec3>
 {
 public:
-	using AbsoluteSetOperation::AbsoluteSetOperation;
+	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Color";
 
 	LightColorChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
@@ -47,10 +47,10 @@ public:
 };
 
 /** @brief Absolute light-shadow toggle. */
-class SetLightShadowOp : public AbsoluteSetOperation<SetLightShadowOp, LightShadowChanged, bool>
+class SetLightShadowOp : public TransitionOp<SetLightShadowOp, LightShadowChanged, bool>
 {
 public:
-	using AbsoluteSetOperation::AbsoluteSetOperation;
+	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Toggle Light Shadow";
 
 	LightShadowChanged MakeEvent(const ObjectID* o, const bool& v) const
@@ -60,10 +60,10 @@ public:
 };
 
 /** @brief Absolute position edit. */
-class SetPositionOp : public AbsoluteSetOperation<SetPositionOp, PositionChanged, glm::vec3>
+class SetPositionOp : public TransitionOp<SetPositionOp, PositionChanged, glm::vec3>
 {
 public:
-	using AbsoluteSetOperation::AbsoluteSetOperation;
+	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Move";
 
 	PositionChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
@@ -73,10 +73,10 @@ public:
 };
 
 /** @brief Absolute rotation edit. */
-class SetRotationOp : public AbsoluteSetOperation<SetRotationOp, RotationChanged, glm::vec3>
+class SetRotationOp : public TransitionOp<SetRotationOp, RotationChanged, glm::vec3>
 {
 public:
-	using AbsoluteSetOperation::AbsoluteSetOperation;
+	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Rotate";
 
 	RotationChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
@@ -86,10 +86,10 @@ public:
 };
 
 /** @brief Absolute scale edit. */
-class SetScaleOp : public AbsoluteSetOperation<SetScaleOp, ScaleChanged, glm::vec3>
+class SetScaleOp : public TransitionOp<SetScaleOp, ScaleChanged, glm::vec3>
 {
 public:
-	using AbsoluteSetOperation::AbsoluteSetOperation;
+	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Scale";
 
 	ScaleChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const

@@ -56,14 +56,14 @@ public:
 };
 
 /**
- * @brief Generic base for "absolute set" edits, shared by concrete operations.
+ * @brief Generic base for reversible before→after value edits (a "transition").
  *
- * An absolute-set operation stores a target object's UID plus the absolute
- * before/after values, and replays by dispatching the scene event the UI would
- * emit — keeping mutation on the single controller path and making inversion a
- * value swap. This base carries all the shared logic; a concrete subclass only
- * declares how a stored value becomes its event via a `MakeEvent()` member and
- * a static `kLabel`.
+ * A transition stores a target object's UID plus the *absolute* before/after
+ * values (endpoints, not deltas), and replays by dispatching the scene event
+ * the UI would emit — keeping mutation on the single controller path and making
+ * inversion a value swap. This base carries all the shared logic; a concrete
+ * subclass only declares how a stored value becomes its event via a
+ * `MakeEvent()` member and a static `kLabel`.
  *
  * CRTP (Curiously Recurring Template Pattern) lets Inverse() reconstruct the
  * *concrete* subclass with swapped values, so an operation on the redo stack
@@ -78,10 +78,10 @@ public:
  * @tparam Value   Stored value type (float, bool, glm::vec3, ...).
  */
 template<typename Derived, typename TEvent, typename Value>
-class AbsoluteSetOperation : public Operation
+class TransitionOp : public Operation
 {
 public:
-	AbsoluteSetOperation(int uid, Value before, Value after)
+	TransitionOp(int uid, Value before, Value after)
 		: m_uid(uid)
 		, m_before(std::move(before))
 		, m_after(std::move(after))
