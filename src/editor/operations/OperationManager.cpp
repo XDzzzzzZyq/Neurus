@@ -31,6 +31,7 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 	{
 		m_undo.back()->MergeFrom(*op);
 		m_redo.clear();
+		++m_revision;
 		return;
 	}
 
@@ -40,6 +41,7 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 	const bool preservesRedo = op->PreservesRedo();
 	m_undo.push_back(std::move(op));
 	if (!preservesRedo) m_redo.clear();
+	++m_revision;
 }
 
 void OperationManager::Undo()
@@ -52,6 +54,7 @@ void OperationManager::Undo()
 	std::unique_ptr<Operation> inverse = g->Inverse();
 	Replay(*inverse);
 	m_redo.push_back(std::move(inverse));
+	++m_revision;
 }
 
 void OperationManager::Redo()
@@ -65,12 +68,33 @@ void OperationManager::Redo()
 	std::unique_ptr<Operation> forward = gInverse->Inverse();
 	Replay(*forward);
 	m_undo.push_back(std::move(forward));
+	++m_revision;
 }
 
 void OperationManager::Clear()
 {
 	m_undo.clear();
 	m_redo.clear();
+	++m_revision;
+}
+
+HistoryView OperationManager::GetHistoryView() const
+{
+	HistoryView view;
+	view.revision = m_revision;
+
+	// Undo entries: oldest → newest (front → back); the last is the next Undo.
+	view.undo.reserve(m_undo.size());
+	for (const auto& op : m_undo)
+		view.undo.push_back(op->Label());
+
+	// Redo entries: replay order — the next Redo is m_redo.back(), so walk the
+	// stack top → bottom to list them in the order Redo would reapply them.
+	view.redo.reserve(m_redo.size());
+	for (auto it = m_redo.rbegin(); it != m_redo.rend(); ++it)
+		view.redo.push_back((*it)->Label());
+
+	return view;
 }
 
 void OperationManager::Replay(Operation& op)

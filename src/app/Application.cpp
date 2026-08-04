@@ -394,9 +394,12 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 	                         rctx.editor = editor;
 	                         auto profile = app_renderer->DrawFrame(rctx);
 
+	                         const neurus::HistoryView history = app_editor->GetHistory();
+
 	                         neurus::UIContext ctx;
 	                         ctx.editor = editor;
 	                         ctx.profile = &profile;
+	                         ctx.history = &history;
 	                         app_mainWindow->Refresh(ctx);
 	                     }
 	                 });

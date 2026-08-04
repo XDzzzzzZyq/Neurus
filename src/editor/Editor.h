@@ -7,6 +7,7 @@
 
 #include "controllers/Controllers.h"
 #include "editor/events/EventBus.h"
+#include "editor/operations/HistoryView.h"
 #include "editor/operations/OperationManager.h"
 #include "render/RenderConfig.h"
 #include "scene/EditorContext.h"
@@ -64,6 +65,16 @@ public:
 	 * never builds a RenderContext or UIContext itself.
 	 */
 	EditorContext GetContext() const;
+
+	/**
+	 * @brief Returns a read-only snapshot of the undo/redo history.
+	 *
+	 * The Application carries this into UIContext each frame so the History
+	 * panel can display the stacks without touching Editor-owned operations.
+	 * It is intentionally kept out of EditorContext because the Renderer has
+	 * no use for history state.
+	 */
+	HistoryView GetHistory() const { return ed_operations.GetHistoryView(); }
 
 	template<typename T>
 	void RegisterController()

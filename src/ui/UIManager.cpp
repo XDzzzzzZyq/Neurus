@@ -9,10 +9,14 @@
 #include "UIContext.h"
 
 #include "editor/events/UIEvents.h"
+#include "editor/operations/HistoryView.h"
 
 #include <QApplication>
+#include <QAction>
 #include <QFileDialog>
+#include <QFont>
 #include <QLabel>
+#include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QVBoxLayout>
@@ -82,10 +86,71 @@ int UIManager::getViewportHeight() const
 
 void UIManager::Refresh(const UIContext& ctx)
 {
+	// Cache the latest undo/redo labels so the Edit submenus can display the
+	// stacks on demand (the snapshot pointer is only valid for this call).
+	if (const auto* history = static_cast<const HistoryView*>(ctx.history))
+	{
+		m_undoLabels.clear();
+		for (const auto& label : history->undo)
+			m_undoLabels.push_back(QString::fromStdString(label));
+
+		m_redoLabels.clear();
+		for (const auto& label : history->redo)
+			m_redoLabels.push_back(QString::fromStdString(label));
+
+		// Grey out an empty submenu, matching how Undo/Redo normally disable.
+		if (m_undoMenu)
+			m_undoMenu->menuAction()->setEnabled(!m_undoLabels.isEmpty());
+		if (m_redoMenu)
+			m_redoMenu->menuAction()->setEnabled(!m_redoLabels.isEmpty());
+	}
+
 	for (auto& [type, widget] : m_panels)
 	{
 		auto* panel = qobject_cast<UIPanel*>(widget);
 		panel->Refresh(ctx);
+	}
+}
+
+// =========================================================================
+// Edit menu Undo/Redo submenus — populate the stack list before showing
+// =========================================================================
+
+void UIManager::PopulateUndoMenu()
+{
+	for (QAction* item : m_undoItems)
+	{
+		m_undoMenu->removeAction(item);
+		delete item;
+	}
+	m_undoItems.clear();
+
+	// Newest first: the top row is the next Ctrl+Z target. View-only (disabled).
+	for (auto it = m_undoLabels.crbegin(); it != m_undoLabels.crend(); ++it)
+	{
+		auto* item = new QAction(*it, m_undoMenu);
+		item->setEnabled(false);
+		m_undoMenu->addAction(item);
+		m_undoItems.push_back(item);
+	}
+}
+
+void UIManager::PopulateRedoMenu()
+{
+	for (QAction* item : m_redoItems)
+	{
+		m_redoMenu->removeAction(item);
+		delete item;
+	}
+	m_redoItems.clear();
+
+	// Replay order: the top row is the next Ctrl+Y target. View-only (disabled).
+	for (const QString& label : m_redoLabels)
+	{
+		auto* item = new QAction(label, m_redoMenu);
+		item->setEnabled(false);
+		m_redoMenu->addAction(item);
+		m_redoItems.push_back(item);
 	}
 }
 
@@ -140,17 +205,28 @@ void UIManager::CreateMenus()
 
 	auto* editMenu = menuBar()->addMenu("&Edit");
 
-	auto* undoAction = editMenu->addAction("&Undo");
-	undoAction->setShortcut(QKeySequence::Undo);
-	connect(undoAction, &QAction::triggered, []() {
+	// Undo/Redo are expandable submenus that reveal their stacks (like "Add").
+	// The actual trigger actions live on the window so Ctrl+Z / Ctrl+Y keep
+	// working without a clickable menu action.
+	auto* undoTrigger = new QAction(this);
+	undoTrigger->setShortcut(QKeySequence::Undo);
+	connect(undoTrigger, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestUndo();
 	});
+	addAction(undoTrigger);
 
-	auto* redoAction = editMenu->addAction("&Redo");
-	redoAction->setShortcut(QKeySequence::Redo);
-	connect(redoAction, &QAction::triggered, []() {
+	auto* redoTrigger = new QAction(this);
+	redoTrigger->setShortcut(QKeySequence::Redo);
+	connect(redoTrigger, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestRedo();
 	});
+	addAction(redoTrigger);
+
+	m_undoMenu = editMenu->addMenu("&Undo");
+	connect(m_undoMenu, &QMenu::aboutToShow, this, &UIManager::PopulateUndoMenu);
+
+	m_redoMenu = editMenu->addMenu("&Redo");
+	connect(m_redoMenu, &QMenu::aboutToShow, this, &UIManager::PopulateRedoMenu);
 
 	editMenu->addSeparator();
 

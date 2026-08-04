@@ -19,10 +19,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <vector>
 
+#include "editor/operations/HistoryView.h"
 #include "editor/operations/IOperationSink.h"
 #include "editor/operations/Operation.h"
 
@@ -57,6 +59,12 @@ public:
 	bool CanUndo() const { return !m_undo.empty(); }
 	bool CanRedo() const { return !m_redo.empty(); }
 
+	/**
+	 * @brief Builds a read-only snapshot of both stacks for the History panel.
+	 * @return Labels (oldest-first undo, replay-order redo) plus the current revision.
+	 */
+	HistoryView GetHistoryView() const;
+
 	/** @brief Clears both stacks (e.g. on New/Load scene). */
 	void Clear();
 
@@ -72,6 +80,9 @@ private:
 
 	std::vector<std::unique_ptr<Operation>> m_undo;
 	std::vector<std::unique_ptr<Operation>> m_redo;
+
+	/// Monotonic counter bumped on every stack change; drives UI change detection.
+	uint64_t m_revision = 0;
 
 	Phase m_phase = Phase::Idle;
 };

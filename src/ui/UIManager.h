@@ -1,9 +1,11 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QStringList>
 #include "platform/PlatformSurface.h"
 #include <map>
 #include <string>
+#include <vector>
 
 #include "panels/UIPanel.h"
 
@@ -11,6 +13,9 @@ namespace ads {
 class CDockManager;
 class CDockWidget;
 }
+
+class QAction;
+class QMenu;
 
 namespace neurus {
 
@@ -90,6 +95,11 @@ private:
 	void CreateDocks();
 	void RestoreDefaultLayout();
 
+	/** @brief Populates the Undo submenu with the applied-operation stack. */
+	void PopulateUndoMenu();
+	/** @brief Populates the Redo submenu with the undone-operation stack. */
+	void PopulateRedoMenu();
+
 	ads::CDockManager* win_dockManager = nullptr;
 
 	// --- Panel registry (raw pointers; Qt parent-child manages lifetime) ---
@@ -97,6 +107,14 @@ private:
 
 	// --- Dock registry (raw pointers; CDockManager owns via Qt parent-child) ---
 	std::map<PanelType, ads::CDockWidget*> m_docks;
+
+	// --- Edit-menu Undo/Redo submenus (view-only stack lists) ---
+	QMenu*                m_undoMenu = nullptr; ///< Expands to the applied-op stack.
+	QMenu*                m_redoMenu = nullptr; ///< Expands to the undone-op stack.
+	std::vector<QAction*> m_undoItems;          ///< Rows currently shown in Undo menu.
+	std::vector<QAction*> m_redoItems;          ///< Rows currently shown in Redo menu.
+	QStringList           m_undoLabels;         ///< Applied ops, oldest → newest.
+	QStringList           m_redoLabels;         ///< Undone ops, in replay order.
 };
 
 } // namespace neurus

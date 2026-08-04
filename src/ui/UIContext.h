@@ -46,6 +46,14 @@ struct UIContext
 	const void* profile = nullptr;
 
 	/**
+	 * @brief Opaque pointer to the current undo/redo snapshot (const HistoryView*).
+	 *        Set by the Application from Editor::GetHistory(); the HistoryPanel
+	 *        casts it to const HistoryView*. Kept opaque so UIContext.h stays
+	 *        free of editor headers.
+	 */
+	const void* history = nullptr;
+
+	/**
 	 * @brief Returns all scene objects as const ObjectID* pointers.
 	 *
 	 * Casts editor.scene to const Scene* and collects every ObjectID from the
