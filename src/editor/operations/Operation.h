@@ -53,6 +53,25 @@ public:
 	 * @brief Human-readable label (for Edit menu / debugging).
 	 */
 	virtual std::string Label() const = 0;
+
+	/**
+	 * @brief Coalescing key for merging consecutive edits into one history entry.
+	 * @return Non-empty key for mergeable ops, empty (default) for standalone ops.
+	 * @note Two ops merge only when their keys are equal and non-empty; encode the
+	 *       target UID in the key so edits to different objects never coalesce.
+	 *       Used for low-frequency, high-count streams (camera scroll/drag) so a
+	 *       continuous manipulation collapses to a single undo step.
+	 */
+	virtual std::string MergeKey() const { return {}; }
+
+	/**
+	 * @brief Folds a newer same-key op's end state into this op (extends the range).
+	 * @param newer The just-submitted op that shares this op's MergeKey().
+	 * @note Only called by OperationManager when MergeKey() matches, which
+	 *       guarantees @p newer is the same concrete type and target. The base
+	 *       does nothing; TransitionOp adopts the newer "after" value.
+	 */
+	virtual void MergeFrom(const Operation& newer) { (void)newer; }
 };
 
 /**
@@ -101,6 +120,16 @@ public:
 	}
 
 	std::string Label() const override { return Derived::kLabel; }
+
+	/**
+	 * @brief Adopts @p newer's "after" value, keeping this op's original "before".
+	 * @note Safe cast: OperationManager calls this only when MergeKey() matches,
+	 *       so @p newer is the same TransitionOp specialization.
+	 */
+	void MergeFrom(const Operation& newer) override
+	{
+		m_after = static_cast<const TransitionOp&>(newer).m_after;
+	}
 
 protected:
 	int m_uid;      ///< Target object UID (serialized).

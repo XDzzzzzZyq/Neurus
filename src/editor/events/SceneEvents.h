@@ -103,6 +103,24 @@ struct CameraFovChanged
 	float fov = 60.0f;
 };
 
+/**
+ * @brief Absolute camera pose (position + look-at target) set.
+ *
+ * Emitted only when replaying a CameraTransformOp: live navigation events
+ * (rotate/slide/push/zoom) carry relative deltas and cannot be replayed, so
+ * the undoable operation stores the absolute endpoints and dispatches this.
+ */
+struct CameraPoseChanged
+{
+	const ObjectID* object = nullptr;
+	float posX = 0.0f;
+	float posY = 0.0f;
+	float posZ = 0.0f;
+	float tarX = 0.0f;
+	float tarY = 0.0f;
+	float tarZ = 0.0f;
+};
+
 // ---------------------------------------------------------------------------
 // Mesh property events
 // ---------------------------------------------------------------------------

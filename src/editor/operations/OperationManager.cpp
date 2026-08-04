@@ -23,6 +23,17 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 	if (m_phase == Phase::Replaying) return;
 	if (!op) return;
 
+	// Coalesce a stream of same-key edits (e.g. camera scroll/drag) into the
+	// undo-stack top so a continuous manipulation is a single undo step. The
+	// live state is already up to date; merging only extends the recorded range.
+	const std::string key = op->MergeKey();
+	if (!key.empty() && !m_undo.empty() && m_undo.back()->MergeKey() == key)
+	{
+		m_undo.back()->MergeFrom(*op);
+		m_redo.clear();
+		return;
+	}
+
 	m_undo.push_back(std::move(op));
 	// A new forward edit invalidates the redo timeline.
 	m_redo.clear();

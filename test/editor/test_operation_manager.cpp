@@ -21,6 +21,7 @@
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/SceneOperations.h"
+#include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
@@ -35,10 +36,12 @@ protected:
 	{
 		m_controller.Init(m_eventBus, m_operations);
 
-		m_mesh  = std::make_shared<Mesh>();
-		m_light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+		m_mesh   = std::make_shared<Mesh>();
+		m_light  = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+		m_camera = std::make_shared<Camera>();
 		m_scene.UseMesh(m_mesh);
 		m_scene.UseLight(m_light);
+		m_scene.UseCamera(m_camera);
 	}
 
 	void Process() { m_eventBus.Process(); }
@@ -49,6 +52,7 @@ protected:
 	SceneController m_controller;
 	std::shared_ptr<Mesh> m_mesh;
 	std::shared_ptr<Light> m_light;
+	std::shared_ptr<Camera> m_camera;
 };
 
 // --- Round-trip ------------------------------------------------------------
@@ -185,4 +189,129 @@ TEST_F(OperationManagerTest, Clear_EmptiesBothStacks)
 	m_operations.Clear();
 	EXPECT_FALSE(m_operations.CanUndo());
 	EXPECT_FALSE(m_operations.CanRedo());
+}
+
+// --- Visibility round-trip -------------------------------------------------
+
+TEST_F(OperationManagerTest, Visibility_RoundTrip)
+{
+	// Mesh starts fully visible.
+	ASSERT_TRUE(m_mesh->is_viewport);
+	ASSERT_TRUE(m_mesh->is_rendered);
+
+	m_eventBus.enqueue(VisibilityChanged{ m_mesh.get(), false, false });
+	Process();
+	EXPECT_FALSE(m_mesh->is_viewport);
+	EXPECT_FALSE(m_mesh->is_rendered);
+
+	m_operations.Undo();
+	EXPECT_TRUE(m_mesh->is_viewport);
+	EXPECT_TRUE(m_mesh->is_rendered);
+
+	m_operations.Redo();
+	EXPECT_FALSE(m_mesh->is_viewport);
+	EXPECT_FALSE(m_mesh->is_rendered);
+}
+
+// --- Camera FOV ("Camera Ratio") round-trip --------------------------------
+
+TEST_F(OperationManagerTest, CameraFov_RoundTrip)
+{
+	const float original = m_camera->cam_pers;
+
+	m_eventBus.enqueue(CameraFovChanged{ m_camera.get(), 35.0f });
+	Process();
+	EXPECT_FLOAT_EQ(m_camera->cam_pers, 35.0f);
+
+	m_operations.Undo();
+	EXPECT_FLOAT_EQ(m_camera->cam_pers, original);
+
+	m_operations.Redo();
+	EXPECT_FLOAT_EQ(m_camera->cam_pers, 35.0f);
+}
+
+// --- Camera pose (coupled transform) round-trip ----------------------------
+
+TEST_F(OperationManagerTest, CameraPose_RoundTrip)
+{
+	const glm::vec3 startPos(0.0f, 5.0f, 0.0f);
+	const glm::vec3 startTar(0.0f, 0.0f, 0.0f);
+	m_camera->SetPosition(startPos);
+	m_camera->SetTarPos(startTar);
+
+	const glm::vec3 endPos(2.0f, 5.0f, 1.0f);
+	const glm::vec3 endTar(1.0f, 0.0f, 0.0f);
+
+	// Simulate a recorded navigation: state already moved to end, op records it.
+	m_camera->SetPosition(endPos);
+	m_camera->SetTarPos(endTar);
+	m_operations.Submit(std::make_unique<CameraTransformOp>(
+		m_camera->GetObjectID(),
+		CameraPose{ startPos, startTar },
+		CameraPose{ endPos, endTar }));
+
+	m_operations.Undo();
+	EXPECT_EQ(m_camera->GetPosition(), startPos);
+	EXPECT_EQ(m_camera->cam_tar, startTar);
+
+	m_operations.Redo();
+	EXPECT_EQ(m_camera->GetPosition(), endPos);
+	EXPECT_EQ(m_camera->cam_tar, endTar);
+}
+
+// --- Merge coalescing -------------------------------------------------------
+
+TEST_F(OperationManagerTest, CameraPose_Merge_CoalescesIntoOneUndo)
+{
+	const int uid = m_camera->GetObjectID();
+	const glm::vec3 a(0.0f, 5.0f, 0.0f);
+	const glm::vec3 b(0.0f, 4.0f, 0.0f);
+	const glm::vec3 c(0.0f, 3.0f, 0.0f);
+	const glm::vec3 tar(0.0f, 0.0f, 0.0f);
+
+	// Three consecutive same-camera pose edits share a MergeKey and collapse
+	// into a single undo entry spanning a→c.
+	m_operations.Submit(std::make_unique<CameraTransformOp>(uid, CameraPose{ a, tar }, CameraPose{ b, tar }));
+	m_operations.Submit(std::make_unique<CameraTransformOp>(uid, CameraPose{ b, tar }, CameraPose{ c, tar }));
+	m_operations.Submit(std::make_unique<CameraTransformOp>(uid, CameraPose{ c, tar }, CameraPose{ a, tar }));
+
+	ASSERT_TRUE(m_operations.CanUndo());
+
+	// A single undo returns to the original endpoint, proving one merged entry.
+	m_operations.Undo();
+	EXPECT_EQ(m_camera->GetPosition(), a);
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+TEST_F(OperationManagerTest, DifferentKeys_DoNotMerge)
+{
+	m_eventBus.enqueue(CameraFovChanged{ m_camera.get(), 40.0f });
+	Process();
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 25.0f });
+	Process();
+
+	// Two different-key edits are two entries: two undos to clear.
+	ASSERT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
+	EXPECT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+TEST_F(OperationManagerTest, CameraTransform_Inverse_IsInvolution)
+{
+	const int uid = m_camera->GetObjectID();
+	const glm::vec3 pos(1.0f, 2.0f, 3.0f);
+	const glm::vec3 tar(4.0f, 5.0f, 6.0f);
+	auto op = std::make_unique<CameraTransformOp>(
+		uid, CameraPose{ glm::vec3(0.0f), glm::vec3(0.0f) }, CameraPose{ pos, tar });
+	auto twice = op->Inverse()->Inverse();
+
+	EXPECT_EQ(twice->Label(), op->Label());
+	EXPECT_EQ(twice->MergeKey(), op->MergeKey());
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	twice->Emit(ctx);
+	EXPECT_EQ(m_camera->GetPosition(), pos);
+	EXPECT_EQ(m_camera->cam_tar, tar);
 }

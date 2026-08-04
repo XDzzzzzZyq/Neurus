@@ -12,10 +12,13 @@
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"
 #include "editor/events/EventBus.h"
+#include "editor/operations/IOperationSink.h"
+#include "editor/operations/SceneOperations.h"
 #include "scene/Camera.h"
 
 #include <algorithm>
 #include <cmath>
+#include <memory>
 
 namespace {
 
@@ -47,6 +50,29 @@ constexpr float kDollySensitivity = 0.05f;
 void NotifyCameraChanged(const neurus::Camera& camera)
 {
 	(void)camera;
+}
+
+/**
+ * @brief Records the coupled camera pose transition for undo/redo.
+ * @param ops Operation sink.
+ * @param camera Camera after the navigation math ran.
+ * @param beforePos Camera position captured before the edit.
+ * @param beforeTar Look-at target captured before the edit.
+ * @note No-op if the pose did not change (degenerate/clamped moves), so the
+ *       history is not polluted. The CameraTransformOp's per-camera MergeKey
+ *       coalesces a continuous manipulation (orbit/pan/dolly/zoom) into one step.
+ */
+void RecordCameraPose(neurus::IOperationSink& ops, const neurus::Camera& camera,
+                      const glm::vec3& beforePos, const glm::vec3& beforeTar)
+{
+	const glm::vec3 afterPos = camera.GetPosition();
+	const glm::vec3 afterTar = camera.cam_tar;
+	if (afterPos == beforePos && afterTar == beforeTar) return;
+
+	ops.Submit(std::make_unique<neurus::CameraTransformOp>(
+		camera.GetObjectID(),
+		neurus::CameraPose{ beforePos, beforeTar },
+		neurus::CameraPose{ afterPos, afterTar }));
 }
 
 // ---------------------------------------------------------------------------
@@ -206,24 +232,37 @@ namespace neurus {
 // Init — subscribe to camera events
 // ---------------------------------------------------------------------------
 
-void CameraController::Init(EventQueue& bus, IOperationSink& /*ops*/)
+void CameraController::Init(EventQueue& bus, IOperationSink& ops)
 {
-	bus.subscribe<CameraZoomEvent>([&bus](const CameraZoomEvent& e) {
+	bus.subscribe<CameraZoomEvent>([&bus, &ops](const CameraZoomEvent& e) {
+		const glm::vec3 bp = e.cam->GetPosition();
+		const glm::vec3 bt = e.cam->cam_tar;
 		OnCameraZoom(e);
+		RecordCameraPose(ops, *e.cam, bp, bt);
 		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraRotateEvent>([&bus](const CameraRotateEvent& e) {
+	bus.subscribe<CameraRotateEvent>([&bus, &ops](const CameraRotateEvent& e) {
+		const glm::vec3 bp = e.cam->GetPosition();
+		const glm::vec3 bt = e.cam->cam_tar;
 		OnCameraRotate(e);
+		RecordCameraPose(ops, *e.cam, bp, bt);
 		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraPushEvent>([&bus](const CameraPushEvent& e) {
+	bus.subscribe<CameraPushEvent>([&bus, &ops](const CameraPushEvent& e) {
+		const glm::vec3 bp = e.cam->GetPosition();
+		const glm::vec3 bt = e.cam->cam_tar;
 		OnCameraPush(e);
+		RecordCameraPose(ops, *e.cam, bp, bt);
 		bus.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraSlideEvent>([&bus](const CameraSlideEvent& e) {
+	bus.subscribe<CameraSlideEvent>([&bus, &ops](const CameraSlideEvent& e) {
+		const glm::vec3 bp = e.cam->GetPosition();
+		const glm::vec3 bt = e.cam->cam_tar;
 		OnCameraSlide(e);
+		RecordCameraPose(ops, *e.cam, bp, bt);
 		bus.enqueue(RenderResetEvent{});
 	});
+	// Resize is viewport-driven (aspect ratio), not a user edit — not recorded.
 	bus.subscribe<CameraResizeEvent>([&bus](const CameraResizeEvent& e) {
 		OnCameraResize(e);
 		bus.enqueue(RenderResetEvent{});
