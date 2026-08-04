@@ -139,7 +139,7 @@ f 2 6 7 3
 		auto cubeMesh = std::make_shared<Mesh>();
 		cubeMesh->o_name = "MultiShadowCube";
 		cubeMesh->o_mesh = cubeMeshData;
-		cubeMesh->SetPosition(glm::vec3(0.0f, 0.0f, 0.0f));  // cube rests on plane
+		cubeMesh->SetPosition(glm::vec3(0.0f, 0.0f, 0.5f));  // cube bottom at z=0, rests on plane
 
 		res.scene->UseMesh(cubeMesh);
 	}
@@ -191,8 +191,26 @@ f 1 2 3 4
 	for (int i = 0; i < numLights; ++i)
 	{
 		const float radius = 2.0f;
-		const float angle = glm::radians(
-			static_cast<float>(i) * 360.0f / static_cast<float>(numLights));
+
+		// Sun lights: cluster on the -Y half of the ring so all shadows
+		// are cast toward +Y (visible from the camera at (0, 1, 3)).
+		// Point lights: evenly distribute around the full ring (shadows
+		// always cast downward onto the plane regardless of XY angle).
+		float angleDeg;
+		if (lightType == LightType::SUNLIGHT)
+		{
+			// 120° spread centered at 45°: angles -75°, 45°, 165° for 3 lights.
+			// Center chosen so all 3 shadows are visible from the camera and
+			// none is fully occluded by the cube.
+			constexpr float sunSpread = 120.0f;  // degrees between adjacent lights
+			constexpr float sunCenter = 45.0f;  // ring center angle
+			angleDeg = sunCenter + (static_cast<float>(i) - (numLights - 1) / 2.0f) * sunSpread;
+		}
+		else
+		{
+			angleDeg = static_cast<float>(i) * 360.0f / static_cast<float>(numLights);
+		}
+		const float angle = glm::radians(angleDeg);
 		glm::vec3 pos(radius * cos(angle), radius * sin(angle), 2.0f);
 
 		if (lightType == LightType::SUNLIGHT)

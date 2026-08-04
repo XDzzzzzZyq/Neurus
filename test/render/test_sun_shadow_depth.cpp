@@ -46,7 +46,8 @@ protected:
 	static constexpr uint32_t kRes   = ShadowDepthPass::kSunResolution;
 	static constexpr float    kField = Light::sun_shadow_field;   // 2.5
 	static constexpr float    kNear  = Light::sun_shadow_near;    // -10
-	static constexpr float    kFar   = Light::sun_shadow_far;     // 10
+	static constexpr float    kFar   = Light::sun_shadow_far;     // 30
+	static constexpr float    kEyeDist = Light::sun_depth_range; // 10
 	static constexpr float    kQuadY = -5.f;   // world-space y (quad at Y=-5, 5 units forward from eye — Z-up)
 	static constexpr float    kQSize = 2.5f;   // half-width (quad = 5x5, fills full field)
 	static constexpr float    kTol   = 3.f / 255.f;
@@ -60,12 +61,12 @@ protected:
 	void TearDown() override { VulkanTestShared::TearDown(); }
 
 	static float ExpectedDepth() {
-		// Z-up: camera at Y=-10 looking +Y, quad at Y=-5.
+		// Z-up: eye at Y=-kEyeDist=-10 looking +Y, quad at Y=-5.
 		// GLM_FORCE_DEPTH_ZERO_TO_ONE → left-handed view: +Z = forward.
 		// Vz = world_y - eye_y = -5 - (-10) = 5 (in view-space)
-		// ndc = (Vz - near) / (far - near) = (5 - (-10)) / 20 = 15/20 = 0.75
-		float Vz = kQuadY + kFar;  // -5 + 10 = 5
-		return (Vz - kNear) / (kFar - kNear);  // (5 - (-10))/20 = 0.75
+		// ndc = (Vz - near) / (far - near) = (5 - (-10)) / (30 - (-10)) = 15/40 = 0.375
+		float Vz = kQuadY + kEyeDist;  // -5 + 10 = 5
+		return (Vz - kNear) / (kFar - kNear);  // (5 - (-10))/40 = 0.375
 	}
 
 	static std::vector<uint8_t> DepthToRGBA8(const std::vector<float>& d) {
@@ -87,6 +88,7 @@ protected:
 		cam->ChangeCamRatio(static_cast<float>(kRes), static_cast<float>(kRes));
 		r.s->UseCamera(cam);
 		// Quad at y=-5 in XZ plane, 5 units forward from the sun shadow camera at (0,-10,0)
+		// (eye distance = sun_depth_range = 10, decoupled from far plane = 30)
 		const char* ob =
 			"v -2.5 -5 -2.5\n"
 			"v  2.5 -5 -2.5\n"

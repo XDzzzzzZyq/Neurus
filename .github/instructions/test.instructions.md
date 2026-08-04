@@ -179,12 +179,16 @@ projection. Key differences from point light cubemap tests:
 - **Shadow map**: 2D `VK_FORMAT_D32_SFLOAT`, 2048×2048 resolution, accessed
   via `RenderCache::GetShadowMap(lightUID, LightType::SUNLIGHT)`.
 
-**Test pattern**: Place occluder geometry (e.g. a quad at z=-1.0) between the
-light and a receiver plane (z=-3.0). Compute expected depth value at the
-occluder's pixel using the orthographic projection formula. The fragment
-shader writes `gl_FragCoord.z` (NDC depth). Read back the shadow map depth
-buffer, verify that occluder pixels have the expected depth and background
-pixels have the clear value (1.0).
+**Test pattern**: Place occluder geometry (e.g. a quad at y=-5, 5 units forward
+from the eye at y=-10) filling the ortho field. Compute expected depth value
+at the occluder's pixel using the orthographic projection formula:
+`Vz = world_y - eye_y = -5 - (-10) = 5` (view-space, left-handed),
+`ndc = (Vz - near) / (far - near) = (5 - (-10)) / (30 - (-10)) = 15/40 = 0.375`.
+The eye distance (`sun_depth_range = 10`) is decoupled from the far plane
+(`sun_shadow_far = 30`) so geometry sits at mid-depth instead of the far
+boundary. The fragment shader writes `gl_FragCoord.z` (NDC depth). Read back
+the shadow map depth buffer, verify that occluder pixels have the expected
+depth and background pixels have the clear value (1.0).
 
 ### Sun Shadow Intensity Eval (test_sun_shadow_intensity.cpp)
 

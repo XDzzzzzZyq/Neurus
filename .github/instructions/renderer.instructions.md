@@ -296,6 +296,12 @@ Barrier::Transition(cmdBuf, myImage, ImageState::ColorShaderRead);
 ### Sun Shadow Convention
 - **Projection**: Orthographic (`glm::ortho()`) with configurable left/right/bottom/top planes and near/far planes
 - **Depth range**: NDC Z in `[0, 1]` (Vulkan convention, requires `GLM_FORCE_DEPTH_ZERO_TO_ONE`)
+- **Frustum parameters** (`Light.h` static constexpr):
+  - `sun_shadow_field = 2.5` — XY half-extent (5×5 unit area centered on camera target)
+  - `sun_shadow_near = -10` — near plane (view-space, behind eye)
+  - `sun_shadow_far = 30` — far plane (view-space, extended past geometry so depth is not crammed at NDC Z=1.0)
+  - `sun_depth_range = 10` — eye distance from ortho center (decoupled from far plane so geometry sits at mid-depth)
+- **Eye placement**: `eye = center - sunDir * sun_depth_range` (NOT `* farPlane`, which would place geometry at the far boundary)
 - **Push constant**: `SunShadowPushConstants` carries `mat4 lightViewProj` (view × projection)
 - **Shadow map resolution**: 2048×2048, `VK_FORMAT_D32_SFLOAT`
 - **PCF**: Percentage-closer filtering via `sampler2DShadow` with UV offset kernel, ortho depth comparison
