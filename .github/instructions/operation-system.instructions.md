@@ -26,7 +26,10 @@ model, coalescing rules, and persistence.
   stack. **Selection** ops (`SetSelectionOp`) override it to `true` so navigating
   the selection appends to undo *without* discarding a pending redo — safe
   because ops are absolute. Selection is scene-level SET state, so it replays via
-  the absolute `SelectionChanged` event + `Selections::RestoreState`.
+  the absolute `SelectionChanged` event + `Selections::RestoreState`. The *live*
+  selection is also persisted independently of history by `Scene::serialize`
+  (as UIDs — see data-resource.instructions.md), so a reopened project restores
+  its selection even with an empty undo/redo history.
 
 ## Coalescing gestures into one undo entry
 

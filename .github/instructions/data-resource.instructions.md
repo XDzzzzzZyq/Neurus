@@ -84,6 +84,18 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
      plus `HistoryComponent` (Editor-owned undo/redo stacks). `HistoryComponent`
      is registered last so legacy files without an `m_history` node load cleanly
      (its `Load` clears the stacks instead of throwing).
+   - `Scene::serialize` persists selection state alongside the typed object
+     pools. Selection is held at runtime as `const ObjectID*` pointers but
+     written as UIDs (`selectedUids` + `activeUid`), mirroring `SelectionState`
+     in `SceneOperations.h`. On load the UIDs are resolved back to pointers via
+     `Scene::GetObjectID()` *after* `RebuildObjList()`. The selection block is
+     optional: legacy files without it load with an empty selection (the load
+     branch catches the missing-NVP `cereal::Exception`).
+   - The pointer↔UID conversion lives in scene-layer free functions
+     `neurus::SnapshotSelectionUids` / `RestoreSelectionUids` (in `Scene.h`),
+     shared by `Scene::serialize` and the editor's `SceneController` selection
+     snapshot/restore. Kept in the scene layer (which owns the pointer↔UID
+     mapping) so the editor depends downward only.
 
 ## Data Flow
 

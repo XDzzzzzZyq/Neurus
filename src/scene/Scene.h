@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include <cereal/types/memory.hpp>
 #include <cereal/types/unordered_map.hpp>
@@ -47,6 +48,27 @@
 
 namespace neurus
 {
+
+class Scene;
+
+/**
+ * @brief Snapshots a pointer-based selection set as absolute object UIDs.
+ * @param selections Runtime selection holding const ObjectID* pointers.
+ * @param outSelectedUids Filled with the selected objects' UIDs (order preserved).
+ * @param outActiveUid Set to the active object's UID, or 0 if none.
+ * @note Scene-layer conversion shared by Scene::serialize and the editor's
+ *       selection snapshot; keeps pointer↔UID logic in the layer that owns it.
+ */
+inline void SnapshotSelectionUids(const Selections<const ObjectID*>& selections,
+                                  std::vector<int>& outSelectedUids, int& outActiveUid);
+
+/**
+ * @brief Restores a selection set from UIDs, resolving them against a scene.
+ * @param scene Scene used to resolve UIDs to live objects.
+ * @param selectedUids Object UIDs to select (stale UIDs are skipped).
+ * @param activeUid Active object UID, or 0 for none.
+ */
+inline void RestoreSelectionUids(Scene& scene, const std::vector<int>& selectedUids, int activeUid);
 
 /**
  * @brief Container for all scene objects, environments, and scene-wide state.
@@ -134,12 +156,18 @@ public:
 	~Scene();
 
 	/**
-	 * @brief Cereal serialization for scene pools.
+	 * @brief Cereal serialization for scene pools and selection state.
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
 	 * @note Only typed pools are serialized. obj_list (master pool) is
 	 *       reconstructed from typed pools on deserialization.
 	 *       m_status (runtime state) is not serialized.
+	 * @note Selection is stored at runtime as pointers (const ObjectID*) but
+	 *       persisted as object UIDs, mirroring SelectionState in
+	 *       SceneOperations.h. On load, UIDs are resolved back to pointers via
+	 *       GetObjectID() AFTER obj_list is rebuilt. The selection block is
+	 *       optional: legacy project files that predate it load with an empty
+	 *       selection instead of failing.
 	 */
 	template<class Archive>
 	void serialize(Archive& ar)
@@ -148,10 +176,34 @@ public:
 		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list),
 		   CEREAL_NVP(env_list));
 
-		// Rebuild obj_list from typed pools after loading.
-		if constexpr (Archive::is_loading::value)
+		if constexpr (Archive::is_saving::value)
 		{
+			// Persist selection as UIDs (pointers are not serializable).
+			std::vector<int> selectedUids;
+			int activeUid = 0;
+			SnapshotSelectionUids(selections, selectedUids, activeUid);
+			ar(CEREAL_NVP(selectedUids), CEREAL_NVP(activeUid));
+		}
+		else
+		{
+			// Rebuild obj_list from typed pools before resolving UIDs.
 			RebuildObjList();
+
+			// Restore selection from UIDs. Missing block (legacy files)
+			// degrades gracefully to no selection.
+			std::vector<int> selectedUids;
+			int activeUid = 0;
+			try
+			{
+				ar(CEREAL_NVP(selectedUids), CEREAL_NVP(activeUid));
+			}
+			catch (const cereal::Exception&)
+			{
+				selectedUids.clear();
+				activeUid = 0;
+			}
+
+			RestoreSelectionUids(*this, selectedUids, activeUid);
 		}
 	}
 
@@ -200,7 +252,8 @@ public:
 	ResPool<DebugPoints> dPoints_list;  ///< Debug point primitives
 	ResPool<Environment> env_list;      ///< Environment objects (IBL)
 
-	/// Selection state for scene objects (runtime-only, not serialized).
+	/// Selection state for scene objects. Persisted as UIDs by serialize()
+	/// (see the serialize note); resolved to pointers on load.
 	/// Stores const ObjectID* — compatible with both Editor (mutable objects via GetObjectID)
 	/// and Outliner (const ObjectID* from GetObjectIDs enumeration).
 	Selections<const ObjectID*> selections;
@@ -360,6 +413,35 @@ private:
 		obj_list[id] = Resource<ObjectID>(obj, basePtr);
 	}
 };
+
+// ---------------------------------------------------------------------------
+// Selection UID conversion (shared by serialize and the editor controller)
+// ---------------------------------------------------------------------------
+
+inline void SnapshotSelectionUids(const Selections<const ObjectID*>& selections,
+                                  std::vector<int>& outSelectedUids, int& outActiveUid)
+{
+	const auto& list = selections.GetSelectedList();
+	outSelectedUids.clear();
+	outSelectedUids.reserve(list.size());
+	for (const ObjectID* obj : list)
+		if (obj) outSelectedUids.push_back(obj->GetObjectID());
+
+	const ObjectID* active = selections.GetActiveObject();
+	outActiveUid = active ? active->GetObjectID() : 0;
+}
+
+inline void RestoreSelectionUids(Scene& scene, const std::vector<int>& selectedUids, int activeUid)
+{
+	std::vector<const ObjectID*> list;
+	list.reserve(selectedUids.size());
+	for (int uid : selectedUids)
+		if (const ObjectID* obj = scene.GetObjectID(uid))
+			list.push_back(obj);
+
+	const ObjectID* active = activeUid != 0 ? scene.GetObjectID(activeUid) : nullptr;
+	scene.selections.RestoreState(std::move(list), active);
+}
 
 } // namespace neurus
 

@@ -70,13 +70,7 @@ void LightingRebuilt(neurus::EventQueue& bus)
 neurus::SelectionState SnapshotSelection(const neurus::Scene& scene)
 {
 	neurus::SelectionState state;
-	const auto& list = scene.selections.GetSelectedList();
-	state.selectedUids.reserve(list.size());
-	for (const neurus::ObjectID* obj : list)
-		if (obj) state.selectedUids.push_back(obj->GetObjectID());
-
-	const neurus::ObjectID* active = scene.selections.GetActiveObject();
-	state.activeUid = active ? active->GetObjectID() : 0;
+	neurus::SnapshotSelectionUids(scene.selections, state.selectedUids, state.activeUid);
 	return state;
 }
 
@@ -128,14 +122,7 @@ void OnSelectionChanged(const neurus::SelectionChanged& e, neurus::EventQueue&)
 
 	// Replay path for SetSelectionOp: resolve stored UIDs to live objects and
 	// restore the whole set at once. Skip stale UIDs (object gone).
-	std::vector<const neurus::ObjectID*> list;
-	list.reserve(e.selectedUids.size());
-	for (int uid : e.selectedUids)
-		if (const neurus::ObjectID* obj = scene->GetObjectID(uid))
-			list.push_back(obj);
-
-	const neurus::ObjectID* active = e.activeUid != 0 ? scene->GetObjectID(e.activeUid) : nullptr;
-	scene->selections.RestoreState(std::move(list), active);
+	neurus::RestoreSelectionUids(*scene, e.selectedUids, e.activeUid);
 }
 
 // ---------------------------------------------------------------------------
