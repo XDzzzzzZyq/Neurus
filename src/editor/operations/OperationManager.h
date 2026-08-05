@@ -68,6 +68,23 @@ public:
 	/** @brief Clears both stacks (e.g. on New/Load scene). */
 	void Clear();
 
+	// --- Persistence hooks (used by project::HistoryComponent) ---
+	/** @brief Undo stack, oldest→newest (next-undo last). Read-only. */
+	const std::vector<std::unique_ptr<Operation>>& GetUndoStack() const { return m_undo; }
+	/** @brief Redo stack, bottom→top (next-redo last). Read-only. */
+	const std::vector<std::unique_ptr<Operation>>& GetRedoStack() const { return m_redo; }
+
+	/**
+	 * @brief Replaces both stacks wholesale (project load).
+	 * @param undo New undo stack (ownership taken).
+	 * @param redo New redo stack (ownership taken).
+	 * @note Does NOT replay: the ops are absolute state-sets restored as-is;
+	 *       the live scene is loaded separately. Bumps the revision so the UI
+	 *       refreshes its history view.
+	 */
+	void RestoreHistory(std::vector<std::unique_ptr<Operation>> undo,
+	                    std::vector<std::unique_ptr<Operation>> redo);
+
 private:
 	/** @brief Replay phase — Submit() is suppressed while Replaying. */
 	enum class Phase { Idle, Replaying };

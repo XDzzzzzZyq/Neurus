@@ -76,6 +76,14 @@ public:
 	 */
 	HistoryView GetHistory() const { return ed_operations.GetHistoryView(); }
 
+	/**
+	 * @brief Returns the undo/redo manager (for project history persistence).
+	 *
+	 * The Application registers a project::HistoryComponent against this so the
+	 * operation stacks are saved/loaded alongside the scene and render config.
+	 */
+	OperationManager& GetOperations() { return ed_operations; }
+
 	template<typename T>
 	void RegisterController()
 	{

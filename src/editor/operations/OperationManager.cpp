@@ -78,6 +78,14 @@ void OperationManager::Clear()
 	++m_revision;
 }
 
+void OperationManager::RestoreHistory(std::vector<std::unique_ptr<Operation>> undo,
+                                      std::vector<std::unique_ptr<Operation>> redo)
+{
+	m_undo = std::move(undo);
+	m_redo = std::move(redo);
+	++m_revision;
+}
+
 HistoryView OperationManager::GetHistoryView() const
 {
 	HistoryView view;

@@ -44,6 +44,7 @@ add_executable(neurus_test
 	editor/test_event_bus_typed.cpp
 	editor/test_scene_controller.cpp
 	editor/test_operation_manager.cpp
+	editor/test_operation_serialization.cpp
 	editor/test_render_config_controller.cpp
 	scene/test_camera.cpp
 	scene/test_mesh.cpp

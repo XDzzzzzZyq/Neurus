@@ -23,6 +23,8 @@
 #include <string>
 #include <utility>
 
+#include <cereal/cereal.hpp>
+
 #include "editor/operations/OperationContext.h"
 
 namespace neurus {
@@ -113,6 +115,8 @@ template<typename Derived, typename TEvent, typename Value>
 class TransitionOp : public Operation
 {
 public:
+	TransitionOp() = default;
+
 	TransitionOp(int uid, Value before, Value after)
 		: m_uid(uid)
 		, m_before(std::move(before))
@@ -144,10 +148,25 @@ public:
 		m_after = static_cast<const TransitionOp&>(newer).m_after;
 	}
 
+	/**
+	 * @brief Serializes {uid, before, after}; Value must be cereal-serializable.
+	 * @note Templated (not archive-fixed) so cereal's polymorphic machinery can
+	 *       (de)serialize a `std::unique_ptr<Operation>` and dispatch to the
+	 *       registered concrete type. Reconstruction default-constructs the
+	 *       Derived then loads into it, so Derived must be default-constructible.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("uid", m_uid),
+		   cereal::make_nvp("before", m_before),
+		   cereal::make_nvp("after", m_after));
+	}
+
 protected:
-	int m_uid;      ///< Target object UID (serialized).
-	Value m_before; ///< Value before the edit (serialized).
-	Value m_after;  ///< Value after the edit (serialized).
+	int m_uid = 0;      ///< Target object UID (serialized).
+	Value m_before{};   ///< Value before the edit (serialized).
+	Value m_after{};    ///< Value after the edit (serialized).
 };
 
 } // namespace neurus

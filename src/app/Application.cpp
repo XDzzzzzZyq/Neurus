@@ -35,6 +35,7 @@
 #include "asset/SceneComponent.h"
 #include "asset/ConfigComponent.h"
 #include "asset/UIComponent.h"
+#include "editor/operations/HistoryComponent.h"
 #include "scene/Scene.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
@@ -85,6 +86,9 @@ static void BuildProject(neurus::project::Project& proj,
 	proj.Register<neurus::project::SceneComponent>(editor.GetScene());
 	proj.Register<neurus::project::ConfigComponent>(editor.GetRenderConfig());
 	proj.Register<neurus::project::UIComponent>(uiLayout);
+	// History last: legacy files without an "m_history" node load cleanly
+	// (HistoryComponent::Load clears the stacks instead of throwing).
+	proj.Register<neurus::project::HistoryComponent>(editor.GetOperations());
 }
 
 } // anonymous namespace

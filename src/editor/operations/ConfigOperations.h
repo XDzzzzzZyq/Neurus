@@ -32,6 +32,8 @@ namespace neurus {
 class SetRenderConfigOp : public Operation
 {
 public:
+	SetRenderConfigOp() = default;
+
 	SetRenderConfigOp(RenderConfig before, RenderConfig after)
 		: m_before(std::move(before))
 		, m_after(std::move(after))
@@ -48,6 +50,14 @@ public:
 	}
 
 	std::string Label() const override { return "Render Config"; }
+
+	/** @brief Serializes the before/after RenderConfig endpoints. */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("before", m_before),
+		   cereal::make_nvp("after", m_after));
+	}
 
 private:
 	RenderConfig m_before;

@@ -18,10 +18,13 @@
 #include <utility>
 #include <vector>
 
+#include <cereal/types/vector.hpp>
+
 #include "glm/glm.hpp"
 
 #include "editor/events/SceneEvents.h"
 #include "editor/operations/Operation.h"
+#include "scene/GlmSerialization.h"
 
 namespace neurus {
 
@@ -30,6 +33,13 @@ struct VisibilityState
 {
 	bool viewportVisible = true;
 	bool renderVisible = true;
+
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("viewportVisible", viewportVisible),
+		   cereal::make_nvp("renderVisible", renderVisible));
+	}
 };
 
 /** @brief Camera pose endpoint: position + look-at target (value for CameraTransformOp). */
@@ -37,6 +47,13 @@ struct CameraPose
 {
 	glm::vec3 position{ 0.0f };
 	glm::vec3 target{ 0.0f };
+
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("position", position),
+		   cereal::make_nvp("target", target));
+	}
 };
 
 /** @brief Absolute light-power edit. */
@@ -295,6 +312,13 @@ struct SelectionState
 {
 	std::vector<int> selectedUids; ///< Ordered selected object UIDs.
 	int activeUid = 0;             ///< Active object UID (0 = none).
+
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("selectedUids", selectedUids),
+		   cereal::make_nvp("activeUid", activeUid));
+	}
 };
 
 /**
@@ -312,6 +336,8 @@ struct SelectionState
 class SetSelectionOp : public Operation
 {
 public:
+	SetSelectionOp() = default;
+
 	SetSelectionOp(SelectionState before, SelectionState after)
 		: m_before(std::move(before))
 		, m_after(std::move(after))
@@ -330,6 +356,14 @@ public:
 	std::string Label() const override { return "Select"; }
 
 	bool PreservesRedo() const override { return true; }
+
+	/** @brief Serializes the before/after selection endpoints. */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("before", m_before),
+		   cereal::make_nvp("after", m_after));
+	}
 
 private:
 	SelectionState m_before;
