@@ -266,42 +266,15 @@ UIEvents::newFrame() → Editor::Edit(input) → Renderer::DrawFrame(scene)
 - Scene loading/saving orchestration
 - Transform gizmo interaction
 
-## Undo/Redo (`src/editor/operations/`)
+## Undo/Redo controllers (`src/editor/operations/`)
 
-Event-replay undo/redo (Design B, group-theoretic). Operations never mutate the
-scene directly: `Emit()` re-dispatches the originating scene event via
-`EventQueue::EmitNow`, so the existing controller handler performs the mutation
-(single mutation path). A `Phase::Replaying` guard in `OperationManager` makes
-`Submit()` a no-op during replay so playback does not re-record.
+The operation model, coalescing strategies, and history persistence are
+documented in
+[operation-system.instructions.md](operation-system.instructions.md). This
+section covers only how the editor's controllers *produce* operations.
 
-- Operations are **absolute state-sets** (before/after endpoints by UID), not
-  deltas — safe to replay across intervening changes and to no-op on stale UIDs.
-- `TransitionOp<Derived, TEvent, Value>` (CRTP) covers per-object value edits;
-  `Inverse()` swaps before/after. `MergeKey()`/`MergeFrom()` coalesce a
-  continuous manipulation (e.g. camera drag) into one undo entry.
-- `Operation::PreservesRedo()` (default false): a branching edit clears the redo
-  stack. **Selection** ops (`SetSelectionOp`) override it to `true` so navigating
-  the selection appends to undo *without* discarding a pending redo — safe
-  because ops are absolute. Selection is scene-level SET state, so it replays via
-  the absolute `SelectionChanged` event + `Selections::RestoreState`.
-
-### Coalescing gestures into one undo entry
-
-A continuous manipulation (a slider drag, a camera orbit) fires a *stream* of
-value changes but must collapse to a single undo entry. Two strategies exist:
-
-- **Implicit merge (MergeKey):** the op declares a non-empty `MergeKey()`;
-  `OperationManager::Submit` folds a same-key edit into the undo-stack top.
-  Used where there is no natural press/release boundary — **scroll zoom**
-  (`CameraZoomOp`, keyed `camera_zoom:<uid>`) records per-event and merges.
-- **Controller-owned gesture (explicit begin/end):** the controller holds a
-  small gesture state, captures the "before" endpoint on a begin event, mutates
-  live during the drag WITHOUT recording, and records ONE op on the end event.
-  Used where the UI has a real press/release boundary. This needs NO changes to
-  `OperationManager` or `IOperationSink` — the boundaries are ordinary typed
-  events flowing through the same controller chain.
-
-Two controllers use the gesture pattern:
+Two controllers use the explicit begin/end gesture pattern (capture "before" on
+a begin event, mutate live without recording, record ONE op on the end event):
 
 - **`CameraController`** — `CameraDragBegin` captures the pose, `CameraRotate/
   Push/Slide` mutate live, `CameraDragEnd` records one `CameraTransformOp`
@@ -320,34 +293,4 @@ Two controllers use the gesture pattern:
   and record immediately. No-op writes (`before == after`, via `RenderConfig`'s
   defaulted `operator==`) are never recorded. `SetRenderConfigOp` is scene-level
   (not UID-based) and deliberately non-mergeable (empty `MergeKey`).
-
-### Persisting the history stacks
-
-The undo/redo stacks are saved into the project file via `HistoryComponent`
-(`src/editor/operations/HistoryComponent.h/cpp`), a `project::Serializable`
-adapter keyed `"m_history"` that wraps `OperationManager`. `Save` writes the
-`undo`/`redo` vectors of `std::unique_ptr<Operation>`; `Load` decodes them and
-calls `OperationManager::RestoreHistory`. `Application::BuildProject` registers
-it **last**, after Scene/Config/UI, so a legacy file with no `m_history` node
-still loads — `HistoryComponent::Load` catches the cereal exception and clears
-the stacks rather than throwing.
-
-Operations serialize polymorphically through cereal, mirroring scene objects
-(`src/asset/TypeRegistration.cpp`). Each op has a default ctor and a templated
-`serialize`; concrete types are registered in
-`src/editor/operations/OperationRegistration.cpp` via `CEREAL_REGISTER_TYPE` +
-`CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, …)`. Two non-obvious
-requirements when adding a new op to that file:
-
-- The registration TU **must** `#include <cereal/archives/json.hpp>` before the
-  macros, otherwise the type binds to no archive and save throws "Trying to save
-  an unregistered polymorphic type" at runtime despite compiling cleanly.
-- Ops live in a static lib, so the registration TU is dead-stripped unless
-  force-linked: `CEREAL_REGISTER_DYNAMIC_INIT(neurus_operations)` in the `.cpp`
-  plus `CEREAL_FORCE_DYNAMIC_INIT(neurus_operations)` (in
-  `OperationRegistration.h`) included at every serialization site.
-
-To add a new op: give it a default ctor + templated `serialize`, then add the
-two registration lines in `OperationRegistration.cpp`. No manual type-tag or
-factory is needed.
 
