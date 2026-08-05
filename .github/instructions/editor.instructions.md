@@ -321,3 +321,33 @@ Two controllers use the gesture pattern:
   defaulted `operator==`) are never recorded. `SetRenderConfigOp` is scene-level
   (not UID-based) and deliberately non-mergeable (empty `MergeKey`).
 
+### Persisting the history stacks
+
+The undo/redo stacks are saved into the project file via `HistoryComponent`
+(`src/editor/operations/HistoryComponent.h/cpp`), a `project::Serializable`
+adapter keyed `"m_history"` that wraps `OperationManager`. `Save` writes the
+`undo`/`redo` vectors of `std::unique_ptr<Operation>`; `Load` decodes them and
+calls `OperationManager::RestoreHistory`. `Application::BuildProject` registers
+it **last**, after Scene/Config/UI, so a legacy file with no `m_history` node
+still loads — `HistoryComponent::Load` catches the cereal exception and clears
+the stacks rather than throwing.
+
+Operations serialize polymorphically through cereal, mirroring scene objects
+(`src/asset/TypeRegistration.cpp`). Each op has a default ctor and a templated
+`serialize`; concrete types are registered in
+`src/editor/operations/OperationRegistration.cpp` via `CEREAL_REGISTER_TYPE` +
+`CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, …)`. Two non-obvious
+requirements when adding a new op to that file:
+
+- The registration TU **must** `#include <cereal/archives/json.hpp>` before the
+  macros, otherwise the type binds to no archive and save throws "Trying to save
+  an unregistered polymorphic type" at runtime despite compiling cleanly.
+- Ops live in a static lib, so the registration TU is dead-stripped unless
+  force-linked: `CEREAL_REGISTER_DYNAMIC_INIT(neurus_operations)` in the `.cpp`
+  plus `CEREAL_FORCE_DYNAMIC_INIT(neurus_operations)` (in
+  `OperationRegistration.h`) included at every serialization site.
+
+To add a new op: give it a default ctor + templated `serialize`, then add the
+two registration lines in `OperationRegistration.cpp`. No manual type-tag or
+factory is needed.
+
