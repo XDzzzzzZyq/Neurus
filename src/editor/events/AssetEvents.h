@@ -19,10 +19,4 @@ struct SunLightAddEvent {};
 /** @brief Emitted when a new spot light should be added to the scene (Edit → Add → Spot Light). */
 struct SpotLightAddEvent {};
 
-/** @brief Emitted when the user requests undo (Edit → Undo / Ctrl+Z). */
-struct UndoRequested {};
-
-/** @brief Emitted when the user requests redo (Edit → Redo / Ctrl+Shift+Z). */
-struct RedoRequested {};
-
 } // namespace neurus

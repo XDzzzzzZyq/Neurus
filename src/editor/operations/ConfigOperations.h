@@ -39,9 +39,9 @@ public:
 		, m_after(std::move(after))
 	{}
 
-	void Emit(OperationContext& ctx) override
+	void Apply(OperationContext& ctx) override
 	{
-		ctx.bus.EmitNow(RenderConfigChangedEvent{ m_after });
+		ctx.bus.emitNow(RenderConfigChangedEvent{ m_after });
 	}
 
 	std::unique_ptr<Operation> Inverse() const override

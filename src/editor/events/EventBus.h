@@ -56,11 +56,11 @@ public:
 	 * (a correctness requirement — see the Operation system design). Do NOT use
 	 * this for real-time input; that must go through enqueue()/Process().
 	 *
-	 * @note Named EmitNow (not "emit") because Qt reserves `emit` as a keyword
+	 * @note Named emitNow (not "emit") because Qt reserves `emit` as a keyword
 	 *       macro; this header is included in Qt translation units.
 	 */
 	template<typename TEvent>
-	void EmitNow(const TEvent& event)
+	void emitNow(const TEvent& event)
 	{
 		this->dispatch(event);
 	}

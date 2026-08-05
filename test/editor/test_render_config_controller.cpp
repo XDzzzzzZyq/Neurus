@@ -174,7 +174,7 @@ TEST_F(RenderConfigControllerTest, SetRenderConfigOp_Inverse_IsInvolution)
 	EXPECT_EQ(twice->Label(), op->Label());
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	twice->Emit(ctx); // (g⁻¹)⁻¹ reproduces the original forward effect.
+	twice->Apply(ctx); // (g⁻¹)⁻¹ reproduces the original forward effect.
 	EXPECT_FLOAT_EQ(m_config.r_gamma, 2.2f);
 }
 
@@ -186,6 +186,6 @@ TEST_F(RenderConfigControllerTest, SetRenderConfigOp_Inverse_AppliesBefore)
 	auto inv = op->Inverse();
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	inv->Emit(ctx); // inverse applies the "before" config.
+	inv->Apply(ctx); // inverse applies the "before" config.
 	EXPECT_FLOAT_EQ(m_config.r_gamma, 1.0f);
 }

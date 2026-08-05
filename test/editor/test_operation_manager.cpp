@@ -141,7 +141,7 @@ TEST_F(OperationManagerTest, Inverse_IsInvolution)
 	EXPECT_EQ(twice->Label(), op->Label());
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	twice->Emit(ctx); // EmitNow() dispatches synchronously.
+	twice->Apply(ctx); // emitNow() dispatches synchronously.
 	EXPECT_FLOAT_EQ(m_light->light_power, 77.0f);
 }
 
@@ -152,19 +152,19 @@ TEST_F(OperationManagerTest, Inverse_SwapsBeforeAfter)
 	auto inv = op->Inverse();
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	inv->Emit(ctx); // inverse applies the "before" value.
+	inv->Apply(ctx); // inverse applies the "before" value.
 	EXPECT_FLOAT_EQ(m_light->light_power, 10.0f);
 }
 
 // --- Stale identity ---------------------------------------------------------
 
-TEST_F(OperationManagerTest, Emit_UnknownUid_IsNoOp)
+TEST_F(OperationManagerTest, Apply_UnknownUid_IsNoOp)
 {
 	const float before = m_light->light_power;
 	auto op = std::make_unique<SetLightPowerOp>(999999, 1.0f, 2.0f); // no object with this UID
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	op->Emit(ctx); // Resolve() -> nullptr -> safe no-op, must not crash.
+	op->Apply(ctx); // Resolve() -> nullptr -> safe no-op, must not crash.
 	EXPECT_FLOAT_EQ(m_light->light_power, before);
 }
 
@@ -339,7 +339,7 @@ TEST_F(OperationManagerTest, CameraTransform_Inverse_IsInvolution)
 	EXPECT_EQ(twice->MergeKey(), op->MergeKey());
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	twice->Emit(ctx);
+	twice->Apply(ctx);
 	EXPECT_EQ(m_camera->GetPosition(), pos);
 	EXPECT_EQ(m_camera->cam_tar, tar);
 }
@@ -439,8 +439,31 @@ TEST_F(OperationManagerTest, SetSelectionOp_Inverse_IsInvolution)
 	EXPECT_TRUE(twice->PreservesRedo());
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	twice->Emit(ctx); // reproduces the original "after" selection.
+	twice->Apply(ctx); // reproduces the original "after" selection.
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
 	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_mesh.get());
+}
+
+// --- Bounded undo depth -----------------------------------------------------
+
+TEST_F(OperationManagerTest, BoundedUndoDepth_EvictsOldestEntries)
+{
+	// A manager capped at 3 entries: submitting 5 distinct edits keeps only the
+	// newest 3; the two oldest are evicted from the front.
+	OperationManager capped{ m_eventBus, [this]() -> Scene* { return &m_scene; }, 3 };
+
+	const int uid = m_light->GetObjectID();
+	for (int i = 1; i <= 5; ++i)
+		capped.Submit(std::make_unique<SetLightPowerOp>(
+			uid, static_cast<float>(i), static_cast<float>(i + 1)));
+
+	const HistoryView view = capped.GetHistoryView();
+	ASSERT_EQ(view.undo.size(), 3u); // only the newest 3 survive
+
+	// Exactly three undos exhaust the (bounded) stack — no more, no less.
+	capped.Undo();
+	capped.Undo();
+	capped.Undo();
+	EXPECT_FALSE(capped.CanUndo());
 }
 

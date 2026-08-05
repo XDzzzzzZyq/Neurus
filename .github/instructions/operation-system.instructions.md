@@ -3,8 +3,8 @@
 ## Overview
 
 Event-replay undo/redo (Design B, group-theoretic), implemented in
-`src/editor/operations/`. Operations never mutate the scene directly: `Emit()`
-re-dispatches the originating scene event via `EventQueue::EmitNow`, so the
+`src/editor/operations/`. Operations never mutate the scene directly: `Apply()`
+re-dispatches the originating scene event via `EventQueue::emitNow`, so the
 existing controller handler performs the mutation. This keeps a **single
 mutation path** — undo/redo exercises the same code as a live edit. A
 `Phase::Replaying` guard in `OperationManager` makes `Submit()` a no-op during
@@ -30,6 +30,14 @@ model, coalescing rules, and persistence.
   selection is also persisted independently of history by `Scene::serialize`
   (as UIDs — see data-resource.instructions.md), so a reopened project restores
   its selection even with an empty undo/redo history.
+
+## Bounded undo depth
+
+`OperationManager` caps the undo stack at `kDefaultMaxUndoDepth` (256) entries;
+the ctor takes an optional `maxUndoDepth` override (0 = unbounded). `Submit` and
+`RestoreHistory` call `EnforceUndoLimit()`, which evicts the **oldest** entries
+(front of `m_undo`) once the cap is exceeded, bounding memory over long sessions.
+Redo is bounded implicitly: its entries only ever originate from undo pops.
 
 ## Coalescing gestures into one undo entry
 

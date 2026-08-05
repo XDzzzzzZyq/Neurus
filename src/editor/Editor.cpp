@@ -2,6 +2,7 @@
 
 #include "editor/events/InputEvents.h"
 #include "editor/events/AssetEvents.h"
+#include "editor/events/OperationEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"

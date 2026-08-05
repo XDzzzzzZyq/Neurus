@@ -11,9 +11,11 @@
 
 namespace neurus {
 
-OperationManager::OperationManager(EventQueue& bus, std::function<Scene*()> sceneProvider)
+OperationManager::OperationManager(EventQueue& bus, std::function<Scene*()> sceneProvider,
+                                   size_t maxUndoDepth)
 	: m_bus(bus)
 	, m_sceneProvider(std::move(sceneProvider))
+	, m_maxUndoDepth(maxUndoDepth)
 {}
 
 void OperationManager::Submit(std::unique_ptr<Operation> op)
@@ -41,6 +43,7 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 	const bool preservesRedo = op->PreservesRedo();
 	m_undo.push_back(std::move(op));
 	if (!preservesRedo) m_redo.clear();
+	EnforceUndoLimit();
 	++m_revision;
 }
 
@@ -83,6 +86,7 @@ void OperationManager::RestoreHistory(std::vector<std::unique_ptr<Operation>> un
 {
 	m_undo = std::move(undo);
 	m_redo = std::move(redo);
+	EnforceUndoLimit();
 	++m_revision;
 }
 
@@ -113,8 +117,18 @@ void OperationManager::Replay(Operation& op)
 	OperationContext ctx{ *scene, m_bus };
 
 	m_phase = Phase::Replaying;
-	op.Emit(ctx);
+	op.Apply(ctx);
 	m_phase = Phase::Idle;
+}
+
+void OperationManager::EnforceUndoLimit()
+{
+	if (m_maxUndoDepth == 0) return; // 0 = unbounded.
+	if (m_undo.size() <= m_maxUndoDepth) return;
+
+	// Evict the oldest entries (front) so the newest m_maxUndoDepth remain.
+	const size_t excess = m_undo.size() - m_maxUndoDepth;
+	m_undo.erase(m_undo.begin(), m_undo.begin() + excess);
 }
 
 } // namespace neurus

@@ -9,7 +9,7 @@
  *
  * Replay is synchronous and guarded by Phase::Replaying, so Submit() (called
  * by the re-run handler) is suppressed and does not corrupt the stacks. This
- * is only safe because Emit() dispatches via EventQueue::EmitNow (direct
+ * is only safe because Apply() dispatches via EventQueue::emitNow (direct
  * dispatch), never through the deferred queue.
  *
  * The manager does not own the Scene: it holds a provider so the correct
@@ -39,13 +39,19 @@ class Scene;
 class OperationManager : public IOperationSink
 {
 public:
+	/** @brief Default cap on undo-stack depth (per Issue #19). */
+	static constexpr size_t kDefaultMaxUndoDepth = 256;
+
 	/**
 	 * @brief Constructs the manager.
 	 * @param bus Event queue operations replay their events on.
 	 * @param sceneProvider Returns the current scene (re-queried each replay,
 	 *        so a scene swap does not leave a dangling reference).
+	 * @param maxUndoDepth Cap on undo-stack entries; oldest are evicted past it
+	 *        (default kDefaultMaxUndoDepth). Bounds memory for long sessions.
 	 */
-	OperationManager(EventQueue& bus, std::function<Scene*()> sceneProvider);
+	OperationManager(EventQueue& bus, std::function<Scene*()> sceneProvider,
+	                 size_t maxUndoDepth = kDefaultMaxUndoDepth);
 
 	// --- IOperationSink ---
 	void Submit(std::unique_ptr<Operation> op) override;
@@ -92,11 +98,20 @@ private:
 	/** @brief Emits an operation synchronously under the replay guard. */
 	void Replay(Operation& op);
 
+	/**
+	 * @brief Evicts the oldest undo entries so the stack stays within
+	 *        m_maxUndoDepth. Redo is unaffected (bounded implicitly by undo).
+	 */
+	void EnforceUndoLimit();
+
 	EventQueue& m_bus;
 	std::function<Scene*()> m_sceneProvider;
 
 	std::vector<std::unique_ptr<Operation>> m_undo;
 	std::vector<std::unique_ptr<Operation>> m_redo;
+
+	/// Maximum undo-stack depth; oldest entries evicted past this.
+	size_t m_maxUndoDepth = kDefaultMaxUndoDepth;
 
 	/// Monotonic counter bumped on every stack change; drives UI change detection.
 	uint64_t m_revision = 0;

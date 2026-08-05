@@ -343,9 +343,9 @@ public:
 		, m_after(std::move(after))
 	{}
 
-	void Emit(OperationContext& ctx) override
+	void Apply(OperationContext& ctx) override
 	{
-		ctx.bus.EmitNow(SelectionChanged{ &ctx.scene, m_after.selectedUids, m_after.activeUid });
+		ctx.bus.emitNow(SelectionChanged{ &ctx.scene, m_after.selectedUids, m_after.activeUid });
 	}
 
 	std::unique_ptr<Operation> Inverse() const override

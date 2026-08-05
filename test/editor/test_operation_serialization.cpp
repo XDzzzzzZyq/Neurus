@@ -98,10 +98,10 @@ TEST_F(OperationSerializationTest, FloatOp_RoundTrip)
 	EXPECT_EQ(restored->Label(), op->Label());
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	restored->Emit(ctx);
+	restored->Apply(ctx);
 	EXPECT_FLOAT_EQ(m_light->light_power, 42.0f); // "after" survived
 
-	restored->Inverse()->Emit(ctx);
+	restored->Inverse()->Apply(ctx);
 	EXPECT_FLOAT_EQ(m_light->light_power, 10.0f); // "before" + uid survived
 }
 
@@ -115,9 +115,9 @@ TEST_F(OperationSerializationTest, BoolOp_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetLightShadowOp*>(restored.get()), nullptr);
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	restored->Emit(ctx);
+	restored->Apply(ctx);
 	EXPECT_FALSE(m_light->use_shadow);
-	restored->Inverse()->Emit(ctx);
+	restored->Inverse()->Apply(ctx);
 	EXPECT_TRUE(m_light->use_shadow);
 }
 
@@ -132,9 +132,9 @@ TEST_F(OperationSerializationTest, Vec3Op_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetPositionOp*>(restored.get()), nullptr);
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	restored->Emit(ctx);
+	restored->Apply(ctx);
 	EXPECT_EQ(m_mesh->GetPosition(), glm::vec3(1.0f, 2.0f, 3.0f));
-	restored->Inverse()->Emit(ctx);
+	restored->Inverse()->Apply(ctx);
 	EXPECT_EQ(m_mesh->GetPosition(), glm::vec3(0.0f));
 }
 
@@ -149,10 +149,10 @@ TEST_F(OperationSerializationTest, VisibilityStateOp_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetVisibilityOp*>(restored.get()), nullptr);
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	restored->Emit(ctx);
+	restored->Apply(ctx);
 	EXPECT_FALSE(m_mesh->is_viewport);
 	EXPECT_FALSE(m_mesh->is_rendered);
-	restored->Inverse()->Emit(ctx);
+	restored->Inverse()->Apply(ctx);
 	EXPECT_TRUE(m_mesh->is_viewport);
 	EXPECT_TRUE(m_mesh->is_rendered);
 }
@@ -170,7 +170,7 @@ TEST_F(OperationSerializationTest, CameraPoseOp_RoundTrip)
 	EXPECT_NE(dynamic_cast<CameraTransformOp*>(restored.get()), nullptr);
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	restored->Emit(ctx);
+	restored->Apply(ctx);
 	EXPECT_EQ(m_camera->GetPosition(), pos);
 	EXPECT_EQ(m_camera->cam_tar, tar);
 }
@@ -188,7 +188,7 @@ TEST_F(OperationSerializationTest, SelectionStateOp_RoundTrip)
 	EXPECT_TRUE(restored->PreservesRedo());
 
 	OperationContext ctx{ m_scene, m_eventBus };
-	restored->Emit(ctx);
+	restored->Apply(ctx);
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_light.get()));
 	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_light.get());

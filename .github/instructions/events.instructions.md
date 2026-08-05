@@ -38,6 +38,7 @@ scene events.
 | `src/editor/events/InputEvents.h` | Viewport raw input events (mouse move, press, release, scroll) |
 | `src/editor/events/ProjectEvents.h` | Project lifecycle events (new, open, save, saveAs) |
 | `src/editor/events/AssetEvents.h` | Asset import events (mesh, camera, light add) |
+| `src/editor/events/OperationEvents.h` | Undo/redo request events (`UndoRequested`, `RedoRequested`) |
 | `src/editor/events/ConfigEvents.h` | Render config change events |
 | `src/editor/events/ShaderEvents.h` | Shader editor events (create, compile, code/struct edit, field add) |
 | `src/editor/events/UIEvents.h` | QObject singleton — Qt signal definitions for UI→Editor dispatch |

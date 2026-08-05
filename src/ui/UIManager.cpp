@@ -216,7 +216,9 @@ void UIManager::CreateMenus()
 	addAction(undoTrigger);
 
 	auto* redoTrigger = new QAction(this);
-	redoTrigger->setShortcut(QKeySequence::Redo);
+	// QKeySequence::Redo maps to Ctrl+Y on Windows; also bind Ctrl+Shift+Z so
+	// the common cross-platform redo chord works everywhere (Issue #43).
+	redoTrigger->setShortcuts({ QKeySequence::Redo, QKeySequence("Ctrl+Shift+Z") });
 	connect(redoTrigger, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestRedo();
 	});
