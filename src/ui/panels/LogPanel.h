@@ -20,10 +20,12 @@
 #include "ui/panels/UIPanel.h"
 
 class QComboBox;
+class QEvent;
 class QHBoxLayout;
 class QLabel;
 class QLineEdit;
 class QToolButton;
+class QWidget;
 
 namespace neurus
 {
@@ -42,6 +44,8 @@ public:
 	explicit LogPanel(QWidget* parent = nullptr);
 
 	void Refresh(const UIContext& ctx) override;
+
+	bool eventFilter(QObject* watched, QEvent* event) override;
 
 signals:
 	/**
@@ -62,7 +66,8 @@ private:
 	void OnClearClicked();
 	void OnExportClicked();
 
-	QLabel*      m_counts = nullptr;
+	QWidget*     m_searchWrap = nullptr;
+	QLabel*      m_stats = nullptr;
 	QComboBox*   m_filter = nullptr;
 	QLineEdit*   m_search = nullptr;
 	QToolButton* m_autoScrollBtn = nullptr;

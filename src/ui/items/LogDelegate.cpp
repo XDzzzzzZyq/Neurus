@@ -35,8 +35,8 @@ void LogDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
 
 	const int level = index.data(LogModel::LevelRole).toInt();
 	const QColor textColor = (level == static_cast<int>(LogLevel::Error))
-	                             ? QColor(255, 90, 90)   // red for errors
-	                             : QColor(80, 200, 200); // cyan for info
+	                             ? QColor(211, 47, 47)   // red for errors (#d32f2f)
+	                             : QColor(48, 48, 48);   // dark gray for info (#303030)
 
 	QFont font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
 	if (font.pointSize() < 1)

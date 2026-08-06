@@ -3,6 +3,7 @@
 #include <fstream>
 
 #include <QComboBox>
+#include <QEvent>
 #include <QFile>
 #include <QFileDialog>
 #include <QHBoxLayout>
@@ -10,6 +11,7 @@
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QScrollBar>
+#include <QStyle>
 #include <QTextStream>
 #include <QToolButton>
 #include <QVBoxLayout>
@@ -46,11 +48,6 @@ LogPanel::LogPanel(QWidget* parent)
 	root->setContentsMargins(4, 4, 4, 4);
 	root->setSpacing(4);
 
-	// Counts header (dirty-checked in Refresh()).
-	m_counts = new QLabel(QStringLiteral("INFO 0 · ERROR 0"), this);
-	m_counts->setObjectName(QStringLiteral("logCounts"));
-	root->addWidget(m_counts);
-
 	BuildToolbar();
 	root->addLayout(m_toolbar);
 
@@ -80,11 +77,30 @@ void LogPanel::BuildToolbar()
 	m_filter->setObjectName(QStringLiteral("logToolBtn"));
 	m_toolbar->addWidget(m_filter);
 
-	m_search = new QLineEdit(this);
+	// Search bar: a bordered container holding the search field (stretch)
+	// and the live INFO/ERROR counts as a right-side suffix, so the stats
+	// read as part of the search control rather than a separate header.
+	m_searchWrap = new QWidget(this);
+	m_searchWrap->setObjectName(QStringLiteral("logSearchWrap"));
+	m_searchWrap->setAttribute(Qt::WA_StyledBackground, true);
+
+	auto* searchLayout = new QHBoxLayout(m_searchWrap);
+	searchLayout->setContentsMargins(6, 0, 8, 0);
+	searchLayout->setSpacing(6);
+
+	m_search = new QLineEdit(m_searchWrap);
 	m_search->setPlaceholderText(QStringLiteral("Search..."));
 	m_search->setClearButtonEnabled(true);
 	m_search->setObjectName(QStringLiteral("logSearch"));
-	m_toolbar->addWidget(m_search, 1);
+	m_search->installEventFilter(this);
+	searchLayout->addWidget(m_search, 1);
+
+	m_stats = new QLabel(QStringLiteral("INFO 0 · ERROR 0"), m_searchWrap);
+	m_stats->setObjectName(QStringLiteral("logStats"));
+	m_stats->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
+	searchLayout->addWidget(m_stats);
+
+	m_toolbar->addWidget(m_searchWrap, 1);
 
 	m_autoScrollBtn = new QToolButton(this);
 	m_autoScrollBtn->setText(QStringLiteral("Auto-scroll"));
@@ -160,13 +176,13 @@ void LogPanel::Refresh(const UIContext& ctx)
 		emit errorNotified(static_cast<int>(delta), firstMsg);
 	}
 
-	// Counts header (dirty-checked).
+	// Stats suffix inside the search bar (dirty-checked).
 	if (info != m_lastInfoCount || errors != m_lastErrorCount)
 	{
 		m_lastInfoCount = info;
 		m_lastErrorCount = errors;
-		m_counts->setText(QStringLiteral("INFO %1 · ERROR %2")
-		                      .arg(info).arg(errors));
+		m_stats->setText(QStringLiteral("INFO %1 · ERROR %2")
+		                     .arg(info).arg(errors));
 	}
 
 	if (m_autoScrollBtn->isChecked() && wasAtBottom)
@@ -215,7 +231,23 @@ void LogPanel::OnClearClicked()
 	m_lastErrorCount = 0;
 	m_lastInfoCount = 0;
 	m_model.Refresh(&LogBuffer::instance());
-	m_counts->setText(QStringLiteral("INFO 0 · ERROR 0"));
+	m_stats->setText(QStringLiteral("INFO 0 · ERROR 0"));
+}
+
+bool LogPanel::eventFilter(QObject* watched, QEvent* event)
+{
+	// Mirror the search field's focus onto the surrounding search bar so
+	// the whole control shows a single focus ring (QSS dynamic property).
+	if (watched == m_search
+	    && (event->type() == QEvent::FocusIn || event->type() == QEvent::FocusOut))
+	{
+		const bool focused = (event->type() == QEvent::FocusIn);
+		m_searchWrap->setProperty("focusState", focused ? QStringLiteral("true")
+		                                               : QStringLiteral("false"));
+		m_searchWrap->style()->unpolish(m_searchWrap);
+		m_searchWrap->style()->polish(m_searchWrap);
+	}
+	return QWidget::eventFilter(watched, event);
 }
 
 void LogPanel::OnExportClicked()

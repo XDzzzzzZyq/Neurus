@@ -1,35 +1,87 @@
-/* Log Panel stylesheet. Severity coloring lives in LogDelegate; this file
-   sets the chrome: list background, search field, toolbar buttons, counts. */
+/* Log Panel stylesheet (light theme). Severity coloring lives in LogDelegate;
+   this file sets the chrome: list background, search bar + stats suffix,
+   toolbar buttons and combo popup. Matches the app's light-panel language:
+   near-white surfaces, dark text, #ff6f00 accent for active/toggle-on,
+   #4A90D9 for selection. */
 
 QListView#logView {
-    background-color: #1e1e1e;
-    alternate-background-color: #252526;
-    border: 1px solid #3c3c3c;
-    outline: none;
+	background-color: #ffffff;
+	alternate-background-color: #f5f5f5;
+	border: 1px solid #d0d0d0;
+	outline: none;
+	color: #303030;
+}
+
+/* Search bar: bordered container that visually joins the search field with
+   the INFO/ERROR counts suffix on the right. */
+QWidget#logSearchWrap {
+	background-color: #ffffff;
+	border: 1px solid #c8c8c8;
+	border-radius: 3px;
+}
+
+QWidget#logSearchWrap[focusState="true"] {
+	border-color: #ff6f00;
 }
 
 QLineEdit#logSearch {
-    padding: 2px 6px;
-    border: 1px solid #3c3c3c;
-    border-radius: 2px;
-    background-color: #252526;
-    color: #dcdcdc;
+	border: none;
+	background: transparent;
+	color: #1a1a1a;
+	selection-background-color: #4A90D9;
+	selection-color: #ffffff;
+	placeholder-text-color: #8a8a8a;
+	padding: 3px 0;
 }
 
+QLabel#logStats {
+	color: #8a8a8a;
+	font-size: 11px;
+	background: transparent;
+}
+
+QComboBox#logToolBtn,
 QToolButton#logToolBtn {
-    padding: 3px 6px;
-    border: 1px solid #3c3c3c;
-    border-radius: 2px;
-    background-color: #2d2d2d;
-    color: #dcdcdc;
+	padding: 3px 8px;
+	border: 1px solid #c8c8c8;
+	border-radius: 3px;
+	background-color: #ffffff;
+	color: #1a1a1a;
 }
 
+QComboBox#logToolBtn:hover,
+QToolButton#logToolBtn:hover {
+	background-color: #f0f0f0;
+	border-color: #a0a0a0;
+}
+
+QComboBox#logToolBtn:pressed,
+QToolButton#logToolBtn:pressed {
+	background-color: #e0e0e0;
+}
+
+/* Toggle-on state (auto-scroll/pause): solid accent so it is unmistakable
+   on a white background. */
 QToolButton#logToolBtn:checked {
-    background-color: #094771;
-    border-color: #1b4b73;
+	background-color: #ff6f00;
+	border-color: #e06000;
+	color: #ffffff;
 }
 
-QLabel#logCounts {
-    color: #9cdcfe;
-    font-weight: bold;
+QToolButton#logToolBtn:checked:hover {
+	background-color: #e86500;
+}
+
+QComboBox#logToolBtn::drop-down {
+	border: none;
+	width: 18px;
+}
+
+QComboBox#logToolBtn QAbstractItemView {
+	background-color: #ffffff;
+	border: 1px solid #c8c8c8;
+	color: #1a1a1a;
+	selection-background-color: #4A90D9;
+	selection-color: #ffffff;
+	outline: none;
 }

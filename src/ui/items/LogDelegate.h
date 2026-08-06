@@ -1,7 +1,7 @@
 /**
  * @file LogDelegate.h
  * @brief Paints a log row as "HH:MM:SS.mmm  [func:line]  message" in a
- *        fixed-width font, colored by severity (cyan Info, red Error).
+ *        fixed-width font, colored by severity (dark gray Info, red Error).
  * @note Reads the composed Qt::DisplayRole text from LogModel and the
  *       LevelRole for color; keeps selection/hover backgrounds.
  */

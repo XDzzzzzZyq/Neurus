@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <ctime>
 
-#include <QDateTime>
 #include <QString>
 
 #include "core/Log.h"
@@ -91,14 +90,18 @@ void LogModel::Refresh(const LogBuffer* buffer)
 		return;
 	}
 
-	// Size unchanged. If seq advanced, the ring wrapped (oldest replaced
-	// by newest) - simplest correct signal is a full reset.
+	// Size unchanged but seq advanced: the ring wrapped (oldest replaced
+	// by newest). Drop the oldest row and append the newest row instead of
+	// a full model reset, so a view scrolled up into history keeps its
+	// position rather than being yanked back to the bottom on every append.
 	if (newSeq > m_lastSeq)
 	{
-		beginResetModel();
+		beginRemoveRows(QModelIndex(), 0, 0);
+		endRemoveRows();
+		beginInsertRows(QModelIndex(), newRows - 1, newRows - 1);
 		m_buffer = buffer;
 		m_lastSeq = newSeq;
-		endResetModel();
+		endInsertRows();
 	}
 	else
 	{

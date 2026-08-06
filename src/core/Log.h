@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -157,6 +158,7 @@ public:
 	LogEntry At(std::size_t logicalIdx) const
 	{
 		std::lock_guard<std::mutex> lock(m_mtx);
+		assert(logicalIdx < m_count);
 		return m_ring[(m_head + logicalIdx) % kLogCapacity];
 	}
 
