@@ -236,6 +236,22 @@ public:
 		m_active = T{};
 	}
 
+	/**
+	 * @brief Replaces the entire selection set with an absolute state.
+	 * @param list Ordered selected values (becomes the new selection order).
+	 * @param active Active value (T{} for none).
+	 * @note Absolute setter used by undo/redo replay: it overwrites the whole
+	 *       set at once rather than mutating incrementally, so restoring a
+	 *       recorded endpoint is order-preserving and independent of history.
+	 */
+	void RestoreState(std::vector<T> list, const T& active)
+	{
+		m_selectedList = std::move(list);
+		m_selectionSet.clear();
+		m_selectionSet.insert(m_selectedList.begin(), m_selectedList.end());
+		m_active = active;
+	}
+
 	// -------------------------------------------------------------------
 	// Cereal serialization
 	// -------------------------------------------------------------------

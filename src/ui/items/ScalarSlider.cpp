@@ -7,6 +7,7 @@
 
 #include <QDoubleSpinBox>
 #include <QHBoxLayout>
+#include <QMouseEvent>
 #include <QSlider>
 
 #include <cmath>
@@ -69,6 +70,12 @@ ScalarSlider::ScalarSlider(double min, double max, int sliderSteps,
 		m_slider->blockSignals(false);
 		emit valueChanged();
 	});
+
+	// --- Gesture boundaries: bracket the whole mouse interaction ---
+	// Filter raw press/release on the slider rather than forwarding
+	// sliderPressed/sliderReleased, which skip groove clicks and would split a
+	// click+drag into two undo entries.
+	m_slider->installEventFilter(this);
 }
 
 // =========================================================================
@@ -91,6 +98,28 @@ void ScalarSlider::setValue(double v)
 	m_slider->setValue(static_cast<int>((v - m_min) / (m_max - m_min) * m_sliderSteps));
 	
 	m_v = v;
+}
+
+// =========================================================================
+// Gesture bracketing
+// =========================================================================
+
+bool ScalarSlider::eventFilter(QObject* watched, QEvent* event)
+{
+	if (watched == m_slider)
+	{
+		if (event->type() == QEvent::MouseButtonPress)
+		{
+			if (static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton)
+				emit pressed();
+		}
+		else if (event->type() == QEvent::MouseButtonRelease)
+		{
+			if (static_cast<QMouseEvent*>(event)->button() == Qt::LeftButton)
+				emit released();
+		}
+	}
+	return QWidget::eventFilter(watched, event);
 }
 
 } // namespace neurus

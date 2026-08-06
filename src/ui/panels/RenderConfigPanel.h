@@ -65,6 +65,14 @@ signals:
 	/** @brief Emitted whenever any control value changes, carrying the new config. */
 	void configValueChanged(const RenderConfigChangedEvent& e);
 
+	/** @brief Emitted when a bounded slider edit begins (slider press).
+	 *  Bounds one undo entry for continuous slider drags. */
+	void editBegin(const ConfigEditBegin& e);
+
+	/** @brief Emitted when a bounded slider edit ends (slider release).
+	 *  Bounds one undo entry for continuous slider drags. */
+	void editEnd(const ConfigEditEnd& e);
+
 private:
 	// --- Section builders ---
 	void BuildShadowsSection();

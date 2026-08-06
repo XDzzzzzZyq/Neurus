@@ -10,8 +10,23 @@ add_library(neurus_editor STATIC
 	controllers/Controllers.h
 	controllers/CameraController.h
 	controllers/CameraController.cpp
+	controllers/RenderConfigController.h
+	controllers/RenderConfigController.cpp
 	controllers/ShaderController.h
 	controllers/ShaderController.cpp
+	operations/IOperationSink.h
+	operations/Operation.h
+	operations/OperationContext.h
+	operations/OperationContext.cpp
+	operations/OperationManager.h
+	operations/OperationManager.cpp
+	operations/SceneOperations.h
+	operations/ConfigOperations.h
+	operations/ShaderOperations.h
+	operations/OperationRegistration.h
+	operations/OperationRegistration.cpp
+	operations/HistoryComponent.h
+	operations/HistoryComponent.cpp
 	events/UIEvents.h
 	events/UIEvents.cpp
 )

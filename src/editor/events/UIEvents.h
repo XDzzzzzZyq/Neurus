@@ -5,6 +5,7 @@
 
 #include "editor/events/ProjectEvents.h"
 #include "editor/events/AssetEvents.h"
+#include "editor/events/OperationEvents.h"
 
 namespace neurus {
 
@@ -109,6 +110,14 @@ signals:
 	/** @brief Emitted when a new spot light should be added to the scene (Edit → Add → Spot Light). */
 	void spotLightAddRequested(const SpotLightAddEvent& e);
 
+	// --- Undo/redo signals ---
+
+	/** @brief Emitted when the user requests undo (Edit → Undo / Ctrl+Z). */
+	void undoRequested(const UndoRequested& e);
+
+	/** @brief Emitted when the user requests redo (Edit → Redo / Ctrl+Shift+Z). */
+	void redoRequested(const RedoRequested& e);
+
 public:
 	/**
 	 * @brief Convenience method to emit screenshotRequested from any layer.
@@ -136,6 +145,9 @@ public:
 	void requestLightAdd() { emit lightAddRequested(LightAddEvent{}); }
 	void requestSunLightAdd() { emit sunLightAddRequested(SunLightAddEvent{}); }
 	void requestSpotLightAdd() { emit spotLightAddRequested(SpotLightAddEvent{}); }
+
+	void requestUndo() { emit undoRequested(UndoRequested{}); }
+	void requestRedo() { emit redoRequested(RedoRequested{}); }
 
 	void requestUIRecreation(quintptr newHwnd) { emit uiRecreated(newHwnd); }
 

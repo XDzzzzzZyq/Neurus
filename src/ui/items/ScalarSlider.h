@@ -71,6 +71,27 @@ signals:
 	/** @brief Emitted whenever the slider or spinbox value changes. */
 	void valueChanged();
 
+	/** @brief Emitted when the user begins dragging the slider handle (mouse press).
+	 *  Bounds one undo entry. Fired on the slider's raw mouse-button press so
+	 *  that a groove click and the drag that follows are one gesture, not two. */
+	void pressed();
+
+	/** @brief Emitted when the user releases the slider handle (mouse release).
+	 *  Bounds one undo entry. Fired on the slider's raw mouse-button release. */
+	void released();
+
+protected:
+	/**
+	 * @brief Event filter on the inner slider to bracket a drag gesture.
+	 *
+	 * QSlider's sliderPressed/sliderReleased only fire when the press lands on
+	 * the handle; a groove click (jump-to-position) skips them, which would
+	 * split a click+drag into two undo entries. Filtering the raw
+	 * MouseButtonPress/Release guarantees exactly one pressed()/released()
+	 * bracket around the whole interaction.
+	 */
+	bool eventFilter(QObject* watched, QEvent* event) override;
+
 private:
 	QSlider*        m_slider      = nullptr;
 	QDoubleSpinBox* m_spin        = nullptr;

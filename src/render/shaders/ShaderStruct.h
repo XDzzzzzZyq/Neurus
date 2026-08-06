@@ -56,6 +56,9 @@ struct S_IO
 	ParaType type;            ///< GLSL type of the variable
 	std::string typeName;     ///< Original type name string for custom types (empty -> use ParseType(type))
 	Interp interpolation = Interp::Smooth;  ///< Interpolation qualifier
+
+	/** @brief Member-wise equality (used by undo/redo no-net-change diffing). */
+	bool operator==(const S_IO&) const = default;
 };
 
 /** @brief Ordered parameter list: (type, name, originalTypeName) triples. */
@@ -73,6 +76,9 @@ struct S_StructDef
 	std::string name;         ///< Struct / block type name
 	std::vector<S_IO> fields; ///< Member fields (location unused for struct members)
 	std::string varName;      ///< Variable / instance name (used for ubuffer_list; empty for others)
+
+	/** @brief Member-wise equality (used by undo/redo no-net-change diffing). */
+	bool operator==(const S_StructDef&) const = default;
 };
 
 /**
@@ -89,6 +95,9 @@ struct S_Uniform
 	std::string qualifiers; ///< Qualifiers (e.g. "writeonly", "readonly"; empty = none)
 	std::string actualType; ///< Original GLSL type string (e.g. "image2D"; empty -> use ParseType(type))
 	std::string imageFormat; ///< Image format qualifier (e.g. "r8", "rgba16f"; empty = none)
+
+	/** @brief Member-wise equality (used by undo/redo no-net-change diffing). */
+	bool operator==(const S_Uniform&) const = default;
 };
 
 /**
@@ -103,6 +112,9 @@ struct S_Func
 	std::string name;                                    ///< Function / const name
 	std::string body;                                    ///< Function body or const value
 	Args args;  ///< Parameter list
+
+	/** @brief Member-wise equality (used by undo/redo no-net-change diffing). */
+	bool operator==(const S_Func&) const = default;
 };
 
 /** @brief Alias: const values share the same structure as functions. */
@@ -145,6 +157,9 @@ struct S_PushConstant
 	uint32_t offset;      ///< Byte offset from the start of the push-constant block
 	uint32_t size;        ///< Byte size of this member
 	std::string typeName; ///< GLSL type of this member (e.g. "mat4", "vec4", "float")
+
+	/** @brief Member-wise equality (used by undo/redo no-net-change diffing). */
+	bool operator==(const S_PushConstant&) const = default;
 };
 
 /**

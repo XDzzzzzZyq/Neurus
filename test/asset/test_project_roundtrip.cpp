@@ -284,3 +284,83 @@ TEST(ProjectRoundtrip, FullScene)
 	EXPECT_EQ(loadedLight->GetPosition(), glm::vec3(-2.0f, 0.0f, 5.0f));
 	EXPECT_EQ(loadedLight->o_type, ObjectID::GOType::GO_LIGHT);
 }
+
+// -----------------------------------------------------------------------
+// Roundtrip: Selection state
+// -----------------------------------------------------------------------
+
+/**
+ * @test Selection (stored as pointers, persisted as UIDs) survives a
+ *       save/load roundtrip: selected set and active object are restored
+ *       against the reloaded objects by UID.
+ */
+TEST(ProjectRoundtrip, SelectionState)
+{
+	TempFile tmp("test_rt_selection.neurus.json");
+	int meshUid = 0;
+	int lightUid = 0;
+	{
+		Scene scene;
+		RenderConfig config;
+
+		auto mesh = std::make_shared<Mesh>("obj/cube.obj");
+		scene.UseMesh(mesh);
+		meshUid = mesh->GetObjectID();
+
+		auto light = std::make_shared<Light>(POINTLIGHT, 5.0f, glm::vec3(1.0f));
+		scene.UseLight(light);
+		lightUid = light->GetObjectID();
+
+		// Select mesh (replace), then add light — light becomes active.
+		scene.selections.Select(mesh.get(), false);
+		scene.selections.Select(light.get(), true);
+
+		auto p = MakeProject(scene, config);
+		p.Save(tmp.path);
+	}
+	Scene loadedScene;
+	RenderConfig loadedConfig;
+	{
+		auto p = MakeProject(loadedScene, loadedConfig);
+		p.Load(tmp.path);
+	}
+
+	// Both objects selected, light is active.
+	EXPECT_EQ(loadedScene.selections.GetSelectionCount(), 2u);
+
+	const ObjectID* loadedMesh = loadedScene.GetObjectID(meshUid);
+	const ObjectID* loadedLight = loadedScene.GetObjectID(lightUid);
+	ASSERT_NE(loadedMesh, nullptr);
+	ASSERT_NE(loadedLight, nullptr);
+	EXPECT_TRUE(loadedScene.selections.IsSelected(loadedMesh));
+	EXPECT_TRUE(loadedScene.selections.IsSelected(loadedLight));
+
+	const ObjectID* active = loadedScene.selections.GetActiveObject();
+	ASSERT_NE(active, nullptr);
+	EXPECT_EQ(active->GetObjectID(), lightUid);
+}
+
+/**
+ * @test A scene with no selection roundtrips to an empty selection
+ *       (the selection block is present but empty).
+ */
+TEST(ProjectRoundtrip, EmptySelection)
+{
+	TempFile tmp("test_rt_empty_selection.neurus.json");
+	{
+		Scene scene;
+		RenderConfig config;
+		auto mesh = std::make_shared<Mesh>("obj/cube.obj");
+		scene.UseMesh(mesh);
+		auto p = MakeProject(scene, config);
+		p.Save(tmp.path);
+	}
+	Scene loadedScene;
+	RenderConfig loadedConfig;
+	{
+		auto p = MakeProject(loadedScene, loadedConfig);
+		p.Load(tmp.path);
+	}
+	EXPECT_EQ(loadedScene.selections.GetSelectionCount(), 0u);
+	EXPECT_EQ(loadedScene.selections.GetActiveObject(), nullptr);
+}

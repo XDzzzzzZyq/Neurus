@@ -7,6 +7,8 @@
 
 #include "controllers/Controllers.h"
 #include "editor/events/EventBus.h"
+#include "editor/operations/HistoryView.h"
+#include "editor/operations/OperationManager.h"
 #include "render/RenderConfig.h"
 #include "scene/EditorContext.h"
 
@@ -64,11 +66,29 @@ public:
 	 */
 	EditorContext GetContext() const;
 
+	/**
+	 * @brief Returns a read-only snapshot of the undo/redo history.
+	 *
+	 * The Application carries this into UIContext each frame so the History
+	 * panel can display the stacks without touching Editor-owned operations.
+	 * It is intentionally kept out of EditorContext because the Renderer has
+	 * no use for history state.
+	 */
+	HistoryView GetHistory() const { return ed_operations.GetHistoryView(); }
+
+	/**
+	 * @brief Returns the undo/redo manager (for project history persistence).
+	 *
+	 * The Application registers a project::HistoryComponent against this so the
+	 * operation stacks are saved/loaded alongside the scene and render config.
+	 */
+	OperationManager& GetOperations() { return ed_operations; }
+
 	template<typename T>
 	void RegisterController()
 	{
 		auto ctrl = std::make_unique<T>();
-		ctrl->Init(ed_eventBus);
+		ctrl->Init(ed_eventBus, ed_operations);
 		ed_controllers.push_back(std::move(ctrl));
 	}
 
@@ -100,6 +120,7 @@ private:
 
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
+	OperationManager ed_operations;                ///< Undo/redo history over event-replay ops.
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---

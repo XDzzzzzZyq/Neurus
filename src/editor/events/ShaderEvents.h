@@ -21,10 +21,25 @@
 #pragma once
 
 #include <string>
+#include <variant>
+
+#include "render/shaders/ShaderStruct.h"
 
 namespace neurus {
 
 class ObjectID;
+
+/**
+ * @brief One ShaderStruct element payload (the granularity of an undoable edit).
+ *
+ * A struct edit captures the whole addressed element before and after the edit
+ * (not a stringified single field), so undo/redo restores it by plain
+ * assignment and the op serializes via the non-intrusive serialize functions in
+ * ShaderStructSerialize.h. The ShaderSection still discriminates *which*
+ * container the element belongs to (multiple sections share an element type:
+ * AB_list/pass_list are both S_IO; input/output/uniform are all S_Uniform).
+ */
+using ShaderFieldValue = std::variant<S_IO, S_Uniform, S_Func, S_PushConstant, S_StructDef>;
 
 /**
  * @brief Identifies which ShaderStruct container is being edited.
@@ -121,6 +136,101 @@ struct ShaderCompileRequested
 	const ObjectID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	int unitType = 0;         ///< 0 = Code path, 1 = Struct path
+};
+
+/**
+ * @brief Emitted when a bounded shader code-edit gesture begins (editor focus-in).
+ *
+ * Mirrors ConfigEditBegin: ShaderController captures the "before" source
+ * ({code, parsed IR}) for the (object, stage) on this event and applies live
+ * keystrokes without recording, so the whole edit burst collapses to one undo
+ * entry committed on ShaderEditEnd.
+ */
+struct ShaderEditBegin
+{
+	const ObjectID* object = nullptr;
+	int stage = 0;            ///< ShaderType as int
+};
+
+/**
+ * @brief Emitted when a bounded shader code-edit gesture ends (editor focus-out).
+ *
+ * ShaderController records a single SetShaderCodeOp spanning the code text
+ * captured at ShaderEditBegin through the current code, if it actually changed.
+ */
+struct ShaderEditEnd
+{
+	const ObjectID* object = nullptr;
+	int stage = 0;            ///< ShaderType as int
+};
+
+// ---------------------------------------------------------------------------
+// Undo/redo restore events (replayed by the shader operations)
+//
+// These mirror the forward edit events 1:1 in field detail, but are distinct
+// event types so replay can bump the ShaderUnit version (refreshing the panel)
+// while forward live edits deliberately do NOT bump (avoiding a cursor-jumping
+// reload mid-typing). All are CPU-only: they restore editable source without
+// recompiling to SPIR-V.
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Restores a stage's GLSL code text (replayed by SetShaderCodeOp).
+ *
+ * Mirrors ShaderCodeEdited. ShaderController overwrites ShaderUnit::code and
+ * bumps the ShaderUnit version so the editor panel refreshes.
+ */
+struct ShaderCodeRestored
+{
+	const ObjectID* object = nullptr;
+	int stage = 0;            ///< ShaderType as int
+	std::string code;         ///< Absolute GLSL text to restore
+};
+
+/**
+ * @brief Restores one ShaderStruct element (replayed by SetShaderFieldOp).
+ *
+ * Carries the whole addressed element (a ShaderFieldValue). ShaderController
+ * assigns it into the section's vector at fieldIndex, then bumps the version so
+ * the editor panel refreshes. Whole-element assignment (rather than replaying a
+ * single {field,value}) makes both undo and redo a plain copy.
+ */
+struct ShaderFieldRestored
+{
+	const ObjectID* object = nullptr;
+	int stage = 0;            ///< ShaderType as int
+	ShaderSection section;    ///< Which ShaderStruct container
+	int fieldIndex = 0;       ///< Index into the section's vector
+	ShaderFieldValue value;   ///< Whole element to assign back
+};
+
+/**
+ * @brief Re-appends a default entry to a ShaderStruct container (redo of an add).
+ *
+ * Mirrors ShaderFieldAdded. Replayed by AddShaderFieldOp when re-applying an
+ * add. ShaderController appends the same default entry and bumps the version.
+ */
+struct ShaderFieldAddRestored
+{
+	const ObjectID* object = nullptr;
+	int stage = 0;            ///< ShaderType as int
+	ShaderSection section;    ///< Which ShaderStruct container to append to
+	int subFieldIndex = -1;   ///< For StructDefs: which struct def to add a member to
+};
+
+/**
+ * @brief Removes the last entry from a ShaderStruct container (undo of an add).
+ *
+ * Replayed by AddShaderFieldOp when inverting an add. Because undo/redo is
+ * strictly LIFO, the added entry is always the last one, so dropping the last
+ * element is safe. ShaderController bumps the version after removal.
+ */
+struct ShaderFieldRemoved
+{
+	const ObjectID* object = nullptr;
+	int stage = 0;            ///< ShaderType as int
+	ShaderSection section;    ///< Which ShaderStruct container to remove from
+	int subFieldIndex = -1;   ///< For StructDefs: which struct def to remove a member from
 };
 
 } // namespace neurus

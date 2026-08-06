@@ -17,6 +17,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace neurus {
 
@@ -40,6 +41,21 @@ struct ObjectDeselected
 {
 	const UID* scene = nullptr;
 	const ObjectID* object = nullptr;
+};
+
+/**
+ * @brief Absolute selection-set state applied to the scene.
+ *
+ * Emitted only when replaying a SetSelectionOp: live selection events
+ * (ObjectSelected/ObjectDeselected) mutate the set incrementally, so the
+ * undoable operation stores the absolute selected-UID list plus the active
+ * UID and dispatches this to restore the whole set at once.
+ */
+struct SelectionChanged
+{
+	const UID* scene = nullptr;       ///< Editor-owned Scene (selection state).
+	std::vector<int> selectedUids;    ///< Ordered selected object UIDs.
+	int activeUid = 0;                ///< Active object UID (0 = none).
 };
 
 // ---------------------------------------------------------------------------
@@ -103,6 +119,24 @@ struct CameraFovChanged
 	float fov = 60.0f;
 };
 
+/**
+ * @brief Absolute camera pose (position + look-at target) set.
+ *
+ * Emitted only when replaying a CameraTransformOp: live navigation events
+ * (rotate/slide/push/zoom) carry relative deltas and cannot be replayed, so
+ * the undoable operation stores the absolute endpoints and dispatches this.
+ */
+struct CameraPoseChanged
+{
+	const ObjectID* object = nullptr;
+	float posX = 0.0f;
+	float posY = 0.0f;
+	float posZ = 0.0f;
+	float tarX = 0.0f;
+	float tarY = 0.0f;
+	float tarZ = 0.0f;
+};
+
 // ---------------------------------------------------------------------------
 // Mesh property events
 // ---------------------------------------------------------------------------
@@ -127,6 +161,14 @@ struct LightPowerChanged
 {
 	const ObjectID* object = nullptr;
 	float power = 10.0f;
+};
+
+struct LightColorChanged
+{
+	const ObjectID* object = nullptr;
+	float r = 1.0f;
+	float g = 1.0f;
+	float b = 1.0f;
 };
 
 struct LightRadiusChanged

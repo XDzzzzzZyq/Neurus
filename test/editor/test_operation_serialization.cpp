@@ -1,0 +1,260 @@
+/**
+ * @file test_operation_serialization.cpp
+ * @brief Operation-stack (undo/redo) serialization round-trip tests (no GPU).
+ *
+ * Two layers of coverage:
+ *  1. Per-value-shape single-op round-trips through cereal polymorphic
+ *     serialization: serialize a std::unique_ptr<Operation> to JSON and load it
+ *     back, letting cereal reconstruct the concrete subclass from its registered
+ *     type name (see OperationRegistration.cpp). Replaying the restored op (and
+ *     its inverse) proves uid + before + after all survived for each Value shape
+ *     (float, bool, glm::vec3, VisibilityState, CameraPose, SelectionState).
+ *  2. A full HistoryComponent save/load cycle: submit real edits, undo some so
+ *     both stacks are non-empty, save, load into a fresh manager, and confirm
+ *     the undo/redo stacks (and their replay behavior) match.
+ */
+
+#include <gtest/gtest.h>
+
+#include <memory>
+#include <sstream>
+
+#include <cereal/archives/json.hpp>
+#include <cereal/types/memory.hpp>
+#include <cereal/types/polymorphic.hpp>
+
+#include "glm/glm.hpp"
+
+#include "editor/controllers/SceneController.h"
+#include "editor/events/EventBus.h"
+#include "editor/events/SceneEvents.h"
+#include "editor/Input.h"
+#include "editor/operations/HistoryComponent.h"
+#include "editor/operations/OperationContext.h"
+#include "editor/operations/OperationManager.h"
+#include "editor/operations/OperationRegistration.h"
+#include "editor/operations/SceneOperations.h"
+#include "scene/Camera.h"
+#include "scene/Light.h"
+#include "scene/Mesh.h"
+#include "scene/Scene.h"
+
+using namespace neurus;
+
+namespace {
+
+/** @brief Serializes an op through a base pointer and reconstructs it via cereal. */
+std::unique_ptr<Operation> RoundTrip(const std::unique_ptr<Operation>& op)
+{
+	std::stringstream ss;
+	{
+		cereal::JSONOutputArchive out(ss);
+		out(cereal::make_nvp("op", op));
+	}
+	std::unique_ptr<Operation> restored;
+	cereal::JSONInputArchive in(ss);
+	in(cereal::make_nvp("op", restored));
+	return restored;
+}
+
+} // namespace
+
+class OperationSerializationTest : public ::testing::Test
+{
+protected:
+	void SetUp() override
+	{
+		m_controller.Init(m_eventBus, m_operations);
+
+		m_mesh   = std::make_shared<Mesh>();
+		m_light  = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+		m_camera = std::make_shared<Camera>();
+		m_scene.UseMesh(m_mesh);
+		m_scene.UseLight(m_light);
+		m_scene.UseCamera(m_camera);
+	}
+
+	void Process() { m_eventBus.Process(); }
+
+	EventQueue m_eventBus;
+	Scene m_scene;
+	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	SceneController m_controller;
+	std::shared_ptr<Mesh> m_mesh;
+	std::shared_ptr<Light> m_light;
+	std::shared_ptr<Camera> m_camera;
+};
+
+// --- Per-value-shape single-op round-trips ---------------------------------
+
+TEST_F(OperationSerializationTest, FloatOp_RoundTrip)
+{
+	const int uid = m_light->GetObjectID();
+	std::unique_ptr<Operation> op = std::make_unique<SetLightPowerOp>(uid, 10.0f, 42.0f);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<SetLightPowerOp*>(restored.get()), nullptr);
+	EXPECT_EQ(restored->Label(), op->Label());
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_FLOAT_EQ(m_light->light_power, 42.0f); // "after" survived
+
+	restored->Inverse()->Apply(ctx);
+	EXPECT_FLOAT_EQ(m_light->light_power, 10.0f); // "before" + uid survived
+}
+
+TEST_F(OperationSerializationTest, BoolOp_RoundTrip)
+{
+	const int uid = m_light->GetObjectID();
+	std::unique_ptr<Operation> op = std::make_unique<SetLightShadowOp>(uid, true, false);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<SetLightShadowOp*>(restored.get()), nullptr);
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_FALSE(m_light->use_shadow);
+	restored->Inverse()->Apply(ctx);
+	EXPECT_TRUE(m_light->use_shadow);
+}
+
+TEST_F(OperationSerializationTest, Vec3Op_RoundTrip)
+{
+	const int uid = m_mesh->GetObjectID();
+	std::unique_ptr<Operation> op = std::make_unique<SetPositionOp>(
+		uid, glm::vec3(0.0f), glm::vec3(1.0f, 2.0f, 3.0f));
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<SetPositionOp*>(restored.get()), nullptr);
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_EQ(m_mesh->GetPosition(), glm::vec3(1.0f, 2.0f, 3.0f));
+	restored->Inverse()->Apply(ctx);
+	EXPECT_EQ(m_mesh->GetPosition(), glm::vec3(0.0f));
+}
+
+TEST_F(OperationSerializationTest, VisibilityStateOp_RoundTrip)
+{
+	const int uid = m_mesh->GetObjectID();
+	std::unique_ptr<Operation> op = std::make_unique<SetVisibilityOp>(
+		uid, VisibilityState{ true, true }, VisibilityState{ false, false });
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<SetVisibilityOp*>(restored.get()), nullptr);
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_FALSE(m_mesh->is_viewport);
+	EXPECT_FALSE(m_mesh->is_rendered);
+	restored->Inverse()->Apply(ctx);
+	EXPECT_TRUE(m_mesh->is_viewport);
+	EXPECT_TRUE(m_mesh->is_rendered);
+}
+
+TEST_F(OperationSerializationTest, CameraPoseOp_RoundTrip)
+{
+	const int uid = m_camera->GetObjectID();
+	const glm::vec3 pos(2.0f, 5.0f, 1.0f);
+	const glm::vec3 tar(1.0f, 0.0f, 0.0f);
+	std::unique_ptr<Operation> op = std::make_unique<CameraTransformOp>(
+		uid, CameraPose{ glm::vec3(0.0f), glm::vec3(0.0f) }, CameraPose{ pos, tar });
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<CameraTransformOp*>(restored.get()), nullptr);
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_EQ(m_camera->GetPosition(), pos);
+	EXPECT_EQ(m_camera->cam_tar, tar);
+}
+
+TEST_F(OperationSerializationTest, SelectionStateOp_RoundTrip)
+{
+	SelectionState before{ {}, 0 };
+	SelectionState after{ { m_mesh->GetObjectID(), m_light->GetObjectID() },
+	                      m_light->GetObjectID() };
+	std::unique_ptr<Operation> op = std::make_unique<SetSelectionOp>(before, after);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<SetSelectionOp*>(restored.get()), nullptr);
+	EXPECT_TRUE(restored->PreservesRedo());
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_light.get()));
+	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_light.get());
+}
+
+// --- Full HistoryComponent save/load cycle ---------------------------------
+
+TEST_F(OperationSerializationTest, HistoryComponent_SaveLoad_BothStacks)
+{
+	// Record three edits, then undo one so BOTH stacks are populated.
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 20.0f });
+	Process();
+	m_eventBus.enqueue(PositionChanged{ m_mesh.get(), 1.0f, 2.0f, 3.0f });
+	Process();
+	m_eventBus.enqueue(CameraFovChanged{ m_camera.get(), 35.0f });
+	Process();
+	m_operations.Undo(); // camera fov edit → redo stack
+
+	const HistoryView before = m_operations.GetHistoryView();
+	ASSERT_EQ(before.undo.size(), 2u);
+	ASSERT_EQ(before.redo.size(), 1u);
+
+	// Save through the Serializable adapter.
+	std::stringstream ss;
+	{
+		cereal::JSONOutputArchive out(ss);
+		project::HistoryComponent saveComp(m_operations);
+		saveComp.Save(out);
+	}
+
+	// Load into a completely fresh manager bound to the SAME scene.
+	OperationManager fresh{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	{
+		cereal::JSONInputArchive in(ss);
+		project::HistoryComponent loadComp(fresh);
+		loadComp.Load(in);
+	}
+
+	const HistoryView after = fresh.GetHistoryView();
+	EXPECT_EQ(after.undo, before.undo); // same labels, same order
+	EXPECT_EQ(after.redo, before.redo);
+	EXPECT_TRUE(fresh.CanUndo());
+	EXPECT_TRUE(fresh.CanRedo());
+
+	// Restored redo still reapplies the undone camera-fov edit.
+	fresh.Redo();
+	EXPECT_FLOAT_EQ(m_camera->cam_pers, 35.0f);
+}
+
+TEST_F(OperationSerializationTest, HistoryComponent_Load_MissingNode_ClearsHistory)
+{
+	// A project file without an "m_history" node (older format) must not throw
+	// and must leave the manager with empty stacks.
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 20.0f });
+	Process();
+	ASSERT_TRUE(m_operations.CanUndo());
+
+	std::stringstream ss;
+	{
+		cereal::JSONOutputArchive out(ss);
+		out(cereal::make_nvp("unrelated", 123));
+	}
+	cereal::JSONInputArchive in(ss);
+	project::HistoryComponent comp(m_operations);
+	comp.Load(in);
+
+	EXPECT_FALSE(m_operations.CanUndo());
+	EXPECT_FALSE(m_operations.CanRedo());
+}

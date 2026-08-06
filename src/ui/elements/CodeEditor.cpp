@@ -1,6 +1,7 @@
 #include "CodeEditor.h"
 #include "ShaderHighlighter.h"
 
+#include <QFocusEvent>
 #include <QPainter>
 #include <QResizeEvent>
 #include <QTextBlock>
@@ -69,6 +70,18 @@ void CodeEditor::resizeEvent(QResizeEvent* event)
 	QPlainTextEdit::resizeEvent(event);
 	QRect cr = contentsRect();
 	m_lineNumberArea->setGeometry(QRect(cr.left(), cr.top(), lineNumberAreaWidth(), cr.height()));
+}
+
+void CodeEditor::focusInEvent(QFocusEvent* event)
+{
+	QPlainTextEdit::focusInEvent(event);
+	emit editingStarted();
+}
+
+void CodeEditor::focusOutEvent(QFocusEvent* event)
+{
+	QPlainTextEdit::focusOutEvent(event);
+	emit editingFinished();
 }
 
 void CodeEditor::paintEvent(QPaintEvent* event)
