@@ -38,6 +38,7 @@ scene events.
 | `src/editor/events/InputEvents.h` | Viewport raw input events (mouse move, press, release, scroll) |
 | `src/editor/events/ProjectEvents.h` | Project lifecycle events (new, open, save, saveAs) |
 | `src/editor/events/AssetEvents.h` | Asset import events (mesh, camera, light add) |
+| `src/editor/events/OperationEvents.h` | Undo/redo request events (`UndoRequested`, `RedoRequested`) |
 | `src/editor/events/ConfigEvents.h` | Render config change events |
 | `src/editor/events/ShaderEvents.h` | Shader editor events (create, compile, code/struct edit, field add) |
 | `src/editor/events/UIEvents.h` | QObject singleton — Qt signal definitions for UI→Editor dispatch |
@@ -67,6 +68,14 @@ struct ObjectDeselected {
     const ObjectID* object = nullptr;
 };
 
+// Selection replay (dispatched only by SetSelectionOp on undo/redo): absolute
+// selection-set restore by UID. Live selection uses the incremental events above.
+struct SelectionChanged {
+    const UID*       scene = nullptr;   // Editor-owned Scene (selection state)
+    std::vector<int> selectedUids;      // Ordered selected object UIDs
+    int              activeUid = 0;     // Active object UID (0 = none)
+};
+
 // Visibility
 struct VisibilityChanged {
     const ObjectID* object = nullptr;
@@ -82,6 +91,9 @@ struct ScaleChanged    { const ObjectID* object; float sclX, sclY, sclZ; };
 // Camera properties
 struct CameraTargetChanged { const ObjectID* object; float targetX, targetY, targetZ; };
 struct CameraFovChanged    { const ObjectID* object; float fov; };
+// Absolute camera pose (position + target) — replay only, dispatched by
+// CameraTransformOp on undo/redo (live navigation carries relative deltas).
+struct CameraPoseChanged   { const ObjectID* object; float posX, posY, posZ, tarX, tarY, tarZ; };
 
 // Mesh properties
 struct MeshShadowChanged  { const ObjectID* object; bool enabled; };
@@ -125,12 +137,25 @@ struct RenderResetEvent {};                    // temporal accumulation reset
 ### CameraEvents.h
 
 ```cpp
-struct CameraRotateEvent  { Camera* camera; float dx; float dy; };
-struct CameraZoomEvent    { Camera* camera; float delta; };
-struct CameraPushEvent    { Camera* camera; float delta; };
-struct CameraSlideEvent   { Camera* camera; float dx; float dy; };
-struct CameraResizeEvent  { Camera* camera; int w; int h; };
+struct CameraRotateEvent  { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraZoomEvent    { Camera* cam; float scroll_dir; };
+struct CameraPushEvent    { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraSlideEvent   { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraSpinEvent    { Camera* cam; float mouse_delta_x, mouse_delta_y; };
+struct CameraResizeEvent  { Camera* cam; int width; int height; };
+
+// Drag-gesture boundaries — bracket a continuous orbit/pan/dolly manipulation
+// so it collapses to ONE undo entry (controller-owned gesture, see
+// editor.instructions.md → Undo/Redo). CameraController captures the "before"
+// pose on begin, mutates live during the drag WITHOUT recording, and records
+// one CameraTransformOp on end.
+struct CameraDragBegin { Camera* cam; };
+struct CameraDragEnd   { Camera* cam; };
 ```
+
+Scroll zoom has no press/release, so it is NOT bracketed: `CameraZoomEvent`
+records per-event and relies on `CameraTransformOp::MergeKey()` to coalesce a
+scroll burst into one undo step.
 
 ### InputEvents.h
 
@@ -139,6 +164,21 @@ struct MouseMoveEvent   { int x, y; float dx, dy; Modifiers mods; };
 struct MousePressEvent  { int x, y; MouseButton btn; Modifiers mods; };
 struct MouseReleaseEvent{ int x, y; MouseButton btn; Modifiers mods; };
 struct MouseScrollEvent { int x, y; float delta; Modifiers mods; };
+```
+
+### ConfigEvents.h
+
+```cpp
+// Whole-config change (UI panel emits it; SetRenderConfigOp replays it).
+struct RenderConfigChangedEvent { RenderConfig config; };
+
+// Slider-drag boundaries — same controller-owned gesture pattern as the camera
+// drag (see editor.instructions.md → Undo/Redo). RenderConfigController captures
+// the "before" config on begin, applies intermediate values live WITHOUT
+// recording, and records one SetRenderConfigOp on end. Discrete edits (checkbox,
+// combo box) arrive with no gesture and are recorded immediately, one op each.
+struct ConfigEditBegin {};
+struct ConfigEditEnd   {};
 ```
 
 ### ShaderEvents.h
@@ -159,6 +199,16 @@ struct ShaderCodeEdited       { const ObjectID* object; int stage; std::string c
 struct ShaderStructEdited     { const ObjectID* object; int stage; ShaderSection section;
                                 int fieldIndex; int subFieldIndex; std::string field; std::string value; };
 struct ShaderFieldAdded       { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };
+
+// Undo/redo wiring (content edits only — see operation-system.instructions.md)
+struct ShaderEditBegin        { const ObjectID* object; int stage; };  // gesture start: snapshot "before" code
+struct ShaderEditEnd          { const ObjectID* object; int stage; };  // gesture end: record one SetShaderCodeOp if changed
+// Replayed restore events (mirror the forward edit events 1:1, but bump version)
+struct ShaderCodeRestored     { const ObjectID* object; int stage; std::string code; };
+struct ShaderFieldRestored    { const ObjectID* object; int stage; ShaderSection section;
+                                int fieldIndex; ShaderFieldValue value; };  // whole element to assign back
+struct ShaderFieldAddRestored { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };  // redo of an add
+struct ShaderFieldRemoved     { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };  // undo of an add
 ```
 
 **Version flow:** Only `ShaderCreateRequested` and `ShaderCompileRequested` bump
@@ -166,6 +216,22 @@ struct ShaderFieldAdded       { const ObjectID* object; int stage; ShaderSection
 data without recompiling — the user must press Compile to apply changes to the
 GPU pipeline. Because create/compile rebuild the pipeline, `ShaderController`
 enqueues `RenderResetEvent` after both, so temporal accumulation resets.
+
+**Undo/redo flow:** Content edits are recorded as delta-only ops matching each
+edit event: `SetShaderCodeOp` (before/after code), `SetShaderFieldOp`
+(before/after of one whole IR element — a `ShaderFieldValue` variant over
+`S_IO`/`S_Uniform`/`S_Func`/`S_PushConstant`/`S_StructDef`) and `AddShaderFieldOp`
+(append vs remove one default entry). The forward `ShaderStructEdited` still
+delivers a single `{subFieldIndex, field, value}`; the controller applies it onto
+the live element and snapshots the element before/after for the op. Code edits are
+bracketed by `ShaderEditBegin`/`ShaderEditEnd` so a keystroke burst collapses to
+one undo entry on focus-out; discrete struct/field edits record one op each.
+Undo/redo replays a dedicated restore event
+(`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
+`ShaderFieldRemoved`) that re-applies one edit dimension and bumps
+`ShaderUnit::m_version` (panel refresh) — CPU-only, no recompile to SPIR-V.
+Create/Compile stay non-undoable. See
+[operation-system.instructions.md](operation-system.instructions.md).
 
 ## UIEvents (Qt Signal Bus)
 

@@ -18,6 +18,7 @@ isolation. Use this file as the high-level reference; detailed rules live in
 | Testing Standards | [test.instructions.md](.github/instructions/test.instructions.md) |
 | Renderer Layer | [renderer.instructions.md](.github/instructions/renderer.instructions.md) |
 | Editor Layer | [editor.instructions.md](.github/instructions/editor.instructions.md) |
+| Operation System (Undo/Redo) | [operation-system.instructions.md](.github/instructions/operation-system.instructions.md) |
 | UI System | [ui-system.instructions.md](.github/instructions/ui-system.instructions.md) |
 | Event System | [events.instructions.md](.github/instructions/events.instructions.md) |
 | Asset Layer | [data-resource.instructions.md](.github/instructions/data-resource.instructions.md) |
@@ -206,6 +207,13 @@ Neurus/
 │   │   │   ├── Controllers.h     # Base class for all controllers
 │   │   │   ├── CameraController.h/cpp  # Event-driven camera controls
 │   │   │   └── ShaderController.h/cpp  # Event-driven shader lifecycle
+│   │   ├── operations/      # Undo/redo (see operation-system.instructions.md)
+│   │   │   ├── Operation.h              # Base op + TransitionOp CRTP
+│   │   │   ├── SceneOperations.h        # Per-object + selection ops
+│   │   │   ├── ConfigOperations.h       # RenderConfig op
+│   │   │   ├── OperationManager.h/cpp   # Undo/redo stacks + replay guard
+│   │   │   ├── OperationRegistration.h/cpp  # cereal polymorphic registration
+│   │   │   └── HistoryComponent.h/cpp   # Serializable adapter for the stacks
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus

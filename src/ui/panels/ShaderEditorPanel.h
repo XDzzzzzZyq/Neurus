@@ -46,13 +46,12 @@ signals:
 	void codeEdited(const ShaderCodeEdited& e);
 	void structEdited(const ShaderStructEdited& e);
 	void fieldAdded(const ShaderFieldAdded& e);
+	void editBegin(const ShaderEditBegin& e);
+	void editEnd(const ShaderEditEnd& e);
 
 private:
 	/** @brief Populates the struct tree model and code editor from a ShaderUnit. */
 	void populateSections(const void* shaderUnitPtr, bool objectChanged);
-
-	/** @brief Builds a label + "+" button row widget for a section header or struct def row. */
-	QWidget* createAddRowWidget(const QModelIndex& index);
 
 	/** @brief Emits fieldAdded for the section/struct-def row whose "+" was clicked. */
 	void handleAddClick(const QModelIndex& index);

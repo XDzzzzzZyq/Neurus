@@ -35,6 +35,7 @@
 #include "asset/SceneComponent.h"
 #include "asset/ConfigComponent.h"
 #include "asset/UIComponent.h"
+#include "editor/operations/HistoryComponent.h"
 #include "scene/Scene.h"
 #include "render/DeferredRenderer.h"
 #include "render/RenderCache.h"
@@ -85,6 +86,9 @@ static void BuildProject(neurus::project::Project& proj,
 	proj.Register<neurus::project::SceneComponent>(editor.GetScene());
 	proj.Register<neurus::project::ConfigComponent>(editor.GetRenderConfig());
 	proj.Register<neurus::project::UIComponent>(uiLayout);
+	// History last: legacy files without an "m_history" node load cleanly
+	// (HistoryComponent::Load clears the stacks instead of throwing).
+	proj.Register<neurus::project::HistoryComponent>(editor.GetOperations());
 }
 
 } // anonymous namespace
@@ -394,10 +398,13 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 	                         rctx.editor = editor;
 	                         auto profile = app_renderer->DrawFrame(rctx);
 
+	                         const neurus::HistoryView history = app_editor->GetHistory();
+
 	                         neurus::UIContext ctx;
 	                         ctx.editor = editor;
 	                         ctx.profile = &profile;
 	                         ctx.log = &neurus::LogBuffer::instance();
+	                         ctx.history = &history;
 	                         app_mainWindow->Refresh(ctx);
 	                     }
 	                 });
@@ -430,6 +437,10 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::sunLightAddRequested);
 	ConnectUIEvent(&uiEvents, &neurus::UIEvents::spotLightAddRequested);
 
+	// --- Undo/redo (Edit menu + shortcuts) → Editor ---
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::undoRequested);
+	ConnectUIEvent(&uiEvents, &neurus::UIEvents::redoRequested);
+
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
@@ -451,6 +462,13 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 
 		// Forward mouse scroll to Editor for camera zoom
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseScrolled);
+
+		// Forward mouse press/release to Editor so it can bound the camera
+		// drag gesture (middle-button orbit/pan/dolly → one undo entry). The
+		// selection lambda below also listens to mousePressed (Left button);
+		// both connections coexist.
+		ConnectUIEvent(viewport, &neurus::Viewport::mousePressed);
+		ConnectUIEvent(viewport, &neurus::Viewport::mouseReleased);
 
 		// Handle left-click for pixel-perfect object selection via IDBuffer
 		QObject::connect(viewport, &neurus::Viewport::mousePressed,
@@ -487,6 +505,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	if (auto* cfgPanel = app_mainWindow->GetPanel<neurus::RenderConfigPanel>())
 	{
 		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::configValueChanged);
+		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::editBegin);
+		ConnectUIEvent(cfgPanel, &neurus::RenderConfigPanel::editEnd);
 	}
 
 	// --- Shader Editor signals → Editor ---
@@ -497,6 +517,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::codeEdited);
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::structEdited);
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::fieldAdded);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::editBegin);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::editEnd);
 	}
 
 	// Handle Transform changes from Property Panel → Editor

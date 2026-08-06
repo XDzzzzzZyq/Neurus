@@ -19,7 +19,7 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/ProfilingPanel.h/cpp` | Real-time GPU profiling tree (Profiling dock) |
 | `src/ui/panels/ShaderEditorPanel.h/cpp` | Shader editor dock — Code mode + Structure mode (tree-based Struct Editor) |
 | `src/ui/items/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
-| `src/ui/items/ShaderFieldDelegate.h/cpp` | Delegate with QComboBox (type) / QLineEdit (name) editors for struct field rows |
+| `src/ui/items/ShaderFieldDelegate.h/cpp` | Delegate: QComboBox (type) / QLineEdit (name) editors + painted "+" glyph for section/struct-def rows |
 | `src/ui/elements/CodeEditor.h/cpp` | GLSL code editor widget (line numbers, monospace font) |
 | `src/ui/elements/ShaderHighlighter.h/cpp` | GLSL syntax highlighter for the code editor |
 | `src/ui/presets/CameraProperties.h/cpp` | Camera property editor preset (target Vec3Spin + FOV ScalarSlider) |
@@ -219,19 +219,23 @@ modes selected by a `QComboBox`:
   (sections → fields/structs → members). Type/name cells are edited inline via
   `QComboBox` / `QLineEdit` editors and emit `structEdited`.
 
-Each section header row and each struct-definition row carries a real
-`QPushButton` "+" (`QTreeView::setIndexWidget`), which appends a new entry to
-that section (or a member field to that struct) and emits `fieldAdded`. A
-toolbar "−" removes the selected entry. Both "Create Shader" (no shader yet)
-and "Compile" buttons are available; Compile re-parses/generates/compiles and
-bumps the shader version so the GeometryPass pipeline rebuilds.
+Each section header row and each struct-definition row carries a "+" glyph
+painted at the row's right edge by `ShaderFieldDelegate` (no per-row index
+widgets — `QTreeView::setIndexWidget` fought with the frequent model resets and
+macOS accessibility, swallowing input after a click). Clicking it appends a new
+entry to that section (or a member field to that struct) and emits
+`fieldAdded`. A toolbar "−" removes the selected entry. Both "Create Shader"
+(no shader yet) and "Compile" buttons are available; Compile
+re-parses/generates/compiles and bumps the shader version so the GeometryPass
+pipeline rebuilds.
 
 **State preservation across `Refresh()`:** the tree model is rebuilt on every
 shader version change (`setShaderStruct` → model reset), which would wipe
-expansion, selection, and index widgets. `populateSections()` captures the
-expanded rows and current selection before the rebuild and restores them after,
-then re-installs the per-row "+" buttons and column spans. Opened sections stay
-open, closed sections stay closed, and the selected row survives edits/adds.
+expansion, selection, column spans, and keyboard focus. `populateSections()`
+captures the expanded rows, current selection, and focus before the rebuild and
+restores them after, then re-applies the spans. Opened sections stay open,
+closed sections stay closed, the selected row survives edits/adds, and window
+shortcuts (Ctrl+Z) keep working after a "+" click.
 
 Signals (`createShaderRequested`, `compileRequested`, `codeEdited`,
 `structEdited`, `fieldAdded`) are wired by `Application` to `Editor` and

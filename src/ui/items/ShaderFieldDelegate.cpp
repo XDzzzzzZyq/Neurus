@@ -4,6 +4,9 @@
 
 #include <QComboBox>
 #include <QLineEdit>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QStyle>
 #include <QStyleOptionViewItem>
 
 namespace neurus
@@ -72,6 +75,60 @@ void ShaderFieldDelegate::updateEditorGeometry(QWidget* editor, const QStyleOpti
                                               const QModelIndex& /*index*/) const
 {
 	editor->setGeometry(option.rect);
+}
+
+QRect ShaderFieldDelegate::AddButtonRect(const QRect& cell)
+{
+	const int size = 14;
+	return QRect(cell.right() - size - 4, cell.center().y() - size / 2, size, size);
+}
+
+void ShaderFieldDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
+                                const QModelIndex& index) const
+{
+	QStyledItemDelegate::paint(painter, option, index);
+
+	// Section / struct-def rows span the full row; draw the "+" at its right
+	// edge (a plain-delegate control — no index widgets to fight the resets).
+	const int nodeType = index.data(ShaderStructModel::RoleNodeType).toInt();
+	if (nodeType == ShaderStructModel::NodeSection ||
+	    nodeType == ShaderStructModel::NodeStructDef)
+	{
+		painter->save();
+		painter->setRenderHint(QPainter::Antialiasing, true);
+		QStyleOptionButton btnOpt;
+		btnOpt.rect = AddButtonRect(option.rect);
+		btnOpt.state = QStyle::State_Enabled;
+		if (option.state & QStyle::State_MouseOver)
+			btnOpt.state |= QStyle::State_MouseOver;
+		if (const QWidget* w = option.widget)
+			w->style()->drawControl(QStyle::CE_PushButton, &btnOpt, painter, w);
+		painter->drawText(btnOpt.rect, Qt::AlignCenter, QStringLiteral("+"));
+		painter->restore();
+	}
+}
+
+bool ShaderFieldDelegate::editorEvent(QEvent* event, QAbstractItemModel* model,
+                                      const QStyleOptionViewItem& option,
+                                      const QModelIndex& index)
+{
+	const int nodeType = index.data(ShaderStructModel::RoleNodeType).toInt();
+	if (nodeType == ShaderStructModel::NodeSection ||
+	    nodeType == ShaderStructModel::NodeStructDef)
+	{
+		if (event->type() == QEvent::MouseButtonRelease)
+		{
+			auto* me = static_cast<QMouseEvent*>(event);
+			if (me->button() == Qt::LeftButton &&
+			    AddButtonRect(option.rect).contains(me->pos()))
+			{
+				emit addClicked(index);
+				return true; // consumed: the "+" is an action, not a row click
+			}
+		}
+	}
+
+	return QStyledItemDelegate::editorEvent(event, model, option, index);
 }
 
 void ShaderFieldDelegate::populateTypeCombo(QComboBox* combo) const

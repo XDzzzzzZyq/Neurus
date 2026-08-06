@@ -2,6 +2,7 @@
 
 #include "editor/events/InputEvents.h"
 #include "editor/events/AssetEvents.h"
+#include "editor/events/OperationEvents.h"
 #include "editor/events/ConfigEvents.h"
 #include "editor/events/CameraEvents.h"
 #include "editor/events/EditorEvents.h"
@@ -9,6 +10,7 @@
 #include "editor/events/SceneEvents.h"
 
 #include "editor/controllers/CameraController.h"
+#include "editor/controllers/RenderConfigController.h"
 #include "editor/controllers/ShaderController.h"
 #include "editor/controllers/SceneController.h"
 #include "editor/events/EventBus.h"
@@ -60,9 +62,10 @@ static QString resolveResourcePath(const char* relativePath)
 namespace neurus {
 
 Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
-	: ed_renderer(renderer)
+	: m_scene(std::make_unique<Scene>())
+	, ed_operations(ed_eventBus, [this]() -> Scene* { return m_scene.get(); })
+	, ed_renderer(renderer)
 	, ed_uploadManager(uploadManager)
-	, m_scene(std::make_unique<Scene>())
 {}
 
 Editor::~Editor()
@@ -97,9 +100,13 @@ void Editor::Initialize()
 		OnSpotLightAdd();
 	});
 
-	ed_eventBus.subscribe<RenderConfigChangedEvent>([this](const RenderConfigChangedEvent& e) {
-		ed_eventBus.enqueue(RenderResetEvent{});
-		m_config = e.config;
+	// Undo/redo replay their inverse events synchronously (never queued), so
+	// the mutation applies in-place and cannot reorder against live input.
+	ed_eventBus.subscribe<UndoRequested>([this](const UndoRequested&) {
+		ed_operations.Undo();
+	});
+	ed_eventBus.subscribe<RedoRequested>([this](const RedoRequested&) {
+		ed_operations.Redo();
 	});
 
 	// Load IBL environment now that the scene is available
@@ -109,6 +116,17 @@ void Editor::Initialize()
 	RegisterController<CameraController>();
 	RegisterController<ShaderController>();
 	RegisterController<SceneController>();
+
+	// RenderConfigController needs the Editor-owned RenderConfig, which
+	// RegisterController<T>() can't supply — construct it manually with a
+	// provider. It applies + records config edits (the single mutation path),
+	// replacing the inline RenderConfigChangedEvent handler removed above.
+	{
+		auto cfgCtrl = std::make_unique<RenderConfigController>(
+			[this]() -> RenderConfig* { return &m_config; });
+		cfgCtrl->Init(ed_eventBus, ed_operations);
+		ed_controllers.push_back(std::move(cfgCtrl));
+	}
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
@@ -137,6 +155,20 @@ void Editor::Initialize()
 			else
 				ed_eventBus.enqueue(CameraRotateEvent{cam, e.delta.x, e.delta.y});
 		}
+	});
+
+	// Middle-button press/release bound the orbit/pan/dolly drag gesture so it
+	// collapses to one undo entry. The typed drag events flow through the same
+	// controller chain as the camera moves themselves (no direct handling here).
+	ed_eventBus.subscribe<MousePressEvent>([this](const MousePressEvent& e) {
+		if (e.button != Input::Middle) return;
+		if (auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera()))
+			ed_eventBus.enqueue(CameraDragBegin{cam});
+	});
+	ed_eventBus.subscribe<MouseReleaseEvent>([this](const MouseReleaseEvent& e) {
+		if (e.button != Input::Middle) return;
+		if (auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera()))
+			ed_eventBus.enqueue(CameraDragEnd{cam});
 	});
 
 	ed_eventBus.subscribe<MouseScrollEvent>([this](const MouseScrollEvent& e) {
@@ -231,6 +263,7 @@ void Editor::NewScene()
 		m_scene = std::make_unique<Scene>();
 		m_config = RenderConfig{};
 		m_dirty = false;
+		ed_operations.Clear(); // History does not span scenes.
 		NEURUS_LOG("[Editor] Created new scene.");
 
 		UploadSceneResources();
@@ -252,6 +285,7 @@ void Editor::BeginLoad()
 
 	m_scene = std::make_unique<Scene>();
 	m_config = RenderConfig{};
+	ed_operations.Clear(); // History does not span scenes.
 	// Application deserializes into GetScene()/GetRenderConfig() before FinishLoad().
 }
 

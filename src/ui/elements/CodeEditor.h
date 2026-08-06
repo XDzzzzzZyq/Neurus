@@ -32,9 +32,17 @@ public:
 signals:
     void codeChanged(const std::string& code);
 
+    /** @brief Emitted when the editor gains keyboard focus (code-edit gesture begin). */
+    void editingStarted();
+
+    /** @brief Emitted when the editor loses keyboard focus (code-edit gesture end). */
+    void editingFinished();
+
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void focusInEvent(QFocusEvent* event) override;
+    void focusOutEvent(QFocusEvent* event) override;
 
 private:
     void updateLineNumberAreaWidth();
