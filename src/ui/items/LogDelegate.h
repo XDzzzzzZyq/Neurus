@@ -2,8 +2,9 @@
  * @file LogDelegate.h
  * @brief Paints a log row as "HH:MM:SS.mmm  [func:line]  message" in a
  *        fixed-width font, colored by severity (dark gray Info, red Error).
- * @note Reads the composed Qt::DisplayRole text from LogModel and the
- *       LevelRole for color; keeps selection/hover backgrounds.
+ * @note Composes the row from the TimestampRole / SourceRole / MessageRole
+ *       data so the source field can be right-justified to a fixed column
+ *       (setSourcePad); keeps selection/hover backgrounds.
  */
 
 #pragma once
@@ -21,10 +22,21 @@ class LogDelegate : public QStyledItemDelegate
 public:
 	explicit LogDelegate(QObject* parent = nullptr);
 
+	/**
+	 * @brief Sets the monospace column width (in characters) used to
+	 *        right-justify the "[func:line]" source field, so message text
+	 *        starts at the same X position on every row.
+	 * @param chars Padding width; 0 disables padding (default).
+	 */
+	void setSourcePad(int chars);
+
 	void paint(QPainter* painter, const QStyleOptionViewItem& option,
 	           const QModelIndex& index) const override;
 	QSize sizeHint(const QStyleOptionViewItem& option,
 	               const QModelIndex& index) const override;
+
+private:
+	int m_sourcePad = 0;
 };
 
 } // namespace neurus

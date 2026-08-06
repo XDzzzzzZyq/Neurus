@@ -1,5 +1,6 @@
 #include "ui/items/LogModel.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 
@@ -32,6 +33,11 @@ LogModel::LogModel(QObject* parent)
 {
 }
 
+int LogModel::SourceLength(const LogEntry& e) const
+{
+	return QStringLiteral("%1:%2").arg(e.func).arg(e.line).length();
+}
+
 void LogModel::Refresh(const LogBuffer* buffer)
 {
 	if (!buffer)
@@ -41,6 +47,7 @@ void LogModel::Refresh(const LogBuffer* buffer)
 			beginResetModel();
 			m_buffer = nullptr;
 			m_lastSeq = 0;
+			m_maxSourceChars = 0;
 			endResetModel();
 		}
 		return;
@@ -57,6 +64,10 @@ void LogModel::Refresh(const LogBuffer* buffer)
 			beginInsertRows(QModelIndex(), 0, newRows - 1);
 			m_buffer = buffer;
 			m_lastSeq = newSeq;
+			m_maxSourceChars = 0;
+			for (int i = 0; i < newRows; ++i)
+				m_maxSourceChars = std::max(m_maxSourceChars,
+				                            SourceLength(buffer->At(static_cast<std::size_t>(i))));
 			endInsertRows();
 		}
 		else
@@ -65,6 +76,7 @@ void LogModel::Refresh(const LogBuffer* buffer)
 			// insert range.
 			m_buffer = buffer;
 			m_lastSeq = newSeq;
+			m_maxSourceChars = 0;
 		}
 		return;
 	}
@@ -75,6 +87,7 @@ void LogModel::Refresh(const LogBuffer* buffer)
 		beginResetModel();
 		m_buffer = buffer;
 		m_lastSeq = newSeq;
+		m_maxSourceChars = 0;
 		endResetModel();
 		return;
 	}
@@ -86,6 +99,9 @@ void LogModel::Refresh(const LogBuffer* buffer)
 		beginInsertRows(QModelIndex(), oldRows, newRows - 1);
 		m_buffer = buffer;
 		m_lastSeq = newSeq;
+		for (int i = oldRows; i < newRows; ++i)
+			m_maxSourceChars = std::max(m_maxSourceChars,
+			                            SourceLength(buffer->At(static_cast<std::size_t>(i))));
 		endInsertRows();
 		return;
 	}
@@ -101,6 +117,8 @@ void LogModel::Refresh(const LogBuffer* buffer)
 		beginInsertRows(QModelIndex(), newRows - 1, newRows - 1);
 		m_buffer = buffer;
 		m_lastSeq = newSeq;
+		m_maxSourceChars = std::max(m_maxSourceChars,
+		                            SourceLength(buffer->At(static_cast<std::size_t>(newRows - 1))));
 		endInsertRows();
 	}
 	else

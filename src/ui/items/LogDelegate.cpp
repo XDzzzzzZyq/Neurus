@@ -17,6 +17,11 @@ LogDelegate::LogDelegate(QObject* parent)
 {
 }
 
+void LogDelegate::setSourcePad(int chars)
+{
+	m_sourcePad = chars;
+}
+
 void LogDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
                         const QModelIndex& index) const
 {
@@ -45,7 +50,18 @@ void LogDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
 	painter->setFont(font);
 	painter->setPen(textColor);
 
-	const QString line = index.data(Qt::DisplayRole).toString();
+	// Compose the row from the three roles so the source field can be
+	// right-justified to a fixed column; messages then align on every row.
+	// rightJustified(0) returns the source unchanged, so pad 0 renders
+	// exactly like the previous single-string behavior.
+	const QString ts = index.data(LogModel::TimestampRole).toString();
+	const QString src = index.data(LogModel::SourceRole).toString();
+	const QString msg = index.data(LogModel::MessageRole).toString();
+	const QString line = QStringLiteral("%1  [%2]  %3")
+	                         .arg(ts)
+	                         .arg(src.rightJustified(m_sourcePad))
+	                         .arg(msg);
+
 	const QString elided = QFontMetrics(font).elidedText(
 	    line, Qt::ElideRight, opt.rect.width() - 8);
 	painter->drawText(opt.rect.adjusted(4, 0, -4, 0),

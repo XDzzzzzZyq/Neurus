@@ -151,7 +151,10 @@ void LogPanel::Refresh(const UIContext& ctx)
 	const bool wasAtBottom = m_view.verticalScrollBar()->value() >= m_view.verticalScrollBar()->maximum();
 
 	if (!m_paused)
+	{
 		m_model.Refresh(buffer);
+		m_delegate.setSourcePad(m_model.MaxSourceChars());
+	}
 
 	const std::size_t info = buffer->InfoCount();
 	const std::size_t errors = buffer->ErrorCount();
@@ -222,7 +225,10 @@ void LogPanel::OnPauseToggled(bool checked)
 {
 	m_paused = checked;
 	if (!m_paused)
+	{
 		m_model.Refresh(&LogBuffer::instance());
+		m_delegate.setSourcePad(m_model.MaxSourceChars());
+	}
 }
 
 void LogPanel::OnClearClicked()
@@ -231,6 +237,7 @@ void LogPanel::OnClearClicked()
 	m_lastErrorCount = 0;
 	m_lastInfoCount = 0;
 	m_model.Refresh(&LogBuffer::instance());
+	m_delegate.setSourcePad(m_model.MaxSourceChars());
 	m_stats->setText(QStringLiteral("INFO 0 · ERROR 0"));
 }
 
