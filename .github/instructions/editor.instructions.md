@@ -168,8 +168,9 @@ void SceneController::Init(EventQueue& bus)
 ### ShaderController (Event-Driven)
 
 ```cpp
-void ShaderController::Init(EventQueue& bus)
+void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 {
+    // Lifecycle (non-undoable): bump Shader::m_version + reset accumulation.
     bus.subscribe<ShaderCreateRequested>( [&bus](const ShaderCreateRequested& e) {
         OnCreateShader(e);
         bus.enqueue(RenderResetEvent{});  // pipeline created -> reset accumulation
@@ -178,19 +179,38 @@ void ShaderController::Init(EventQueue& bus)
         OnCompileShader(e);
         bus.enqueue(RenderResetEvent{});  // pipeline rebuilt -> reset accumulation
     });
+
+    // Code edits apply live; recording is bracketed by ShaderEditBegin/End so a
+    // keystroke burst collapses to ONE undo entry on focus-out.
     bus.subscribe<ShaderCodeEdited>( [](const ShaderCodeEdited& e) { OnCodeEdited(e); });
-    bus.subscribe<ShaderStructEdited>( [](const ShaderStructEdited& e) { OnStructEdited(e); });
-    bus.subscribe<ShaderFieldAdded>( [](const ShaderFieldAdded& e) { OnFieldAdded(e); });
+    bus.subscribe<ShaderEditBegin>( /* capture m_beforeCode */ );
+    bus.subscribe<ShaderEditEnd>( /* record SetShaderCodeOp if code changed */ );
+
+    // Discrete struct/field edits: snapshot the element, apply the edit, record one delta op each.
+    bus.subscribe<ShaderStructEdited>( /* VisitElement + ApplyFieldEdit; Submit SetShaderFieldOp if before != after */ );
+    bus.subscribe<ShaderFieldAdded>( /* AppendDefault + Submit AddShaderFieldOp */ );
+
+    // Undo/redo replay: re-apply one edit dimension + bump version (panel refresh).
+    bus.subscribe<ShaderCodeRestored>(     [](const ShaderCodeRestored& e)     { OnCodeRestored(e); });
+    bus.subscribe<ShaderFieldRestored>(    [](const ShaderFieldRestored& e)    { OnFieldRestored(e); });
+    bus.subscribe<ShaderFieldAddRestored>( [](const ShaderFieldAddRestored& e) { OnFieldAddRestored(e); });
+    bus.subscribe<ShaderFieldRemoved>(     [](const ShaderFieldRemoved& e)     { OnFieldRemoved(e); });
 }
 ```
 
 **Design:**
-- Stateless: all handlers are free functions in an anonymous namespace
+- Mutation handlers are free functions in an anonymous namespace; gesture state
+  (`m_codeEditing`, `m_editObject`, `m_editStage`, `m_beforeCode`,
+  `m_beforeParsed`) lives on the controller so begin/end can bracket a burst
 - Handlers cast the event's `const ObjectID*` to `Mesh*` (the only shader-owning
   object) and mutate `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
-- Create/Compile bump `Shader::m_version` on success (pipeline rebuild); the other
-  events only mutate IR/code and require the user to press Compile
+- Create/Compile bump `Shader::m_version` on success (pipeline rebuild) and stay
+  **non-undoable** lifecycle actions; content edits (code/struct/field) only mutate
+  CPU IR/code and require the user to press Compile to reach the GPU
 - Only Create/Compile enqueue `RenderResetEvent` (temporal accumulation reset)
+- Undo/redo of content edits is CPU-only: `OnRestoreSource` overwrites the stage's
+  `code` + `parsed` IR and bumps `ShaderUnit::m_version` (panel refresh) — it does
+  **not** recompile to SPIR-V (see Undo/Redo controllers below)
 - Located in `src/editor/controllers/ShaderController.h`
 
 ## Data Flow
@@ -273,8 +293,9 @@ documented in
 [operation-system.instructions.md](operation-system.instructions.md). This
 section covers only how the editor's controllers *produce* operations.
 
-Two controllers use the explicit begin/end gesture pattern (capture "before" on
-a begin event, mutate live without recording, record ONE op on the end event):
+Three controllers use the explicit begin/end gesture pattern (capture "before"
+on a begin event, mutate live without recording, record ONE op on the end
+event):
 
 - **`CameraController`** — `CameraDragBegin` captures the pose, `CameraRotate/
   Push/Slide` mutate live, `CameraDragEnd` records one `CameraTransformOp`
@@ -293,4 +314,26 @@ a begin event, mutate live without recording, record ONE op on the end event):
   and record immediately. No-op writes (`before == after`, via `RenderConfig`'s
   defaulted `operator==`) are never recorded. `SetRenderConfigOp` is scene-level
   (not UID-based) and deliberately non-mergeable (empty `MergeKey`).
+- **`ShaderController`** — content edits to a mesh's shader become undoable via
+  three fine-grained delta ops, each carrying only its before/after slice (no
+  whole-`ShaderStruct` snapshot — keeps history and project files small):
+  `SetShaderCodeOp` (before/after GLSL text of one stage), `SetShaderFieldOp`
+  (before/after of one whole IR element — a `ShaderFieldValue` variant, keyed by
+  section + field index), and `AddShaderFieldOp` (append vs. remove one default entry via a `bool add`
+  flag, whose `Inverse()` flips the flag). All are keyed by mesh UID + stage.
+  Code edits are gesture-bounded: `ShaderEditBegin` snapshots `m_beforeCode`,
+  `ShaderCodeEdited` applies live, `ShaderEditEnd` records one `SetShaderCodeOp`
+  on focus-out only if the code changed (no net change → no op). Discrete
+  struct/field edits have no gesture: `ShaderStructEdited` snapshots the element,
+  applies the UI's `{field,value}` via `VisitElement`/`ApplyFieldEdit`, and records
+  a `SetShaderFieldOp` only if the element changed (`before != after`); `ShaderFieldAdded` calls `AppendDefault` and
+  records an `AddShaderFieldOp(add=true)`. Undo/redo replays four dedicated
+  restore events — `ShaderCodeRestored`, `ShaderFieldRestored`,
+  `ShaderFieldAddRestored`, `ShaderFieldRemoved` — distinct from the forward
+  events so the replay handlers bump `ShaderUnit::m_version` (panel refresh)
+  while live forward edits do NOT (avoids cursor-jump mid-typing). Restore is
+  **CPU-only, no recompile to SPIR-V**; the user presses Compile to push
+  restored source to the GPU. All three ops are deliberately non-mergeable
+  (empty `MergeKey`). Shader Create and Compile stay non-undoable lifecycle
+  actions.
 

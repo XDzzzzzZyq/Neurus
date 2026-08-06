@@ -46,6 +46,8 @@ signals:
 	void codeEdited(const ShaderCodeEdited& e);
 	void structEdited(const ShaderStructEdited& e);
 	void fieldAdded(const ShaderFieldAdded& e);
+	void editBegin(const ShaderEditBegin& e);
+	void editEnd(const ShaderEditEnd& e);
 
 private:
 	/** @brief Populates the struct tree model and code editor from a ShaderUnit. */

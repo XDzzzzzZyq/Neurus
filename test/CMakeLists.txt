@@ -46,6 +46,8 @@ add_executable(neurus_test
 	editor/test_operation_manager.cpp
 	editor/test_operation_serialization.cpp
 	editor/test_render_config_controller.cpp
+	editor/test_shader_controller.cpp
+	editor/test_shader_editor_panel.cpp
 	scene/test_camera.cpp
 	scene/test_mesh.cpp
 	scene/test_uid.cpp

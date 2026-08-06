@@ -12,6 +12,8 @@
 #include <gtest/gtest.h>
 
 #include <memory>
+#include <stdexcept>
+#include <vector>
 
 #include "glm/glm.hpp"
 
@@ -465,5 +467,61 @@ TEST_F(OperationManagerTest, BoundedUndoDepth_EvictsOldestEntries)
 	capped.Undo();
 	capped.Undo();
 	EXPECT_FALSE(capped.CanUndo());
+}
+
+// --- Replay exception safety ------------------------------------------------
+
+namespace {
+
+/** @brief Operation whose Apply always throws — exercises replay phase cleanup. */
+class ThrowingOp : public Operation
+{
+public:
+	void Apply(OperationContext&) override { throw std::runtime_error("boom"); }
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		return std::make_unique<ThrowingOp>();
+	}
+	std::string Label() const override { return "Throwing"; }
+};
+
+} // anonymous namespace
+
+TEST_F(OperationManagerTest, ExceptionDuringUndo_DoesNotKillRecording)
+{
+	// A throwing op sits on top of the stack.
+	m_operations.Submit(std::make_unique<ThrowingOp>());
+	ASSERT_TRUE(m_operations.CanUndo());
+
+	// Replay contains handler exceptions: Undo() must NOT throw, the failed
+	// inverse must NOT be pushed to redo, and the replay phase is restored —
+	// otherwise every later Submit() is silently suppressed and the whole undo
+	// system appears dead.
+	m_operations.Undo();
+	ASSERT_FALSE(m_operations.CanUndo());
+	EXPECT_FALSE(m_operations.CanRedo()); // failed op dropped, not moved to redo
+
+	// A fresh edit must still record after the failed undo.
+	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 7.0f });
+	Process();
+	EXPECT_TRUE(m_operations.CanUndo());
+
+	// And undo of the fresh edit still applies correctly.
+	m_operations.Undo();
+	EXPECT_FLOAT_EQ(m_light->light_power, 10.0f);
+}
+
+TEST_F(OperationManagerTest, ExceptionDuringRedo_DoesNotPushToUndo)
+{
+	// Seed a throwing op on the redo stack (as a failed inverse would be).
+	std::vector<std::unique_ptr<Operation>> redo;
+	redo.push_back(std::make_unique<ThrowingOp>());
+	m_operations.RestoreHistory({}, std::move(redo));
+	ASSERT_TRUE(m_operations.CanRedo());
+
+	// Redo must not throw, and the failed forward op must not be pushed to undo.
+	m_operations.Redo();
+	EXPECT_FALSE(m_operations.CanRedo());
+	EXPECT_FALSE(m_operations.CanUndo());
 }
 

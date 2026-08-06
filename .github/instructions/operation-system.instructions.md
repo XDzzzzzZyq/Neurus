@@ -8,7 +8,11 @@ re-dispatches the originating scene event via `EventQueue::emitNow`, so the
 existing controller handler performs the mutation. This keeps a **single
 mutation path** — undo/redo exercises the same code as a live edit. A
 `Phase::Replaying` guard in `OperationManager` makes `Submit()` a no-op during
-replay so playback does not re-record.
+replay so playback does not re-record. The guard is RAII (restored on
+exception), `Replay()` catches + logs handler exceptions and returns whether
+the op applied, and `Undo()`/`Redo()` only move an op onto the opposite stack
+when replay succeeded — a failed replay is dropped, never enqueued as a phantom
+entry.
 
 The controller-side wiring that produces operations (gesture begin/end,
 per-controller specifics) lives in
@@ -56,7 +60,23 @@ value changes but must collapse to a single undo entry. Two strategies exist:
   events flowing through the same controller chain.
 
 For the concrete controller wiring (`CameraController`,
-`RenderConfigController`), see [editor.instructions.md](editor.instructions.md).
+`RenderConfigController`, `ShaderController`), see
+[editor.instructions.md](editor.instructions.md).
+
+`ShaderController` records delta-only ops matching each edit event's
+granularity: `SetShaderCodeOp` (before/after GLSL text), `SetShaderFieldOp`
+(before/after of one whole `ShaderStruct` element — a `ShaderFieldValue` variant
+over `S_IO`/`S_Uniform`/`S_Func`/`S_PushConstant`/`S_StructDef`, serialized via the
+non-intrusive functions in `render/shaders/ShaderStructSerialize.h`) and
+`AddShaderFieldOp` (append vs remove one default entry, keyed by a `bool add` flag
+it flips in `Inverse`).
+All are keyed by mesh UID + stage. Code edits use the explicit begin/end gesture
+(`ShaderEditBegin`/`ShaderEditEnd`), while discrete struct/field edits record one
+op immediately per change. The ops are deliberately non-mergeable (empty
+`MergeKey`). Their `Apply`/replay is CPU-only — each re-emits a dedicated restore
+event (`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
+`ShaderFieldRemoved`) that re-applies one edit dimension and bumps
+`ShaderUnit::m_version`, never recompiling to SPIR-V.
 
 ## Persisting the history stacks
 

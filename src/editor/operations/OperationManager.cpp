@@ -5,6 +5,7 @@
 
 #include "editor/operations/OperationManager.h"
 
+#include "core/Log.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/events/EventBus.h"
 #include "scene/Scene.h"
@@ -22,7 +23,11 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 {
 	// Replay re-runs the originating handler, which calls Submit again;
 	// suppress it so history is not corrupted by its own playback.
-	if (m_phase == Phase::Replaying) return;
+	if (m_phase == Phase::Replaying)
+	{
+		NEURUS_ERR("[OperationManager] Submit suppressed during replay: " << op->Label());
+		return;
+	}
 	if (!op) return;
 
 	// Coalesce a stream of same-key edits (e.g. camera scroll/drag) into the
@@ -31,6 +36,8 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 	const std::string key = op->MergeKey();
 	if (!key.empty() && !m_undo.empty() && m_undo.back()->MergeKey() == key)
 	{
+		NEURUS_LOG("[OperationManager] Submit: merged '" << op->Label()
+		           << "' into the top entry (mergeKey='" << key << "')");
 		m_undo.back()->MergeFrom(*op);
 		m_redo.clear();
 		++m_revision;
@@ -45,37 +52,70 @@ void OperationManager::Submit(std::unique_ptr<Operation> op)
 	if (!preservesRedo) m_redo.clear();
 	EnforceUndoLimit();
 	++m_revision;
+
+	NEURUS_LOG("[OperationManager] Submit: '" << m_undo.back()->Label()
+	           << "' (undo stack size " << m_undo.size()
+	           << ", phase=" << (m_phase == Phase::Replaying ? "Replaying" : "Idle")
+	           << ", mergeKey='" << key << "')");
 }
 
 void OperationManager::Undo()
 {
-	if (m_undo.empty()) return;
+	if (m_undo.empty())
+	{
+		NEURUS_ERR("[OperationManager] Undo requested but the undo stack is empty");
+		return;
+	}
+
+	NEURUS_LOG("[OperationManager] Undo: popping '" << m_undo.back()->Label()
+	           << "' (undo size " << m_undo.size() << ", redo size " << m_redo.size() << ")");
 
 	std::unique_ptr<Operation> g = std::move(m_undo.back());
 	m_undo.pop_back();
 
 	std::unique_ptr<Operation> inverse = g->Inverse();
-	Replay(*inverse);
-	m_redo.push_back(std::move(inverse));
+	if (Replay(*inverse))
+		m_redo.push_back(std::move(inverse));
+	else
+		NEURUS_ERR("[OperationManager] Undo of '" << g->Label()
+		           << "' failed; nothing pushed to redo");
 	++m_revision;
+
+	NEURUS_LOG("[OperationManager] Undo done: (undo size " << m_undo.size()
+	           << ", redo size " << m_redo.size() << ")");
 }
 
 void OperationManager::Redo()
 {
-	if (m_redo.empty()) return;
+	if (m_redo.empty())
+	{
+		NEURUS_ERR("[OperationManager] Redo requested but the redo stack is empty");
+		return;
+	}
+
+	NEURUS_LOG("[OperationManager] Redo: popping '" << m_redo.back()->Label()
+	           << "' (undo size " << m_undo.size() << ", redo size " << m_redo.size() << ")");
 
 	std::unique_ptr<Operation> gInverse = std::move(m_redo.back());
 	m_redo.pop_back();
 
 	// (g⁻¹)⁻¹ = g — the original forward edit.
 	std::unique_ptr<Operation> forward = gInverse->Inverse();
-	Replay(*forward);
-	m_undo.push_back(std::move(forward));
+	if (Replay(*forward))
+		m_undo.push_back(std::move(forward));
+	else
+		NEURUS_ERR("[OperationManager] Redo of '" << gInverse->Label()
+		           << "' failed; nothing pushed to undo");
 	++m_revision;
+
+	NEURUS_LOG("[OperationManager] Redo done: (undo size " << m_undo.size()
+	           << ", redo size " << m_redo.size() << ")");
 }
 
 void OperationManager::Clear()
 {
+	NEURUS_LOG("[OperationManager] Clear: dropping " << m_undo.size()
+	           << " undo + " << m_redo.size() << " redo entries");
 	m_undo.clear();
 	m_redo.clear();
 	++m_revision;
@@ -84,6 +124,8 @@ void OperationManager::Clear()
 void OperationManager::RestoreHistory(std::vector<std::unique_ptr<Operation>> undo,
                                       std::vector<std::unique_ptr<Operation>> redo)
 {
+	NEURUS_LOG("[OperationManager] RestoreHistory: " << undo.size()
+	           << " undo + " << redo.size() << " redo entries");
 	m_undo = std::move(undo);
 	m_redo = std::move(redo);
 	EnforceUndoLimit();
@@ -109,16 +151,51 @@ HistoryView OperationManager::GetHistoryView() const
 	return view;
 }
 
-void OperationManager::Replay(Operation& op)
+bool OperationManager::Replay(Operation& op)
 {
 	Scene* scene = m_sceneProvider ? m_sceneProvider() : nullptr;
-	if (!scene) return;
+	if (!scene)
+	{
+		NEURUS_ERR("[OperationManager] Replay aborted: no scene provider");
+		return false;
+	}
+
+	NEURUS_LOG("[OperationManager] Replay: applying '" << op.Label()
+	           << "' (phase -> Replaying)");
 
 	OperationContext ctx{ *scene, m_bus };
 
+	// m_phase must be restored on every exit path (success or caught handler
+	// exception). A stuck Replaying phase would silently suppress every later
+	// Submit(), making all further undo/redo recording appear dead (the user's
+	// "undo stopped working" symptom).
+	const Phase prior = m_phase;
 	m_phase = Phase::Replaying;
-	op.Apply(ctx);
-	m_phase = Phase::Idle;
+
+	// Contain handler exceptions: a single broken handler must not abort the
+	// undo/redo call (or propagate into the Qt event loop). The exception is
+	// logged loudly and reported as failure so the caller drops the op instead
+	// of moving it onto the opposite stack.
+	try
+	{
+		op.Apply(ctx);
+	}
+	catch (const std::exception& ex)
+	{
+		NEURUS_ERR("[OperationManager] Replay of '" << op.Label()
+		           << "' threw: " << ex.what());
+		m_phase = prior;
+		return false;
+	}
+	catch (...)
+	{
+		NEURUS_ERR("[OperationManager] Replay of '" << op.Label()
+		           << "' threw a non-standard exception");
+		m_phase = prior;
+		return false;
+	}
+	m_phase = prior;
+	return true;
 }
 
 void OperationManager::EnforceUndoLimit()
@@ -128,6 +205,8 @@ void OperationManager::EnforceUndoLimit()
 
 	// Evict the oldest entries (front) so the newest m_maxUndoDepth remain.
 	const size_t excess = m_undo.size() - m_maxUndoDepth;
+	NEURUS_LOG("[OperationManager] Evicting " << excess
+	           << " oldest entries (undo cap " << m_maxUndoDepth << ")");
 	m_undo.erase(m_undo.begin(), m_undo.begin() + excess);
 }
 

@@ -199,6 +199,16 @@ struct ShaderCodeEdited       { const ObjectID* object; int stage; std::string c
 struct ShaderStructEdited     { const ObjectID* object; int stage; ShaderSection section;
                                 int fieldIndex; int subFieldIndex; std::string field; std::string value; };
 struct ShaderFieldAdded       { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };
+
+// Undo/redo wiring (content edits only — see operation-system.instructions.md)
+struct ShaderEditBegin        { const ObjectID* object; int stage; };  // gesture start: snapshot "before" code
+struct ShaderEditEnd          { const ObjectID* object; int stage; };  // gesture end: record one SetShaderCodeOp if changed
+// Replayed restore events (mirror the forward edit events 1:1, but bump version)
+struct ShaderCodeRestored     { const ObjectID* object; int stage; std::string code; };
+struct ShaderFieldRestored    { const ObjectID* object; int stage; ShaderSection section;
+                                int fieldIndex; ShaderFieldValue value; };  // whole element to assign back
+struct ShaderFieldAddRestored { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };  // redo of an add
+struct ShaderFieldRemoved     { const ObjectID* object; int stage; ShaderSection section; int subFieldIndex; };  // undo of an add
 ```
 
 **Version flow:** Only `ShaderCreateRequested` and `ShaderCompileRequested` bump
@@ -206,6 +216,22 @@ struct ShaderFieldAdded       { const ObjectID* object; int stage; ShaderSection
 data without recompiling — the user must press Compile to apply changes to the
 GPU pipeline. Because create/compile rebuild the pipeline, `ShaderController`
 enqueues `RenderResetEvent` after both, so temporal accumulation resets.
+
+**Undo/redo flow:** Content edits are recorded as delta-only ops matching each
+edit event: `SetShaderCodeOp` (before/after code), `SetShaderFieldOp`
+(before/after of one whole IR element — a `ShaderFieldValue` variant over
+`S_IO`/`S_Uniform`/`S_Func`/`S_PushConstant`/`S_StructDef`) and `AddShaderFieldOp`
+(append vs remove one default entry). The forward `ShaderStructEdited` still
+delivers a single `{subFieldIndex, field, value}`; the controller applies it onto
+the live element and snapshots the element before/after for the op. Code edits are
+bracketed by `ShaderEditBegin`/`ShaderEditEnd` so a keystroke burst collapses to
+one undo entry on focus-out; discrete struct/field edits record one op each.
+Undo/redo replays a dedicated restore event
+(`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
+`ShaderFieldRemoved`) that re-applies one edit dimension and bumps
+`ShaderUnit::m_version` (panel refresh) — CPU-only, no recompile to SPIR-V.
+Create/Compile stay non-undoable. See
+[operation-system.instructions.md](operation-system.instructions.md).
 
 ## UIEvents (Qt Signal Bus)
 

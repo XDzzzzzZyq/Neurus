@@ -206,6 +206,20 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 			emit codeEdited({m_activeObject, m_cachedStageType, code});
 	});
 
+	// --- CodeEditor focus in/out -> gesture brackets for undo coalescing ---
+	// A keystroke burst between focus-in and focus-out collapses to one undo
+	// entry recorded on focus-out (debounce_discrete).
+	QObject::connect(m_codeEditor, &CodeEditor::editingStarted, [this]()
+	{
+		if (m_activeObject)
+			emit editBegin({m_activeObject, m_cachedStageType});
+	});
+	QObject::connect(m_codeEditor, &CodeEditor::editingFinished, [this]()
+	{
+		if (m_activeObject)
+			emit editEnd({m_activeObject, m_cachedStageType});
+	});
+
 	// --- Create Shader button -> event signal ---
 	QObject::connect(m_createBtn, &QPushButton::clicked, [this]()
 	{
@@ -397,6 +411,11 @@ QWidget* ShaderEditorPanel::createAddRowWidget(const QModelIndex& index)
 	addBtn->setObjectName("sectionAddBtn");
 	addBtn->setToolTip("Add entry");
 	addBtn->setFixedSize(16, 16);
+	// Click-only control: never take keyboard focus. A focused "+" button is
+	// deleted on the next model rebuild (setIndexWidget replacement), and on
+	// macOS with accessibility active the dead-focus state swallows
+	// window-level shortcuts (Ctrl+Z) until the user clicks elsewhere.
+	addBtn->setFocusPolicy(Qt::NoFocus);
 	layout->addWidget(addBtn);
 
 	QObject::connect(addBtn, &QPushButton::clicked, this,

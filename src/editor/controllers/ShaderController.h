@@ -12,7 +12,18 @@
  *   - ShaderCreateRequested  → OnCreateShader  (load default, parse, compile, bump version)
  *   - ShaderCompileRequested → OnCompileShader (compile stage, store spv, bump version)
  *   - ShaderCodeEdited       → OnCodeEdited    (update ShaderUnit::code, no version bump)
- *   - ShaderStructEdited     → OnStructEdited  (mutate ShaderStruct IR, regenerate GLSL, no bump)
+ *   - ShaderStructEdited     → SetFieldValue   (mutate one ShaderStruct field, no bump)
+ *   - ShaderFieldAdded       → AppendDefault   (append one default entry, no bump)
+ *
+ * Undo/redo (content edits only):
+ *   - ShaderEditBegin/End bracket a code-editor burst; one SetShaderCodeOp is
+ *     recorded on focus-out. Discrete struct edits record one SetShaderFieldOp
+ *     each; field adds record one AddShaderFieldOp each.
+ *   - Replay uses dedicated restore events (ShaderCodeRestored /
+ *     ShaderFieldRestored / ShaderFieldAddRestored / ShaderFieldRemoved): each
+ *     re-applies one edit dimension and bumps the ShaderUnit version so the
+ *     panel refreshes. CPU-only, no recompile.
+ *   - Create/Compile stay non-undoable lifecycle actions.
  *
  * Architecture:
  *   - Bound to an EventQueue via Init() — no per-frame Update() polling.
@@ -25,8 +36,11 @@
 
 #pragma once
 
+#include <string>
+
 #include "editor/controllers/Controllers.h"
 #include "editor/events/EventBus.h"
+#include "editor/events/ShaderEvents.h"
 
 namespace neurus {
 
@@ -43,9 +57,16 @@ public:
 	 * initialization, before any events are enqueued.
 	 *
 	 * @param bus EventQueue to subscribe to.
-	 * @param ops Operation sink (unused; shader edits are not yet undoable).
+	 * @param ops Operation sink; records shader content edits for undo/redo.
 	 */
 	void Init(EventQueue& bus, IOperationSink& ops) override;
+
+private:
+	// --- Code-edit gesture state (ShaderEditBegin -> ShaderEditEnd) ---
+	bool            m_codeEditing = false;   ///< True between begin and end.
+	const ObjectID* m_editObject  = nullptr; ///< Object captured at gesture start.
+	int             m_editStage   = 0;       ///< Stage captured at gesture start.
+	std::string     m_beforeCode;            ///< Code snapshot at gesture start.
 };
 
 } // namespace neurus

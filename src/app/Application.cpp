@@ -516,6 +516,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::codeEdited);
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::structEdited);
 		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::fieldAdded);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::editBegin);
+		ConnectUIEvent(shaderPanel, &neurus::ShaderEditorPanel::editEnd);
 	}
 
 	// Handle Transform changes from Property Panel → Editor

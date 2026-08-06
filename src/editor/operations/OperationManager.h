@@ -95,8 +95,13 @@ private:
 	/** @brief Replay phase — Submit() is suppressed while Replaying. */
 	enum class Phase { Idle, Replaying };
 
-	/** @brief Emits an operation synchronously under the replay guard. */
-	void Replay(Operation& op);
+	/**
+	 * @brief Emits an operation synchronously under the replay guard.
+	 * @return true if the operation applied (no handler exception), false if
+	 *         it was caught and discarded. Callers must not move the op onto
+	 *         the opposite stack on failure.
+	 */
+	bool Replay(Operation& op);
 
 	/**
 	 * @brief Evicts the oldest undo entries so the stack stays within
