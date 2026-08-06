@@ -98,11 +98,16 @@ public:
 	/** @brief Orthographic projection field size for sun shadows. */
 	static constexpr float sun_shadow_field = 2.5f;
 
-	/** @brief Near plane for sun shadow map. */
+	/** @brief Near plane for sun shadow map (view-space, relative to eye). */
 	static constexpr float sun_shadow_near = -10.0f;
 
-	/** @brief Far plane for sun shadow map. */
-	static constexpr float sun_shadow_far = 10.0f;
+	/** @brief Far plane for sun shadow map (view-space, relative to eye).
+	 *  Extended past the geometry so depth is not crammed at NDC Z=1.0. */
+	static constexpr float sun_shadow_far = 30.0f;
+
+	/** @brief Eye distance from the shadow ortho center (decoupled from far
+	 *  plane so geometry sits at mid-depth instead of the far boundary). */
+	static constexpr float sun_depth_range = 10.0f;
 
 	/** @brief Near plane for point light shadow map. */
 	static constexpr float point_shadow_near = 0.1f;

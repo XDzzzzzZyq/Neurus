@@ -592,7 +592,7 @@ PassStats ShadowIntensityPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cac
 			// Use camera target as ortho centre (same as ShadowDepthPass)
 			const Camera* activeCam = scene->GetActiveCamera();
 			const glm::vec3 center = activeCam->cam_tar;
-			const glm::vec3 lightEye = center - lightDir * farPlane;
+			const glm::vec3 lightEye = center - lightDir * Light::sun_depth_range;
 			const glm::mat4 lightView = glm::lookAt(lightEye, center, up);
 			const glm::mat4 lightViewProj = lightProj * lightView;
 

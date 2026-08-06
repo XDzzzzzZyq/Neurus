@@ -450,7 +450,7 @@ PassStats ShadowDepthPass::Record(vk::CommandBuffer cmdBuf, RenderCache& cache, 
 
 			// --- Compute sun direction (local forward vector) ---
 			const glm::vec3 sunDir = glm::normalize(lightPtr->GetDirection());
-			const glm::vec3 eye = center - sunDir * farPlane;
+			const glm::vec3 eye = center - sunDir * Light::sun_depth_range;
 
 			// --- Degenerate up-vector check ---
 			const glm::vec3 up = (glm::abs(glm::dot(sunDir, kWorldUp)) > 0.999f)

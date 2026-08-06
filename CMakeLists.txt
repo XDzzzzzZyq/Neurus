@@ -28,6 +28,14 @@ option(NEURUS_BUILD_TESTS "Build unit tests" ON)
 option(NEURUS_ENABLE_VALIDATION "Enable Vulkan validation layers" OFF)
 
 # ---------------------------------------------------------------------------
+# Debug macro (uniform across compilers)
+# ---------------------------------------------------------------------------
+# MSVC's CRT auto-defines _DEBUG in Debug builds; Clang/GCC do not. Define it
+# ourselves so NEURUS_LOG and any other _DEBUG-guarded code behave the same on
+# every platform.
+add_compile_definitions($<$<CONFIG:Debug>:_DEBUG>)
+
+# ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
 

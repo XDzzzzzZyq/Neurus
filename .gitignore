@@ -100,3 +100,8 @@ graphify-out/graph.html
 
 # Graphify timestamped backups
 /graphify-out/20*/
+
+# BEGIN oh-my-opencode-slim worktrees
+.slim/worktrees/
+.slim/worktrees.json
+# END oh-my-opencode-slim worktrees

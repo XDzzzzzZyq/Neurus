@@ -30,8 +30,12 @@
  *
  * Prints to std::cout with function name and line number prefix.
  * Compiled out entirely in Release builds.
+ *
+ * Debug detection: MSVC's CRT auto-defines _DEBUG in Debug builds. Clang/GCC
+ * do not; they rely on the standard NDEBUG macro (absent in Debug). Accept
+ * either signal so the log is active in Debug on every supported compiler.
  */
-#ifdef _DEBUG
+#if defined(_DEBUG) || !defined(NDEBUG)
 #define NEURUS_LOG(msg) \
 	do { \
 		if (NEURUS_ISATTY(stdout)) { \
