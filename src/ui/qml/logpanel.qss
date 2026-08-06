@@ -1,0 +1,35 @@
+/* Log Panel stylesheet. Severity coloring lives in LogDelegate; this file
+   sets the chrome: list background, search field, toolbar buttons, counts. */
+
+QListView#logView {
+    background-color: #1e1e1e;
+    alternate-background-color: #252526;
+    border: 1px solid #3c3c3c;
+    outline: none;
+}
+
+QLineEdit#logSearch {
+    padding: 2px 6px;
+    border: 1px solid #3c3c3c;
+    border-radius: 2px;
+    background-color: #252526;
+    color: #dcdcdc;
+}
+
+QToolButton#logToolBtn {
+    padding: 3px 6px;
+    border: 1px solid #3c3c3c;
+    border-radius: 2px;
+    background-color: #2d2d2d;
+    color: #dcdcdc;
+}
+
+QToolButton#logToolBtn:checked {
+    background-color: #094771;
+    border-color: #1b4b73;
+}
+
+QLabel#logCounts {
+    color: #9cdcfe;
+    font-weight: bold;
+}

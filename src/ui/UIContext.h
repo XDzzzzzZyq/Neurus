@@ -46,6 +46,13 @@ struct UIContext
 	const void* profile = nullptr;
 
 	/**
+	 * @brief Opaque pointer to the core LogBuffer (const neurus::LogBuffer*).
+	 *        Set by the Application each frame; the LogPanel casts it to
+	 *        const LogBuffer* to poll new log entries.
+	 */
+	const void* log = nullptr;
+
+	/**
 	 * @brief Returns all scene objects as const ObjectID* pointers.
 	 *
 	 * Casts editor.scene to const Scene* and collects every ObjectID from the
