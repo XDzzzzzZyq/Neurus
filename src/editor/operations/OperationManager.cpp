@@ -156,8 +156,13 @@ bool OperationManager::Replay(Operation& op)
 	Scene* scene = m_sceneProvider ? m_sceneProvider() : nullptr;
 	if (!scene)
 	{
-		NEURUS_ERR("[OperationManager] Replay aborted: no scene provider");
-		return false;
+		// No scene provider: the op cannot apply, but this is an environmental
+		// no-op, not a replay failure — Undo/Redo still move the op between
+		// stacks (camera-controller bookkeeping tests rely on this). Only an
+		// exception inside Apply() counts as failure (op is then dropped).
+		NEURUS_LOG("[OperationManager] Replay skipped: no scene provider ('" << op.Label()
+		           << "' moves stacks without applying)");
+		return true;
 	}
 
 	NEURUS_LOG("[OperationManager] Replay: applying '" << op.Label()

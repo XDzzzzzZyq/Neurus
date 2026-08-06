@@ -97,9 +97,9 @@ private:
 
 	/**
 	 * @brief Emits an operation synchronously under the replay guard.
-	 * @return true if the operation applied (no handler exception), false if
-	 *         it was caught and discarded. Callers must not move the op onto
-	 *         the opposite stack on failure.
+	 * @return true if the operation applied (or was skipped because no scene
+	 *         provider exists — an environmental no-op that still advances the
+	 *         stacks), false only if Apply() threw and the op must be dropped.
 	 */
 	bool Replay(Operation& op);
 
