@@ -21,6 +21,8 @@ add_library(neurus_ui STATIC
 	items/ShaderFieldDelegate.cpp
 	items/LogModel.h
 	items/LogModel.cpp
+	items/LogFilterProxy.h
+	items/LogFilterProxy.cpp
 	elements/ShaderHighlighter.h
 	elements/ShaderHighlighter.cpp
 	elements/CodeEditor.h
