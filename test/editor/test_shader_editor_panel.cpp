@@ -19,7 +19,8 @@
 #include <gtest/gtest.h>
 
 #include <QAbstractItemModel>
-#include <QPushButton>
+#include <QApplication>
+#include <QTest>
 #include <QTreeView>
 
 #include "editor/controllers/ShaderController.h"
@@ -76,14 +77,21 @@ QModelIndex SectionRow(QAbstractItemModel* model, const QString& title)
 	return QModelIndex();
 }
 
-/** @brief Clicks the "+" button installed on a section / struct-def row. */
-void ClickAddButton(QTreeView* tree, const QModelIndex& idx)
+/**
+ * @brief Left-clicks the "+" glyph of a section / struct-def row.
+ *
+ * The "+" is painted at the right edge of the spanned row by the item
+ * delegate (no index widgets); a real mouse click at the glyph's center
+ * drives the same editorEvent path the app uses.
+ */
+void ClickAddCell(QTreeView* tree, const QModelIndex& idx)
 {
-	QWidget* widget = tree->indexWidget(idx);
-	ASSERT_NE(widget, nullptr) << "row has no + button";
-	QPushButton* btn = widget->findChild<QPushButton*>();
-	ASSERT_NE(btn, nullptr) << "row widget has no button";
-	btn->click();
+	tree->scrollTo(idx);
+	const QRect r = tree->visualRect(idx);
+	ASSERT_FALSE(r.isEmpty()) << "no visual rect for row " << idx.row();
+	// The "+" glyph is a 14px button inset 4px from the row's right edge.
+	const QPoint glyph(r.right() - 11, r.center().y());
+	QTest::mouseClick(tree->viewport(), Qt::LeftButton, Qt::NoModifier, glyph);
 }
 
 } // anonymous namespace
@@ -116,6 +124,11 @@ protected:
 		                 [this](const ShaderFieldAdded& e) { m_bus.enqueue(e); });
 		QObject::connect(&m_panel, &ShaderEditorPanel::structEdited,
 		                 [this](const ShaderStructEdited& e) { m_bus.enqueue(e); });
+
+		// Show the panel so the tree lays out and visualRect works for the
+		// delegate-cell clicks used by these tests.
+		m_panel.show();
+		QApplication::processEvents();
 	}
 
 	/** @brief Drains queued events (one "frame" of Editor::Edit()). */
@@ -152,13 +165,13 @@ TEST_F(ShaderEditorPanelTest, FieldAdd_TwoDifferentSections_UndoRefreshesTree)
 	// Add one field to Attributes, then one to Uniforms (different sections).
 	QModelIndex attrs = SectionRow(model, "Attributes");
 	ASSERT_TRUE(attrs.isValid());
-	ClickAddButton(tree, attrs);
+	ClickAddCell(tree, attrs);
 	Process();
 	RefreshPanel();
 
 	QModelIndex unifs = SectionRow(model, "Uniforms");
 	ASSERT_TRUE(unifs.isValid());
-	ClickAddButton(tree, unifs);
+	ClickAddCell(tree, unifs);
 	Process();
 	RefreshPanel();
 
@@ -178,12 +191,11 @@ TEST_F(ShaderEditorPanelTest, FieldAdd_TwoDifferentSections_UndoRefreshesTree)
 	EXPECT_FALSE(m_operations.CanUndo());
 }
 
-TEST_F(ShaderEditorPanelTest, AddButtons_NeverTakeKeyboardFocus)
+TEST_F(ShaderEditorPanelTest, Sections_HaveNoIndexWidgets)
 {
-	// The "+" buttons are click-only: they must never grab keyboard focus.
-	// A focused "+" button is deleted on the next model rebuild, and the
-	// dead-focus state on macOS swallows window shortcuts (Ctrl+Z) until the
-	// user clicks elsewhere — the reported "undo not working after add" bug.
+	// Regression: per-row "+" index widgets fought with the frequent model
+	// resets and macOS accessibility (input loss after clicking "+"). The "+"
+	// is now a delegate-painted cell, so the tree must hold no index widgets.
 	RefreshPanel();
 
 	auto* tree = m_panel.findChild<QTreeView*>();
@@ -191,18 +203,59 @@ TEST_F(ShaderEditorPanelTest, AddButtons_NeverTakeKeyboardFocus)
 	auto* model = static_cast<ShaderStructModel*>(tree->model());
 	ASSERT_NE(model, nullptr);
 
-	// Every section row's "+" button must be NoFocus.
 	for (int row = 0; row < model->rowCount(QModelIndex()); ++row)
 	{
 		QModelIndex sectionIdx = model->index(row, 0, QModelIndex());
-		QWidget* widget = tree->indexWidget(sectionIdx);
-		ASSERT_NE(widget, nullptr);
-		QPushButton* btn = widget->findChild<QPushButton*>();
-		ASSERT_NE(btn, nullptr);
-		EXPECT_EQ(btn->focusPolicy(), Qt::NoFocus)
-			<< "section '" << sectionIdx.data(Qt::DisplayRole).toString().toStdString()
-			<< "' + button must not take focus";
+		EXPECT_EQ(tree->indexWidget(sectionIdx), nullptr)
+			<< "section rows must not use index widgets";
+		for (int child = 0; child < model->rowCount(sectionIdx); ++child)
+		{
+			QModelIndex childIdx = model->index(child, 0, sectionIdx);
+			EXPECT_EQ(tree->indexWidget(childIdx), nullptr)
+				<< "struct-def rows must not use index widgets";
+		}
 	}
+}
+
+TEST_F(ShaderEditorPanelTest, AddClick_DoesNotMoveFocusAway)
+{
+	// Clicking "+" must not move keyboard focus anywhere (NoFocus buttons) —
+	// dead focus after the tree rebuild was the reported input-loss bug.
+	RefreshPanel();
+
+	auto* tree = m_panel.findChild<QTreeView*>();
+	ASSERT_NE(tree, nullptr);
+	auto* model = static_cast<ShaderStructModel*>(tree->model());
+	ASSERT_NE(model, nullptr);
+
+	// Make the panel a real (offscreen) window so the focus system works.
+	m_panel.show();
+	QApplication::processEvents();
+	m_panel.activateWindow();
+	QApplication::processEvents();
+	tree->setFocus();
+	QApplication::processEvents();
+
+	QWidget* before = QApplication::focusWidget();
+	EXPECT_EQ(before, tree) << "tree should own focus before the click";
+
+	ClickAddCell(tree, SectionRow(model, "Attributes"));
+
+	// Focus must still be on the tree — the "+" button must not grab it.
+	QWidget* afterClick = QApplication::focusWidget();
+	EXPECT_EQ(afterClick, tree)
+		<< "focus moved to " << (afterClick ? afterClick->metaObject()->className() : "null")
+		<< " after clicking +";
+
+	// After the frame that applies the add + rebuilds the model, focus must be
+	// back on the tree (the rebuild drops it; we restore it so window shortcuts
+	// keep working — otherwise macOS accessibility swallows key input).
+	Process();
+	RefreshPanel();
+	QWidget* afterRebuild = QApplication::focusWidget();
+	EXPECT_EQ(afterRebuild, tree)
+		<< "focus must return to the tree after the rebuild (was "
+		<< (afterRebuild ? afterRebuild->metaObject()->className() : "null") << ")";
 }
 
 TEST_F(ShaderEditorPanelTest, FieldAdd_AttributesAndPassOutputs_UndoRefreshesTree)
@@ -218,13 +271,13 @@ TEST_F(ShaderEditorPanelTest, FieldAdd_AttributesAndPassOutputs_UndoRefreshesTre
 
 	QModelIndex attrs = SectionRow(model, "Attributes");
 	ASSERT_TRUE(attrs.isValid());
-	ClickAddButton(tree, attrs);
+	ClickAddCell(tree, attrs);
 	Process();
 	RefreshPanel();
 
 	QModelIndex pass = SectionRow(model, "Pass Outputs");
 	ASSERT_TRUE(pass.isValid());
-	ClickAddButton(tree, pass);
+	ClickAddCell(tree, pass);
 	Process();
 	RefreshPanel();
 
@@ -260,13 +313,13 @@ TEST_F(ShaderEditorPanelTest, FieldAdd_60FpsFramePattern_UndoRefreshesTree)
 	ASSERT_NE(model, nullptr);
 
 	// Click "+" on Attributes (deferred: applied next frame).
-	ClickAddButton(tree, SectionRow(model, "Attributes"));
+	ClickAddCell(tree, SectionRow(model, "Attributes"));
 	RefreshPanel(); // frame N: nothing processed yet — repopulate is a no-op visually
 	Process();
 	RefreshPanel(); // frame N+1: add applied + repopulated
 
 	// Click "+" on Pass Outputs.
-	ClickAddButton(tree, SectionRow(model, "Pass Outputs"));
+	ClickAddCell(tree, SectionRow(model, "Pass Outputs"));
 	RefreshPanel();
 	Process();
 	RefreshPanel();
@@ -306,13 +359,13 @@ TEST_F(ShaderEditorPanelTest, FieldAdd_TwoStructDefs_UndoRefreshesTree)
 	// Add a member field to struct 0, then one to struct 1.
 	QModelIndex sd = SectionRow(model, "Struct Definitions");
 	ASSERT_TRUE(sd.isValid());
-	ClickAddButton(tree, model->index(0, 0, sd));
+	ClickAddCell(tree, model->index(0, 0, sd));
 	Process();
 	RefreshPanel();
 
 	sd = SectionRow(model, "Struct Definitions");
 	ASSERT_TRUE(sd.isValid());
-	ClickAddButton(tree, model->index(1, 0, sd));
+	ClickAddCell(tree, model->index(1, 0, sd));
 	Process();
 	RefreshPanel();
 

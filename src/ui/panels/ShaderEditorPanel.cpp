@@ -164,6 +164,12 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	m_delegate = new ShaderFieldDelegate(this);
 	m_treeView->setModel(m_model);
 	m_treeView->setItemDelegate(m_delegate);
+
+	// "+" clicks on section / struct-def rows flow through the delegate (the
+	// glyph is painted at the row's right edge — no per-row index widgets,
+	// which fought with the frequent model resets and macOS accessibility).
+	QObject::connect(m_delegate, &ShaderFieldDelegate::addClicked,
+	                 this, &ShaderEditorPanel::handleAddClick);
 	m_treeView->setAlternatingRowColors(true);
 	m_treeView->setUniformRowHeights(true);
 	m_treeView->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -337,6 +343,7 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr, bool objectC
 	// section and drop the selected row on every refresh.
 	std::vector<std::vector<int>> expandedPaths;
 	std::vector<int> currentPath;
+	const bool hadFocus = m_treeView->hasFocus();
 	if (!objectChanged)
 	{
 		collectExpandedPaths(m_treeView, m_model, QModelIndex(), expandedPaths);
@@ -369,60 +376,35 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr, bool objectC
 		}
 	}
 
-	// Span first column for section headers and struct def rows, and install
-	// per-row "+" buttons. The model reset drops spans AND index widgets, so
-	// both are re-applied on every populate.
+	// Span the title across the full row for section headers and struct-def
+	// rows; the delegate paints the "+" at the row's right edge. Re-applied on
+	// every populate because the model reset clears spans.
 	for (int row = 0; row < m_model->rowCount(QModelIndex()); ++row)
 	{
 		QModelIndex sectionIdx = m_model->index(row, 0, QModelIndex());
 		m_treeView->setFirstColumnSpanned(row, QModelIndex(), true);
-		m_treeView->setIndexWidget(sectionIdx, createAddRowWidget(sectionIdx));
 		for (int child = 0; child < m_model->rowCount(sectionIdx); ++child)
 		{
 			QModelIndex childIdx = m_model->index(child, 0, sectionIdx);
-			int nodeType = childIdx.data(ShaderStructModel::RoleNodeType).toInt();
-			if (nodeType == ShaderStructModel::NodeStructDef)
+			if (childIdx.data(ShaderStructModel::RoleNodeType).toInt() ==
+			    ShaderStructModel::NodeStructDef)
 			{
 				m_treeView->setFirstColumnSpanned(child, sectionIdx, true);
-				m_treeView->setIndexWidget(childIdx, createAddRowWidget(childIdx));
 			}
 		}
 	}
+
+	// The model reset drops the view's keyboard focus. Restore it so window
+	// shortcuts (Ctrl+Z) keep working: with no focus widget, macOS accessibility
+	// chases the dangling focused table and swallows key input until the user
+	// clicks elsewhere ("undo not working after add" bug).
+	if (hadFocus)
+		m_treeView->setFocus();
 }
 
 // =========================================================================
-// Per-row add buttons
+// Per-row add handling (delegate-painted "+" column -> handleAddClick)
 // =========================================================================
-
-QWidget* ShaderEditorPanel::createAddRowWidget(const QModelIndex& index)
-{
-	auto* widget = new QWidget(m_treeView);
-	auto* layout = new QHBoxLayout(widget);
-	layout->setContentsMargins(4, 0, 0, 0);
-	layout->setSpacing(4);
-
-	auto* label = new QLabel(index.data(Qt::DisplayRole).toString(), widget);
-	QFont font = label->font();
-	font.setBold(index.data(ShaderStructModel::RoleNodeType).toInt() == ShaderStructModel::NodeSection);
-	label->setFont(font);
-	layout->addWidget(label, 1);
-
-	auto* addBtn = new QPushButton("+", widget);
-	addBtn->setObjectName("sectionAddBtn");
-	addBtn->setToolTip("Add entry");
-	addBtn->setFixedSize(16, 16);
-	// Click-only control: never take keyboard focus. A focused "+" button is
-	// deleted on the next model rebuild (setIndexWidget replacement), and on
-	// macOS with accessibility active the dead-focus state swallows
-	// window-level shortcuts (Ctrl+Z) until the user clicks elsewhere.
-	addBtn->setFocusPolicy(Qt::NoFocus);
-	layout->addWidget(addBtn);
-
-	QObject::connect(addBtn, &QPushButton::clicked, this,
-	                 [this, index]() { handleAddClick(index); });
-
-	return widget;
-}
 
 void ShaderEditorPanel::handleAddClick(const QModelIndex& index)
 {
