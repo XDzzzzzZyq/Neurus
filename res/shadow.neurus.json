@@ -35,8 +35,8 @@
                                         "z": 1.0
                                     }
                                 },
-                                "cam_w": 902.0,
-                                "cam_h": 601.0,
+                                "cam_w": 974.0,
+                                "cam_h": 719.0,
                                 "cam_pers": 60.0,
                                 "cam_near": 0.10000000149011612,
                                 "cam_far": 100.0,
@@ -399,6 +399,6 @@
             "r_fxaa_edge_threshold_min": 0.08330000191926956,
             "r_sampling_mode": 0
         },
-        "ui": "AdnQywADAAAAAAAAAAAAMAAABdsAAANaAAAAAAAAAE4AAAXbAAADWgAAAAAAAAAABqsAAAAAAAAATgAABdsAAANa\nAAADbniclVPBToNAEL37FRPulQKmagI0DdqjrdLW89qd4kbYbZahtsaPd7caUtdS9UBg5j3em3kL8XBblbBBXQslEy8473uAcqm4kEXizWfj3pU3TON7GvENk0vkN2r5YrB8VxNWsGhf9GBeo25rI5MpSUxI07FwGrc1jEvFaG/QN/18XQoi055ogYZCe4GeFWgkJV7YyXlvOdEfdUYaGczY034kyBqt0UKThko7mWE8Cl4gwR2r8KAPWalq5HZgP419K9MpNtVqjZp2MGUSS1fSQY8K5+IN6zQKArBX7H/W5v61Yaf1QuDrWmlyTdv+b3tEB2IPKLlJ0xzbShSuYv7MLHjLBSk3HnfflTAhFqdI361OZBKGl3DdDyEa/CuXGW6p0Qg2h5+n7KAn7AfGPggujlr77fdtnjv+l/TsA+fBIJQ="
+        "ui": "AdnQywADAAAAAAAA////+QAABqoAAAP6AAAAAAAAAE4AAAXbAAADWgAAAAACAAAABqsAAAAAAAAAFwAABqoAAAP6\nAAADinjajVPBTsJAEL37FZPesUCLSFJKCMrJCFrA88oOdWO7S7ZTBOPHu4um0kLBQ7Odmdc3781sg8E2TWCDOhNK9p3WddMBlEvFhYz7znw2btw6gzB4oiHfMLlEfqeW76YW7TLCFBbFhw7MM9RFbGhGShIT0mRsOQyKGMaJYrRv0DT5aJ0IIpOeaIEGQnuChiXIJfWddi3mq8B4/+QZamQwY697STDKtUZbmuSUWGUG8SJ4jASPLMWDPIwSlSG3gt0wcC1NLdlUqzVq2sGUSUyqlJXqSeJIfGIWet0m2Cdwf2Jz/jqsbb0Q+LFWmqpNi/wlH+0DsuiNcTPNey5IHU3mGaUtmp2uRFyhLQHLLOfsdnrQ6/rg3fiXLHvlaa+EWVJcVTjDLeUawXo/2mAJ+aDOOvjrcEZ91+9Au9U6qdwtbr55r/mTwqtvOoMoWw=="
     }
 }
