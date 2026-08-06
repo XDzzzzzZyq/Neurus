@@ -49,7 +49,8 @@ public:
 	 * @brief Resyncs the model with the buffer.
 	 * @param buffer Current log buffer; null detaches (empties the model).
 	 * @note Grow -> beginInsertRows for the delta. Seq drop (Clear) ->
-	 *       beginResetModel. Ring wrap with size unchanged -> reset.
+	 *       beginResetModel. Ring wrap with size unchanged -> remove oldest
+	 *       + append newest (scroll position preserved).
 	 */
 	void Refresh(const LogBuffer* buffer);
 
