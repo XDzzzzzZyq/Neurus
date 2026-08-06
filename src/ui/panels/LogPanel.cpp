@@ -130,6 +130,10 @@ void LogPanel::Refresh(const UIContext& ctx)
 	if (!buffer)
 		return;
 
+	// Auto-scroll only re-pins when the user is already at the bottom;
+	// if they scrolled up, don't yank them back down every frame.
+	const bool wasAtBottom = m_view.verticalScrollBar()->value() >= m_view.verticalScrollBar()->maximum();
+
 	if (!m_paused)
 		m_model.Refresh(buffer);
 
@@ -165,7 +169,8 @@ void LogPanel::Refresh(const UIContext& ctx)
 		                      .arg(info).arg(errors));
 	}
 
-	MaybeScrollToBottom();
+	if (m_autoScrollBtn->isChecked() && wasAtBottom)
+		MaybeScrollToBottom();
 }
 
 void LogPanel::MaybeScrollToBottom()
