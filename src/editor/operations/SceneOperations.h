@@ -275,6 +275,11 @@ public:
  * into a single undo entry. Kept a separate type (rather than a flag on
  * CameraTransformOp) so the mergeable-vs-standalone intent is encoded in the
  * type, not decided at each call site.
+ *
+ * The merge key includes the zoom direction (derived from the stored pose:
+ * camera-to-target distance shrinking = in, growing = out), so changing scroll
+ * direction breaks the merge — a zoom-in run and a zoom-out run each get their
+ * own undo entry.
  */
 class CameraZoomOp : public TransitionOp<CameraZoomOp, CameraPoseChanged, CameraPose>
 {
@@ -282,7 +287,13 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Camera Zoom";
 
-	std::string MergeKey() const override { return "camera_zoom:" + std::to_string(m_uid); }
+	std::string MergeKey() const override
+	{
+		const float beforeR = glm::length(m_before.position - m_before.target);
+		const float afterR  = glm::length(m_after.position - m_after.target);
+		const char* dir = afterR < beforeR ? "in" : "out";
+		return "camera_zoom:" + std::to_string(m_uid) + ":" + dir;
+	}
 
 	CameraPoseChanged MakeEvent(const ObjectID* o, const CameraPose& v) const
 	{

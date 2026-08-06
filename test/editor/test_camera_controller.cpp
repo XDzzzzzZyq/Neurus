@@ -528,3 +528,38 @@ TEST_F(CameraControllerTest, ScrollZoom_RecordsPerEvent_WithoutGesture)
 
 	EXPECT_TRUE(m_operations.CanUndo());
 }
+
+/**
+ * @test ScrollZoom_DirectionChangeBreaksMerge
+ *
+ * Same-direction scroll notches coalesce into ONE undo entry, but changing
+ * scroll direction starts a NEW entry: zooming in several notches, then
+ * zooming out several notches, yields exactly TWO entries (the zoom-in burst
+ * merged, the zoom-out burst merged). Undo steps therefore map to direction
+ * runs, not the whole scroll session.
+ */
+TEST_F(CameraControllerTest, ScrollZoom_DirectionChangeBreaksMerge)
+{
+	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
+	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
+
+	// Three zoom-in notches -> one merged undo entry.
+	for (int i = 0; i < 3; ++i)
+		m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), 1.0f});
+	m_eventBus.Process();
+
+	// One zoom-out notch -> direction changed, so a NEW entry is recorded.
+	m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), -1.0f});
+	m_eventBus.Process();
+
+	// Another zoom-out notch -> same direction as the previous, merges with it.
+	m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), -1.0f});
+	m_eventBus.Process();
+
+	// Still exactly two entries: the merged zoom-in run and the merged
+	// zoom-out run. Two undos empty the stack.
+	m_operations.Undo();
+	EXPECT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
+	EXPECT_FALSE(m_operations.CanUndo());
+}

@@ -270,19 +270,43 @@ TEST_F(OperationManagerTest, CameraZoom_Merge_CoalescesIntoOneUndo)
 	const glm::vec3 a(0.0f, 5.0f, 0.0f);
 	const glm::vec3 b(0.0f, 4.0f, 0.0f);
 	const glm::vec3 c(0.0f, 3.0f, 0.0f);
+	const glm::vec3 d(0.0f, 2.0f, 0.0f);
 	const glm::vec3 tar(0.0f, 0.0f, 0.0f);
 
-	// Three consecutive same-camera zoom edits share a MergeKey and collapse
-	// into a single undo entry spanning a→c.
+	// Three consecutive SAME-DIRECTION (zoom-in) edits share a MergeKey and
+	// collapse into a single undo entry spanning a→d.
 	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ a, tar }, CameraPose{ b, tar }));
 	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ b, tar }, CameraPose{ c, tar }));
-	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ c, tar }, CameraPose{ a, tar }));
+	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ c, tar }, CameraPose{ d, tar }));
 
 	ASSERT_TRUE(m_operations.CanUndo());
 
 	// A single undo returns to the original endpoint, proving one merged entry.
 	m_operations.Undo();
 	EXPECT_EQ(m_camera->GetPosition(), a);
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+TEST_F(OperationManagerTest, CameraZoom_DirectionChange_BreaksMerge)
+{
+	const int uid = m_camera->GetObjectID();
+	const glm::vec3 a(0.0f, 5.0f, 0.0f);
+	const glm::vec3 b(0.0f, 4.0f, 0.0f);
+	const glm::vec3 c(0.0f, 3.0f, 0.0f);
+	const glm::vec3 tar(0.0f, 0.0f, 0.0f);
+
+	// Zoom in twice, then zoom back OUT: the direction change must break the
+	// merge, producing two undo entries (merged zoom-in run + zoom-out run).
+	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ a, tar }, CameraPose{ b, tar }));
+	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ b, tar }, CameraPose{ c, tar }));
+	m_operations.Submit(std::make_unique<CameraZoomOp>(uid, CameraPose{ c, tar }, CameraPose{ b, tar }));
+
+	ASSERT_TRUE(m_operations.CanUndo());
+
+	// Two undos empty the stack: the zoom-out, then the merged zoom-in.
+	m_operations.Undo();
+	EXPECT_TRUE(m_operations.CanUndo());
+	m_operations.Undo();
 	EXPECT_FALSE(m_operations.CanUndo());
 }
 
