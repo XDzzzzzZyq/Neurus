@@ -127,7 +127,7 @@ target_compile_definitions(Neurus PRIVATE ADS_STATIC)
 ## Panel System
 
 All dock panels inherit from `UIPanel` (`src/ui/panels/UIPanel.h`):
-- `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig)
+- `PanelType` enum identifies each panel (Viewport, Outliner, PropertyEditor, RenderConfig, Log)
 - `virtual void Refresh(const UIContext& ctx)` — called per-frame to sync panel UI with application state
 - `UIContext` embeds an `EditorContext editor` (from `Editor::GetContext()`) with
   `editor.scene` (opaque `const UID*`, cast to `const Scene*`) and `editor.config`
@@ -163,6 +163,26 @@ GPU (ms), Draws, Dispatches):
 - `Refresh()` rebuilds the tree only when the frame totals change; GPU columns
   show `--` until timestamp readback is ready (device support + fence signal)
 - Profiling is always on; the panel is display-only
+
+### LogPanel
+
+`LogPanel` (Bottom dock, tabbed with Texture Viewer) is a realtime log viewer
+reading the core `LogBuffer` via `UIContext::log` (opaque `const LogBuffer*`,
+polled in `Refresh()`):
+
+- **Row rendering**: `QListView` + `LogModel` (custom `QAbstractListModel` over
+  the buffer) + `LogFilterProxy` (level filter + case-insensitive search) +
+  `LogDelegate` (severity coloring: cyan Info, red Error). Virtualized - only
+  visible rows are queried.
+- **Counts**: `QLabel` header "INFO n · ERROR m", dirty-checked in `Refresh()`.
+- **Controls**: filter combo (All/Info/Errors), search box, auto-scroll toggle
+  (default on), pause toggle, Clear (resets the core buffer), Export... (`*.log`
+  via `QFileDialog` + `std::ofstream`).
+- **Error notifier**: on new `NEURUS_ERR` entries, LogPanel emits
+  `errorNotified(delta, firstMessage)`; UIManager shows a 3s status-bar message
+  ("N new error(s): <first>"). Throttled - repeated errors accumulate in delta.
+- **Release behavior**: `NEURUS_LOG` compiles out, so only `NEURUS_ERR` lines
+  appear and the count reflects that.
 
 ### Outliner and PropertyPanel (Scene-Event Panels)
 

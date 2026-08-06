@@ -213,7 +213,10 @@ Neurus/
 │   │   ├── items/               # Reusable composite widgets
 │   │   │   ├── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
 │   │   │   ├── ShaderStructModel.h/cpp  # Tree model for ShaderStruct IR
-│   │   │   └── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
+│   │   │   ├── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
+│   │   │   ├── LogModel.h/cpp        # QAbstractListModel over core LogBuffer
+│   │   │   ├── LogFilterProxy.h/cpp  # Level filter + search proxy
+│   │   │   └── LogDelegate.h/cpp     # Severity-colored row delegate
 │   │   ├── elements/            # Editor widgets
 │   │   │   ├── CodeEditor.h/cpp     # GLSL code editor (line numbers, monospace)
 │   │   │   └── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
@@ -223,7 +226,8 @@ Neurus/
 │   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
 │   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
 │   │   │   ├── RenderConfigPanel.h/cpp  # Live render setting controls
-│   │   │   └── ShaderEditorPanel.h/cpp  # Code + Structure shader editor
+│   │   │   ├── ShaderEditorPanel.h/cpp  # Code + Structure shader editor
+│   │   │   └── LogPanel.h/cpp        # Realtime log viewer dock (issue #39)
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── ConfigComponent.h/cpp  # RenderConfig serialization adapter
