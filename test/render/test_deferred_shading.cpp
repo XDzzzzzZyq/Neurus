@@ -33,7 +33,7 @@
 #include "render/Texture.h"
 
 // --- Data layer ---
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 
 // --- Scene layer ---
 #include "scene/Camera.h"

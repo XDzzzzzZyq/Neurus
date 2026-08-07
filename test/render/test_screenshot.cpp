@@ -3,7 +3,7 @@
 #include "shared/TestVulkanShared.h"
 #include "render/Screenshot.h"
 #include "render/Image.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 
 #include <vulkan/vulkan_raii.hpp>
 

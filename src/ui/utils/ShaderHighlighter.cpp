@@ -1,4 +1,4 @@
-#include "ShaderHighlighter.h"
+#include "utils/ShaderHighlighter.h"
 
 namespace neurus {
 

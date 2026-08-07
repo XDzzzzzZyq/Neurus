@@ -33,8 +33,8 @@
 #include "render/buffers/VertexBuffer.h"
 
 // --- Asset layer ---
-#include "asset/MeshData.h"
-#include "asset/ImageData.h"
+#include "asset/data/MeshData.h"
+#include "asset/data/ImageData.h"
 
 // --- Scene layer ---
 #include "scene/Camera.h"

@@ -1,20 +1,22 @@
 # src/asset/CMakeLists.txt - Asset Layer (CPU-side data + project persistence)
 
 add_library(neurus_asset STATIC
-	ConfigComponent.h
-	ConfigComponent.cpp
-	ImageData.h
-	ImageData.cpp
-	MeshData.h
-	MeshData.cpp
 	Project.h
 	Project.cpp
-	SceneComponent.h
-	SceneComponent.cpp
 	Serializable.h
-	UIComponent.h
-	UIComponent.cpp
-	TypeRegistration.cpp
+	PixelFormat.h
+	components/ConfigComponent.h
+	components/ConfigComponent.cpp
+	components/SceneComponent.h
+	components/SceneComponent.cpp
+	components/UIComponent.h
+	components/UIComponent.cpp
+	components/HistoryComponent.h
+	components/HistoryComponent.cpp
+	data/ImageData.h
+	data/ImageData.cpp
+	data/MeshData.h
+	data/MeshData.cpp
 )
 
 target_link_libraries(neurus_asset PUBLIC
@@ -33,3 +35,9 @@ target_include_directories(neurus_asset PRIVATE
 )
 
 target_compile_features(neurus_asset PUBLIC cxx_std_20)
+
+# NOTE: components/HistoryComponent.cpp includes editor/operations headers
+# (OperationManager, OperationRegistration) so undo/redo stacks can round-trip
+# through the project file. That is a reverse asset->editor dependency, confined
+# to that one .cpp; every final binary links neurus_editor alongside neurus_asset,
+# so no extra link target is declared here.

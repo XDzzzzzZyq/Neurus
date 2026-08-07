@@ -15,20 +15,20 @@ add_library(neurus_ui STATIC
 	items/Vec3Spin.cpp
 	items/ShaderFieldRow.h
 	items/ShaderFieldRow.cpp
-	items/ShaderStructModel.h
-	items/ShaderStructModel.cpp
-	items/ShaderFieldDelegate.h
-	items/ShaderFieldDelegate.cpp
-	items/LogModel.h
-	items/LogModel.cpp
-	items/LogFilterProxy.h
-	items/LogFilterProxy.cpp
-	items/LogDelegate.h
-	items/LogDelegate.cpp
-	elements/ShaderHighlighter.h
-	elements/ShaderHighlighter.cpp
-	elements/CodeEditor.h
-	elements/CodeEditor.cpp
+	items/CodeEditor.h
+	items/CodeEditor.cpp
+	models/LogModel.h
+	models/LogModel.cpp
+	models/LogFilterProxy.h
+	models/LogFilterProxy.cpp
+	models/ShaderStructModel.h
+	models/ShaderStructModel.cpp
+	delegates/LogDelegate.h
+	delegates/LogDelegate.cpp
+	delegates/ShaderFieldDelegate.h
+	delegates/ShaderFieldDelegate.cpp
+	utils/ShaderHighlighter.h
+	utils/ShaderHighlighter.cpp
 	presets/CameraProperties.h
 	presets/CameraProperties.cpp
 	presets/MeshProperties.h

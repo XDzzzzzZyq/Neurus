@@ -18,8 +18,8 @@
 #include "shaders/Shader.h"
 #include "shaders/ShaderLibrary.h"
 
-#include "asset/ImageData.h"
-#include "asset/MeshData.h"
+#include "asset/data/ImageData.h"
+#include "asset/data/MeshData.h"
 #include "asset/PixelFormat.h"
 #include "buffers/IndexBuffer.h"
 #include "buffers/VertexBuffer.h"

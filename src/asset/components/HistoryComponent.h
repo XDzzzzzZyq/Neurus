@@ -8,9 +8,12 @@
  * concrete type); Load reconstructs them and hands them back to the manager
  * with RestoreHistory().
  *
- * Layering: this lives in the editor layer (not asset) because it depends on
- * editor/operations headers. It only implements the asset-layer Serializable
- * interface (a header-only pure abstract), which does not violate isolation.
+ * Layering: the header stays Vulkan-free and only forward-declares
+ * OperationManager, so it lives with the other components in the asset layer.
+ * The .cpp includes editor/operations headers (OperationManager,
+ * OperationRegistration) to drive the undo/redo stacks — a reverse dependency
+ * from asset to editor, kept in the .cpp only, since every final binary links
+ * editor alongside asset.
  */
 
 #pragma once

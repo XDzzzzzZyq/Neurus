@@ -20,7 +20,7 @@
 #include "shared/TestVulkanShared.h"
 
 #include "scene/Mesh.h"
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 #include "render/RenderCache.h"
 #include "render/resources/MeshGPU.h"
 #include "render/buffers/VertexBuffer.h"

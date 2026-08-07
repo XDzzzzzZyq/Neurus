@@ -30,7 +30,7 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 

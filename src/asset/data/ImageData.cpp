@@ -4,7 +4,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
 
-#include "ImageData.h"
+#include "asset/data/ImageData.h"
 #include "core/Log.h"
 
 #include <algorithm>

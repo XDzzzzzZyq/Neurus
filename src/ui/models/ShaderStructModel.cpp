@@ -1,4 +1,4 @@
-#include "ShaderStructModel.h"
+#include "models/ShaderStructModel.h"
 
 #include <QFont>
 

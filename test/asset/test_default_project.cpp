@@ -17,8 +17,8 @@
 #include <string>
 
 #include "asset/Project.h"
-#include "asset/SceneComponent.h"
-#include "asset/ConfigComponent.h"
+#include "asset/components/SceneComponent.h"
+#include "asset/components/ConfigComponent.h"
 #include "render/RenderConfig.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"

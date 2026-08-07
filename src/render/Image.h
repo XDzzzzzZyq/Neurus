@@ -1,6 +1,6 @@
 #pragma once
 
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "asset/PixelFormat.h"
 
 #include <vulkan/vulkan_raii.hpp>

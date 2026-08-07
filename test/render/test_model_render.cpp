@@ -29,14 +29,14 @@
 #include "render/passes/LightingPass.h"
 #include "render/RenderContext.h"
 #include "render/Texture.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "render/Texture.h"
 #include "render/buffers/BufferLayout.h"
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
 // Data layer
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 
 // Scene layer
 #include "scene/Camera.h"

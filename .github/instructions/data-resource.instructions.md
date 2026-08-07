@@ -15,15 +15,16 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 
 ## Location
 
-- `src/asset/MeshData.h/cpp` - Mesh geometry data (vertices, indices)
-- `src/asset/ImageData.h/cpp` - Image pixel data (CPU-side, owning vector, PNG/HDR save)
+- `src/asset/data/MeshData.h/cpp` - Mesh geometry data (vertices, indices)
+- `src/asset/data/ImageData.h/cpp` - Image pixel data (CPU-side, owning vector, PNG/HDR save)
 - `src/asset/PixelFormat.h` - Vulkan-free pixel format enum for CPU-side format queries (PixelByteSize, ChannelCount, IsSRGB, IsHDR helpers)
 - `src/asset/Project.h/cpp` - Pure registration-based serializer (no data ownership)
 - `src/asset/Serializable.h` - Abstract base class: Key/Save/Load virtual interface
-- `src/asset/SceneComponent.h/cpp` - Scene serialization adapter (Serializable implementation)
-- `src/asset/ConfigComponent.h/cpp` - RenderConfig serialization adapter (Serializable implementation)
-- `src/asset/UIComponent.h/cpp` - UI-state serialization adapter (opaque layout blob; Serializable implementation)
-- `src/editor/operations/HistoryComponent.h/cpp` - Undo/redo-stack serialization adapter (Serializable implementation; lives in the editor layer, wraps OperationManager)
+- `src/asset/components/SceneComponent.h/cpp` - Scene serialization adapter (Serializable implementation)
+- `src/asset/components/ConfigComponent.h/cpp` - RenderConfig serialization adapter (Serializable implementation)
+- `src/asset/components/UIComponent.h/cpp` - UI-state serialization adapter (opaque layout blob; Serializable implementation)
+- `src/asset/components/HistoryComponent.h/cpp` - Undo/redo-stack serialization adapter (Serializable implementation; header forward-declares OperationManager, .cpp includes editor/operations headers)
+- `src/scene/registrations/TypeRegistration.cpp` - Cereal polymorphic registration for scene object types
 - `src/render/buffers/Buffer.h` - Virtual base class (Buffer) with m_buffer, m_memory
 - `src/render/buffers/StagingBuffer.h/cpp` - Host-visible staging buffer (StagingBuffer) for CPU↔GPU transfers
 - `src/render/buffers/GPUBuffer.h/cpp` - Device-local GPU buffer (GPUBuffer) with staging Map/Unmap
@@ -39,12 +40,12 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 
 ## Core Responsibilities
 
-1. **Mesh Data Loading** (`src/asset/MeshData.h/cpp`)
+1. **Mesh Data Loading** (`src/asset/data/MeshData.h/cpp`)
    - Parse OBJ files into vertex/index buffers
    - Compute vertex attributes (positions, normals, UVs, tangents)
    - Provide MeshData struct for GPU upload
 
-2. **Image Data Loading** (`src/asset/ImageData.h/cpp`)
+2. **Image Data Loading** (`src/asset/data/ImageData.h/cpp`)
    - Decode PNG/BMP/HDR files into owned pixel buffers (std::vector&lt;uint8_t&gt;)
    - Owns width, height, and format metadata
    - Member functions: `SavePNG()` / `SaveHDR()` for disk output
@@ -81,7 +82,8 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
      builds a transient `Project` per save/open, registering `SceneComponent` +
      `ConfigComponent` (Editor-owned) and `UIComponent` (Application-owned UI blob
      sourced from `UIManager::ExportLayout()` / applied via `UIManager::ApplyLayout()`),
-     plus `HistoryComponent` (Editor-owned undo/redo stacks). `HistoryComponent`
+     plus `HistoryComponent` (undo/redo-stack adapter in asset/components that
+     wraps the editor's `OperationManager`). `HistoryComponent`
      is registered last so legacy files without an `m_history` node load cleanly
      (its `Load` clears the stacks instead of throwing).
    - `Scene::serialize` persists selection state alongside the typed object
@@ -103,7 +105,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 File System (OBJ, PNG)
     │
     ▼
-src/asset/: MeshData / ImageData (CPU-side loading)
+src/asset/data/: MeshData / ImageData (CPU-side loading)
     │                              ▲
     │  Image::FromImageData()      │  Image::ReadImageData()
     ▼                              │
@@ -132,7 +134,9 @@ All image layout transitions go through `Barrier::Transition()`.
 - Issue draw calls (Renderer's responsibility)
 - Create pipelines or shader modules (Renderer's responsibility)
 - Manage swapchain or presentation (Renderer's responsibility)
-- Depend on Editor or UI layers
+- Depend on Editor or UI layers (exception: `components/HistoryComponent.cpp`
+  includes editor/operations headers to persist the undo/redo stacks; its
+  header stays editor-free so the dependency is confined to one .cpp)
 - Store application-level state
 
 ## Current Scope

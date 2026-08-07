@@ -31,7 +31,7 @@
 #include "scene/Mesh.h"
 #include "scene/Light.h"
 #include "scene/Camera.h"
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/buffers/IndexBuffer.h"
 

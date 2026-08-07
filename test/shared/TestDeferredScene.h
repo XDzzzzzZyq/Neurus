@@ -26,7 +26,7 @@
 
 #include "core/Log.h"
 
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Material.h"

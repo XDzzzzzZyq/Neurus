@@ -22,7 +22,7 @@
 #include "render/buffers/IndexBuffer.h"
 #include "render/buffers/VertexBuffer.h"
 
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 

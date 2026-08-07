@@ -72,8 +72,10 @@ are shared across layers.
 - Qt6 Widgets presentation layer with Qt-Advanced-Docking-System (ADS)
 - **UIManager**: QMainWindow subclass with dock manager, menus, and per-frame Refresh pipeline
 - **Panel system**: all dock widgets inherit `UIPanel` (`PanelType` enum for registry): Viewport, Outliner, PropertyEditor, RenderConfigPanel
-- `src/ui/items/`: Definion of UI elements, 
-    - **ScalarSlider**: reusable slider+spinbox composite widget with auto-derived step/decimals
+- `src/ui/items/`: Reusable composite QWidgets (ScalarSlider, Vec3Spin, OutlinerRow, ShaderFieldRow, CodeEditor)
+- `src/ui/models/`: Qt item models (ShaderStructModel, LogModel, LogFilterProxy)
+- `src/ui/delegates/`: Qt item delegates (ShaderFieldDelegate, LogDelegate)
+- `src/ui/utils/`: Non-widget UI helpers (ShaderHighlighter)
 - Displays data and captures user input
 - Emits Qt signals via UIEvents for state changes
 - Must NOT directly access Renderer internals

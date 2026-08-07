@@ -18,10 +18,14 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/RenderConfigPanel.h/cpp` | Live render config controls (Render Config dock) |
 | `src/ui/panels/ProfilingPanel.h/cpp` | Real-time GPU profiling tree (Profiling dock) |
 | `src/ui/panels/ShaderEditorPanel.h/cpp` | Shader editor dock — Code mode + Structure mode (tree-based Struct Editor) |
-| `src/ui/items/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
-| `src/ui/items/ShaderFieldDelegate.h/cpp` | Delegate: QComboBox (type) / QLineEdit (name) editors + painted "+" glyph for section/struct-def rows |
-| `src/ui/elements/CodeEditor.h/cpp` | GLSL code editor widget (line numbers, monospace font) |
-| `src/ui/elements/ShaderHighlighter.h/cpp` | GLSL syntax highlighter for the code editor |
+| `src/ui/panels/LogPanel.h/cpp` | Realtime log viewer dock: filter bar + list view (issue #39) |
+| `src/ui/models/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
+| `src/ui/models/LogModel.h/cpp` | QAbstractListModel over the core LogBuffer |
+| `src/ui/models/LogFilterProxy.h/cpp` | QSortFilterProxyModel: level filter + text search |
+| `src/ui/delegates/ShaderFieldDelegate.h/cpp` | Delegate: QComboBox (type) / QLineEdit (name) editors + painted "+" glyph for section/struct-def rows |
+| `src/ui/delegates/LogDelegate.h/cpp` | Severity-colored row delegate for the log view |
+| `src/ui/items/CodeEditor.h/cpp` | GLSL code editor widget (line numbers, monospace font) |
+| `src/ui/utils/ShaderHighlighter.h/cpp` | GLSL syntax highlighter for the code editor |
 | `src/ui/presets/CameraProperties.h/cpp` | Camera property editor preset (target Vec3Spin + FOV ScalarSlider) |
 | `src/ui/presets/MeshProperties.h/cpp` | Mesh property editor preset (path label + shadow/material checkboxes) |
 | `src/ui/presets/LightProperties.h/cpp` | Light property editor preset (type label + power/radius sliders + shadow checkbox) |
@@ -243,9 +247,11 @@ dispatched to `ShaderController` (see events.instructions.md).
 
 ## Reusable Items
 
-Items in `src/ui/items/` are self-contained composite widgets used across panels.
-They do NOT belong to any specific panel and should be reused rather than
-redefined. For type-specific property editors built from items, see
+Items in `src/ui/items/` are self-contained composite QWidgets used across panels.
+Qt model/view helpers live in `src/ui/models/` (QAbstractItemModel subclasses)
+and `src/ui/delegates/` (QStyledItemDelegate subclasses); non-widget helpers live
+in `src/ui/utils/`. They do NOT belong to any specific panel and should be reused
+rather than redefined. For type-specific property editors built from items, see
 [Property Presets](#property-presets) in `src/ui/presets/`.
 
 ### Icons
@@ -365,8 +371,9 @@ rather than PascalCase. This aligns with Qt's own convention for setter methods
 (`QSpinBox::setValue()`, `QWidget::setVisible()`) and distinguishes them from
 application-level PascalCase methods (`BuildTransformEditor()`, `PopulateTransform()`).
 
-New reusable items in `src/ui/items/` should follow this convention for all
-public setters that participate in the Refresh pipeline.
+New reusable widgets in `src/ui/items/` (and models/delegates/utils) should
+follow this convention for all public setters that participate in the Refresh
+pipeline.
 
 ### ✅ UI MAY:
 - Own QVulkanInstance, VulkanWindow, QMainWindow

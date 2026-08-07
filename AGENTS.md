@@ -212,21 +212,26 @@ Neurus/
 │   │   │   ├── SceneOperations.h        # Per-object + selection ops
 │   │   │   ├── ConfigOperations.h       # RenderConfig op
 │   │   │   ├── OperationManager.h/cpp   # Undo/redo stacks + replay guard
-│   │   │   ├── OperationRegistration.h/cpp  # cereal polymorphic registration
-│   │   │   └── HistoryComponent.h/cpp   # Serializable adapter for the stacks
+│   │   │   └── registrations/           # cereal polymorphic registration
+│   │   │       └── OperationRegistration.h/cpp  # op type registration + force-link
 │   │   └── CMakeLists.txt
 │   ├── ui/                 # UI layer (Qt6 Widgets + ADS)
 │   │   ├── UIManager.h/cpp      # Main window with ADS dock manager + menus
 │   │   ├── UIContext.h          # Per-frame UI data snapshot
-│   │   ├── items/               # Reusable composite widgets
+│   │   ├── items/               # Reusable composite QWidgets
 │   │   │   ├── ScalarSlider.h/cpp  # Slider+spinbox pair with auto-derived step
+│   │   │   ├── Vec3Spin.h/cpp      # XYZ triple-spinbox composite widget
+│   │   │   ├── OutlinerRow.h/cpp   # Pool-recyclable outliner row
+│   │   │   ├── ShaderFieldRow.h/cpp # Type/name editor row for struct fields
+│   │   │   └── CodeEditor.h/cpp    # GLSL code editor (line numbers, monospace)
+│   │   ├── models/               # Qt item models (non-widget)
 │   │   │   ├── ShaderStructModel.h/cpp  # Tree model for ShaderStruct IR
-│   │   │   ├── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
 │   │   │   ├── LogModel.h/cpp        # QAbstractListModel over core LogBuffer
-│   │   │   ├── LogFilterProxy.h/cpp  # Level filter + search proxy
+│   │   │   └── LogFilterProxy.h/cpp  # Level filter + search proxy
+│   │   ├── delegates/            # Qt item delegates (non-widget)
+│   │   │   ├── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
 │   │   │   └── LogDelegate.h/cpp     # Severity-colored row delegate
-│   │   ├── elements/            # Editor widgets
-│   │   │   ├── CodeEditor.h/cpp     # GLSL code editor (line numbers, monospace)
+│   │   ├── utils/                # Non-widget UI helpers
 │   │   │   └── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
 │   │   ├── panels/               # Dock panel widgets
 │   │   │   ├── UIPanel.h         # Base class for all panels
@@ -238,18 +243,24 @@ Neurus/
 │   │   │   └── LogPanel.h/cpp        # Realtime log viewer dock (issue #39)
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
-│   │   ├── ConfigComponent.h/cpp  # RenderConfig serialization adapter
-│   │   ├── ImageData.h/cpp # CPU-side image pixels (no Vulkan)
-│   │   ├── MeshData.h/cpp  # CPU-side mesh geometry (no Vulkan)
-│   │   ├── PixelFormat.h   # Vulkan-free format enum + helpers
 │   │   ├── Project.h/cpp            # Pure registration-based serializer
-│   │   ├── SceneComponent.h/cpp     # Scene serialization adapter
-│   │   └── Serializable.h           # Abstract base class: Key/Save/Load
+│   │   ├── Serializable.h           # Abstract base class: Key/Save/Load
+│   │   ├── PixelFormat.h            # Vulkan-free format enum + helpers
+│   │   ├── components/              # project::Serializable adapters
+│   │   │   ├── ConfigComponent.h/cpp    # RenderConfig serialization adapter
+│   │   │   ├── SceneComponent.h/cpp     # Scene serialization adapter
+│   │   │   ├── UIComponent.h/cpp        # UI-state serialization adapter
+│   │   │   └── HistoryComponent.h/cpp   # Undo/redo-stack adapter (wraps OperationManager)
+│   │   ├── data/                     # CPU-side data containers
+│   │   │   ├── MeshData.h/cpp        # CPU-side mesh geometry (no Vulkan)
+│   │   │   └── ImageData.h/cpp       # CPU-side image pixels (no Vulkan)
 │   ├── scene/              # Scene layer (Vulkan-free)
 │   │   ├── Camera.h        # Camera object
 │   │   ├── Light.h         # Light objects (PointLight, SunLight)
 │   │   ├── Mesh.h          # Mesh + Transform (no GPU buffers)
-│   │   └── Transform.h     # Spatial transform
+│   │   ├── Transform.h     # Spatial transform
+│   │   └── registrations/           # cereal polymorphic registration
+│   │       └── TypeRegistration.cpp  # scene object types
 │   └── main.cpp            # Application entry point
 ├── test/
 │   ├── render/             # Renderer GPU tests

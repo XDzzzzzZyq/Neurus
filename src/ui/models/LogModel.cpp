@@ -1,4 +1,4 @@
-#include "ui/items/LogModel.h"
+#include "ui/models/LogModel.h"
 
 #include <algorithm>
 #include <cstdio>

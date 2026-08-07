@@ -23,7 +23,7 @@
 #include "scene/Scene.h"
 #include "scene/Mesh.h"
 
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 
 #include "scene/Camera.h"
 #include "scene/Light.h"

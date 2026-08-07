@@ -3,7 +3,7 @@
  * @brief Undo/redo stack (de)serialization for project persistence.
  */
 
-#include "editor/operations/HistoryComponent.h"
+#include "asset/components/HistoryComponent.h"
 
 #include <memory>
 #include <vector>
@@ -15,7 +15,7 @@
 #include "core/Log.h"
 #include "editor/operations/Operation.h"
 #include "editor/operations/OperationManager.h"
-#include "editor/operations/OperationRegistration.h"
+#include "editor/operations/registrations/OperationRegistration.h"
 
 namespace neurus::project
 {
@@ -27,8 +27,9 @@ HistoryComponent::HistoryComponent(OperationManager& operations)
 void HistoryComponent::Save(cereal::JSONOutputArchive& ar) const
 {
 	// Both stacks are std::vector<std::unique_ptr<Operation>>; cereal's
-	// polymorphic machinery (see OperationRegistration.cpp) emits each op's
-	// concrete type name + payload, so loading reconstructs the right subclass.
+	// polymorphic machinery (see editor/operations/registrations/OperationRegistration.cpp)
+	// emits each op's concrete type name + payload, so loading reconstructs
+	// the right subclass.
 	ar.setNextName("m_history");
 	ar.startNode();
 	ar(cereal::make_nvp("undo", m_operations->GetUndoStack()),

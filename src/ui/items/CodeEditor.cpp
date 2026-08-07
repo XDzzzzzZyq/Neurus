@@ -1,5 +1,5 @@
-#include "CodeEditor.h"
-#include "ShaderHighlighter.h"
+#include "items/CodeEditor.h"
+#include "utils/ShaderHighlighter.h"
 
 #include <QFocusEvent>
 #include <QPainter>

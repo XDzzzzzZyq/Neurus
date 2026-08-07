@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "ShaderHighlighter.h"
+#include "utils/ShaderHighlighter.h"
 
 namespace neurus {
 

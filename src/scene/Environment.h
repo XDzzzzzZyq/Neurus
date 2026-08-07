@@ -25,7 +25,7 @@
 
 #include "UID.h"
 #include "Transform.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 
 namespace neurus
 {

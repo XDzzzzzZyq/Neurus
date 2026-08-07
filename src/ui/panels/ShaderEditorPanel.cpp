@@ -1,8 +1,8 @@
 #include "ShaderEditorPanel.h"
 
-#include "elements/CodeEditor.h"
-#include "items/ShaderFieldDelegate.h"
-#include "items/ShaderStructModel.h"
+#include "items/CodeEditor.h"
+#include "delegates/ShaderFieldDelegate.h"
+#include "models/ShaderStructModel.h"
 #include "UIContext.h"
 #include "scene/Scene.h"
 #include "render/shaders/ShaderUnit.h"

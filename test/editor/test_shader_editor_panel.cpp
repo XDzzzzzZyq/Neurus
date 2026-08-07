@@ -33,7 +33,7 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 #include "ui/UIContext.h"
-#include "ui/items/ShaderStructModel.h"
+#include "ui/models/ShaderStructModel.h"
 #include "ui/panels/ShaderEditorPanel.h"
 
 using namespace neurus;

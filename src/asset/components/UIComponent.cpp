@@ -1,4 +1,4 @@
-#include "asset/UIComponent.h"
+#include "asset/components/UIComponent.h"
 #include "core/Log.h"
 
 namespace neurus::project

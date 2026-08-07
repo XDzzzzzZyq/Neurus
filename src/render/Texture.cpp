@@ -1,6 +1,6 @@
 #include "Texture.h"
 #include "buffers/StagingBuffer.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "render/Barrier.h"
 
 #include "core/Log.h"

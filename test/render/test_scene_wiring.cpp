@@ -15,7 +15,7 @@
 
 #include "shared/TestVulkanShared.h"
 
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 #include "render/DeferredRenderer.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"

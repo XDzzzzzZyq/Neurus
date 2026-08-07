@@ -4,7 +4,7 @@
  */
 
 #include "scene/Environment.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "core/Log.h"
 
 namespace neurus

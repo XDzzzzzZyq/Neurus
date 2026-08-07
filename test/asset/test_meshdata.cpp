@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 
 #include <cmath>
 #include <sstream>

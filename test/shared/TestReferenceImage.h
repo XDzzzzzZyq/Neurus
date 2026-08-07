@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 
 #include <algorithm>
 #include <cmath>

@@ -2,8 +2,8 @@
 #include <QString>
 
 #include "core/Log.h"
-#include "ui/items/LogModel.h"
-#include "ui/items/LogFilterProxy.h"
+#include "ui/models/LogModel.h"
+#include "ui/models/LogFilterProxy.h"
 
 namespace neurus
 {

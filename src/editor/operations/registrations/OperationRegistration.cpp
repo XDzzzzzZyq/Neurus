@@ -8,10 +8,10 @@
  * serializing a base-class pointer emits the concrete type's stable name and
  * payload, and loading reconstructs the right subclass automatically.
  *
- * Mirrors src/asset/TypeRegistration.cpp (scene objects). These macros generate
- * template specializations at global scope, so they MUST reside in a .cpp file
- * (not a header) to avoid ODR violations. The abstract Operation base is NOT
- * registered — only concrete leaf types are.
+ * Mirrors src/scene/registrations/TypeRegistration.cpp (scene objects). These
+ * macros generate template specializations at global scope, so they MUST
+ * reside in a .cpp file (not a header) to avoid ODR violations. The abstract
+ * Operation base is NOT registered — only concrete leaf types are.
  */
 
 #include <cereal/archives/json.hpp>

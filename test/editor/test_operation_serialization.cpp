@@ -6,7 +6,7 @@
  *  1. Per-value-shape single-op round-trips through cereal polymorphic
  *     serialization: serialize a std::unique_ptr<Operation> to JSON and load it
  *     back, letting cereal reconstruct the concrete subclass from its registered
- *     type name (see OperationRegistration.cpp). Replaying the restored op (and
+ *     type name (see operations/registrations/OperationRegistration.cpp). Replaying the restored op (and
  *     its inverse) proves uid + before + after all survived for each Value shape
  *     (float, bool, glm::vec3, VisibilityState, CameraPose, SelectionState).
  *  2. A full HistoryComponent save/load cycle: submit real edits, undo some so
@@ -29,10 +29,10 @@
 #include "editor/events/EventBus.h"
 #include "editor/events/SceneEvents.h"
 #include "editor/Input.h"
-#include "editor/operations/HistoryComponent.h"
+#include "asset/components/HistoryComponent.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
-#include "editor/operations/OperationRegistration.h"
+#include "editor/operations/registrations/OperationRegistration.h"
 #include "editor/operations/SceneOperations.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"

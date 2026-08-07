@@ -2,7 +2,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "asset/PixelFormat.h"
 
 #include <vector>

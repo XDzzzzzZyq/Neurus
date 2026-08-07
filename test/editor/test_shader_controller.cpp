@@ -42,7 +42,7 @@
 #include "editor/events/ShaderEvents.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
-#include "editor/operations/OperationRegistration.h"
+#include "editor/operations/registrations/OperationRegistration.h"
 #include "editor/operations/ShaderOperations.h"
 #include "render/shaders/RenderShader.h"
 #include "render/shaders/Shader.h"

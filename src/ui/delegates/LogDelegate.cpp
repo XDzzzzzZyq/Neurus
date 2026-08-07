@@ -1,4 +1,4 @@
-#include "ui/items/LogDelegate.h"
+#include "ui/delegates/LogDelegate.h"
 
 #include <QFontDatabase>
 #include <QFontMetrics>
@@ -7,7 +7,7 @@
 #include <QStyleOptionViewItem>
 
 #include "core/Log.h"
-#include "ui/items/LogModel.h"
+#include "ui/models/LogModel.h"
 
 namespace neurus
 {

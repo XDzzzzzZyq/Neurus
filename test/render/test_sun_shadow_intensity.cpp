@@ -39,7 +39,7 @@
 #include "render/passes/GeometryPass.h"
 #include "render/Image.h"
 #include "render/Barrier.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "core/Log.h"
 
 // --- Scene layer ---

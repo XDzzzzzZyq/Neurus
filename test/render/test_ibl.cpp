@@ -18,7 +18,7 @@
 
 #include "shared/TestReferenceImage.h"
 
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "render/Barrier.h"
 #include "render/PipelineBuilder.h"
 #include "render/DescriptorManager.h"

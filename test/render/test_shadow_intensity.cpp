@@ -33,7 +33,7 @@
 #include "render/Image.h"
 #include "render/Barrier.h"
 #include "render/RenderCache.h"
-#include "asset/ImageData.h"
+#include "asset/data/ImageData.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Scene.h"

@@ -81,7 +81,7 @@ event (`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
 ## Persisting the history stacks
 
 The undo/redo stacks are saved into the project file via `HistoryComponent`
-(`src/editor/operations/HistoryComponent.h/cpp`), a `project::Serializable`
+(`src/asset/components/HistoryComponent.h/cpp`), a `project::Serializable`
 adapter keyed `"m_history"` that wraps `OperationManager`. `Save` writes the
 `undo`/`redo` vectors of `std::unique_ptr<Operation>`; `Load` decodes them and
 calls `OperationManager::RestoreHistory`. `Application::BuildProject` registers
@@ -90,9 +90,10 @@ still loads — `HistoryComponent::Load` catches the cereal exception and clears
 the stacks rather than throwing.
 
 Operations serialize polymorphically through cereal, mirroring scene objects
-(`src/asset/TypeRegistration.cpp`). Each op has a default ctor and a templated
-`serialize`; concrete types are registered in
-`src/editor/operations/OperationRegistration.cpp` via `CEREAL_REGISTER_TYPE` +
+(`src/scene/registrations/TypeRegistration.cpp`). Each op has a default ctor and
+a templated `serialize`; concrete types are registered in
+`src/editor/operations/registrations/OperationRegistration.cpp` via
+`CEREAL_REGISTER_TYPE` +
 `CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, …)`. Two non-obvious
 requirements when adding a new op to that file:
 
@@ -102,7 +103,8 @@ requirements when adding a new op to that file:
 - Ops live in a static lib, so the registration TU is dead-stripped unless
   force-linked: `CEREAL_REGISTER_DYNAMIC_INIT(neurus_operations)` in the `.cpp`
   plus `CEREAL_FORCE_DYNAMIC_INIT(neurus_operations)` (in
-  `OperationRegistration.h`) included at every serialization site.
+  `operations/registrations/OperationRegistration.h`) included at every
+  serialization site.
 
 > **Why no `polymorphic_name` on scene objects but yes on ops?** cereal only
 > writes a type name when a pointer's runtime type differs from its declared
@@ -111,11 +113,19 @@ requirements when adding a new op to that file:
 > `0x40000000`, no name). Operation stacks hold `unique_ptr<Operation>` (abstract
 > base) with derived runtime types, so cereal records `polymorphic_name` for
 > dispatch on load.
+>
+> Because scene pools are concrete-typed, `TypeRegistration.cpp` is never
+> odr-used and is currently dropped from the final binaries by the static
+> linker — the project round-trip tests pass without it. It is kept as the
+> registration reference for scene types; if scene objects are ever serialized
+> through `shared_ptr<ObjectID>` base pointers, it will need the same
+> `CEREAL_REGISTER_DYNAMIC_INIT`/`CEREAL_FORCE_DYNAMIC_INIT` treatment as the
+> ops.
 
 ## Adding a new operation
 
 1. Give the op a default ctor + templated `serialize`.
-2. Add the two registration lines in `OperationRegistration.cpp`
+2. Add the two registration lines in `operations/registrations/OperationRegistration.cpp`
    (`CEREAL_REGISTER_TYPE` + `CEREAL_REGISTER_POLYMORPHIC_RELATION`).
 
 No manual type-tag or factory is needed.

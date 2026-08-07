@@ -14,9 +14,9 @@
 #include <QListView>
 #include <cstddef>
 
-#include "ui/items/LogDelegate.h"
-#include "ui/items/LogFilterProxy.h"
-#include "ui/items/LogModel.h"
+#include "ui/delegates/LogDelegate.h"
+#include "ui/models/LogFilterProxy.h"
+#include "ui/models/LogModel.h"
 #include "ui/panels/UIPanel.h"
 
 class QComboBox;

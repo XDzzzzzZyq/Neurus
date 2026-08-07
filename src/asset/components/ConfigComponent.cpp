@@ -1,4 +1,4 @@
-#include "asset/ConfigComponent.h"
+#include "asset/components/ConfigComponent.h"
 #include "render/RenderConfig.h"
 #include "core/Log.h"
 

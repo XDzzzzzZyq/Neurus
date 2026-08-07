@@ -1,4 +1,4 @@
-#include "asset/SceneComponent.h"
+#include "asset/components/SceneComponent.h"
 #include "scene/Scene.h"
 #include "scene/Camera.h"
 #include "core/Log.h"

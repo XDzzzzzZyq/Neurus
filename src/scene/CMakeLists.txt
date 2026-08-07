@@ -32,6 +32,7 @@
 	DebugPoints.cpp
 	Environment.h
 	Environment.cpp
+	registrations/TypeRegistration.cpp
 )
 
 target_include_directories(neurus_scene PRIVATE

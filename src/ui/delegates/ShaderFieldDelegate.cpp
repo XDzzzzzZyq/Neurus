@@ -1,5 +1,5 @@
-#include "ShaderFieldDelegate.h"
-#include "ShaderStructModel.h"
+#include "delegates/ShaderFieldDelegate.h"
+#include "models/ShaderStructModel.h"
 #include "render/shaders/ShaderStruct.h"
 
 #include <QComboBox>

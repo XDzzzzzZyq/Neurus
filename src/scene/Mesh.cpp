@@ -1,6 +1,6 @@
 ﻿#include "scene/Mesh.h"
 #include "core/Log.h"
-#include "asset/MeshData.h"
+#include "asset/data/MeshData.h"
 #include "render/shaders/Shader.h"
 
 namespace neurus

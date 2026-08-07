@@ -23,10 +23,8 @@ add_library(neurus_editor STATIC
 	operations/SceneOperations.h
 	operations/ConfigOperations.h
 	operations/ShaderOperations.h
-	operations/OperationRegistration.h
-	operations/OperationRegistration.cpp
-	operations/HistoryComponent.h
-	operations/HistoryComponent.cpp
+	operations/registrations/OperationRegistration.h
+	operations/registrations/OperationRegistration.cpp
 	events/UIEvents.h
 	events/UIEvents.cpp
 )
