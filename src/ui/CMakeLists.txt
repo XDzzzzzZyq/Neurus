@@ -19,6 +19,12 @@ add_library(neurus_ui STATIC
 	items/ShaderStructModel.cpp
 	items/ShaderFieldDelegate.h
 	items/ShaderFieldDelegate.cpp
+	items/LogModel.h
+	items/LogModel.cpp
+	items/LogFilterProxy.h
+	items/LogFilterProxy.cpp
+	items/LogDelegate.h
+	items/LogDelegate.cpp
 	elements/ShaderHighlighter.h
 	elements/ShaderHighlighter.cpp
 	elements/CodeEditor.h
@@ -44,6 +50,8 @@ add_library(neurus_ui STATIC
 	panels/Viewport.cpp
 	panels/ShaderEditorPanel.h
 	panels/ShaderEditorPanel.cpp
+	panels/LogPanel.h
+	panels/LogPanel.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC
@@ -71,6 +79,7 @@ qt_add_resources(neurus_ui "resources"
 		qml/main.qml
 		qml/outliner.qss
 		qml/shader_editor.qss
+		qml/logpanel.qss
 )
 
 # Qt resource file (SVG icons)

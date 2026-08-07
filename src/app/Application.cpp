@@ -403,6 +403,7 @@ void Application::NewFrameSignals(neurus::UIEvents& uiEvents)
 	                         neurus::UIContext ctx;
 	                         ctx.editor = editor;
 	                         ctx.profile = &profile;
+	                         ctx.log = &neurus::LogBuffer::instance();
 	                         ctx.history = &history;
 	                         app_mainWindow->Refresh(ctx);
 	                     }

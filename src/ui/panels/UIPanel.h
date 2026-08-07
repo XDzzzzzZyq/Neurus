@@ -35,6 +35,7 @@ enum class PanelType : uint8_t
 	RenderConfig,
 	ShaderEditor,
 	Profiling,
+	Log,
 	Count
 };
 
@@ -87,6 +88,7 @@ private:
 		case PanelType::RenderConfig:   return "Render Config";
 		case PanelType::ShaderEditor:   return "Shader Editor";
 		case PanelType::Profiling:      return "Profiling";
+		case PanelType::Log:            return "Log";
 		default:                        return "Unknown";
 		}
 	}

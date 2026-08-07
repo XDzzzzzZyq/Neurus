@@ -62,6 +62,8 @@ add_executable(neurus_test
 	asset/test_ui_component.cpp
 	core/test_graph.cpp
 	core/test_selections.cpp
+	core/test_log_buffer.cpp
+	ui/test_log_model.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE

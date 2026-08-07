@@ -588,6 +588,14 @@ These patterns were established during deferred PBR development and apply to all
   power/radius/shadow/cutoff (power/radius/cutoff enqueue `LightGpuChanged`, shadow
   enqueues `LightingRebuild`), environment intensity/rotation, and dirty semantics
   (`SceneModified` on property changes, never on selection). Run in CI.
+- **Log Buffer Tests** (`test/core/test_log_buffer.cpp`, `test/ui/test_log_model.cpp`): Non-GPU tests that run in CI.
+  `LogBufferTest` (core) covers ring capacity + wrap (drops oldest), per-level
+  counts (Info/Error) including wrap adjustment, Clear() resets size/counts/seq,
+  monotonic seq assignment, thread-safe Append from 2 threads. `LogModelTest`
+  (ui) covers rowCount matching the buffer, custom role data
+  (Level/Timestamp/Source/Message/Seq), Refresh inserting new rows, Clear reset.
+  `LogFilterProxyTest` (ui) covers the level filter (All/InfoOnly/ErrorsOnly),
+  case-insensitive search, and level + search combined.
 
 ## Common Pitfalls Summary
 

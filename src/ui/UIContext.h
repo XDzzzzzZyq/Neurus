@@ -46,6 +46,13 @@ struct UIContext
 	const void* profile = nullptr;
 
 	/**
+	 * @brief Opaque pointer to the core LogBuffer (const neurus::LogBuffer*).
+	 *        Set by the Application each frame; the LogPanel casts it to
+	 *        const LogBuffer* to poll new log entries.
+	 */
+	const void* log = nullptr;
+
+	/**
 	 * @brief Opaque pointer to the current undo/redo snapshot (const HistoryView*).
 	 *        Set by the Application from Editor::GetHistory(); the HistoryPanel
 	 *        casts it to const HistoryView*. Kept opaque so UIContext.h stays

@@ -1,5 +1,6 @@
 #include "UIManager.h"
 #include "Icons.h"
+#include "panels/LogPanel.h"
 #include "panels/Outliner.h"
 #include "panels/ProfilingPanel.h"
 #include "panels/PropertyPanel.h"
@@ -19,6 +20,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QStatusBar>
 #include <QVBoxLayout>
 
 #include <DockManager.h>
@@ -381,6 +383,25 @@ void UIManager::CreateDocks()
 	textureDock->resize(300, 200);
 	textureDock->setMinimumSize(200, 150);
 	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
+
+	// --- Bottom: Log Panel (tabbed onto Texture Viewer area) ---
+	auto logPanel = std::make_unique<neurus::LogPanel>();
+	auto* logPanelRaw = logPanel.get();
+	auto* logDock = new ads::CDockWidget(win_dockManager, logPanel->PanelName());
+	logDock->setWidget(logPanel.get(), ads::CDockWidget::ForceNoScrollArea);
+	logDock->resize(640, 220);
+	logDock->setMinimumSize(320, 140);
+	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, logDock,
+	                               textureDock->dockAreaWidget());
+	m_panels[PanelType::Log] = logPanel.release();
+	m_docks[PanelType::Log] = logDock;
+
+	// Error notifier: LogPanel signal -> status bar (3s, throttled by delta)
+	QObject::connect(logPanelRaw, &neurus::LogPanel::errorNotified,
+	                 this, [this](int delta, const QString& first) {
+	                     statusBar()->showMessage(
+	                         tr("%1 new error(s): %2").arg(delta).arg(first), 3000);
+	                 });
 
 	// Notify Application of the new native window handle for surface recreation
 	UIEvents::instance().requestUIRecreation(reinterpret_cast<quintptr>(newHwnd));
