@@ -41,4 +41,11 @@ void Environment::SetEquirectPath(const std::string& path)
 		o_equirectData = std::make_shared<ImageData>(path);
 }
 
+void Environment::LoadEquirectFromPath(const std::string& path)
+{
+	// Does NOT touch o_equirectPath (stays relative / portable) or
+	// o_imageDataId (the pooled reference stays authoritative).
+	o_equirectData = std::make_shared<ImageData>(path);
+}
+
 } // namespace neurus

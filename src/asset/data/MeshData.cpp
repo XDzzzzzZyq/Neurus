@@ -1,4 +1,5 @@
 #include "asset/data/MeshData.h"
+#include "asset/data/AssetPath.h"
 
 #include "core/Log.h"
 #include "core/Timer.h"
@@ -28,9 +29,10 @@ void MeshData::ReloadContent()
 	if (m_path.empty())
 		return;
 
-	if (!LoadObj(m_path))
+	const std::string resolved = ResolveAssetPath(m_path);
+	if (!LoadObj(resolved))
 	{
-		NEURUS_ERR("[MeshData] ReloadContent failed to load: " << m_path);
+		NEURUS_ERR("[MeshData] ReloadContent failed to load: " << resolved);
 	}
 }
 

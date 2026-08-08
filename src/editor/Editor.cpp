@@ -257,7 +257,9 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 	light->SetRadius(0.01f);
 	m_scene->UseLight(light);
 
-	auto imageData = m_resources->Load<ImageData>(m_assetDir + "/tex/hdr/room.hdr");
+	// Paths are relative ("res/...") so project files stay portable; the
+	// resource layer resolves them against the asset dir at load time.
+	auto imageData = m_resources->Load<ImageData>("res/tex/hdr/room.hdr");
 	auto env = m_resources->Load<Environment>(imageData, "tex/hdr/room.hdr");
 	m_scene->UseEnvironment(env);
 
@@ -510,17 +512,20 @@ void Editor::OnIBLLoad()
 	auto env = scene->env_list.begin()->second;
 	NEURUS_LOG("[Editor] Using environment (ID " << env->GetObjectID() << ")");
 
-	// Read the equirect path from the environment object (set by CreateDefault or deserialized)
+	// Read the equirect path from the environment object (set by CreateDefault or deserialized).
+	// The path stays RELATIVE in the serialized file (portability); the pooled
+	// ImageData (loaded via ResourceManager) provides the pixels. Only when no
+	// pooled data is available do we fall back to loading from the asset dir.
 	const std::string& envRelPath = env->GetEquirectPath();
 	if (envRelPath.empty())
 	{
 		NEURUS_LOG("[Editor] No environment path set, using procedural fallback");
 	}
-	else
+	else if (!env->GetEquirectData() || !env->GetEquirectData()->IsValid())
 	{
 		const std::string hdrPath = resolveResourcePath(envRelPath.c_str()).toStdString();
 		NEURUS_LOG("[Editor] Loading environment: " << envRelPath);
-		env->SetEquirectPath(hdrPath);
+		env->LoadEquirectFromPath(hdrPath);
 	}
 
 	GenerateIBL(env);

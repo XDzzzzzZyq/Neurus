@@ -62,7 +62,7 @@
                                 "value0": {
                                     "o_id": 14
                                 },
-                                "m_path": "D:/Projects/Neurus/.omo/feature-resource-manager/build/Debug/res/obj/sphere.obj"
+                                "m_path": "res/obj/sphere.obj"
                             }
                         }
                     }
@@ -173,7 +173,7 @@
                                 "value0": {
                                     "o_id": 17
                                 },
-                                "m_path": "D:/Projects/Neurus/.omo/feature-resource-manager/build/Debug/res//tex/hdr/room.hdr"
+                                "m_path": "res/tex/hdr/room.hdr"
                             }
                         }
                     }
@@ -258,7 +258,7 @@
             "r_fxaa_edge_threshold_min": 0.08330000191926956,
             "r_sampling_mode": 0
         },
-        "ui": "AdnQywADAAAAAAAHAAAAAAAABkYAAAOhAAAABwAAAB4AAAZGAAADoQAAAAAAAAAABqsAAAAHAAAAHgAABkYAAAOh\nAAAD1XjalZPfT8IwEMff/Ssue8dtbERMxghBeTKCDvC5smM2jpZ0NwTjH+8VySLjR7KHZu33e/vc9dpG/e0qhw2aQmrVc/xbzwFUC51KlfWc2XTU6jr9OHqhQboRaoHpg158spfsCsIVzKsfHZgVaKo1Y4ZakZCKFWvHUbWGUa4F7RN4rCfrXBKxPDYSOYT2gJYFlIp6Tngx5qeK6XDMwKCAqXjfp4NhaQxaa1xSbrNyxJtMMyR4Fiv8p8Mw1wWmthg3jlyLuQh7RZVyFbyVpczqxGOzCXZi9BoN7WAiFOZ1bs1tAk4+hC3pMZWkTzpwbDbBziV+rbWhOrHSz8IS+Y1F3PbuIOh0ocMj8APwwxAi98/j7+Ggr7VqKfngsjNdOhhNdjLFLZUGwVZ+ekdqbhPwkz6p0EpXGhP4IfhdHmEAbe/+bFPc6hHx/MKjjG9+AXYVPdk=",
+        "ui": "AdnQywADAAAAAAAA////+QAABqoAAAP6AAAAAAAAAE4AAAXbAAADWgAAAAACAAAABqsAAAAAAAAAFwAABqoAAAP6\nAAAD9XjalVNRb4IwEH7fr7jw7hDUqQlijJtPy3RD3XMnJ2uGrSmH02U/fi0zRBB0eyCl93397r671hvuNzHsUCVcioHl3DYtQLGSIRfRwFrMJ42eNfS9ZxqFOyZWGN7L1YfGgkNCuIFlftCCRYIq32uZsRTEuNARA/tevodJLBllCZo6HmxjTqTDU8VRUygTaBiBVNDAcms53zmn9UedkUIGc/aWlQTjVCk00DSl2FSmGa88jJDgiW3wJA7jWCYYmoJt37ONTK3YTMktKjrAjAmMy5IltFI44F+Y+K07F8zn2b97vR4d1qZecvzcSkXlpHn8mg/3ROwFRai7qce25lFZsQgWZQvE4J0Z4kPISaqLdjt96Hfb2nK70vK1K1Aa76mTR3lW/xz3lCoE05mz+RaY5vA/x7/m+tZEFZM/Ahe64Di6BR23V92CLNJ1++A2u5UMO39k+r/m0fo3P/ubSrM=",
         "m_history": {
             "undo": [],
             "redo": []

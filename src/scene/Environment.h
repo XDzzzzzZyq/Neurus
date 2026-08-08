@@ -114,6 +114,18 @@ public:
 	 */
 	const std::string& GetEquirectPath() const { return o_equirectPath; }
 
+	/**
+	 * @brief Loads equirect pixels from an absolute path WITHOUT touching
+	 *        the serialized path or the pooled reference.
+	 *
+	 * Used as a runtime fallback when no pooled ImageData is available. The
+	 * serialized o_equirectPath stays relative (portable project files) and
+	 * o_imageDataId keeps pointing at the pooled resource.
+	 *
+	 * @param path Absolute file path to the HDR equirect map.
+	 */
+	void LoadEquirectFromPath(const std::string& path);
+
 	// -----------------------------------------------------------------------
 	// Intensity
 	// -----------------------------------------------------------------------

@@ -126,6 +126,36 @@ public:
 		Transition(*cmd, image, before, after, subresourceRange);
 	}
 
+	/**
+	 * @brief Records a release barrier after a transfer-queue image upload.
+	 *
+	 * Makes transfer writes available to subsequent graphics usage WITHOUT a
+	 * graphics-stage dstStageMask, which is invalid on transfer-only command
+	 * pools (VUID-vkCmdPipelineBarrier2-dstStageMask-09676). The image layout
+	 * still becomes ShaderReadOnlyOptimal so the graphics side can sample it;
+	 * the consuming pass re-transitions the image on first use.
+	 *
+	 * @param cmd               Command buffer (raw VkCommandBuffer).
+	 * @param image             Raw Vulkan image handle.
+	 * @param before            Source logical state (TransferDst or TransferSrc).
+	 * @param subresourceRange  Subresource range for the barrier.
+	 */
+	static void ReleaseToRead(VkCommandBuffer cmd,
+	                          vk::Image image,
+	                          ImageState before,
+	                          const vk::ImageSubresourceRange& subresourceRange);
+
+	/**
+	 * @brief Convenience overload for vk::raii::CommandBuffer.
+	 */
+	static void ReleaseToRead(const vk::raii::CommandBuffer& cmd,
+	                          vk::Image image,
+	                          ImageState before,
+	                          const vk::ImageSubresourceRange& subresourceRange)
+	{
+		ReleaseToRead(*cmd, image, before, subresourceRange);
+	}
+
 	// --- Buffer barriers (state-tracked) ---
 
 	/**
