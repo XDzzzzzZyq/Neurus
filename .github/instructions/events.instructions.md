@@ -33,7 +33,7 @@ scene events.
 | File | Purpose |
 |------|---------|
 | `src/editor/events/SceneEvents.h` | Scene-domain events (selection, transform, visibility, camera/mesh/light/env property changes) — ephemeral, carry `const ObjectID*` / `const UID*` |
-| `src/editor/events/EditorEvents.h` | Cross-component events only (RenderResetEvent, EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild) — pure data, no Qt |
+| `src/editor/events/EditorEvents.h` | Cross-component events only (RenderResetEvent, EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild, SceneObjectGpuUploadRequested) — pure data, no Qt |
 | `src/editor/events/CameraEvents.h` | Camera input events (rotate, push, slide, zoom, resize) |
 | `src/editor/events/InputEvents.h` | Viewport raw input events (mouse move, press, release, scroll) |
 | `src/editor/events/ProjectEvents.h` | Project lifecycle events (new, open, save, saveAs) |
@@ -161,7 +161,7 @@ live in SceneEvents.h.
 struct SceneModified {};                       // mark project dirty
 struct LightGpuChanged { const ObjectID* object; };  // single light SSBO update
 struct LightingRebuild {};                     // full light SSBO dict rebuild
-struct EnvironmentChanged { int sceneId; int envId; };  // IBL regeneration
+struct SceneObjectGpuUploadRequested { const ObjectID* object; };  // on-demand MeshGPU/LightGPU/EnvironmentGPU upload (scene add + shadow toggle)
 struct RenderResetEvent {};                    // temporal accumulation reset
 ```
 
@@ -451,6 +451,12 @@ SceneController mutation handler
   └── Enqueues one or more EditorEvents:
         ├── SceneModified{} → Editor marks project dirty
         ├── RenderResetEvent{} → DeferredRenderer resets temporal accumulation
+        │
+        ├── Scene object enters scene (add / undo-redo re-add) or light
+        │   shadow toggled ON → SceneObjectGpuUploadRequested{object}
+        │     └── Editor::OnSceneObjectGpuUpload handler:
+        │         casts to Mesh*/Light*/Environment* and uploads on demand
+        │         (MeshGPU / LightGPU shadow maps / IBL), skip-if-cached
         │
         ├── Light property change → LightGpuChanged{lightPtr}
         │     └── Editor::LightGpuChanged handler:

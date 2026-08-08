@@ -24,6 +24,9 @@
 #include "scene/Light.h"
 #include "scene/Mesh.h"
 #include "asset/data/MeshData.h"
+#include "render/shaders/RenderShader.h"
+#include "render/shaders/Shader.h"
+#include "render/shaders/ShaderUnit.h"
 
 // Force-link the polymorphic registration TUs (static libs) so the pool's
 // UID-derived types are registered for the JSON round-trip below.
@@ -204,4 +207,52 @@ TEST(ResourceManagerTest, PoolSaveLoadRoundtrip)
 	EXPECT_GT(fresh->GetObjectID(), cam->GetObjectID());
 	EXPECT_NE(fresh->GetObjectID(), cam->GetObjectID());
 	EXPECT_NE(fresh->GetObjectID(), mesh->GetObjectID());
+}
+
+/**
+ * @test A pooled RenderShader (the per-mesh "created shader") round-trips
+ *       through the pool. Serialization stores only the source paths, but
+ *       RenderShader::serialize(load) re-parses content from disk AND
+ *       recompiles to SPIR-V (CompileToSpv), so the loaded shader is ready for
+ *       GeometryPass's per-mesh pipeline without any post-load recompile step.
+ *
+ *       Regression: "[GeometryPass] Per-mesh pipeline creation failed" after
+ *       create shader → save project → reopen app (SPIR-V was lost on load).
+ */
+TEST(ResourceManagerTest, PooledShaderRecompilesAfterLoad)
+{
+	ResourceManager pool;
+
+	// Mirrors Editor::OnCreateShader: pooled RenderShader + parse + compile.
+	auto shader = pool.Load<RenderShader>(
+		"MeshShader_10", "res/shaders/render/gbuffer.vert", "res/shaders/render/gbuffer.frag");
+	ASSERT_NE(shader, nullptr);
+	ASSERT_TRUE(shader->ParseAndGenerate());
+	ASSERT_TRUE(shader->CompileToSpv());
+	ASSERT_FALSE(shader->GetStage(ShaderType::VERTEX).spv.empty());
+	ASSERT_FALSE(shader->GetStage(ShaderType::FRAGMENT).spv.empty());
+
+	// --- Save (the "save and quit" step) ---
+	std::stringstream ss;
+	{
+		cereal::JSONOutputArchive ar(ss);
+		ar(pool);
+	}
+
+	// --- Load (the "reopen the app" step) ---
+	ResourceManager loaded;
+	{
+		std::stringstream is(ss.str());
+		cereal::JSONInputArchive ar(is);
+		ar(loaded);
+	}
+
+	// The load lifecycle restores derived state: serialize(load) re-parses the
+	// stages and recompiles to SPIR-V, so GeometryPass can build the pipeline
+	// on the first frame (no per-frame "pipeline creation failed" fallback).
+	auto shader2 = loaded.Get<RenderShader>(shader->GetObjectID());
+	ASSERT_NE(shader2, nullptr);
+	EXPECT_FALSE(shader2->GetStage(ShaderType::VERTEX).spv.empty());
+	EXPECT_FALSE(shader2->GetStage(ShaderType::FRAGMENT).spv.empty());
+	EXPECT_GT(shader2->GetVersion(), 0);
 }

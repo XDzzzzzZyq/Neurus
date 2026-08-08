@@ -78,7 +78,10 @@ void Scene::ResolveReferences(ResourceManager& resources)
 	ResolvePool<DebugPoints>(resources, m_pendingDPointsIds, dPoints_list);
 	ResolvePool<Environment>(resources, m_pendingEnvIds, env_list);
 
-	ResolveDataReferences(resources);
+	// Per-object data-resource wiring (Mesh -> MeshData/Shader, Environment ->
+	// ImageData) is a POOL-wide concern handled by ResourceComponent::Load -
+	// the pool's own restore step - so pooled orphans (undo history) stay
+	// self-contained and uploadable after a reload.
 
 	// Rebuild obj_list from the now-populated typed pools, then restore the
 	// selection (mirrors the pre-resource-manager load behavior).
@@ -86,25 +89,6 @@ void Scene::ResolveReferences(ResourceManager& resources)
 	RestoreSelectionUids(*this, m_pendingSelectedUids, m_pendingActiveUid);
 
 	ClearPendingReferences();
-}
-
-void Scene::ResolveDataReferences(ResourceManager& resources)
-{
-	// Wire data references for EVERY pooled mesh/environment, not just the
-	// scene members: pooled objects stay referenced by undo history after
-	// deletion, so their data refs must be wired for the pool-mirrored GPU
-	// caches (RenderCache follows the pool) to upload them after a reload.
-	resources.ForEach<Mesh>([&resources](const std::shared_ptr<Mesh>& mesh) {
-		if (!mesh) return;
-		if (mesh->o_meshDataId != 0)
-			mesh->o_mesh = resources.Get<MeshData>(mesh->o_meshDataId);
-		if (mesh->o_shaderId != 0)
-			mesh->o_shader = resources.Get<Shader>(mesh->o_shaderId);
-	});
-	resources.ForEach<Environment>([&resources](const std::shared_ptr<Environment>& env) {
-		if (!env || env->o_imageDataId == 0) return;
-		env->SetEquirectData(resources.Get<ImageData>(env->o_imageDataId));
-	});
 }
 
 // ---------------------------------------------------------------------------

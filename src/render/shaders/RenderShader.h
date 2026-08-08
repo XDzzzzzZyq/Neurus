@@ -72,8 +72,30 @@ public:
 	void ReloadContent();
 
 	/**
+	 * @brief Compiles every stage's GLSL to SPIR-V in place and bumps versions.
+	 *
+	 * Mirrors the runtime create flow (Editor::OnCreateShader): each stage's
+	 * `spv` is built from its generated `code` and the stage version bumped;
+	 * Shader::m_version bumps once if every present stage compiled. Stages
+	 * that already hold SPIR-V are skipped (idempotent).
+	 *
+	 * Used after project load, where serialization restores only the source
+	 * paths and re-parses content but never recompiles - without this,
+	 * GeometryPass cannot create the per-mesh pipeline.
+	 *
+	 * @return true if every present stage compiled to non-empty SPIR-V.
+	 */
+	bool CompileToSpv();
+
+	/**
 	 * @brief Cereal serialization - name (via Shader) + both source paths,
-	 *        then content reload (re-parse both stages).
+	 *        then content reload (re-parse both stages) + SPIR-V recompile.
+	 *
+	 * Load restores the object's own state per the ResourceManager design
+	 * (each pooled object's serialize(load) restores its content): paths are
+	 * restored, ReloadContent() re-parses the stages from disk, and
+	 * CompileToSpv() regenerates the derived SPIR-V so GeometryPass can build
+	 * the per-mesh pipeline immediately (no post-load recompile step).
 	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
@@ -85,6 +107,7 @@ public:
 		if constexpr (Archive::is_loading::value)
 		{
 			ReloadContent();
+			CompileToSpv();
 		}
 	}
 

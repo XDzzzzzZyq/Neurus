@@ -9,6 +9,7 @@
 
 #include "RenderShader.h"
 
+#include "ShaderLibrary.h"
 #include "ShaderParser.h"
 #include "ShaderGenerator.h"
 #include "core/Log.h"
@@ -38,6 +39,32 @@ void RenderShader::ReloadContent()
 	m_stages[ShaderType::VERTEX].path   = m_vertPath;
 	m_stages[ShaderType::FRAGMENT].path = m_fragPath;
 	ParseAndGenerate();
+}
+
+bool RenderShader::CompileToSpv()
+{
+	bool allOk = true;
+	for (auto type : {ShaderType::VERTEX, ShaderType::FRAGMENT})
+	{
+		if (!HasStage(type)) continue;
+		auto& unit = GetStage(type);
+		if (!unit.spv.empty()) continue; // idempotent: stage already compiled
+		if (unit.code.empty()) continue; // identity shell (no content to compile)
+
+		unit.spv = ShaderLibrary::Compile(unit, type, m_name);
+		if (unit.spv.empty())
+		{
+			NEURUS_ERR("[RenderShader] CompileToSpv failed for '" << m_name
+			           << "' stage " << TypeToString(type));
+			allOk = false;
+			continue;
+		}
+		unit.BumpVersion();
+	}
+
+	if (allOk)
+		BumpVersion();
+	return allOk;
 }
 
 // =========================================================================

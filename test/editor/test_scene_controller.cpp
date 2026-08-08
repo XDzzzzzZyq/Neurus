@@ -8,6 +8,7 @@
 #include "editor/operations/OperationManager.h"
 #include "editor/Input.h"
 #include "core/ResourceManager.h"
+#include "asset/data/ImageData.h"
 #include "asset/data/MeshData.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
@@ -390,4 +391,96 @@ TEST_F(SceneControllerTest, DeleteRequested_Light_EnqueuesLightingRebuild)
 
 	EXPECT_TRUE(rebuilt);
 	EXPECT_EQ(m_scene.light_list.count(light->GetObjectID()), 0u);
+}
+
+// --- Scene-scoped GPU upload on demand (SceneObjectGpuUploadRequested) ------
+
+TEST_F(SceneControllerTest, SceneObjectAdd_Mesh_EnqueuesGpuUpload)
+{
+	const ObjectID* uploaded = nullptr;
+	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
+		uploaded = e.object;
+	});
+
+	auto mesh = m_resources.Load<Mesh>(m_resources.Load<MeshData>());
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, mesh->GetObjectID()});
+	Process();
+
+	ASSERT_NE(uploaded, nullptr);
+	EXPECT_EQ(uploaded, mesh.get());            // the re-added mesh
+	EXPECT_EQ(m_scene.mesh_list.count(mesh->GetObjectID()), 1u);
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_Light_EnqueuesGpuUpload)
+{
+	const ObjectID* uploaded = nullptr;
+	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
+		uploaded = e.object;
+	});
+
+	auto light = m_resources.Load<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, light->GetObjectID()});
+	Process();
+
+	ASSERT_NE(uploaded, nullptr);
+	EXPECT_EQ(uploaded, light.get());
+	EXPECT_EQ(m_scene.light_list.count(light->GetObjectID()), 1u);
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_Environment_EnqueuesGpuUpload)
+{
+	const ObjectID* uploaded = nullptr;
+	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
+		uploaded = e.object;
+	});
+
+	auto env = m_resources.Load<Environment>(m_resources.Load<ImageData>(""));
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, env->GetObjectID()});
+	Process();
+
+	ASSERT_NE(uploaded, nullptr);
+	EXPECT_EQ(uploaded, env.get());
+	EXPECT_EQ(m_scene.env_list.count(env->GetObjectID()), 1u);
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_Camera_DoesNotEnqueueGpuUpload)
+{
+	bool uploaded = false;
+	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested&) {
+		uploaded = true;
+	});
+
+	auto camera = m_resources.Load<Camera>();
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, camera->GetObjectID()});
+	Process();
+
+	EXPECT_FALSE(uploaded); // cameras own no GPU resources
+	EXPECT_EQ(m_scene.cam_list.count(camera->GetObjectID()), 1u);
+}
+
+TEST_F(SceneControllerTest, LightShadowChanged_Enabled_EnqueuesGpuUpload)
+{
+	const ObjectID* uploaded = nullptr;
+	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
+		uploaded = e.object;
+	});
+
+	m_eventBus.enqueue(LightShadowChanged{m_light.get(), true});
+	Process();
+
+	ASSERT_NE(uploaded, nullptr);
+	EXPECT_EQ(uploaded, m_light.get());
+}
+
+TEST_F(SceneControllerTest, LightShadowChanged_Disabled_DoesNotEnqueueGpuUpload)
+{
+	bool uploaded = false;
+	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested&) {
+		uploaded = true;
+	});
+
+	m_eventBus.enqueue(LightShadowChanged{m_light.get(), false});
+	Process();
+
+	EXPECT_FALSE(uploaded);
 }

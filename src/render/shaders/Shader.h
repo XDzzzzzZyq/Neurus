@@ -40,7 +40,8 @@ enum class ShaderType
  * concrete leaf (RenderShader) is registered in the pool; pass/test shaders
  * created via ShaderLibrary stay outside the pool. Each shader serializes
  * itself (name + source paths); RenderShader::serialize(load) re-parses its
- * stages from disk.
+ * stages from disk and recompiles them to SPIR-V (CompileToSpv) so the
+ * per-mesh pipeline is ready immediately after a project load.
  *
  * @note Non-copyable, non-movable (UID semantics - held via shared_ptr).
  * @note Thread-safety: Not thread-safe. Must be used from the main thread.

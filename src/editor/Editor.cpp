@@ -44,6 +44,44 @@
 
 namespace neurus {
 
+namespace {
+
+/** @brief Single MeshGPU upload path: uploads the mesh geometry if not cached. */
+void UploadMeshGpu(UploadManager& uploader, DeferredRenderer& renderer, const Mesh& mesh)
+{
+	const int objId = mesh.GetObjectID();
+	auto& cache = renderer.GetRenderCache();
+	if (cache.GetMeshGPU(objId)) return;
+	auto meshGPU = uploader.UploadMesh(mesh);
+	cache.UseMeshGPU(objId, std::move(meshGPU));
+	NEURUS_LOG("[Editor] Uploaded MeshGPU for objectId=" << objId);
+}
+
+/** @brief Single LightGPU upload path: uploads shadow maps if the light casts shadows. */
+void UploadLightGpu(UploadManager& uploader, DeferredRenderer& renderer, const Light& light)
+{
+	if (!light.use_shadow) return;
+	const int uid = light.GetObjectID();
+	auto& cache = renderer.GetRenderCache();
+	if (cache.GetLightGPU(uid)) return;
+	auto lightGPU = uploader.UploadLight(light);
+	cache.UseLightGPU(uid, std::move(lightGPU));
+	NEURUS_LOG("[Editor] Uploaded LightGPU for lightUID=" << uid);
+}
+
+/** @brief IBL regeneration: uploads the environment's diffuse/specular cubemaps. */
+void GenerateIBL(UploadManager& uploader, DeferredRenderer& renderer,
+                 const std::shared_ptr<Environment>& env)
+{
+	auto envGPU = uploader.UploadEnvironment(*env,
+	    renderer.GetGraphicsQueue(),
+	    renderer.GetGraphicsQueueFamily());
+	renderer.GetRenderCache().UseEnvironmentGPU(env->GetObjectID(), std::move(envGPU));
+	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
+}
+
+} // anonymous namespace
+
 Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
 	: m_scene(std::make_unique<Scene>())
 	, m_resources(std::make_unique<ResourceManager>())
@@ -135,12 +173,18 @@ void Editor::Initialize()
 		auto it = GetScene().env_list.find(e.envId);
 		if (it != GetScene().env_list.end())
 		{
-			GenerateIBL(it->second);
+			GenerateIBL(*ed_uploadManager, *ed_renderer, it->second);
 		}
 		else
 		{
 			NEURUS_ERR("[Editor] EnvironmentChanged: env ID " << e.envId << " not found");
 		}
+	});
+
+	// --- On-demand GPU upload for objects entering the scene (live add or
+	// undo/redo replay) and lights whose shadow was just enabled ---
+	ed_eventBus.subscribe<SceneObjectGpuUploadRequested>([this](const SceneObjectGpuUploadRequested& e) {
+		OnSceneObjectGpuUpload(e.object);
 	});
 
 	ed_eventBus.subscribe<MouseMoveEvent>([this](const MouseMoveEvent& e) {
@@ -299,8 +343,11 @@ void Editor::BeginLoad()
 
 void Editor::FinishLoad()
 {
-	// Meshes now resolve their pooled MeshData via Scene::ResolveDataReferences
-	// (SceneComponent), so no path-based reload loop is needed here.
+	// Pool restore happens during Project::Load: ResourceComponent deserializes
+	// the pool and wires pooled data refs (MeshData/Shader/ImageData), and each
+	// pooled RenderShader re-parses + recompiles to SPIR-V in its own
+	// serialize(load). SceneComponent then resolves the scene's ID references.
+	// Nothing mesh/shader-specific is needed here.
 	m_dirty = false;
 	UploadSceneResources();
 	OnIBLLoad();
@@ -311,17 +358,12 @@ void Editor::OnMeshImport(const std::string& path)
 {
 	try {
 		// Import = load the resource into the pool. The SceneController
-		// registers it into the scene and records the undoable Add operation.
+		// registers it into the scene and records the undoable Add operation;
+		// the MeshGPU upload happens on demand when the add is processed
+		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
+		// OnSceneObjectGpuUpload) - no inline upload here.
 		auto meshData = m_resources->Load<MeshData>(path);
 		auto mesh = m_resources->Load<Mesh>(meshData);
-
-		// Pool-keyed GPU cache upload (RenderCache follows the pool, not the
-		// scene — GeometryPass would also create the MeshGPU lazily).
-		if (ed_uploadManager && ed_renderer)
-		{
-			auto meshGPU = ed_uploadManager->UploadMesh(*mesh);
-			ed_renderer->GetRenderCache().UseMeshGPU(mesh->GetObjectID(), std::move(meshGPU));
-		}
 
 		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), mesh->GetObjectID()});
 		NEURUS_LOG("[Editor] Imported mesh: " << path);
@@ -352,13 +394,10 @@ void Editor::OnLightAdd()
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.01f);
-		// Pool-keyed shadow-map upload; the light SSBO rebuild happens via
+		// Shadow-map GPU upload happens on demand when the add is processed
+		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
+		// OnSceneObjectGpuUpload); the light SSBO rebuild happens via
 		// LightingRebuild after the controller registers the light in the scene.
-		if (ed_uploadManager && ed_renderer && light->use_shadow)
-		{
-			auto lightGPU = ed_uploadManager->UploadLight(*light);
-			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
-		}
 		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added point light at (3, 3, 3)");
 	}
@@ -375,13 +414,9 @@ void Editor::OnSunLightAdd()
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->use_shadow = true;
-		// Pool-keyed shadow-map upload; SSBO rebuild via LightingRebuild
-		// after the controller registers the light in the scene.
-		if (ed_uploadManager && ed_renderer && light->use_shadow)
-		{
-			auto lightGPU = ed_uploadManager->UploadLight(*light);
-			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
-		}
+		// Shadow-map GPU upload happens on demand when the add is processed
+		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
+		// OnSceneObjectGpuUpload); SSBO rebuild via LightingRebuild.
 		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
 	}
@@ -401,13 +436,9 @@ void Editor::OnSpotLightAdd()
 		light->SetCutoff(0.95f);        // ~18° inner cone half-angle
 		light->SetOuterCutoff(0.85f);   // ~32° outer cone half-angle
 		light->use_shadow = true;
-		// Pool-keyed shadow-map upload; SSBO rebuild via LightingRebuild
-		// after the controller registers the light in the scene.
-		if (ed_uploadManager && ed_renderer && light->use_shadow)
-		{
-			auto lightGPU = ed_uploadManager->UploadLight(*light);
-			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
-		}
+		// Shadow-map GPU upload happens on demand when the add is processed
+		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
+		// OnSceneObjectGpuUpload); SSBO rebuild via LightingRebuild.
 		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added spot light at (0, 0, 6) pointing down");
 	}
@@ -478,12 +509,46 @@ void Editor::OnCreateShader(const ShaderCreateRequested& e)
 	}
 }
 
+/**
+ * @brief Uploads the GPU resources for an object entering the scene.
+ *
+ * GPU caches are scene-scoped (UploadSceneResources uploads only objects
+ * present at load), so a mesh/light/environment re-added to the scene -
+ * live add or undo/redo replay of a deletion - or a light whose shadow was
+ * just enabled may lack cached GPU resources. Upload on demand via the
+ * shared helpers (skip if already cached). Light SSBO updates stay with
+ * LightingRebuild.
+ */
+void Editor::OnSceneObjectGpuUpload(const ObjectID* object)
+{
+	if (!ed_uploadManager || !ed_renderer || !object) return;
+
+	if (auto* mesh = Mesh::As(object))
+	{
+		if (mesh->o_mesh) UploadMeshGpu(*ed_uploadManager, *ed_renderer, *mesh);
+	}
+	else if (auto* light = Light::As(object))
+	{
+		if (light->use_shadow) UploadLightGpu(*ed_uploadManager, *ed_renderer, *light);
+	}
+	else if (auto* env = Environment::As(object))
+	{
+		auto envPtr = m_resources->Get<Environment>(env->GetObjectID());
+		if (envPtr) GenerateIBL(*ed_uploadManager, *ed_renderer, envPtr);
+	}
+}
+
 void Editor::OnIBLLoad()
 {
 	Scene* scene = m_scene.get();
 	if (!scene)
 	{
 		NEURUS_ERR("[Editor] OnIBLLoad: no scene available");
+		return;
+	}
+	if (!ed_uploadManager || !ed_renderer)
+	{
+		NEURUS_ERR("[Editor] OnIBLLoad: UploadManager or Renderer not available");
 		return;
 	}
 
@@ -505,51 +570,30 @@ void Editor::OnIBLLoad()
 		NEURUS_LOG("[Editor] Environment has no valid equirect data, using procedural fallback");
 	}
 
-	GenerateIBL(env);
-}
-
-void Editor::GenerateIBL(const std::shared_ptr<Environment>& env)
-{
-	if (!ed_uploadManager || !ed_renderer)
-	{
-		NEURUS_ERR("[Editor] GenerateIBL: UploadManager or Renderer not available");
-		return;
-	}
-
-	auto envGPU = ed_uploadManager->UploadEnvironment(*env,
-	    ed_renderer->GetGraphicsQueue(),
-	    ed_renderer->GetGraphicsQueueFamily());
-	ed_renderer->GetRenderCache().UseEnvironmentGPU(env->GetObjectID(), std::move(envGPU));
-
-	NEURUS_LOG("[Editor] IBL generated for environment (ID " << env->GetObjectID() << ")");
+	GenerateIBL(*ed_uploadManager, *ed_renderer, env);
 }
 
 void Editor::UploadSceneResources()
 {
 	if (!ed_uploadManager || !ed_renderer) return;
 
-	auto& cache = ed_renderer->GetRenderCache();
+	// Scene-scoped upload: GPU resources mirror the SCENE, not the pool, so
+	// memory stays proportional to the scene. Pooled objects not in the scene
+	// (deleted before save, held only by undo history) are skipped; they are
+	// uploaded on demand when re-added - see SceneObjectGpuUploadRequested
+	// (SceneController add handler + shadow toggle) handled by
+	// OnSceneObjectGpuUpload.
+	for (const auto& [id, mesh] : m_scene->mesh_list)
+	{
+		if (!mesh || !mesh->o_mesh) continue;
+		UploadMeshGpu(*ed_uploadManager, *ed_renderer, *mesh);
+	}
 
-	// The UID-keyed GPU caches (MeshGPU, LightGPU) mirror the POOL, not the
-	// scene: pooled objects stay referenced by undo history after deletion,
-	// so their GPU resources must exist for undo/redo to render them without
-	// re-uploading — even after a project save/load rebuilt the cache.
-	m_resources->ForEach<Mesh>([&](const std::shared_ptr<Mesh>& mesh) {
-		if (!mesh || !mesh->o_mesh) return;
-		const int objId = mesh->GetObjectID();
-		NEURUS_LOG("[Editor::UploadSceneResources] Registering MeshGPU: GetObjectID=" << objId);
-		if (cache.GetMeshGPU(objId)) return;
-		auto meshGPU = ed_uploadManager->UploadMesh(*mesh);
-		cache.UseMeshGPU(objId, std::move(meshGPU));
-	});
-
-	m_resources->ForEach<Light>([&](const std::shared_ptr<Light>& light) {
-		if (!light || !light->use_shadow) return;
-		const int uid = light->GetObjectID();
-		if (cache.GetLightGPU(uid)) return;
-		auto lightGPU = ed_uploadManager->UploadLight(*light);
-		cache.UseLightGPU(uid, std::move(lightGPU));
-	});
+	for (const auto& [uid, light] : m_scene->light_list)
+	{
+		if (!light) continue;
+		UploadLightGpu(*ed_uploadManager, *ed_renderer, *light);
+	}
 
 	// The light SSBO remains a scene projection (built from scene->light_list).
 	UploadLighting();

@@ -7,6 +7,13 @@
 #include "core/Log.h"
 #include "core/ResourceManager.h"
 
+// Types needed for the pooled data-reference wiring in Load().
+#include "asset/data/ImageData.h"
+#include "asset/data/MeshData.h"
+#include "scene/Environment.h"
+#include "scene/Mesh.h"
+#include "render/shaders/Shader.h"
+
 // Force-link the polymorphic registration TUs (static libraries) so the pool's
 // UID-derived types are registered before serialization runs.
 #include "scene/registrations/TypeRegistration.h"
@@ -40,6 +47,24 @@ void ResourceComponent::Load(cereal::JSONInputArchive& ar)
 		NEURUS_ERR("ResourceComponent::Load: " << e.what() << " - using empty resource pool.");
 		m_resources->Clear();
 	}
+
+	// Wire data references for EVERY pooled mesh/environment, not just the
+	// scene members: pooled objects stay referenced by undo history after
+	// deletion, so their data refs must be wired for on-demand GPU uploads
+	// (SceneObjectGpuUploadRequested) after a reload. The pool's data-resource
+	// entries have already reloaded their content (their own serialize(load)),
+	// so this is pure pointer wiring - no disk I/O.
+	m_resources->ForEach<Mesh>([&](const std::shared_ptr<Mesh>& mesh) {
+		if (!mesh) return;
+		if (mesh->o_meshDataId != 0)
+			mesh->o_mesh = m_resources->Get<MeshData>(mesh->o_meshDataId);
+		if (mesh->o_shaderId != 0)
+			mesh->o_shader = m_resources->Get<Shader>(mesh->o_shaderId);
+	});
+	m_resources->ForEach<Environment>([&](const std::shared_ptr<Environment>& env) {
+		if (!env || env->o_imageDataId == 0) return;
+		env->SetEquirectData(m_resources->Get<ImageData>(env->o_imageDataId));
+	});
 }
 
 } // namespace neurus::project

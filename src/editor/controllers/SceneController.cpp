@@ -325,6 +325,11 @@ void OnLightShadowChanged(const neurus::LightShadowChanged& e, neurus::EventQueu
 	light->SetShadow(e.enabled);
 	ops.Submit(std::make_unique<neurus::SetLightShadowOp>(light->GetObjectID(), before, e.enabled));
 	LightingRebuilt(bus);
+
+	// Enabling shadow requires the LightGPU (shadow depth maps) to exist; it
+	// was never uploaded if the light was shadowless at load/add time.
+	if (e.enabled)
+		bus.enqueue(neurus::SceneObjectGpuUploadRequested{e.object});
 }
 
 void OnLightCutoffChanged(const neurus::LightCutoffChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
@@ -430,6 +435,19 @@ void OnSceneObjectAddRequested(const neurus::SceneObjectAddRequested& e,
 
 	const neurus::SelectionState before = SnapshotSelection(*scene);
 	UsePooledObject(*scene, resources, e.objectUid);
+
+	// GPU caches are scene-scoped (Editor::UploadSceneResources uploads only
+	// objects present at load), so an object entering the scene - live add or
+	// undo/redo replay - must have its GPU resources uploaded on demand.
+	// Light SSBO handling stays with LightingRebuilt below.
+	const auto objType = obj->o_type;
+	if (objType == neurus::ObjectID::GOType::GO_MESH
+	    || objType == neurus::ObjectID::GOType::GO_LIGHT
+	    || objType == neurus::ObjectID::GOType::GO_POLYLIGHT
+	    || objType == neurus::ObjectID::GOType::GO_ENVIR)
+	{
+		bus.enqueue(neurus::SceneObjectGpuUploadRequested{obj.get()});
+	}
 
 	// Select the added object (set, non-incremental).
 	scene->selections.Select(obj.get(), false);

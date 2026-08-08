@@ -71,4 +71,23 @@ struct LightingRebuild
 {
 };
 
+/**
+ * @brief Emitted when a scene object's GPU resources must exist but may not be
+ *  cached yet.
+ *
+ * Fired by SceneController when an object enters the scene (live add OR
+ * undo/redo replay of SceneObjectAddRequested) and when a light's shadow is
+ * toggled on. GPU caches are scene-scoped (Editor::UploadSceneResources only
+ * uploads objects present at load), so re-added objects and freshly
+ * shadow-enabled lights need an on-demand upload. Editor subscribes, casts to
+ * the concrete type, and uploads if not already cached (skip-if-cached).
+ *
+ * Light SSBO handling stays separate (LightingRebuild); this event covers the
+ * per-object GPU resources: MeshGPU, LightGPU (shadow maps), EnvironmentGPU.
+ */
+struct SceneObjectGpuUploadRequested
+{
+	const ObjectID* object = nullptr; ///< The object entering the scene (or light with shadow just enabled).
+};
+
 } // namespace neurus

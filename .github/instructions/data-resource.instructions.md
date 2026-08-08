@@ -21,6 +21,7 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
 - `src/asset/Project.h/cpp` - Pure registration-based serializer (no data ownership)
 - `src/asset/Serializable.h` - Abstract base class: Key/Save/Load virtual interface
 - `src/asset/components/SceneComponent.h/cpp` - Scene serialization adapter (Serializable implementation)
+- `src/asset/components/ResourceComponent.h/cpp` - ResourceManager pool serialization adapter (Serializable implementation); Load also wires pooled data references (Mesh -> MeshData/Shader, Environment -> ImageData) so the pool is self-contained and uploadable after a reload
 - `src/asset/components/ConfigComponent.h/cpp` - RenderConfig serialization adapter (Serializable implementation)
 - `src/asset/components/UIComponent.h/cpp` - UI-state serialization adapter (opaque layout blob; Serializable implementation)
 - `src/asset/components/HistoryComponent.h/cpp` - Undo/redo-stack serialization adapter (Serializable implementation; header forward-declares OperationManager, .cpp includes editor/operations headers)
@@ -79,7 +80,9 @@ lives in `src/asset/`, GPU resource management lives in `src/render/`.
    - Save/Load iterates all registered components for persistence
    - No coupling to Scene, RenderConfig, or any concrete type
    - Coordinated at the Application level: `Application` owns the project path and
-     builds a transient `Project` per save/open, registering `SceneComponent` +
+     builds a transient `Project` per save/open, registering `ResourceComponent`
+     (the pool, FIRST — so it deserializes and wires pooled data references before
+     the Scene resolves its ID lists) + `SceneComponent` +
      `ConfigComponent` (Editor-owned) and `UIComponent` (Application-owned UI blob
      sourced from `UIManager::ExportLayout()` / applied via `UIManager::ApplyLayout()`),
      plus `HistoryComponent` (undo/redo-stack adapter in asset/components that

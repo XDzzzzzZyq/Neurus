@@ -105,7 +105,7 @@ Event structs in `src/editor/events/` are split by domain:
 `SceneEvents.h` (ephemeral scene-domain events carrying `const ObjectID*` /
 `const UID*`: selection, transform, visibility, camera/mesh/light/env property
 edits), `EditorEvents.h` (cross-component events: RenderResetEvent,
-EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild), and
+EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild, SceneObjectGpuUploadRequested), and
 `AssetEvents.h` (asset add/import: mesh/camera/light adds). Scene mutations are
 handled by `SceneController`, which emits `EditorEvents` for GPU uploads and
 dirty tracking; the Editor executes those uploads.

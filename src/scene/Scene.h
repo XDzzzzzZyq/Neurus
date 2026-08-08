@@ -294,26 +294,16 @@ public:
 	 * @brief Resolves the pending ID references against the resource pool.
 	 *
 	 * Fills the typed pools from the ResourceManager (fetched by ID + cast),
-	 * wires data-resource references (Mesh -> MeshData/Shader, Environment ->
-	 * ImageData), rebuilds obj_list, and restores the selection. Called by
+	 * rebuilds obj_list, and restores the selection. Called by
 	 * SceneComponent::Load AFTER the pool has been deserialized (pool first,
-	 * then Scene).
+	 * then Scene). Per-object data-resource wiring (Mesh -> MeshData/Shader,
+	 * Environment -> ImageData) is NOT here - it is a pool-wide concern done
+	 * by ResourceComponent::Load (the pool's own restore step), so pooled
+	 * orphans (undo history) stay self-contained and uploadable.
 	 *
 	 * @param resources The ResourceManager pool (transient parameter, never a member).
 	 */
 	void ResolveReferences(ResourceManager& resources);
-
-	/**
-	 * @brief Wires per-object data-resource references from the pool.
-	 *
-	 * Part of ResolveReferences: for each pooled mesh/environment, resolve
-	 * o_meshDataId / o_shaderId / o_imageDataId against the pool. The pool's
-	 * data-resource entries have already reloaded their content (pool
-	 * serialize), so this is pure pointer wiring - no disk I/O.
-	 *
-	 * @param resources The ResourceManager pool.
-	 */
-	void ResolveDataReferences(ResourceManager& resources);
 
 	// -------------------------------------------------------------------
 	// Registration - store in both type-specific pool AND obj_list
