@@ -23,7 +23,8 @@
 - The main workspace stays on `master` and must remain clean.
 - All file edits, commits, and builds for feature work happen inside the worktree directory.
 - Do NOT switch branches in the main workspace - use the worktree for isolation.
-- Do NOT create worktree in `~/.config/opencode/*`, create the worktree adjacent to the main workspace. (e.g. `../Neurus_feature_name`)
+- Do NOT create worktree in `~/.config/opencode/*`, create the worktree inside `.omo/worktrees/*` or `.slim/worktrees/*`. So that user can view the changes in the main directory and the worktree directory at the same time.
+- ALWAYS use `make update` to update the git submodules and pre-compiled libs.
 
 **Merge conflicts are expected.**
 - When `master` has progressed (new features added after your branch point), merge conflicts will occur.

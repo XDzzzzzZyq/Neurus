@@ -4,11 +4,9 @@
 #include "render/ProfilingData.h"
 
 #include <QAbstractItemView>
-#include <QFont>
 #include <QHeaderView>
 #include <QStringList>
 #include <QTreeWidget>
-#include <QTreeWidgetItem>
 #include <QVBoxLayout>
 
 namespace neurus
@@ -42,6 +40,8 @@ ProfilingPanel::ProfilingPanel(QWidget* parent)
 	m_tree->viewport()->setAttribute(Qt::WA_Hover, false);
 
 	layout->addWidget(m_tree);
+
+	m_frameHead = std::make_unique<ProfilingHead>(m_tree);
 }
 
 // =========================================================================
@@ -54,9 +54,8 @@ void ProfilingPanel::Refresh(const UIContext& ctx)
 	if (!profile)
 	{
 		// No renderer profile yet: hide every pooled row and reset detection.
-		if (m_frameItem)
-			m_frameItem->setHidden(true);
-		for (auto* row : m_rowPool)
+		m_frameHead->setHidden(true);
+		for (auto& row : m_rowPool)
 			row->setHidden(true);
 		m_hasProfile = false;
 		m_frameCpuMsEma = -1.0;
@@ -83,10 +82,21 @@ void ProfilingPanel::Refresh(const UIContext& ctx)
 // EnsureRowPool - grow the per-pass child-row pool (recycle, never destroy)
 // =========================================================================
 
-void ProfilingPanel::EnsureRowPool(std::size_t needed)
+bool ProfilingPanel::EnsureRowPool(std::size_t needed)
 {
+	// Pool never shrinks: hide the surplus rows instead of destroying them so
+	// they can be recycled if the pass count grows again.
+	const bool resized = needed != m_rowPool.size();
+	if (needed < m_rowPool.size())
+	{
+		for (std::size_t i = needed; i < m_rowPool.size(); ++i)
+			m_rowPool[i]->setHidden(true);
+		return resized;
+	}
 	while (m_rowPool.size() < needed)
-		m_rowPool.push_back(new QTreeWidgetItem(m_frameItem));
+		m_rowPool.push_back(std::make_unique<ProfilingRow>(m_frameHead->item()));
+
+	return resized;
 }
 
 // =========================================================================
@@ -95,22 +105,10 @@ void ProfilingPanel::EnsureRowPool(std::size_t needed)
 
 void ProfilingPanel::Populate(const FrameProfile& profile)
 {
-	// Create the persistent Frame totals row once; reused every frame.
-	if (!m_frameItem)
-	{
-		m_frameItem = new QTreeWidgetItem(m_tree);
-		QFont boldFont = m_frameItem->font(0);
-		boldFont.setBold(true);
-		m_frameItem->setFont(0, boldFont);
-	}
-	m_frameItem->setHidden(false);
-
 	if (profile.passCount == 0)
 	{
-		m_frameItem->setText(0, "No profiling data yet");
-		for (int col = 1; col < 5; ++col)
-			m_frameItem->setText(col, QString());
-		for (auto* row : m_rowPool)
+		m_frameHead->setNoData();
+		for (auto& row : m_rowPool)
 			row->setHidden(true);
 		// Reset smoothing so timings reseed cleanly once data returns.
 		m_frameCpuMsEma = -1.0;
@@ -143,42 +141,36 @@ void ProfilingPanel::Populate(const FrameProfile& profile)
 	if (gpuShown)
 		m_frameGpuMsEma = ema(m_frameGpuMsEma, profile.gpuTotalMs);
 
-	m_frameItem->setText(0, "Frame");
-	m_frameItem->setText(1, QString::number(m_frameCpuMsEma, 'f', 2));
-	m_frameItem->setText(2, gpuShown ? QString::number(m_frameGpuMsEma, 'f', 2) : "--");
-	m_frameItem->setText(3, QString::number(profile.drawCalls));
-	m_frameItem->setText(4, QString::number(profile.dispatches));
+	// Frame totals row - dirty-checked columns (skips setText when the
+	// displayed value is unchanged, including sub-0.005ms EMA drift).
+	m_frameHead->setFrame(m_frameCpuMsEma, m_frameGpuMsEma, gpuShown,
+	                      profile.drawCalls, profile.dispatches);
 
-	EnsureRowPool(profile.passes.size());
-	for (std::size_t i = 0; i < m_rowPool.size(); ++i)
+	const bool resized = EnsureRowPool(profile.passes.size());
+	for (std::size_t i = 0; i < profile.passes.size(); ++i)
 	{
-		QTreeWidgetItem* item = m_rowPool[i];
-		if (i >= profile.passes.size())
-		{
-			item->setHidden(true);
-			continue;
-		}
-
 		const auto& pass = profile.passes[i];
 
 		m_passCpuMsEma[i] = ema(m_passCpuMsEma[i], pass.cpuMs);
 		if (gpuShown)
 			m_passGpuMsEma[i] = ema(m_passGpuMsEma[i], pass.gpuMs);
 
-		item->setHidden(false);
-		item->setText(0, QString::fromStdString(pass.name));
-		item->setText(1, QString::number(m_passCpuMsEma[i], 'f', 2));
-		item->setText(2, gpuShown ? QString::number(m_passGpuMsEma[i], 'f', 2) : "--");
-		item->setText(3, QString::number(pass.drawCalls));
-		item->setText(4, QString::number(pass.dispatches));
+		// Reveal the row (dirty-checked; free if already visible) - needed when
+		// the pass count grows back after a shrink hid surplus rows.
+		m_rowPool[i]->setHidden(false);
+		// Per-column dirty check inside setPass skips setText for stable
+		// columns (name/draws/dispatches) and for timing values whose EMA
+		// drift rounds to the same displayed string.
+		m_rowPool[i]->setPass(pass.name, m_passCpuMsEma[i], m_passGpuMsEma[i],
+		                      gpuShown, pass.drawCalls, pass.dispatches);
 	}
 
-	m_frameItem->setExpanded(true);
-
-	// Fit content columns; keep numeric columns at a fixed readable width.
-	m_tree->resizeColumnToContents(0);
-	m_tree->resizeColumnToContents(3);
-	m_tree->resizeColumnToContents(4);
+	if (resized) {
+		// Fit content columns; keep numeric columns at a fixed readable width.
+		m_tree->resizeColumnToContents(0);
+		m_tree->resizeColumnToContents(3);
+		m_tree->resizeColumnToContents(4);
+	}
 }
 
 } // namespace neurus
