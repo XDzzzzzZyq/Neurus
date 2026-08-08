@@ -15,6 +15,8 @@
 #include "scene/Scene.h"
 #include "scene/Transform.h"
 #include "scene/ObjectID.h"
+#include "asset/data/ImageData.h"
+#include "asset/data/MeshData.h"
 
 #include <QGridLayout>
 
@@ -156,7 +158,8 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 		{
 			auto* mesh = it->second.get();
 			m_meshProps->setObjectId(objectId);
-			m_meshProps->setMeshPath(mesh->o_meshPath);
+			// Path is owned by the pooled MeshData (data layer).
+			m_meshProps->setMeshPath(mesh->o_mesh ? mesh->o_mesh->GetPath() : "");
 			m_meshProps->setShadowEnabled(mesh->using_shadow);
 			m_meshProps->setMaterialEnabled(mesh->using_material);
 		}
@@ -189,7 +192,9 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 			m_envProps->setObjectId(objectId);
 			m_envProps->setIntensity(env->GetIntensity());
 			m_envProps->setRotation(env->GetRotation());
-			m_envProps->setEquirectPath(env->GetEquirectPath());
+			// Path is owned by the pooled ImageData (data layer).
+			auto eqData = env->GetEquirectData();
+			m_envProps->setEquirectPath(eqData ? eqData->GetPath() : "");
 		}
 		break;
 	}

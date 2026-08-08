@@ -189,5 +189,9 @@ TEST(DefaultProject, HasEnvironment)
 	EXPECT_FALSE(scene.env_list.empty());
 	auto env = scene.env_list.begin()->second;
 	ASSERT_NE(env, nullptr);
-	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/room.hdr");
+	// The Environment wraps the pooled ImageData; the path lives in the
+	// data layer (ImageData::GetPath), not on the scene object.
+	ASSERT_NE(env->GetEquirectData(), nullptr);
+	EXPECT_EQ(env->GetEquirectData()->GetPath(), "res/tex/hdr/room.hdr");
+	EXPECT_TRUE(env->GetEquirectData()->IsValid());
 }

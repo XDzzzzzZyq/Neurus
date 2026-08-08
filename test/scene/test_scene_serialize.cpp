@@ -95,7 +95,7 @@ TEST(SceneSerialize, FullRoundtrip)
 		scene.UseLight(light);
 
 		auto imageData = resources.Load<ImageData>("res/tex/hdr/room.hdr");
-		auto env = resources.Load<Environment>(imageData, "tex/hdr/room.hdr");
+		auto env = resources.Load<Environment>(imageData);
 		scene.UseEnvironment(env);
 		envUid = env->GetObjectID();
 		imageDataUid = imageData->GetObjectID();

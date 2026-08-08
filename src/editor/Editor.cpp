@@ -35,32 +35,12 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 
-#include <QCoreApplication>
-
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <unordered_map>
 #include <vector>
-
-namespace {
-
-/**
- * @brief Resolves a resource path relative to the executable directory.
- *
- * The res/ folder is copied alongside the executable by CMake at build time.
- * Resources are resolved as: {exeDir}/res/{relativePath}
- *
- * @param relativePath Path relative to res/ (e.g., "obj/sphere.obj").
- * @return Absolute path to the resource.
- */
-static QString resolveResourcePath(const char* relativePath)
-{
-	return QCoreApplication::applicationDirPath() + "/res/" + relativePath;
-}
-
-} // anonymous namespace
 
 namespace neurus {
 
@@ -258,9 +238,10 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 	m_scene->UseLight(light);
 
 	// Paths are relative ("res/...") so project files stay portable; the
-	// resource layer resolves them against the asset dir at load time.
+	// resource layer resolves them against the asset dir at load time. The
+	// pooled ImageData owns the path; the Environment only wraps it.
 	auto imageData = m_resources->Load<ImageData>("res/tex/hdr/room.hdr");
-	auto env = m_resources->Load<Environment>(imageData, "tex/hdr/room.hdr");
+	auto env = m_resources->Load<Environment>(imageData);
 	m_scene->UseEnvironment(env);
 
 	m_dirty = true;
@@ -512,20 +493,12 @@ void Editor::OnIBLLoad()
 	auto env = scene->env_list.begin()->second;
 	NEURUS_LOG("[Editor] Using environment (ID " << env->GetObjectID() << ")");
 
-	// Read the equirect path from the environment object (set by CreateDefault or deserialized).
-	// The path stays RELATIVE in the serialized file (portability); the pooled
-	// ImageData (loaded via ResourceManager) provides the pixels. Only when no
-	// pooled data is available do we fall back to loading from the asset dir.
-	const std::string& envRelPath = env->GetEquirectPath();
-	if (envRelPath.empty())
+	// The environment wraps a pooled ImageData (path owned by the data layer).
+	// If the pooled pixels are unavailable (missing source file), fall back to
+	// the procedural gradient inside UploadEnvironment - no path loading here.
+	if (!env->GetEquirectData() || !env->GetEquirectData()->IsValid())
 	{
-		NEURUS_LOG("[Editor] No environment path set, using procedural fallback");
-	}
-	else if (!env->GetEquirectData() || !env->GetEquirectData()->IsValid())
-	{
-		const std::string hdrPath = resolveResourcePath(envRelPath.c_str()).toStdString();
-		NEURUS_LOG("[Editor] Loading environment: " << envRelPath);
-		env->LoadEquirectFromPath(hdrPath);
+		NEURUS_LOG("[Editor] Environment has no valid equirect data, using procedural fallback");
 	}
 
 	GenerateIBL(env);

@@ -4,8 +4,8 @@
  *
  * Environment represents a dome light / skybox that provides image-based
  * lighting via diffuse irradiance and specular prefiltered cubemaps.
- * It stores the source equirectangular HDR as CPU-side ImageData and
- * serialisable parameters (path, intensity, rotation).
+ * It wraps the source equirectangular HDR as CPU-side ImageData and holds
+ * serialisable parameters (intensity, rotation).
  *
  * CPU-only - GPU resources are owned by RenderCache (EnvironmentGPU).
  *
@@ -15,7 +15,12 @@
  * - Renderer reads EnvironmentGPU from RenderCache per-frame
  * - Editor mutates environment properties via events and controllers
  *
- * @note Serialization stores only the equirectangular path, not GPU textures.
+ * Layer isolation: Environment holds NO file paths. The source image path is
+ * a data-layer (ImageData) concern; Environment only wraps a shared
+ * ImageData (typically a pooled ResourceManager entry), so the pool tracks
+ * the ImageData's usage and lifetime.
+ *
+ * @note Serialization stores the pooled ImageData UID, not GPU textures.
  * @note Only one Environment is typically active per scene.
  */
 
@@ -34,16 +39,18 @@ namespace neurus
 /**
  * @brief IBL environment map providing image-based lighting for the scene.
  *
- * Environment stores file paths, parameters, and CPU-side pixel data for
- * an HDR equirectangular map.  GPU resources (cubemaps, samplers) are
- * owned by RenderCache and created lazily via CreateEnvironmentGPU().
+ * Environment stores CPU-side pixel data for an HDR equirectangular map and
+ * serializable parameters. GPU resources (cubemaps, samplers) are owned by
+ * RenderCache and created lazily via CreateEnvironmentGPU().
  *
  * Resource Ownership:
- * - o_equirectData:   Shared ImageData (CPU-side equirectangular pixels; may be
- *                     a pooled resource from the ResourceManager)
- * - o_equirectPath:   Owned string (serialized, used for GPU reload / legacy)
+ * - o_equirectData:   Shared ImageData (CPU-side equirectangular pixels; must
+ *                     be a pooled resource from the ResourceManager)
  * - Transform3D:      Owned directly (skybox orientation rotation)
  *
+ * @note Environment has ZERO knowledge of file paths - the source path lives
+ *       in the data layer (ImageData). Load an ImageData through the
+ *       ResourceManager and wrap it here.
  * @note Inheritance: ObjectID for scene identity, Transform3D for rotation.
  * @note Thread-safety: Not thread-safe. Access from main thread only.
  */
@@ -56,13 +63,13 @@ public:
 	Environment();
 
 	/**
-	 * @brief Constructs an environment referencing pooled equirect data.
+	 * @brief Constructs an environment wrapping pooled equirect data.
 	 * @param data Shared ImageData (pooled resource) for the equirect map.
-	 * @param path Legacy source path (kept for serialization compatibility).
 	 * @note Sets o_equirectData + o_imageDataId; the environment is registered
 	 *       in the pool separately via ResourceManager::Load<Environment>.
+	 * @note No path is accepted - file paths belong to the data layer.
 	 */
-	explicit Environment(std::shared_ptr<ImageData> data, std::string path);
+	explicit Environment(std::shared_ptr<ImageData> data);
 
 	/**
 	 * @brief Virtual destructor for polymorphic cleanup.
@@ -79,52 +86,21 @@ public:
 
 	/**
 	 * @brief Returns the CPU-side equirectangular pixel data (shared).
-	 * @note Loaded from o_equirectPath on construction or via SetEquirectPath().
+	 * @note Set via SetEquirectData() (pooled ImageData) only - never loaded
+	 *       from a path inside the scene layer.
 	 */
 	std::shared_ptr<ImageData> GetEquirectData() const { return o_equirectData; }
 
 	/**
-	 * @brief Directly sets the CPU-side equirectangular pixel data (for tests/pooled data).
-	 * @param data Shared ImageData to reference.
-	 * @note Bypasses file loading; records the pooled ID for persistence.
+	 * @brief Directly sets the CPU-side equirectangular pixel data.
+	 * @param data Shared ImageData to reference (pooled resource).
+	 * @note No file loading; records the pooled ID for persistence.
 	 */
 	void SetEquirectData(std::shared_ptr<ImageData> data)
 	{
 		o_equirectData = std::move(data);
 		o_imageDataId = o_equirectData ? o_equirectData->GetObjectID() : 0;
 	}
-
-	// -----------------------------------------------------------------------
-	// File path
-	// -----------------------------------------------------------------------
-
-	/**
-	 * @brief Sets the equirectangular HDR source file path.
-	 *
-	 * The ImageData is NOT reloaded eagerly — UploadManager::UploadEnvironment()
-	 * handles lazy loading via GetEquirectData() with GetEquirectPath() fallback.
-	 *
-	 * @param path Path to the .hdr equirectangular map.
-	 */
-	void SetEquirectPath(const std::string& path);
-
-	/**
-	 * @brief Returns the current equirectangular HDR source file path.
-	 * @return Const reference to the path string.
-	 */
-	const std::string& GetEquirectPath() const { return o_equirectPath; }
-
-	/**
-	 * @brief Loads equirect pixels from an absolute path WITHOUT touching
-	 *        the serialized path or the pooled reference.
-	 *
-	 * Used as a runtime fallback when no pooled ImageData is available. The
-	 * serialized o_equirectPath stays relative (portable project files) and
-	 * o_imageDataId keeps pointing at the pooled resource.
-	 *
-	 * @param path Absolute file path to the HDR equirect map.
-	 */
-	void LoadEquirectFromPath(const std::string& path);
 
 	// -----------------------------------------------------------------------
 	// Intensity
@@ -220,14 +196,12 @@ public:
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
-		   cereal::make_nvp("m_equirectPath", o_equirectPath),
 		   CEREAL_NVP(o_imageDataId),
 		   cereal::make_nvp("m_intensity", o_intensity),
 		   cereal::make_nvp("m_rotation", o_rotation));
 	}
 
 private:
-	std::string o_equirectPath;       ///< Source equirectangular HDR file path
 	float       o_intensity = 1.0f;   ///< IBL intensity multiplier
 	float       o_rotation  = 0.0f;   ///< Y-axis rotation in degrees
 

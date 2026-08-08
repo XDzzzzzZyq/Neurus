@@ -118,6 +118,14 @@ public:
 	std::string GetMeshName() const;
 
 	/**
+	 * @brief Returns the source OBJ path (serialized, relative to asset dir).
+	 * @return Const reference to the stored path (empty for procedural data).
+	 * @note The path lives HERE (data layer) - scene objects wrap this
+	 *       MeshData and never hold the path themselves.
+	 */
+	const std::string& GetPath() const { return m_path; }
+
+	/**
 	 * @brief Get number of unique vertices in the interleaved array.
 	 */
 	size_t GetVertexCount() const;

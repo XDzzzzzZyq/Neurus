@@ -182,10 +182,8 @@ int Application::Run()
 	{
 		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
 		app_editor->CreateDefaultScene(objPath);
-		// Store relative paths in the project file for portability
-		for (auto& [id, mesh] : app_editor->GetScene().mesh_list)
-			mesh->o_meshPath = "obj/sphere.obj";
-		// Save for future runs (captures the current default UI layout too)
+		// Save for future runs (captures the current default UI layout too);
+		// relative res/... paths are stored inside the pooled data resources.
 		OnProjectSave(projectPath);
 	}
 

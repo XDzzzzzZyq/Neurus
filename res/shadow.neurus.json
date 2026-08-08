@@ -62,7 +62,7 @@
                                 "value0": {
                                     "o_id": 100
                                 },
-                                "m_path": "res/obj/shadow/ground.obj"
+                                "m_path": "res/"
                             }
                         }
                     }
@@ -101,7 +101,6 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/ground.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
@@ -123,7 +122,7 @@
                                 "value0": {
                                     "o_id": 101
                                 },
-                                "m_path": "res/obj/shadow/grid2.obj"
+                                "m_path": "res/"
                             }
                         }
                     }
@@ -162,7 +161,6 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/grid2.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
@@ -184,7 +182,7 @@
                                 "value0": {
                                     "o_id": 102
                                 },
-                                "m_path": "res/obj/shadow/grid1.obj"
+                                "m_path": "res/"
                             }
                         }
                     }
@@ -223,7 +221,6 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/grid1.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,

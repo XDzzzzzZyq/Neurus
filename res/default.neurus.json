@@ -62,7 +62,7 @@
                                 "value0": {
                                     "o_id": 14
                                 },
-                                "m_path": "D:/Projects/Neurus/.omo/feature-resource-manager/build/Debug/res/obj/sphere.obj"
+                                "m_path": "res/obj/sphere.obj"
                             }
                         }
                     }
@@ -101,7 +101,6 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/sphere.obj",
                                 "o_meshDataId": 14,
                                 "o_shaderId": 0,
                                 "using_shadow": true,
@@ -173,7 +172,7 @@
                                 "value0": {
                                     "o_id": 17
                                 },
-                                "m_path": "D:/Projects/Neurus/.omo/feature-resource-manager/build/Debug/res//tex/hdr/room.hdr"
+                                "m_path": "res/tex/hdr/room.hdr"
                             }
                         }
                     }
@@ -212,7 +211,6 @@
                                         "z": 1.0
                                     }
                                 },
-                                "m_equirectPath": "tex/hdr/room.hdr",
                                 "o_imageDataId": 17,
                                 "m_intensity": 1.0,
                                 "m_rotation": 0.0

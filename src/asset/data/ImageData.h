@@ -151,6 +151,14 @@ public:
 	 */
 	bool SaveHDR(const std::string& path) const;
 
+	/**
+	 * @brief Returns the source image path (serialized, relative to asset dir).
+	 * @return Const reference to the stored path (empty for procedural data).
+	 * @note The path lives HERE (data layer) - scene objects wrap this
+	 *       ImageData and never hold the path themselves.
+	 */
+	const std::string& GetPath() const { return m_path; }
+
 private:
 	// --- Internal helpers ---
 

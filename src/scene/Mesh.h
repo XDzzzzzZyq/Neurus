@@ -76,16 +76,14 @@ public:
 	int o_meshDataId = 0;      ///< Pooled MeshData UID (geometry source)
 	int o_shaderId   = 0;      ///< Pooled Shader (RenderShader) UID
 
-	/// OBJ file path - LEGACY serialized field for old project files only;
-	/// runtime construction never sets it (geometry comes via MeshData).
-	std::string o_meshPath;
-
 	Mesh();
 	/**
 	 * @brief Constructs a mesh referencing pooled geometry.
 	 * @param meshData Shared MeshData (pooled resource) to reference.
 	 * @note Sets o_mesh and o_meshDataId; the mesh is registered in the pool
 	 *       separately via ResourceManager::Load<Mesh>(meshData).
+	 * @note No path is accepted - file paths belong to the data layer
+	 *       (MeshData holds the source OBJ path).
 	 */
 	explicit Mesh(std::shared_ptr<MeshData> meshData);
 	~Mesh() override;
@@ -95,7 +93,6 @@ public:
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
-		   CEREAL_NVP(o_meshPath),
 		   CEREAL_NVP(o_meshDataId), CEREAL_NVP(o_shaderId),
 		   CEREAL_NVP(using_shadow), CEREAL_NVP(using_material),
 		   CEREAL_NVP(using_sdf), CEREAL_NVP(is_closure));

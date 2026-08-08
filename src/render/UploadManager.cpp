@@ -138,17 +138,10 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env,
 	}
 
 	// --- 1. Load equirectangular ImageData (CPU-side) ---
-	// Use directly-set ImageData first (for tests/procedural), then try path loading,
-	// fall back to pink-purple gradient
+	// Use the environment's wrapped (pooled) ImageData; if it is invalid
+	// (missing source file), fall back to the pink-purple gradient. No path
+	// loading here - paths belong to the data layer.
 	std::shared_ptr<ImageData> equirectData = env.GetEquirectData();
-	if (!equirectData || !equirectData->IsValid())
-	{
-		const std::string& eqPath = env.GetEquirectPath();
-		if (!eqPath.empty())
-		{
-			equirectData = std::make_shared<ImageData>(eqPath);
-		}
-	}
 	if (!equirectData || !equirectData->IsValid())
 	{
 		// Generate pink-purple fallback equirect (64x32)
