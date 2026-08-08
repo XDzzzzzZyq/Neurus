@@ -385,14 +385,17 @@ private:
  * @brief Scene-membership toggle: add (or re-add) an object to the scene.
  *
  * Stores the target object UID plus an `add` flag. Apply() dispatches the
- * matching membership event (SceneObjectAddRequested / SceneObjectDeleteRequested);
- * the SceneController handler performs the mutation by fetching the pooled
- * object from the ResourceManager by UID. Inverse() flips the flag, so the
- * delete direction is the same op type (the AddShaderFieldOp convention).
+ * matching membership RESTORE event (SceneObjectAddRestored /
+ * SceneObjectDeleteRequested); the SceneController handler performs the
+ * mutation by fetching the pooled object from the ResourceManager by UID.
+ * Inverse() flips the flag, so the delete direction is the same op type (the
+ * AddShaderFieldOp convention).
  *
- * The pooled resource is NEVER removed — delete only drops the scene
- * reference, so the inverse re-registers without any reload from disk and
- * survives project save/load (pool + history both persist).
+ * Replay events are pure restores (no selection change, no recording) — the
+ * forward gesture semantics (select + record) live on SceneObjectAddRequested,
+ * which this op never re-emits. The pooled resource is NEVER removed — delete
+ * only drops the scene reference, so the inverse re-registers without any
+ * reload from disk and survives project save/load (pool + history both persist).
  */
 class SceneObjectAddOp : public Operation
 {
@@ -412,7 +415,7 @@ public:
 	void Apply(OperationContext& ctx) override
 	{
 		if (m_add)
-			ctx.bus.emitNow(SceneObjectAddRequested{&ctx.scene, m_uid});
+			ctx.bus.emitNow(SceneObjectAddRestored{&ctx.scene, m_uid});
 		else
 			ctx.bus.emitNow(SceneObjectDeleteRequested{&ctx.scene, m_uid});
 	}

@@ -111,7 +111,8 @@ struct EnvironmentIntensityChanged { const ObjectID* object; float intensity; };
 struct EnvironmentRotationChanged  { const ObjectID* object; float rotation; };
 
 // Scene membership (Add / Delete) — UID-carrying (replay-safe; see below)
-struct SceneObjectAddRequested { const UID* scene; int objectUid; };     // forward (Editor import) + replay
+struct SceneObjectAddRequested { const UID* scene; int objectUid; };     // forward only (Editor import)
+struct SceneObjectAddRestored { const UID* scene; int objectUid; };      // replay only (pure re-register)
 struct SceneObjectDeleteRequested { const UID* scene; int objectUid; };  // replay only (per-uid unit)
 struct ObjectDeleteRequested { const UID* scene; };                      // UI gesture (delete all selected)
 ```
@@ -131,6 +132,10 @@ pooled object by UID and register it). The membership events carry the object
 UID instead of a pointer because they double as replay events for the
 `SceneObjectAddOp` undo operation (see operation-system.instructions.md): a
 serialized op replays by UID, and the pool is the single owner of the object.
+Replay uses dedicated RESTORE events (`SceneObjectAddRestored`,
+`SceneObjectDeleteRequested`) — pure re-register/remove with no gesture
+semantics — so the forward handler (which selects + records) is never
+re-entered during undo/redo.
 `ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
 the SceneController snapshots the selection, guards the last camera, deselects,
 removes every selected object, and records ONE composite operation

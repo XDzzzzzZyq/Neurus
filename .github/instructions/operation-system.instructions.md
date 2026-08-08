@@ -42,8 +42,11 @@ model, coalescing rules, and persistence.
   (same pattern as the manager stacks).
 - **`SceneObjectAddOp`** (membership toggle) makes Add/Delete undoable. It
   stores the object UID plus an `add` flag (the `AddShaderFieldOp` convention):
-  `Apply()` dispatches `SceneObjectAddRequested` / `SceneObjectDeleteRequested`,
-  and `Inverse()` flips the flag — the inverse of Add is Delete and vice versa.
+  `Apply()` dispatches the REPLAY-restore events
+  `SceneObjectAddRestored` / `SceneObjectDeleteRequested` (never the forward
+  gesture event — a replay is a pure re-register/remove, so the recording
+  path is not re-entered and no "Submit suppressed" error fires), and
+  `Inverse()` flips the flag — the inverse of Add is Delete and vice versa.
   Delete NEVER removes the pooled resource: it only drops the scene reference,
   so undo re-registers from the pool without any reload from disk, and the
   operation survives project save/load (pool + history both persist).

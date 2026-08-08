@@ -22,10 +22,13 @@ OperationManager::OperationManager(EventQueue& bus, std::function<Scene*()> scen
 void OperationManager::Submit(std::unique_ptr<Operation> op)
 {
 	// Replay re-runs the originating handler, which calls Submit again;
-	// suppress it so history is not corrupted by its own playback.
+	// suppress it so history is not corrupted by its own playback. This is the
+	// EXPECTED path on every undo/redo (handlers are re-entered by replay), so
+	// it is informational, not an error condition.
 	if (m_phase == Phase::Replaying)
 	{
-		NEURUS_ERR("[OperationManager] Submit suppressed during replay: " << op->Label());
+		NEURUS_LOG("[OperationManager] Submit suppressed during replay (expected): "
+		           << op->Label());
 		return;
 	}
 	if (!op) return;

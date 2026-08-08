@@ -282,6 +282,29 @@ TEST_F(SceneControllerTest, SceneObjectAdd_AlreadyInScene_NoOp)
 	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
 }
 
+TEST_F(SceneControllerTest, UndoOfAdd_ReplaysRestoreEvent_NotForwardEvent)
+{
+	const int uid = LoadPooledMesh(m_resources);
+	int forwardEvents = 0;
+	m_eventBus.subscribe<SceneObjectAddRequested>([&](const SceneObjectAddRequested&) { forwardEvents++; });
+
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uid});
+	Process();
+	EXPECT_EQ(forwardEvents, 1);
+
+	// Undo/redo replay must emit SceneObjectAddRestored, never the forward
+	// gesture event (which would re-enter selection + recording logic and
+	// trip the "Submit suppressed during replay" error).
+	m_operations.Undo();
+	EXPECT_EQ(forwardEvents, 1);
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+
+	m_operations.Redo();
+	EXPECT_EQ(forwardEvents, 1);
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_scene.GetObjectID(uid)));
+}
+
 TEST_F(SceneControllerTest, SceneObjectAdd_StaleUid_NoOp)
 {
 	const int uid = LoadPooledMesh(m_resources);

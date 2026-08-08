@@ -219,15 +219,30 @@ struct EnvironmentRotationChanged
  * @brief Adds an object to the scene.
  *
  * Emitted by the Editor after loading a resource into the pool (mesh import,
- * camera/light add) and by SceneObjectAddOp on undo/redo replay. Carries the
- * UID; the SceneController fetches the pooled object from the ResourceManager
- * by UID and registers it (the forward handler also selects it and records
- * the composite operation).
+ * camera/light add) — FORWARD path only, never replayed. Carries the UID; the
+ * SceneController fetches the pooled object from the ResourceManager by UID,
+ * registers it, selects it, and records the composite operation. Replay uses
+ * SceneObjectAddRestored (no gesture semantics).
  */
 struct SceneObjectAddRequested
 {
 	const UID* scene = nullptr;  ///< Editor-owned Scene.
 	int objectUid = 0;           ///< Pooled object UID.
+};
+
+/**
+ * @brief Re-registers an object in the scene (pure restore).
+ *
+ * Emitted only by SceneObjectAddOp (add direction) on undo/redo replay.
+ * The handler registers the pooled object WITHOUT touching selection and
+ * WITHOUT recording — selection is restored by the composite's own
+ * SetSelectionOp. Mirrors the ShaderCodeRestored convention: forward
+ * gesture events and replay-restore events are distinct types.
+ */
+struct SceneObjectAddRestored
+{
+	const UID* scene = nullptr;
+	int objectUid = 0;
 };
 
 /**
