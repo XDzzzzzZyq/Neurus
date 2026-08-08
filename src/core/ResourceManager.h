@@ -26,6 +26,7 @@
 #pragma once
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -111,6 +112,28 @@ public:
 	 * @brief True if a resource with the given ID is registered.
 	 */
 	bool Contains(int id) const { return resources_.count(id) != 0; }
+
+	/**
+	 * @brief Invokes @p fn on every pooled object of type T.
+	 *
+	 * Iterates the whole pool and calls @p fn only on entries whose runtime
+	 * type is T (or a T-derived type). Used to mirror the pool into UID-keyed
+	 * GPU caches (RenderCache follows the pool, not the scene — pooled
+	 * objects stay referenced by undo history after deletion).
+	 *
+	 * @tparam T Requested type (e.g. Mesh, Light).
+	 * @param fn Callback receiving each matching shared_ptr (any order).
+	 */
+	template<class T>
+	void ForEach(const std::function<void(const std::shared_ptr<T>&)>& fn) const
+	{
+		for (const auto& [id, obj] : resources_)
+		{
+			auto typed = std::dynamic_pointer_cast<T>(obj);
+			if (typed)
+				fn(typed);
+		}
+	}
 
 	/**
 	 * @brief Removes a resource by ID.

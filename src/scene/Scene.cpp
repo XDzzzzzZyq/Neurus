@@ -90,18 +90,21 @@ void Scene::ResolveReferences(ResourceManager& resources)
 
 void Scene::ResolveDataReferences(ResourceManager& resources)
 {
-	for (auto& [id, mesh] : mesh_list)
-	{
+	// Wire data references for EVERY pooled mesh/environment, not just the
+	// scene members: pooled objects stay referenced by undo history after
+	// deletion, so their data refs must be wired for the pool-mirrored GPU
+	// caches (RenderCache follows the pool) to upload them after a reload.
+	resources.ForEach<Mesh>([&resources](const std::shared_ptr<Mesh>& mesh) {
+		if (!mesh) return;
 		if (mesh->o_meshDataId != 0)
 			mesh->o_mesh = resources.Get<MeshData>(mesh->o_meshDataId);
 		if (mesh->o_shaderId != 0)
 			mesh->o_shader = resources.Get<Shader>(mesh->o_shaderId);
-	}
-	for (auto& [id, env] : env_list)
-	{
-		if (env->o_imageDataId != 0)
-			env->SetEquirectData(resources.Get<ImageData>(env->o_imageDataId));
-	}
+	});
+	resources.ForEach<Environment>([&resources](const std::shared_ptr<Environment>& env) {
+		if (!env || env->o_imageDataId == 0) return;
+		env->SetEquirectData(resources.Get<ImageData>(env->o_imageDataId));
+	});
 }
 
 // ---------------------------------------------------------------------------

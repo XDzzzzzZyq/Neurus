@@ -112,6 +112,24 @@ TEST(ResourceManagerTest, RemoveClearSize)
 	EXPECT_FALSE(pool.Contains(light->GetObjectID()));
 }
 
+/**
+ * @test ForEach<T> visits only pooled objects of the requested type.
+ */
+TEST(ResourceManagerTest, ForEachVisitsTypedObjects)
+{
+	ResourceManager pool;
+	auto cam = pool.Load<Camera>();
+	auto mesh = pool.Load<Mesh>(pool.Load<MeshData>());
+	auto light = pool.Load<Light>(POINTLIGHT, 5.0f, glm::vec3(1.0f));
+
+	int meshes = 0, cameras = 0;
+	pool.ForEach<Mesh>([&](const std::shared_ptr<Mesh>& m) { ++meshes; EXPECT_EQ(m, mesh); });
+	pool.ForEach<Camera>([&](const std::shared_ptr<Camera>& c) { ++cameras; EXPECT_EQ(c, cam); });
+
+	EXPECT_EQ(meshes, 1);
+	EXPECT_EQ(cameras, 1);
+}
+
 // -----------------------------------------------------------------------
 // Polymorphic save/load round-trip
 // -----------------------------------------------------------------------

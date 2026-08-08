@@ -528,27 +528,30 @@ void Editor::UploadSceneResources()
 {
 	if (!ed_uploadManager || !ed_renderer) return;
 
-	auto& scene = *m_scene;
+	auto& cache = ed_renderer->GetRenderCache();
 
-	for (const auto& [id, mesh] : scene.mesh_list)
-	{
-		if (!mesh || !mesh->o_mesh) continue;
+	// The UID-keyed GPU caches (MeshGPU, LightGPU) mirror the POOL, not the
+	// scene: pooled objects stay referenced by undo history after deletion,
+	// so their GPU resources must exist for undo/redo to render them without
+	// re-uploading — even after a project save/load rebuilt the cache.
+	m_resources->ForEach<Mesh>([&](const std::shared_ptr<Mesh>& mesh) {
+		if (!mesh || !mesh->o_mesh) return;
 		const int objId = mesh->GetObjectID();
-		NEURUS_LOG("[Editor::UploadSceneResources] Registering MeshGPU: mapKey=" << id << " GetObjectID=" << objId);
-		if (ed_renderer->GetRenderCache().GetMeshGPU(objId)) continue;
+		NEURUS_LOG("[Editor::UploadSceneResources] Registering MeshGPU: GetObjectID=" << objId);
+		if (cache.GetMeshGPU(objId)) return;
 		auto meshGPU = ed_uploadManager->UploadMesh(*mesh);
-		ed_renderer->GetRenderCache().UseMeshGPU(objId, std::move(meshGPU));
-	}
+		cache.UseMeshGPU(objId, std::move(meshGPU));
+	});
 
-	for (const auto& [uid, light] : scene.light_list)
-	{
-		if (!light || !light->use_shadow) continue;
-		if (ed_renderer->GetRenderCache().GetLightGPU(uid)) continue;
+	m_resources->ForEach<Light>([&](const std::shared_ptr<Light>& light) {
+		if (!light || !light->use_shadow) return;
+		const int uid = light->GetObjectID();
+		if (cache.GetLightGPU(uid)) return;
 		auto lightGPU = ed_uploadManager->UploadLight(*light);
-		ed_renderer->GetRenderCache().UseLightGPU(uid, std::move(lightGPU));
-	}
+		cache.UseLightGPU(uid, std::move(lightGPU));
+	});
 
-	// Upload lighting SSBO (point/sun light structs) via variant API
+	// The light SSBO remains a scene projection (built from scene->light_list).
 	UploadLighting();
 
 	NEURUS_LOG("[Editor] Uploaded scene resources to GPU");

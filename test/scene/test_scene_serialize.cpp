@@ -204,3 +204,51 @@ TEST(SceneSerialize, LegacyFileDegrades)
 	EXPECT_TRUE(loadedScene.light_list.empty());
 	EXPECT_EQ(loadedScene.selections.GetSelectionCount(), 0u);
 }
+
+/**
+ * @test A pooled-but-orphaned mesh (deleted from the scene but still in the
+ *       pool — referenced by undo history) gets its data references wired
+ *       after load. The GPU caches mirror the pool, so the orphan must be
+ *       uploadable for undo-of-delete after a project reload.
+ */
+TEST(SceneSerialize, PooledOrphanMesh_DataRefWiredAfterLoad)
+{
+	TempFile tmp("test_scene_serialize_orphan.neurus.json");
+
+	int orphanUid = 0;
+	{
+		Scene scene;
+		RenderConfig config;
+		ResourceManager resources;
+
+		auto meshData = resources.Load<MeshData>("res/obj/sphere.obj");
+		auto orphan = resources.Load<Mesh>(meshData);
+		orphanUid = orphan->GetObjectID();
+		// NOTE: the orphan is deliberately NOT registered in the scene —
+		// simulating a deleted object whose pooled resource survives.
+
+		project::Project p;
+		p.Register<project::ResourceComponent>(resources);
+		p.Register<project::SceneComponent>(scene, resources);
+		p.Register<project::ConfigComponent>(config);
+		p.Save(tmp.path);
+	}
+
+	Scene loadedScene;
+	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
+	{
+		project::Project p;
+		p.Register<project::ResourceComponent>(loadedResources);
+		p.Register<project::SceneComponent>(loadedScene, loadedResources);
+		p.Register<project::ConfigComponent>(loadedConfig);
+		p.Load(tmp.path);
+	}
+
+	ASSERT_TRUE(loadedScene.mesh_list.empty()); // orphan is NOT in the scene
+	auto orphan = loadedResources.Get<Mesh>(orphanUid);
+	ASSERT_NE(orphan, nullptr);
+	EXPECT_NE(orphan->o_meshDataId, 0);        // persisted by the pool
+	ASSERT_NE(orphan->o_mesh, nullptr);        // wired by the pool scan
+	EXPECT_EQ(orphan->o_mesh->GetObjectID(), orphan->o_meshDataId);
+}
