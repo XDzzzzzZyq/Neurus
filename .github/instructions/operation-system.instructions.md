@@ -42,14 +42,20 @@ model, coalescing rules, and persistence.
   (same pattern as the manager stacks).
 - **`SceneObjectAddOp`** (membership toggle) makes Add/Delete undoable. It
   stores the object UID plus an `add` flag (the `AddShaderFieldOp` convention):
-  `Apply()` dispatches the REPLAY-restore events
-  `SceneObjectAddRestored` / `SceneObjectDeleteRequested` (never the forward
-  gesture event — a replay is a pure re-register/remove, so the recording
-  path is not re-entered and no "Submit suppressed" error fires), and
-  `Inverse()` flips the flag — the inverse of Add is Delete and vice versa.
-  Delete NEVER removes the pooled resource: it only drops the scene reference,
-  so undo re-registers from the pool without any reload from disk, and the
-  operation survives project save/load (pool + history both persist).
+  `Apply()` re-dispatches the ORIGINATING events
+  `SceneObjectAddRequested` / `SceneObjectDeleteRequested`, so replay runs the
+  same controller handler as a live edit; the handler's `Submit` is muted by
+  `Phase::Replaying`, so playback does not re-record (the expected "Submit
+  suppressed during replay" LOG). `Inverse()` flips the flag — the inverse of
+  Add is Delete and vice versa. Delete NEVER removes the pooled resource: it
+  only drops the scene reference, so undo re-registers from the pool without
+  any reload from disk, and the operation survives project save/load (pool +
+  history both persist).
+  - **Note (design):** replay re-enters the forward handler (harmless — Submit
+    is muted). If a handler carries gesture side effects (selection, gesture
+    state) that must NOT re-run on replay, give it a dedicated restore event
+    (ShaderCodeRestored convention) instead of the forward event — but keep
+    ops minimal by default.
 
 ## Bounded undo depth
 

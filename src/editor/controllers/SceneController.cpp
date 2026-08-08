@@ -448,26 +448,6 @@ void OnSceneObjectAddRequested(const neurus::SceneObjectAddRequested& e,
 	ops.Submit(std::make_unique<neurus::CompositeOp>(std::move(seq)));
 }
 
-/** @brief Replay-only restore: re-registers a pooled object (no selection, no recording). */
-void OnSceneObjectAddRestored(const neurus::SceneObjectAddRestored& e,
-                              neurus::EventQueue& bus,
-                              neurus::ResourceManager& resources)
-{
-	neurus::Scene* scene = neurus::Scene::As(e.scene);
-	if (!scene) return;
-	if (scene->GetObjectID(e.objectUid)) return; // already registered — idempotent
-
-	const neurus::ObjectID* obj = resources.Get<neurus::ObjectID>(e.objectUid).get();
-	if (!obj) return; // stale UID: resource no longer pooled
-
-	UsePooledObject(*scene, resources, e.objectUid);
-
-	if (IsLightObject(obj))
-		LightingRebuilt(bus);
-	else
-		Mutated(bus);
-}
-
 /** @brief UI gesture: deselect all, delete every selected object, record ONE composite op. */
 void OnObjectDeleteRequested(const neurus::ObjectDeleteRequested& e,
                              neurus::EventQueue& bus, neurus::IOperationSink& ops)
@@ -559,9 +539,6 @@ void SceneController::Init(EventQueue& bus, IOperationSink& ops)
 	// --- Scene membership (add / delete) ---
 	bus.subscribe<SceneObjectAddRequested>([&bus, &ops, this](const SceneObjectAddRequested& e) {
 		OnSceneObjectAddRequested(e, bus, ops, *m_poolProvider());
-	});
-	bus.subscribe<SceneObjectAddRestored>([&bus, this](const SceneObjectAddRestored& e) {
-		OnSceneObjectAddRestored(e, bus, *m_poolProvider());
 	});
 	bus.subscribe<SceneObjectDeleteRequested>([&bus, this](const SceneObjectDeleteRequested& e) {
 		OnSceneObjectDeleteRequested(e, bus);

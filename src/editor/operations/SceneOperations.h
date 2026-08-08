@@ -384,18 +384,23 @@ private:
 /**
  * @brief Scene-membership toggle: add (or re-add) an object to the scene.
  *
- * Stores the target object UID plus an `add` flag. Apply() dispatches the
- * matching membership RESTORE event (SceneObjectAddRestored /
- * SceneObjectDeleteRequested); the SceneController handler performs the
- * mutation by fetching the pooled object from the ResourceManager by UID.
- * Inverse() flips the flag, so the delete direction is the same op type (the
- * AddShaderFieldOp convention).
+ * Stores the target object UID plus an `add` flag. Apply() re-dispatches the
+ * ORIGINATING membership event (SceneObjectAddRequested /
+ * SceneObjectDeleteRequested), so replay runs the same controller handler as a
+ * live edit; the handler's Submit is muted by OperationManager's
+ * Phase::Replaying guard, so playback does not re-record. Inverse() flips the
+ * flag, so the delete direction is the same op type (the AddShaderFieldOp
+ * convention).
  *
- * Replay events are pure restores (no selection change, no recording) — the
- * forward gesture semantics (select + record) live on SceneObjectAddRequested,
- * which this op never re-emits. The pooled resource is NEVER removed — delete
- * only drops the scene reference, so the inverse re-registers without any
- * reload from disk and survives project save/load (pool + history both persist).
+ * The pooled resource is NEVER removed — delete only drops the scene
+ * reference, so the inverse re-registers without any reload from disk and
+ * survives project save/load (pool + history both persist).
+ *
+ * @note Replay re-enters the forward handler (harmless: Submit is muted). If
+ *       a handler carries gesture side effects (selection, gesture state)
+ *       that must NOT re-run on replay, give it a dedicated restore event
+ *       (ShaderCodeRestored convention) instead of the forward event — but
+ *       keep ops minimal by default.
  */
 class SceneObjectAddOp : public Operation
 {
@@ -415,7 +420,7 @@ public:
 	void Apply(OperationContext& ctx) override
 	{
 		if (m_add)
-			ctx.bus.emitNow(SceneObjectAddRestored{&ctx.scene, m_uid});
+			ctx.bus.emitNow(SceneObjectAddRequested{&ctx.scene, m_uid});
 		else
 			ctx.bus.emitNow(SceneObjectDeleteRequested{&ctx.scene, m_uid});
 	}

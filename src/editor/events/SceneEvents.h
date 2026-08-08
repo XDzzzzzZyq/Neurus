@@ -219,10 +219,11 @@ struct EnvironmentRotationChanged
  * @brief Adds an object to the scene.
  *
  * Emitted by the Editor after loading a resource into the pool (mesh import,
- * camera/light add) — FORWARD path only, never replayed. Carries the UID; the
+ * camera/light add) AND by SceneObjectAddOp on undo/redo replay (the
+ * originating event — replay runs the same handler as a live edit; the
+ * handler's Submit is muted by Phase::Replaying). Carries the UID; the
  * SceneController fetches the pooled object from the ResourceManager by UID,
- * registers it, selects it, and records the composite operation. Replay uses
- * SceneObjectAddRestored (no gesture semantics).
+ * registers it, selects it, and records the composite operation.
  */
 struct SceneObjectAddRequested
 {
@@ -231,26 +232,12 @@ struct SceneObjectAddRequested
 };
 
 /**
- * @brief Re-registers an object in the scene (pure restore).
- *
- * Emitted only by SceneObjectAddOp (add direction) on undo/redo replay.
- * The handler registers the pooled object WITHOUT touching selection and
- * WITHOUT recording — selection is restored by the composite's own
- * SetSelectionOp. Mirrors the ShaderCodeRestored convention: forward
- * gesture events and replay-restore events are distinct types.
- */
-struct SceneObjectAddRestored
-{
-	const UID* scene = nullptr;
-	int objectUid = 0;
-};
-
-/**
  * @brief Removes ONE object's scene reference.
  *
  * Emitted only by SceneObjectAddOp (delete direction) on undo/redo replay;
  * the handler removes exactly this UID — no selection logic, no operation
- * recording. The pooled resource is never removed from the pool.
+ * recording (replay of the delete direction is a pure restore). The pooled
+ * resource is never removed from the pool.
  */
 struct SceneObjectDeleteRequested
 {
