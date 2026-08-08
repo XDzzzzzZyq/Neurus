@@ -137,9 +137,8 @@ so undo/redo runs the same controller handlers as live edits; the handler's
 playback does not re-record (the expected "Submit suppressed during replay"
 LOG).
 `ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
-it is a **pure UI intent** — panels emit the default (no scene); the Editor
-stamps the active scene (`Editor::OnObjectDeleteRequested`) before enqueueing,
-so the UI layer stays decoupled from scene state. It is **forward-only** (the
+it carries the Editor-owned scene pointer stamped as UI state (held during
+`Refresh()` — the `ObjectSelected` pattern), and is **forward-only** (the
 recorded composite replays via `SceneObjectDeleteRequested`, never this
 gesture event). The SceneController snapshots the selection, guards the last
 camera, deselects, and DEFERS the actual removals as ONE batched

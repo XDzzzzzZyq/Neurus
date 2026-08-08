@@ -452,12 +452,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	{
 		ConnectUIEvent(outliner, &neurus::Outliner::objectSelected);
 		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
-
-		// Delete is pure UI intent: the Editor stamps the active scene.
-		QObject::connect(outliner, &neurus::Outliner::objectDeleteRequested,
-		                 [this](const neurus::ObjectDeleteRequested&) {
-		                     app_editor->OnObjectDeleteRequested();
-		                 });
+		ConnectUIEvent(outliner, &neurus::Outliner::objectDeleteRequested);
 	}
 
 	// --- Viewport signals: resize + camera control + pixel selection ---
@@ -482,11 +477,8 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(viewport, &neurus::Viewport::mousePressed);
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseReleased);
 
-		// Delete is pure UI intent: the Editor stamps the active scene.
-		QObject::connect(viewport, &neurus::Viewport::objectDeleteRequested,
-		                 [this](const neurus::ObjectDeleteRequested&) {
-		                     app_editor->OnObjectDeleteRequested();
-		                 });
+		// Forward the Delete key (remove all selected objects).
+		ConnectUIEvent(viewport, &neurus::Viewport::objectDeleteRequested);
 
 		// Handle left-click for pixel-perfect object selection via IDBuffer
 		QObject::connect(viewport, &neurus::Viewport::mousePressed,

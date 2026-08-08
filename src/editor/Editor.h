@@ -123,16 +123,6 @@ public:
 	void UploadSceneResources();
 	void UploadLighting();
 
-	/**
-	 * @brief Forwards the UI delete intent with the active scene stamped.
-	 *
-	 * The UI emits a pure ObjectDeleteRequested{} (no payload); the Editor
-	 * owns the active scene, so it stamps it here before enqueueing — keeping
-	 * the UI layer decoupled from scene state. Application wires the panel
-	 * signals to this method.
-	 */
-	void OnObjectDeleteRequested();
-
 private:
 	// --- Handlers called by EventQueue subscribers in Initialize() ---
 	void OnMeshImport(const std::string& path);

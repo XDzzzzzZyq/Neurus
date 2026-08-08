@@ -247,20 +247,19 @@ struct SceneObjectDeleteRequested
 };
 
 /**
- * @brief UI intent: delete ALL selected objects.
+ * @brief UI gesture: delete ALL selected objects (Delete key).
  *
- * Pure signal — panels emit the DEFAULT (scene = nullptr); the Editor
- * forwards the actual event with the active scene stamped
- * (Editor::OnObjectDeleteRequested). This event is FORWARD-ONLY (the user
- * intent entry point): the recorded composite replays via
- * SceneObjectDeleteRequested, never this gesture event. The SceneController
- * snapshots the selection, guards the last camera, deselects, removes every
- * selected object (one batched SceneObjectDeleteRequested), and records ONE
- * composite operation (selection-clear + batched delete).
+ * Emitted by the Outliner / Viewport with the Editor-owned scene pointer
+ * stamped as UI state (held during Refresh — the ObjectSelected pattern).
+ * FORWARD-ONLY: the recorded composite replays via SceneObjectDeleteRequested,
+ * never this gesture event. The SceneController snapshots the selection,
+ * guards the last camera, deselects, removes every selected object (one
+ * batched SceneObjectDeleteRequested), and records ONE composite operation
+ * (selection-clear + batched delete).
  */
 struct ObjectDeleteRequested
 {
-	const UID* scene = nullptr;  ///< Editor-owned Scene (stamped by the Editor).
+	const UID* scene = nullptr;  ///< Editor-owned Scene (UI state).
 };
 
 } // namespace neurus

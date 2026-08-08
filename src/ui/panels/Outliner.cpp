@@ -86,11 +86,10 @@ QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 
 void Outliner::keyPressEvent(QKeyEvent* event)
 {
-	if (event->key() == Qt::Key_Delete)
+	if (event->key() == Qt::Key_Delete && m_scene)
 	{
-		// Delete: pure UI intent — the Editor stamps the active scene and
-		// forwards it to the SceneController.
-		emit objectDeleteRequested(ObjectDeleteRequested{});
+		// UI emits complete events: stamp the Editor-owned scene (UI state).
+		emit objectDeleteRequested(ObjectDeleteRequested{m_scene});
 		event->accept();
 		return;
 	}
