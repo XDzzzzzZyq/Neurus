@@ -26,6 +26,7 @@
 #include <vector>
 
 class QGroupBox;
+class QKeyEvent;
 class QScrollArea;
 class QVBoxLayout;
 
@@ -64,6 +65,20 @@ signals:
 
 	/** @brief Emitted when visibility toggles change for an object. */
 	void visibilityChanged(const VisibilityChanged& e);
+
+	/**
+	 * @brief Emitted when the Delete key is pressed while the outliner has focus.
+	 * @note Carries the scene pointer (UI state); deletes ALL selected objects.
+	 */
+	void objectDeleteRequested(const ObjectDeleteRequested& e);
+
+protected:
+	/**
+	 * @brief Handles keyboard input (Delete = delete all selected objects).
+	 * @param event The key event.
+	 * @note Key events from focused child rows propagate up to this panel.
+	 */
+	void keyPressEvent(QKeyEvent* event) override;
 
 private:
 	/**

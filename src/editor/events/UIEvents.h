@@ -6,6 +6,7 @@
 #include "editor/events/ProjectEvents.h"
 #include "editor/events/AssetEvents.h"
 #include "editor/events/OperationEvents.h"
+#include "editor/events/SceneEvents.h"
 
 namespace neurus {
 
@@ -109,6 +110,13 @@ signals:
 
 	/** @brief Emitted when a new spot light should be added to the scene (Edit → Add → Spot Light). */
 	void spotLightAddRequested(const SpotLightAddEvent& e);
+
+	/**
+	 * @brief Emitted when the user presses Delete in the Outliner or Viewport.
+	 * @note Panels stamp the Editor-owned scene pointer into the event
+	 *       (held as UI state during Refresh), matching ObjectSelected.
+	 */
+	void objectDeleteRequested(const ObjectDeleteRequested& e);
 
 	// --- Undo/redo signals ---
 

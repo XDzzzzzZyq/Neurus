@@ -211,4 +211,49 @@ struct EnvironmentRotationChanged
 	float rotation = 0.0f;
 };
 
+// ---------------------------------------------------------------------------
+// Scene membership (Add / Delete)
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Adds an object to the scene.
+ *
+ * Emitted by the Editor after loading a resource into the pool (mesh import,
+ * camera/light add) and by SceneObjectAddOp on undo/redo replay. Carries the
+ * UID; the SceneController fetches the pooled object from the ResourceManager
+ * by UID and registers it (the forward handler also selects it and records
+ * the composite operation).
+ */
+struct SceneObjectAddRequested
+{
+	const UID* scene = nullptr;  ///< Editor-owned Scene.
+	int objectUid = 0;           ///< Pooled object UID.
+};
+
+/**
+ * @brief Removes ONE object's scene reference.
+ *
+ * Emitted only by SceneObjectAddOp (delete direction) on undo/redo replay;
+ * the handler removes exactly this UID — no selection logic, no operation
+ * recording. The pooled resource is never removed from the pool.
+ */
+struct SceneObjectDeleteRequested
+{
+	const UID* scene = nullptr;
+	int objectUid = 0;
+};
+
+/**
+ * @brief UI gesture: delete ALL selected objects.
+ *
+ * Emitted by the Outliner / Viewport when the Delete key is pressed. The
+ * SceneController snapshots the selection, guards the last camera, deselects,
+ * removes every selected object, and records ONE composite operation
+ * (selection-clear + per-object delete).
+ */
+struct ObjectDeleteRequested
+{
+	const UID* scene = nullptr;
+};
+
 } // namespace neurus

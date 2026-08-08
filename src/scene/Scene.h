@@ -389,6 +389,60 @@ public:
 		RegisterObject(env, env_list);
 	}
 
+	/**
+	 * @brief Unregisters an object from its type pool and obj_list.
+	 * @tparam T Object type (Camera, Mesh, Light, Environment, ...).
+	 * @param id Object UID.
+	 * @param typePool Type-specific pool to remove from.
+	 * @return true if the object was registered under this type.
+	 * @note Mirrors RegisterObject(): erases from the typed pool and the
+	 *       master obj_list and clears the object from the selection. The
+	 *       pooled resource itself is NOT removed from the ResourceManager —
+	 *       deleting only drops the scene reference, so the operation stays
+	 *       invertible (undo re-registers without any reload).
+	 */
+	template<typename T>
+	bool RemoveObject(int id, ResPool<T>& typePool)
+	{
+		auto it = typePool.find(id);
+		if (it == typePool.end())
+			return false; // not registered as this type — stale UID is a safe no-op
+		auto oit = obj_list.find(id);
+		if (oit != obj_list.end())
+			selections.Deselect(oit->second.get(), false);
+		typePool.erase(id);
+		obj_list.erase(id);
+		return true;
+	}
+
+	/**
+	 * @brief Removes a camera's scene reference.
+	 * @param id Camera UID.
+	 * @return true if a camera with that UID was registered.
+	 */
+	bool RemoveCamera(int id) { return RemoveObject(id, cam_list); }
+
+	/**
+	 * @brief Removes a mesh's scene reference.
+	 * @param id Mesh UID.
+	 * @return true if a mesh with that UID was registered.
+	 */
+	bool RemoveMesh(int id) { return RemoveObject(id, mesh_list); }
+
+	/**
+	 * @brief Removes a light's scene reference.
+	 * @param id Light UID.
+	 * @return true if a light with that UID was registered.
+	 */
+	bool RemoveLight(int id) { return RemoveObject(id, light_list); }
+
+	/**
+	 * @brief Removes an environment's scene reference.
+	 * @param id Environment UID.
+	 * @return true if an environment with that UID was registered.
+	 */
+	bool RemoveEnvironment(int id) { return RemoveObject(id, env_list); }
+
 	// -------------------------------------------------------------------
 	// Lookup
 	// -------------------------------------------------------------------

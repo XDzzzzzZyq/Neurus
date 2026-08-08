@@ -34,6 +34,19 @@ model, coalescing rules, and persistence.
   selection is also persisted independently of history by `Scene::serialize`
   (as UIDs — see data-resource.instructions.md), so a reopened project restores
   its selection even with an empty undo/redo history.
+- **`CompositeOp`** (in `Operation.h`, a general-purpose core op) composes any
+  sequence of `Operation`s into ONE undo entry. Group-theoretic inverse: it
+  replays the sequence in forward order, and `Inverse()` returns a composite of
+  the reversed, individually-inverted operations (o = h·g·f ⇒ o⁻¹ = f⁻¹·g⁻¹·h⁻¹),
+  so inversion is an involution. Serializes its contained ops polymorphically
+  (same pattern as the manager stacks).
+- **`SceneObjectAddOp`** (membership toggle) makes Add/Delete undoable. It
+  stores the object UID plus an `add` flag (the `AddShaderFieldOp` convention):
+  `Apply()` dispatches `SceneObjectAddRequested` / `SceneObjectDeleteRequested`,
+  and `Inverse()` flips the flag — the inverse of Add is Delete and vice versa.
+  Delete NEVER removes the pooled resource: it only drops the scene reference,
+  so undo re-registers from the pool without any reload from disk, and the
+  operation survives project save/load (pool + history both persist).
 
 ## Bounded undo depth
 
@@ -46,7 +59,7 @@ Redo is bounded implicitly: its entries only ever originate from undo pops.
 ## Coalescing gestures into one undo entry
 
 A continuous manipulation (a slider drag, a camera orbit) fires a *stream* of
-value changes but must collapse to a single undo entry. Two strategies exist:
+value changes but must collapse to a single undo entry. Three strategies exist:
 
 - **Implicit merge (MergeKey):** the op declares a non-empty `MergeKey()`;
   `OperationManager::Submit` folds a same-key edit into the undo-stack top.
@@ -58,6 +71,14 @@ value changes but must collapse to a single undo entry. Two strategies exist:
   Used where the UI has a real press/release boundary. This needs NO changes to
   `OperationManager` or `IOperationSink` — the boundaries are ordinary typed
   events flowing through the same controller chain.
+- **Composite (one gesture → many primitive ops):** where one gesture spans
+  several *distinct* edits, the controller records a single `CompositeOp`
+  holding the primitive sequence. Scene add records
+  `CompositeOp[SceneObjectAddOp(u,true), SetSelectionOp(before→{u})]` (add AND
+  select = one undo entry); scene delete records
+  `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`
+  (deselect AND remove every selected object = one undo entry). Undo replays
+  the reversed, inverted sequence.
 
 For the concrete controller wiring (`CameraController`,
 `RenderConfigController`, `ShaderController`), see

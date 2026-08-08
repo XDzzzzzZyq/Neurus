@@ -7,6 +7,8 @@
 #include "editor/events/EditorEvents.h"
 #include "editor/operations/OperationManager.h"
 #include "editor/Input.h"
+#include "core/ResourceManager.h"
+#include "asset/data/MeshData.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
 #include "scene/Light.h"
@@ -38,7 +40,8 @@ protected:
 	EventQueue m_eventBus;
 	Scene m_scene;
 	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
-	SceneController m_controller;
+	ResourceManager m_resources;
+	SceneController m_controller{ [this]() -> ResourceManager* { return &m_resources; } };
 	std::shared_ptr<Camera> m_camera;
 	std::shared_ptr<Mesh> m_mesh;
 	std::shared_ptr<Light> m_light;
@@ -232,4 +235,159 @@ TEST_F(SceneControllerTest, Selection_DoesNotEnqueueSceneModified)
 	m_eventBus.enqueue(ObjectSelected{&m_scene, m_mesh.get(), 0});
 	Process();
 	EXPECT_EQ(modified, 0);
+}
+
+// --- Scene membership (Add / Delete) --------------------------------------
+
+/** @brief Loads a mesh into the pool and returns its UID. */
+int LoadPooledMesh(ResourceManager& resources)
+{
+	auto meshData = resources.Load<MeshData>();
+	auto mesh = resources.Load<Mesh>(meshData);
+	return mesh->GetObjectID();
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_RegistersSelectsAndRecordsOp)
+{
+	const int uid = LoadPooledMesh(m_resources);
+
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uid});
+	Process();
+
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+	EXPECT_NE(m_scene.GetObjectID(uid), nullptr);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_scene.GetObjectID(uid)));
+	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_scene.GetObjectID(uid));
+	EXPECT_TRUE(m_operations.CanUndo());
+
+	// Undo: object removed, selection restored to the pre-add (empty) set.
+	m_operations.Undo();
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
+
+	// Redo: object re-registered (from the pool — no reload) + re-selected.
+	m_operations.Redo();
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_scene.GetObjectID(uid)));
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_AlreadyInScene_NoOp)
+{
+	const int uid = LoadPooledMesh(m_resources);
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uid});
+	Process();
+
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uid});
+	Process();
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_StaleUid_NoOp)
+{
+	const int uid = LoadPooledMesh(m_resources);
+	m_resources.Remove(uid); // resource no longer pooled
+
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uid});
+	Process();
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+TEST_F(SceneControllerTest, DeleteRequested_RemovesSelectionAndRecordsComposite)
+{
+	const int uid = LoadPooledMesh(m_resources);
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uid});
+	Process(); // mesh added + selected
+
+	m_eventBus.enqueue(ObjectDeleteRequested{&m_scene});
+	Process();
+
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
+	EXPECT_TRUE(m_operations.CanUndo());
+
+	// Undo: mesh re-added (from the pool) + selection restored.
+	m_operations.Undo();
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(m_scene.GetObjectID(uid)));
+
+	// Redo: deleted again.
+	m_operations.Redo();
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
+}
+
+TEST_F(SceneControllerTest, DeleteRequested_MultiSelection_RemovesAllAndRestores)
+{
+	const int uidA = LoadPooledMesh(m_resources);
+	const int uidB = LoadPooledMesh(m_resources);
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uidA});
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, uidB});
+	Process(); // both added; B selected last
+
+	// Multi-select both (shift-add semantics).
+	m_scene.selections.Select(m_scene.GetObjectID(uidA), true);
+
+	m_eventBus.enqueue(ObjectDeleteRequested{&m_scene});
+	Process();
+
+	EXPECT_EQ(m_scene.mesh_list.count(uidA), 0u);
+	EXPECT_EQ(m_scene.mesh_list.count(uidB), 0u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
+
+	m_operations.Undo();
+	EXPECT_EQ(m_scene.mesh_list.count(uidA), 1u);
+	EXPECT_EQ(m_scene.mesh_list.count(uidB), 1u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 2u);
+
+	m_operations.Redo();
+	// Only the fixture mesh (registered in SetUp) remains.
+	EXPECT_EQ(m_scene.mesh_list.size(), 1u);
+	EXPECT_EQ(m_scene.mesh_list.count(uidA), 0u);
+	EXPECT_EQ(m_scene.mesh_list.count(uidB), 0u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
+}
+
+TEST_F(SceneControllerTest, DeleteRequested_LastCamera_Refused)
+{
+	m_scene.selections.Select(m_camera.get(), false);
+	m_eventBus.enqueue(ObjectDeleteRequested{&m_scene});
+	Process();
+
+	EXPECT_EQ(m_scene.cam_list.count(m_camera->GetObjectID()), 1u);
+	EXPECT_FALSE(m_operations.CanUndo()); // nothing recorded
+}
+
+TEST_F(SceneControllerTest, DeleteRequested_EmptySelection_NoOp)
+{
+	m_eventBus.enqueue(ObjectDeleteRequested{&m_scene});
+	Process();
+	EXPECT_FALSE(m_operations.CanUndo());
+}
+
+TEST_F(SceneControllerTest, SceneObjectAdd_Light_EnqueuesLightingRebuild)
+{
+	bool rebuilt = false;
+	m_eventBus.subscribe<LightingRebuild>([&](const LightingRebuild&) { rebuilt = true; });
+
+	auto light = m_resources.Load<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, light->GetObjectID()});
+	Process();
+	EXPECT_TRUE(rebuilt);
+	EXPECT_EQ(m_scene.light_list.count(light->GetObjectID()), 1u);
+}
+
+TEST_F(SceneControllerTest, DeleteRequested_Light_EnqueuesLightingRebuild)
+{
+	auto light = m_resources.Load<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	m_eventBus.enqueue(SceneObjectAddRequested{&m_scene, light->GetObjectID()});
+	Process();
+
+	bool rebuilt = false;
+	m_eventBus.subscribe<LightingRebuild>([&](const LightingRebuild&) { rebuilt = true; });
+	m_eventBus.enqueue(ObjectDeleteRequested{&m_scene});
+	Process();
+
+	EXPECT_TRUE(rebuilt);
+	EXPECT_EQ(m_scene.light_list.count(light->GetObjectID()), 0u);
 }

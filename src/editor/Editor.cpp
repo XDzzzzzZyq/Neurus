@@ -107,7 +107,16 @@ void Editor::Initialize()
 	// --- Register controllers ---
 	RegisterController<CameraController>();
 	RegisterController<ShaderController>();
-	RegisterController<SceneController>();
+
+	// SceneController needs the Editor-owned resource pool (UID -> object
+	// resolution for add/delete membership), which RegisterController<T>()
+	// can't supply — construct it manually with a provider.
+	{
+		auto sceneCtrl = std::make_unique<SceneController>(
+			[this]() -> ResourceManager* { return m_resources.get(); });
+		sceneCtrl->Init(ed_eventBus, ed_operations);
+		ed_controllers.push_back(std::move(sceneCtrl));
+	}
 
 	// RenderConfigController needs the Editor-owned RenderConfig, which
 	// RegisterController<T>() can't supply — construct it manually with a
@@ -301,18 +310,20 @@ void Editor::FinishLoad()
 void Editor::OnMeshImport(const std::string& path)
 {
 	try {
+		// Import = load the resource into the pool. The SceneController
+		// registers it into the scene and records the undoable Add operation.
 		auto meshData = m_resources->Load<MeshData>(path);
 		auto mesh = m_resources->Load<Mesh>(meshData);
-		m_scene->UseMesh(mesh);
 
-		// Upload to GPU immediately via UploadManager
+		// Pool-keyed GPU cache upload (RenderCache follows the pool, not the
+		// scene — GeometryPass would also create the MeshGPU lazily).
 		if (ed_uploadManager && ed_renderer)
 		{
 			auto meshGPU = ed_uploadManager->UploadMesh(*mesh);
 			ed_renderer->GetRenderCache().UseMeshGPU(mesh->GetObjectID(), std::move(meshGPU));
 		}
 
-		m_dirty = true;
+		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), mesh->GetObjectID()});
 		NEURUS_LOG("[Editor] Imported mesh: " << path);
 	}
 	catch (const std::exception& e) {
@@ -326,8 +337,7 @@ void Editor::OnCameraAdd()
 		auto camera = m_resources->Load<Camera>();
 		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-		m_scene->UseCamera(camera);
-		m_dirty = true;
+		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), camera->GetObjectID()});
 		NEURUS_LOG("[Editor] Added camera at (0, -5, 2)");
 	}
 	catch (const std::exception& e) {
@@ -342,16 +352,14 @@ void Editor::OnLightAdd()
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.01f);
-		m_scene->UseLight(light);
-		// Upload lighting via UploadManager (variant API) → RenderCache
-		UploadLighting();
-		// Upload shadow map for this light
+		// Pool-keyed shadow-map upload; the light SSBO rebuild happens via
+		// LightingRebuild after the controller registers the light in the scene.
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
 		{
 			auto lightGPU = ed_uploadManager->UploadLight(*light);
 			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
 		}
-		m_dirty = true;
+		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added point light at (3, 3, 3)");
 	}
 	catch (const std::exception& e) {
@@ -367,16 +375,14 @@ void Editor::OnSunLightAdd()
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->use_shadow = true;
-		m_scene->UseLight(light);
-		// Upload lighting via UploadManager (variant API) → RenderCache
-		UploadLighting();
-		// Upload shadow map for this sun light
+		// Pool-keyed shadow-map upload; SSBO rebuild via LightingRebuild
+		// after the controller registers the light in the scene.
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
 		{
 			auto lightGPU = ed_uploadManager->UploadLight(*light);
 			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
 		}
-		m_dirty = true;
+		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
 	}
 	catch (const std::exception& e) {
@@ -395,16 +401,14 @@ void Editor::OnSpotLightAdd()
 		light->SetCutoff(0.95f);        // ~18° inner cone half-angle
 		light->SetOuterCutoff(0.85f);   // ~32° outer cone half-angle
 		light->use_shadow = true;
-		m_scene->UseLight(light);
-		// Upload lighting via UploadManager (variant API) → RenderCache
-		UploadLighting();
-		// Upload shadow map (cubemap, shared point-light pool)
+		// Pool-keyed shadow-map upload; SSBO rebuild via LightingRebuild
+		// after the controller registers the light in the scene.
 		if (ed_uploadManager && ed_renderer && light->use_shadow)
 		{
 			auto lightGPU = ed_uploadManager->UploadLight(*light);
 			ed_renderer->GetRenderCache().UseLightGPU(light->GetObjectID(), std::move(lightGPU));
 		}
-		m_dirty = true;
+		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added spot light at (0, 0, 6) pointing down");
 	}
 	catch (const std::exception& e) {

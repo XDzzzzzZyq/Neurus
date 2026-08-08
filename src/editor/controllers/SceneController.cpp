@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @file SceneController.cpp
  * @brief Event-driven scene mutation handlers (selection, transforms, props).
  *
@@ -24,6 +24,8 @@
 #include "editor/operations/IOperationSink.h"
 #include "editor/operations/SceneOperations.h"
 #include "editor/Input.h"
+
+#include "core/ResourceManager.h"
 
 #include "scene/Camera.h"
 #include "scene/Environment.h"
@@ -369,6 +371,144 @@ void OnEnvironmentRotationChanged(const neurus::EnvironmentRotationChanged& e, n
 	Mutated(bus);
 }
 
+// ---------------------------------------------------------------------------
+// Scene membership (Add / Delete)
+// ---------------------------------------------------------------------------
+
+/** @brief Registers a pooled object into the scene by type (camera/mesh/light/env). */
+void UsePooledObject(neurus::Scene& scene, neurus::ResourceManager& resources, int uid)
+{
+	auto obj = resources.Get<neurus::ObjectID>(uid);
+	if (!obj) return;
+	switch (obj->o_type)
+	{
+	case neurus::ObjectID::GOType::GO_CAM:
+		scene.UseCamera(resources.Get<neurus::Camera>(uid));
+		break;
+	case neurus::ObjectID::GOType::GO_MESH:
+		scene.UseMesh(resources.Get<neurus::Mesh>(uid));
+		break;
+	case neurus::ObjectID::GOType::GO_LIGHT:
+	case neurus::ObjectID::GOType::GO_POLYLIGHT:
+		scene.UseLight(resources.Get<neurus::Light>(uid));
+		break;
+	case neurus::ObjectID::GOType::GO_ENVIR:
+		scene.UseEnvironment(resources.Get<neurus::Environment>(uid));
+		break;
+	default:
+		break; // sprites / debug primitives: no add flow
+	}
+}
+
+/** @brief Drops one object's scene reference by UID (typed erase; stale = no-op). */
+bool RemoveSceneObject(neurus::Scene& scene, int uid)
+{
+	return scene.RemoveCamera(uid)
+	    || scene.RemoveMesh(uid)
+	    || scene.RemoveLight(uid)
+	    || scene.RemoveEnvironment(uid);
+}
+
+/** @brief True if the object is a light (SSBO is a scene projection). */
+bool IsLightObject(const neurus::ObjectID* obj)
+{
+	return obj && (obj->o_type == neurus::ObjectID::GOType::GO_LIGHT
+	               || obj->o_type == neurus::ObjectID::GOType::GO_POLYLIGHT);
+}
+
+/** @brief Adds a pooled object to the scene, selects it, and records ONE composite op. */
+void OnSceneObjectAddRequested(const neurus::SceneObjectAddRequested& e,
+                               neurus::EventQueue& bus, neurus::IOperationSink& ops,
+                               neurus::ResourceManager& resources)
+{
+	neurus::Scene* scene = neurus::Scene::As(e.scene);
+	if (!scene) return;
+	if (scene->GetObjectID(e.objectUid)) return; // already registered
+
+	auto obj = resources.Get<neurus::ObjectID>(e.objectUid);
+	if (!obj) return; // stale UID: resource no longer pooled
+
+	const neurus::SelectionState before = SnapshotSelection(*scene);
+	UsePooledObject(*scene, resources, e.objectUid);
+
+	// Select the added object (set, non-incremental).
+	scene->selections.Select(obj.get(), false);
+
+	// Light SSBO mirrors scene->light_list: rebuild after the light is in.
+	if (IsLightObject(obj.get()))
+		LightingRebuilt(bus);
+	else
+		Mutated(bus);
+
+	// One undo entry: add + select (composed selection op restores on undo).
+	std::vector<std::unique_ptr<neurus::Operation>> seq;
+	seq.push_back(std::make_unique<neurus::SceneObjectAddOp>(e.objectUid, true));
+	const neurus::SelectionState after = SnapshotSelection(*scene);
+	seq.push_back(std::make_unique<neurus::SetSelectionOp>(before, after));
+	ops.Submit(std::make_unique<neurus::CompositeOp>(std::move(seq)));
+}
+
+/** @brief UI gesture: deselect all, delete every selected object, record ONE composite op. */
+void OnObjectDeleteRequested(const neurus::ObjectDeleteRequested& e,
+                             neurus::EventQueue& bus, neurus::IOperationSink& ops)
+{
+	neurus::Scene* scene = neurus::Scene::As(e.scene);
+	if (!scene) return;
+
+	const neurus::SelectionState before = SnapshotSelection(*scene);
+	if (before.selectedUids.empty()) return;
+
+	// Last-camera guard: the render passes dereference GetActiveCamera()
+	// unconditionally, so never leave the scene without a camera. Types are
+	// resolved from the SCENE (the objects being deleted are in it by
+	// definition) — no pool dependency.
+	size_t camerasToDelete = 0;
+	for (int uid : before.selectedUids)
+	{
+		const neurus::ObjectID* obj = scene->GetObjectID(uid);
+		if (obj && obj->o_type == neurus::ObjectID::GOType::GO_CAM)
+			++camerasToDelete;
+	}
+	if (camerasToDelete > 0 && scene->cam_list.size() <= camerasToDelete)
+	{
+		NEURUS_ERR("[SceneController] Refusing to delete the last camera");
+		return;
+	}
+
+	// Deselect all, then drop each selected object's scene reference.
+	scene->selections.ClearSelection();
+
+	std::vector<std::unique_ptr<neurus::Operation>> seq;
+	seq.push_back(std::make_unique<neurus::SetSelectionOp>(before, neurus::SelectionState{}));
+	bool removedLight = false;
+	for (int uid : before.selectedUids)
+	{
+		removedLight |= IsLightObject(scene->GetObjectID(uid));
+		if (RemoveSceneObject(*scene, uid))
+			seq.push_back(std::make_unique<neurus::SceneObjectAddOp>(uid, false));
+	}
+	if (removedLight)
+		bus.enqueue(neurus::LightingRebuild{});
+	Mutated(bus);
+
+	ops.Submit(std::make_unique<neurus::CompositeOp>(std::move(seq)));
+}
+
+/** @brief Replay-only: removes ONE object's scene reference (SceneObjectAddOp delete). */
+void OnSceneObjectDeleteRequested(const neurus::SceneObjectDeleteRequested& e,
+                                  neurus::EventQueue& bus)
+{
+	neurus::Scene* scene = neurus::Scene::As(e.scene);
+	if (!scene) return;
+	const bool wasLight = IsLightObject(scene->GetObjectID(e.objectUid));
+	if (!RemoveSceneObject(*scene, e.objectUid)) return; // stale — safe no-op
+
+	if (wasLight)
+		LightingRebuilt(bus);
+	else
+		Mutated(bus);
+}
+
 } // anonymous namespace
 
 namespace neurus {
@@ -395,6 +535,17 @@ void SceneController::Init(EventQueue& bus, IOperationSink& ops)
 	bus.subscribe<LightOuterCutoffChanged>([&bus, &ops](const LightOuterCutoffChanged& e) { OnLightOuterCutoffChanged(e, bus, ops); });
 	bus.subscribe<EnvironmentIntensityChanged>([&bus, &ops](const EnvironmentIntensityChanged& e) { OnEnvironmentIntensityChanged(e, bus, ops); });
 	bus.subscribe<EnvironmentRotationChanged>([&bus, &ops](const EnvironmentRotationChanged& e) { OnEnvironmentRotationChanged(e, bus, ops); });
+
+	// --- Scene membership (add / delete) ---
+	bus.subscribe<SceneObjectAddRequested>([&bus, &ops, this](const SceneObjectAddRequested& e) {
+		OnSceneObjectAddRequested(e, bus, ops, *m_poolProvider());
+	});
+	bus.subscribe<SceneObjectDeleteRequested>([&bus, this](const SceneObjectDeleteRequested& e) {
+		OnSceneObjectDeleteRequested(e, bus);
+	});
+	bus.subscribe<ObjectDeleteRequested>([&bus, &ops, this](const ObjectDeleteRequested& e) {
+		OnObjectDeleteRequested(e, bus, ops);
+	});
 }
 
 } // namespace neurus

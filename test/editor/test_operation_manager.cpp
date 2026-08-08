@@ -21,6 +21,7 @@
 #include "editor/events/EventBus.h"
 #include "editor/events/SceneEvents.h"
 #include "editor/Input.h"
+#include "core/ResourceManager.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/SceneOperations.h"
@@ -52,7 +53,8 @@ protected:
 	EventQueue m_eventBus;
 	Scene m_scene;
 	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
-	SceneController m_controller;
+	ResourceManager m_resources;
+	SceneController m_controller{ [this]() -> ResourceManager* { return &m_resources; } };
 	std::shared_ptr<Mesh> m_mesh;
 	std::shared_ptr<Light> m_light;
 	std::shared_ptr<Camera> m_camera;

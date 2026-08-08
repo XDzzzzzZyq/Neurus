@@ -38,7 +38,8 @@ changes through the event system.
    - `Controllers` base class: `virtual Init(EventQueue& bus)` to bind controller to event bus
    - `Editor::RegisterController<T>(EventQueue& bus)` — template factory that creates controller, calls `Init(bus)`, stores in `m_controllers`
    - `CameraController` — event-driven orbit/zoom/dolly/pan via `CameraEvents` (rotate, push, slide, zoom)
-   - `SceneController` — event-driven scene mutations (selection, transform, visibility, camera/mesh/light/env property edits); stateless with free-function handlers in the .cpp; emits `EditorEvents` (SceneModified, LightGpuChanged, LightingRebuild, RenderResetEvent) for GPU uploads and dirty tracking; see events.instructions.md for the GPU-sync flow
+   - `SceneController` — event-driven scene mutations (selection, transform, visibility, camera/mesh/light/env property edits, scene membership add/delete); stateless with free-function handlers in the .cpp; constructed manually with a `ResourceManager*` provider (UID → object resolution, the `RenderConfigController` pattern); emits `EditorEvents` (SceneModified, LightGpuChanged, LightingRebuild, RenderResetEvent) for GPU uploads and dirty tracking; see events.instructions.md for the GPU-sync flow
+   - **Import/Add split**: `Editor::OnMeshImport`/`OnCameraAdd`/`OnLightAdd`/... only LOAD the resource into the pool and forward the object UID via `SceneObjectAddRequested`; the SceneController fetches the pooled object by UID, registers it, selects it, and records `CompositeOp[SceneObjectAddOp(u,true), SetSelectionOp(...)]`. The Delete gesture (`ObjectDeleteRequested`, Delete key in Outliner/Viewport) removes every selected object's scene reference (last-camera guard, pool never touched) and records `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`. Light membership changes enqueue `LightingRebuild` (the SSBO is a scene projection); the UID-keyed GPU caches (MeshGPU, shadow maps) follow the pool, so undo/redo performs no GPU work.
    - `ShaderController` — event-driven shader lifecycle via `ShaderEvents` (create, compile, code/struct edit, field add); enqueues `RenderResetEvent` after create/compile so temporal accumulation resets
    - Controllers receive discrete events (not per-frame polling); `Editor::Edit()` dispatches all enqueued events via `EventQueue::Process()`
 
@@ -106,7 +107,10 @@ void Editor::RegisterController(EventQueue& bus)
 
 **Design:**
 - Template factory: creates controller, calls `Init(bus)`, stores ownership
-- Called during Editor initialization for each controller type (CameraController, ShaderController, SceneController)
+- Called during Editor initialization for CameraController and ShaderController.
+  Controllers needing Editor-owned state (a provider) are constructed manually
+  instead — `SceneController` takes a `ResourceManager*` provider and
+  `RenderConfigController` a `RenderConfig*` provider (see Editor::Initialize).
 - Controllers are event-driven — no per-frame polling required
 
 ### Editor::Edit() — Event Dispatch

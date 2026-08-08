@@ -109,6 +109,11 @@ struct LightOuterCutoffChanged { const ObjectID* object; float outerCutoff; };
 // Environment properties
 struct EnvironmentIntensityChanged { const ObjectID* object; float intensity; };
 struct EnvironmentRotationChanged  { const ObjectID* object; float rotation; };
+
+// Scene membership (Add / Delete) — UID-carrying (replay-safe; see below)
+struct SceneObjectAddRequested { const UID* scene; int objectUid; };     // forward (Editor import) + replay
+struct SceneObjectDeleteRequested { const UID* scene; int objectUid; };  // replay only (per-uid unit)
+struct ObjectDeleteRequested { const UID* scene; };                      // UI gesture (delete all selected)
 ```
 
 **Scene Events Are Ephemeral**
@@ -118,6 +123,20 @@ they carry pointers, never integer IDs. Controllers cast the `const ObjectID*`
 to the concrete type via the class static `As()` helpers (e.g. `Mesh::As(...)`)
 and mutate the object directly - no Scene lookup by ID. `Editor::OnUIEvent` just
 enqueues them unchanged.
+
+**Membership events are the exception: they carry UIDs.** Add/Delete is split
+into **Import** (Editor: `Load` the resource into the pool — `OnMeshImport`,
+`OnCameraAdd`, `OnLightAdd`, ...) and **Add** (SceneController: fetch the
+pooled object by UID and register it). The membership events carry the object
+UID instead of a pointer because they double as replay events for the
+`SceneObjectAddOp` undo operation (see operation-system.instructions.md): a
+serialized op replays by UID, and the pool is the single owner of the object.
+`ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
+the SceneController snapshots the selection, guards the last camera, deselects,
+removes every selected object, and records ONE composite operation
+(`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`). The
+forward add path records `CompositeOp[SceneObjectAddOp(u,true),
+SetSelectionOp(before→{u})]` — add AND select collapse to one undo entry.
 
 ### EditorEvents.h
 

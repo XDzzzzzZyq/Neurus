@@ -381,4 +381,60 @@ private:
 	SelectionState m_after;
 };
 
+/**
+ * @brief Scene-membership toggle: add (or re-add) an object to the scene.
+ *
+ * Stores the target object UID plus an `add` flag. Apply() dispatches the
+ * matching membership event (SceneObjectAddRequested / SceneObjectDeleteRequested);
+ * the SceneController handler performs the mutation by fetching the pooled
+ * object from the ResourceManager by UID. Inverse() flips the flag, so the
+ * delete direction is the same op type (the AddShaderFieldOp convention).
+ *
+ * The pooled resource is NEVER removed — delete only drops the scene
+ * reference, so the inverse re-registers without any reload from disk and
+ * survives project save/load (pool + history both persist).
+ */
+class SceneObjectAddOp : public Operation
+{
+public:
+	SceneObjectAddOp() = default;
+
+	/**
+	 * @brief Constructs a membership toggle.
+	 * @param uid Target object UID (pooled resource).
+	 * @param add true = add/re-add; false = remove the scene reference.
+	 */
+	SceneObjectAddOp(int uid, bool add)
+		: m_uid(uid)
+		, m_add(add)
+	{}
+
+	void Apply(OperationContext& ctx) override
+	{
+		if (m_add)
+			ctx.bus.emitNow(SceneObjectAddRequested{&ctx.scene, m_uid});
+		else
+			ctx.bus.emitNow(SceneObjectDeleteRequested{&ctx.scene, m_uid});
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		return std::make_unique<SceneObjectAddOp>(m_uid, !m_add);
+	}
+
+	std::string Label() const override { return m_add ? "Add Object" : "Delete Object"; }
+
+	/** @brief Serializes the target UID + membership direction. */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("uid", m_uid),
+		   cereal::make_nvp("add", m_add));
+	}
+
+private:
+	int  m_uid = 0;    ///< Target object UID (serialized).
+	bool m_add = false; ///< true = add/re-add; false = remove (inverse direction).
+};
+
 } // namespace neurus

@@ -30,6 +30,8 @@
 #include "editor/events/SceneEvents.h"
 #include "editor/Input.h"
 #include "asset/components/HistoryComponent.h"
+#include "core/ResourceManager.h"
+#include "asset/data/MeshData.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/registrations/OperationRegistration.h"
@@ -79,7 +81,8 @@ protected:
 	EventQueue m_eventBus;
 	Scene m_scene;
 	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
-	SceneController m_controller;
+	ResourceManager m_resources;
+	SceneController m_controller{ [this]() -> ResourceManager* { return &m_resources; } };
 	std::shared_ptr<Mesh> m_mesh;
 	std::shared_ptr<Light> m_light;
 	std::shared_ptr<Camera> m_camera;
@@ -192,6 +195,52 @@ TEST_F(OperationSerializationTest, SelectionStateOp_RoundTrip)
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_light.get()));
 	EXPECT_EQ(m_scene.selections.GetActiveObject(), m_light.get());
+}
+
+TEST_F(OperationSerializationTest, SceneObjectAddOp_RoundTrip)
+{
+	auto mesh = m_resources.Load<Mesh>(m_resources.Load<MeshData>());
+	const int uid = mesh->GetObjectID();
+	std::unique_ptr<Operation> op = std::make_unique<SceneObjectAddOp>(uid, true);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<SceneObjectAddOp*>(restored.get()), nullptr);
+	EXPECT_EQ(restored->Label(), "Add Object");
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);                       // add survived
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+
+	restored->Inverse()->Apply(ctx);            // uid + flag survived: delete inverse
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+}
+
+TEST_F(OperationSerializationTest, CompositeOp_RoundTrip)
+{
+	auto mesh = m_resources.Load<Mesh>(m_resources.Load<MeshData>());
+	const int uid = mesh->GetObjectID();
+	SelectionState before{ {}, 0 };
+	SelectionState after{ { uid }, uid };
+
+	std::vector<std::unique_ptr<Operation>> seq;
+	seq.push_back(std::make_unique<SceneObjectAddOp>(uid, true));
+	seq.push_back(std::make_unique<SetSelectionOp>(before, after));
+	std::unique_ptr<Operation> op = std::make_unique<CompositeOp>(std::move(seq));
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<CompositeOp*>(restored.get()), nullptr);
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);                       // forward order: add then select
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
+	EXPECT_TRUE(m_scene.selections.IsSelected(mesh.get()));
+
+	auto inv = restored->Inverse();
+	inv->Apply(ctx);                            // reversed inverses: select-before, remove
+	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+	EXPECT_EQ(m_scene.selections.GetSelectionCount(), 0u);
 }
 
 // --- Full HistoryComponent save/load cycle ---------------------------------

@@ -24,6 +24,7 @@
 #include "scene/ObjectID.h"  // ObjectID, GOType
 
 #include <QGroupBox>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
@@ -41,6 +42,8 @@ namespace neurus
 Outliner::Outliner(QWidget* parent)
 	: UIPanel(PanelType::Outliner, QString(), parent)
 {
+	setFocusPolicy(Qt::StrongFocus);
+
 	auto* mainLayout = new QVBoxLayout(this);
 	mainLayout->setContentsMargins(0, 0, 0, 0);
 
@@ -75,6 +78,22 @@ QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 
 	m_listLayout->addWidget(group);
 	return group;
+}
+
+// =========================================================================
+// keyPressEvent — Delete = delete all selected objects
+// =========================================================================
+
+void Outliner::keyPressEvent(QKeyEvent* event)
+{
+	if (event->key() == Qt::Key_Delete && m_scene)
+	{
+		// UI emits complete events: stamp the Editor-owned scene (UI state).
+		emit objectDeleteRequested(ObjectDeleteRequested{m_scene});
+		event->accept();
+		return;
+	}
+	QWidget::keyPressEvent(event);
 }
 
 // =========================================================================

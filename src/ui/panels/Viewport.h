@@ -6,12 +6,15 @@
 #include <glm/glm.hpp>
 
 #include "editor/events/InputEvents.h"
+#include "editor/events/SceneEvents.h"
 
 class QKeyEvent;
 class QMouseEvent;
 class QWheelEvent;
 
 namespace neurus {
+
+class Scene;
 
 /**
  * @brief A QWidget subclass that exposes a native window handle
@@ -50,10 +53,12 @@ public:
 	/**
 	 * @brief Refreshes the panel from a UIContext snapshot.
 	 *
-	 * Currently a no-op - the Viewport is event-driven (input forwarding)
-	 * and renders via Vulkan outside the Qt widget hierarchy.
+	 * Caches the Editor-owned scene pointer (UI state) so the Delete key can
+	 * stamp a complete ObjectDeleteRequested event. The viewport itself is
+	 * event-driven (input forwarding) and renders via Vulkan outside the Qt
+	 * widget hierarchy.
 	 *
-	 * @param ctx Read-only UI context (unused).
+	 * @param ctx Read-only UI context (scene snapshot).
 	 */
 	void Refresh(const UIContext& ctx) override;
 
@@ -107,6 +112,13 @@ signals:
 	 * @param event MouseScrollEvent with delta, position, modifiers, and button state.
 	 */
 	void mouseScrolled(const neurus::MouseScrollEvent& event);
+
+	/**
+	 * @brief Emitted when the Delete key is pressed while the viewport has focus.
+	 * @param event ObjectDeleteRequested with the Editor-owned scene stamped.
+	 * @note Deletes ALL selected objects (see SceneController).
+	 */
+	void objectDeleteRequested(const neurus::ObjectDeleteRequested& event);
 
 protected:
 	/**
@@ -186,6 +198,9 @@ private:
 	bool    m_leftHeld = false;   ///< Left mouse button held.
 	bool    m_middleHeld = false; ///< Middle mouse button held.
 	bool    m_rightHeld = false;  ///< Right mouse button held.
+
+	/// Editor-owned scene pointer (UI state, set each Refresh) for Delete events.
+	const Scene* m_scene = nullptr;
 };
 
 } // namespace neurus

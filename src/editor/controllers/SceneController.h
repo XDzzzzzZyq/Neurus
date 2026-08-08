@@ -25,15 +25,28 @@
 
 #pragma once
 
+#include <functional>
+
 #include "editor/controllers/Controllers.h"
 #include "editor/events/EventBus.h"
 
 namespace neurus {
 
+class ResourceManager;
+
 class SceneController : public Controllers
 {
 public:
-	SceneController() = default;
+	/**
+	 * @brief Constructs the controller with access to the resource pool.
+	 * @param poolProvider Returns the Editor-owned ResourceManager (re-queried
+	 *        per event, so a pool swap on project new/open stays safe).
+	 * @note Constructed manually by the Editor (RegisterController<T>() cannot
+	 *       supply the provider) — same pattern as RenderConfigController.
+	 */
+	explicit SceneController(std::function<ResourceManager*()> poolProvider)
+		: m_poolProvider(std::move(poolProvider))
+	{}
 
 	/**
 	 * @brief Subscribes to scene events on the given EventQueue.
@@ -47,6 +60,10 @@ public:
 	 * @param ops Sink for recording undoable operations.
 	 */
 	void Init(EventQueue& bus, IOperationSink& ops) override;
+
+private:
+	/// Pool provider for UID -> object resolution (add/delete membership).
+	std::function<ResourceManager*()> m_poolProvider;
 };
 
 } // namespace neurus

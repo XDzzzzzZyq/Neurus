@@ -22,8 +22,11 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <cereal/cereal.hpp>
+#include <cereal/types/memory.hpp>
+#include <cereal/types/vector.hpp>
 
 #include "editor/operations/OperationContext.h"
 
@@ -167,6 +170,68 @@ protected:
 	int m_uid = 0;      ///< Target object UID (serialized).
 	Value m_before{};   ///< Value before the edit (serialized).
 	Value m_after{};    ///< Value after the edit (serialized).
+};
+
+/**
+ * @brief Composes a sequence of operations into a single undo entry.
+ *
+ * Group-theoretic composite: Apply() replays the sequence in forward order;
+ * Inverse() returns a composite of the reversed, individually-inverted
+ * operations (o = h·g·f ⇒ o⁻¹ = f⁻¹·g⁻¹·h⁻¹), so inversion is an involution.
+ *
+ * Used wherever one user gesture spans several primitive edits that must
+ * collapse to one history entry — e.g. add an object AND select it, or delete
+ * several selected objects AND clear the selection. The contained ops are
+ * ordinary absolute state-sets, so the composite is trivially serializable
+ * (polymorphic vector, the same pattern as the OperationManager stacks).
+ */
+class CompositeOp : public Operation
+{
+public:
+	CompositeOp() = default;
+
+	/**
+	 * @brief Constructs a composite from a forward-order sequence.
+	 * @param ops Primitive operations, applied in order on redo.
+	 */
+	explicit CompositeOp(std::vector<std::unique_ptr<Operation>> ops)
+		: m_ops(std::move(ops))
+	{}
+
+	void Apply(OperationContext& ctx) override
+	{
+		for (const auto& op : m_ops)
+			op->Apply(ctx);
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		std::vector<std::unique_ptr<Operation>> inv;
+		inv.reserve(m_ops.size());
+		for (auto it = m_ops.rbegin(); it != m_ops.rend(); ++it)
+			inv.push_back((*it)->Inverse());
+		return std::make_unique<CompositeOp>(std::move(inv));
+	}
+
+	std::string Label() const override
+	{
+		return m_ops.empty() ? "Composite" : m_ops.front()->Label();
+	}
+
+	/**
+	 * @brief Serializes the contained operation sequence polymorphically.
+	 * @note All contained concrete types must be registered (see
+	 *       OperationRegistration.cpp); reconstruction default-constructs and
+	 *       loads each op, so every contained type must be default-constructible.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(CEREAL_NVP(m_ops));
+	}
+
+private:
+	std::vector<std::unique_ptr<Operation>> m_ops; ///< Forward-order primitive sequence.
 };
 
 } // namespace neurus
