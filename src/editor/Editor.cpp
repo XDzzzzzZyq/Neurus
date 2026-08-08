@@ -307,6 +307,12 @@ void Editor::FinishLoad()
 }
 
 
+void Editor::OnObjectDeleteRequested()
+{
+	// Stamp the active scene into the UI's pure delete intent.
+	ed_eventBus.enqueue(ObjectDeleteRequested{m_scene.get()});
+}
+
 void Editor::OnMeshImport(const std::string& path)
 {
 	try {

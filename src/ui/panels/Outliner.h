@@ -68,7 +68,8 @@ signals:
 
 	/**
 	 * @brief Emitted when the Delete key is pressed while the outliner has focus.
-	 * @note Carries the scene pointer (UI state); deletes ALL selected objects.
+	 * @note Pure UI intent (default event); the Editor stamps the active scene
+	 *       before forwarding to the SceneController. Deletes ALL selected objects.
 	 */
 	void objectDeleteRequested(const ObjectDeleteRequested& e);
 

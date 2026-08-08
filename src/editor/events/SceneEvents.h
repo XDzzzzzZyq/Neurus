@@ -234,10 +234,11 @@ struct SceneObjectAddRequested
 /**
  * @brief Removes ONE object's scene reference.
  *
- * Emitted only by SceneObjectAddOp (delete direction) on undo/redo replay;
- * the handler removes exactly this UID — no selection logic, no operation
- * recording (replay of the delete direction is a pure restore). The pooled
- * resource is never removed from the pool.
+ * The SINGLE removal path: emitted by the delete gesture (deferred, one
+ * event per selected object) AND by SceneObjectAddOp (delete direction) on
+ * undo/redo replay. The handler removes exactly this UID — no selection
+ * logic, no operation recording (the gesture records the composite; replay
+ * is muted). The pooled resource is never removed from the pool.
  */
 struct SceneObjectDeleteRequested
 {
@@ -246,16 +247,18 @@ struct SceneObjectDeleteRequested
 };
 
 /**
- * @brief UI gesture: delete ALL selected objects.
+ * @brief UI intent: delete ALL selected objects.
  *
- * Emitted by the Outliner / Viewport when the Delete key is pressed. The
- * SceneController snapshots the selection, guards the last camera, deselects,
- * removes every selected object, and records ONE composite operation
- * (selection-clear + per-object delete).
+ * Pure signal — panels emit the DEFAULT (scene = nullptr); the Editor
+ * forwards the actual event with the active scene stamped
+ * (Editor::OnObjectDeleteRequested). The SceneController snapshots the
+ * selection, guards the last camera, deselects, removes every selected
+ * object (via SceneObjectDeleteRequested), and records ONE composite
+ * operation (selection-clear + per-object delete).
  */
 struct ObjectDeleteRequested
 {
-	const UID* scene = nullptr;
+	const UID* scene = nullptr;  ///< Editor-owned Scene (stamped by the Editor).
 };
 
 } // namespace neurus

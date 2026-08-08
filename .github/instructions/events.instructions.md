@@ -112,8 +112,8 @@ struct EnvironmentRotationChanged  { const ObjectID* object; float rotation; };
 
 // Scene membership (Add / Delete) — UID-carrying (replay-safe; see below)
 struct SceneObjectAddRequested { const UID* scene; int objectUid; };     // forward (Editor import) + replay
-struct SceneObjectDeleteRequested { const UID* scene; int objectUid; };  // replay only (per-uid unit)
-struct ObjectDeleteRequested { const UID* scene; };                      // UI gesture (delete all selected)
+struct SceneObjectDeleteRequested { const UID* scene; int objectUid; };  // single removal path (gesture + replay)
+struct ObjectDeleteRequested { const UID* scene; };                      // pure UI intent (Editor stamps scene)
 ```
 
 **Scene Events Are Ephemeral**
@@ -135,8 +135,18 @@ serialized op replays by UID, and the pool is the single owner of the object.
 so undo/redo runs the same controller handlers as live edits; the handler's
 `Submit` is muted by `OperationManager`'s `Phase::Replaying` guard, so
 playback does not re-record (the expected "Submit suppressed during replay"
-LOG). The delete direction is replay-only by design (its handler never
-records).
+LOG).
+`ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
+it is a **pure UI intent** — panels emit the default (no scene); the Editor
+stamps the active scene (`Editor::OnObjectDeleteRequested`) before enqueueing,
+so the UI layer stays decoupled from scene state. The SceneController
+snapshots the selection, guards the last camera, deselects, and DEFERS the
+actual removals as one `SceneObjectDeleteRequested` per selected object —
+so the per-uid handler is the SINGLE removal path shared by the gesture and
+by undo/redo replay (no replay-only handling), and records ONE composite
+(`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`). The
+forward add path records `CompositeOp[SceneObjectAddOp(u,true),
+SetSelectionOp(before→{u})]` — add AND select collapse to one undo entry.
 `ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
 the SceneController snapshots the selection, guards the last camera, deselects,
 removes every selected object, and records ONE composite operation

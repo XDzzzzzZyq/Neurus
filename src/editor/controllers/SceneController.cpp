@@ -448,7 +448,14 @@ void OnSceneObjectAddRequested(const neurus::SceneObjectAddRequested& e,
 	ops.Submit(std::make_unique<neurus::CompositeOp>(std::move(seq)));
 }
 
-/** @brief UI gesture: deselect all, delete every selected object, record ONE composite op. */
+/**
+ * @brief UI gesture: deselect all, delete every selected object, record ONE composite op.
+ *
+ * The actual removals are DEFERRED as per-uid SceneObjectDeleteRequested
+ * events (drained within the same Process()), so the removal logic lives in
+ * exactly one handler — OnSceneObjectDeleteRequested — shared by the gesture
+ * and by undo/redo replay. No "replay-only" path exists.
+ */
 void OnObjectDeleteRequested(const neurus::ObjectDeleteRequested& e,
                              neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
@@ -475,26 +482,29 @@ void OnObjectDeleteRequested(const neurus::ObjectDeleteRequested& e,
 		return;
 	}
 
-	// Deselect all, then drop each selected object's scene reference.
+	// Deselect all, then defer the removals to the single per-uid handler
+	// (each selected object emits one SceneObjectDeleteRequested).
 	scene->selections.ClearSelection();
 
 	std::vector<std::unique_ptr<neurus::Operation>> seq;
 	seq.push_back(std::make_unique<neurus::SetSelectionOp>(before, neurus::SelectionState{}));
-	bool removedLight = false;
 	for (int uid : before.selectedUids)
 	{
-		removedLight |= IsLightObject(scene->GetObjectID(uid));
-		if (RemoveSceneObject(*scene, uid))
-			seq.push_back(std::make_unique<neurus::SceneObjectAddOp>(uid, false));
+		bus.enqueue(neurus::SceneObjectDeleteRequested{e.scene, uid});
+		seq.push_back(std::make_unique<neurus::SceneObjectAddOp>(uid, false));
 	}
-	if (removedLight)
-		bus.enqueue(neurus::LightingRebuild{});
-	Mutated(bus);
 
 	ops.Submit(std::make_unique<neurus::CompositeOp>(std::move(seq)));
 }
 
-/** @brief Replay-only: removes ONE object's scene reference (SceneObjectAddOp delete). */
+/**
+ * @brief The SINGLE per-object removal path (gesture + replay).
+ *
+ * Removes exactly one scene reference and emits the dirty/reset/lighting
+ * events. No selection logic (the gesture deselects; the composite restores
+ * on undo) and no recording (the gesture records the composite; replay is
+ * muted). Stale UIDs are safe no-ops.
+ */
 void OnSceneObjectDeleteRequested(const neurus::SceneObjectDeleteRequested& e,
                                   neurus::EventQueue& bus)
 {
