@@ -257,7 +257,7 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 	light->SetRadius(0.01f);
 	m_scene->UseLight(light);
 
-	auto imageData = m_resources->Load<ImageData>("tex/hdr/room.hdr");
+	auto imageData = m_resources->Load<ImageData>(m_assetDir + "/tex/hdr/room.hdr");
 	auto env = m_resources->Load<Environment>(imageData, "tex/hdr/room.hdr");
 	m_scene->UseEnvironment(env);
 
@@ -448,12 +448,13 @@ void Editor::OnCreateShader(const ShaderCreateRequested& e)
 
 	try
 	{
-		// Load<T> constructs + registers the RenderShader (pooled UID) and
-		// triggers ReloadContent(assetDir) -> ParseAndGenerate for both stages.
-		// Paths are relative to the pool's asset dir.
+		// Load<T> constructs + registers the RenderShader (pooled UID); the
+		// shader owns its own parsing, so parse explicitly here. Paths use the
+		// "res/..." prefix (resolved from the working directory by the shader
+		// pipeline), matching ShaderLibrary-created shaders.
 		auto shader = m_resources->Load<RenderShader>(
-			shaderName, "shaders/render/gbuffer.vert", "shaders/render/gbuffer.frag");
-		if (!shader->HasStage(ShaderType::VERTEX) || !shader->HasStage(ShaderType::FRAGMENT))
+			shaderName, "res/shaders/render/gbuffer.vert", "res/shaders/render/gbuffer.frag");
+		if (!shader->ParseAndGenerate())
 		{
 			NEURUS_ERR("[Editor] Failed to create default shader for mesh " << objectId);
 			m_resources->Remove(shader->GetObjectID());

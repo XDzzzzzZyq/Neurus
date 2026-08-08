@@ -40,7 +40,7 @@ namespace neurus
  *
  * Resource Ownership:
  * - o_equirectData:   Shared ImageData (CPU-side equirectangular pixels; may be
- *                     a pooled DataResource from the ResourceManager)
+ *                     a pooled resource from the ResourceManager)
  * - o_equirectPath:   Owned string (serialized, used for GPU reload / legacy)
  * - Transform3D:      Owned directly (skybox orientation rotation)
  *
@@ -57,7 +57,7 @@ public:
 
 	/**
 	 * @brief Constructs an environment referencing pooled equirect data.
-	 * @param data Shared ImageData (pooled DataResource) for the equirect map.
+	 * @param data Shared ImageData (pooled resource) for the equirect map.
 	 * @param path Legacy source path (kept for serialization compatibility).
 	 * @note Sets o_equirectData + o_imageDataId; the environment is registered
 	 *       in the pool separately via ResourceManager::Load<Environment>.

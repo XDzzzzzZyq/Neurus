@@ -59,14 +59,13 @@ public:
 	void ClearDirty() { m_dirty = false; }
 
 	/**
-	 * @brief Sets the asset directory for path-based resource reload.
-	 * @note Also forwards to the ResourceManager so pooled MeshData/ImageData/
-	 *       Shader resources reload content relative to the asset dir.
+	 * @brief Sets the asset directory used to resolve resource paths.
+	 * @note The Editor resolves relative resource paths (mesh/IBL) against
+	 *       this directory when creating pooled resources.
 	 */
 	void SetAssetDir(const std::string& dir)
 	{
 		m_assetDir = dir;
-		m_resources->SetAssetDir(dir);
 	}
 
 	/**

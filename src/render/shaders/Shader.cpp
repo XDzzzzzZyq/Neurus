@@ -16,11 +16,6 @@ Shader::Shader(std::string name)
 {
 }
 
-void Shader::ReloadContent(const std::string& /*assetDir*/)
-{
-	// Abstract base: leaves (RenderShader/ComputeShader) override to re-parse.
-}
-
 // --------------------------------------
 // Stage accessors
 // --------------------------------------

@@ -166,8 +166,7 @@ TEST(ProjectRoundtrip, MeshWithOBJ)
 		Scene scene;
 		RenderConfig config;
 		ResourceManager resources;
-		resources.SetAssetDir("res");
-		auto meshData = resources.Load<MeshData>("obj/sphere.obj");
+		auto meshData = resources.Load<MeshData>("res/obj/sphere.obj");
 		meshDataId = meshData->GetObjectID();
 		auto mesh = resources.Load<Mesh>(meshData);
 		mesh->using_shadow = false;
@@ -181,7 +180,6 @@ TEST(ProjectRoundtrip, MeshWithOBJ)
 	RenderConfig loadedConfig;
 	ResourceManager loadedResources;
 	{
-		loadedResources.SetAssetDir("res");
 		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}

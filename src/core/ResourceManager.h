@@ -3,14 +3,16 @@
  * @brief Central factory + registry for every persistent UID object.
  *
  * ResourceManager is the single factory and registry for UID-derived objects
- * (scene objects via ObjectID, data resources via DataResource). It is
- * app-scoped (owned by the Editor), type-erased (holds shared_ptr<UID>), and
- * owns the polymorphic serialization of the whole pool.
+ * (scene objects via ObjectID, data resources like MeshData/ImageData/Shader).
+ * It is app-scoped (owned by the Editor), type-erased (holds shared_ptr<UID>),
+ * and owns the polymorphic serialization of the whole pool.
  *
  * Design (see docs/superpowers/plans/2026-08-07-resource-manager-design.md):
- * - Load<T>(args...) constructs + registers in one step; for DataResource
- *   types it also triggers ReloadContent(assetDir) so path-based content loads
- *   immediately.
+ * - UID is the ONLY resource base - every pooled object derives from it and
+ *   serializes itself (identity + own fields), bound by UID + cereal
+ *   polymorphism. No reload hook interface: each object's serialize(load)
+ *   restores its own state.
+ * - Load<T>(args...) constructs + registers in one step.
  * - Scene neither owns nor references the pool; it holds plain typed pools and
  *   resolves references against the pool via Scene::ResolveReferences.
  * - No UID object knows the ResourceManager and no UID object constructs
@@ -35,7 +37,6 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/unordered_map.hpp>
 
-#include "core/DataResource.h"
 #include "core/UID.h"
 
 namespace neurus
@@ -46,8 +47,7 @@ namespace neurus
  *
  * Owned by the Editor (app-scoped). Cleared on project new/open so no stale
  * object leaks into a save. Serializes the whole pool polymorphically via
- * cereal, then triggers DataResource::ReloadContent for every pooled data
- * resource.
+ * cereal; each pooled object's own serialize(load) restores its content.
  */
 class ResourceManager
 {
@@ -59,21 +59,7 @@ public:
 	ResourceManager& operator=(const ResourceManager&) = delete;
 
 	/**
-	 * @brief Sets the project asset directory for path-based content reload.
-	 * @param dir Absolute path to the res/ directory (may be empty).
-	 */
-	void SetAssetDir(std::string dir) { m_assetDir = std::move(dir); }
-
-	/**
-	 * @brief Returns the configured asset directory.
-	 */
-	const std::string& GetAssetDir() const { return m_assetDir; }
-
-	/**
 	 * @brief Constructs a resource and registers it by its UID.
-	 *
-	 * For DataResource types, triggers ReloadContent(m_assetDir) right after
-	 * registration so content loads immediately (e.g. Load<MeshData>(path)).
 	 *
 	 * @tparam T Resource type (must inherit UID, directly or transitively).
 	 * @tparam Args Constructor argument types.
@@ -93,12 +79,6 @@ public:
 		if (!inserted)
 		{
 			throw std::runtime_error("Resource UID already exists: " + std::to_string(id));
-		}
-
-		if constexpr (std::is_base_of_v<DataResource, T>)
-		{
-			if (auto* dr = dynamic_cast<DataResource*>(it->second.get()))
-				dr->ReloadContent(m_assetDir);
 		}
 
 		return std::dynamic_pointer_cast<T>(it->second);
@@ -153,8 +133,9 @@ public:
 	 *
 	 * Save: writes every pooled UID object polymorphically (this is what makes
 	 * the type registrations load-bearing). Load: restores objects (UID
-	 * serialize bumps s_count past restored IDs) and then triggers
-	 * DataResource::ReloadContent(m_assetDir) on every pooled data resource.
+	 * serialize bumps s_count past restored IDs); each object's own
+	 * serialize(load) restores its content (e.g. MeshData reloads from its
+	 * stored path).
 	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
@@ -163,23 +144,11 @@ public:
 	void serialize(Archive& ar)
 	{
 		ar(CEREAL_NVP(resources_));
-
-		if constexpr (Archive::is_loading::value)
-		{
-			for (auto& [id, res] : resources_)
-			{
-				if (auto* dr = dynamic_cast<DataResource*>(res.get()))
-					dr->ReloadContent(m_assetDir);
-			}
-		}
 	}
 
 private:
 	/// Pool of every registered UID object, keyed by UID.
 	std::unordered_map<int, std::shared_ptr<UID>> resources_;
-
-	/// Project asset directory (not serialized).
-	std::string m_assetDir;
 };
 
 } // namespace neurus

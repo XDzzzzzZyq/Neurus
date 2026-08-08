@@ -64,21 +64,16 @@ public:
 	RenderShader& operator=(RenderShader&&) = delete;
 
 	/**
-	 * @brief DataResource hook: re-runs ParseAndGenerate() from disk.
+	 * @brief (Re)loads both shader stages from disk.
 	 *
-	 * Resolves assetDir-relative source paths into the ShaderUnits and
-	 * re-parses + re-generates both stages. Called by ResourceManager after
-	 * pool deserialization. No-op for empty paths (identity shell).
-	 *
-	 * @param assetDir Project asset directory (may be empty).
+	 * Called at the end of serialize(load) so a pooled RenderShader restores
+	 * its parsed IR + generated code. No-op for empty paths (identity shell).
 	 */
-	void ReloadContent(const std::string& assetDir) override;
+	void ReloadContent();
 
 	/**
-	 * @brief Cereal serialization - name (via Shader) + both source paths.
-	 *
-	 * Content stays path-based: only the paths are persisted so ReloadContent
-	 * can re-parse after load.
+	 * @brief Cereal serialization - name (via Shader) + both source paths,
+	 *        then content reload (re-parse both stages).
 	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
@@ -87,6 +82,10 @@ public:
 	void serialize(Archive& ar)
 	{
 		ar(cereal::base_class<Shader>(this), CEREAL_NVP(m_vertPath), CEREAL_NVP(m_fragPath));
+		if constexpr (Archive::is_loading::value)
+		{
+			ReloadContent();
+		}
 	}
 
 	// ----------------------------------

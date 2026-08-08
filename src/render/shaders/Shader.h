@@ -5,7 +5,7 @@
 #include <cereal/types/base_class.hpp>
 #include <cereal/types/string.hpp>
 
-#include "core/DataResource.h"
+#include "core/UID.h"
 
 #include <memory>
 #include <string>
@@ -36,16 +36,16 @@ enum class ShaderType
  * 2. Call ParseAndGenerate() to populate ShaderUnits from source files
  * 3. Access stage data via GetStage() / GetParsedStruct() / GetGeneratedCode()
  *
- * Resource identity: Shader is a pooled data resource (DataResource, core).
- * The concrete leaf (RenderShader) is registered in the pool; pass/test
- * shaders created via ShaderLibrary stay outside the pool. Content is
- * path-based: serialize() stores the name + source paths; ReloadContent
- * re-runs ParseAndGenerate() from disk.
+ * Resource identity: Shader is a pooled resource (UID base, core). The
+ * concrete leaf (RenderShader) is registered in the pool; pass/test shaders
+ * created via ShaderLibrary stay outside the pool. Each shader serializes
+ * itself (name + source paths); RenderShader::serialize(load) re-parses its
+ * stages from disk.
  *
  * @note Non-copyable, non-movable (UID semantics - held via shared_ptr).
  * @note Thread-safety: Not thread-safe. Must be used from the main thread.
  */
-class Shader : public DataResource
+class Shader : public UID
 {
 public:
 	/**
@@ -62,20 +62,10 @@ public:
 	Shader& operator=(Shader&&) = delete;
 
 	/**
-	 * @brief DataResource hook: no-op at the abstract base.
-	 *
-	 * Concrete leaves override it to re-run their parse+generate pipeline
-	 * from disk after pool deserialization.
-	 *
-	 * @param assetDir Project asset directory (may be empty).
-	 */
-	void ReloadContent(const std::string& assetDir) override;
-
-	/**
-	 * @brief Cereal serialization - forwards to DataResource + name.
+	 * @brief Cereal serialization - forwards to UID + name.
 	 *
 	 * Concrete leaves must forward cereal::base_class<Shader>(this) and their
-	 * own source paths so ReloadContent can re-parse after load.
+	 * own source paths so they can re-parse after load.
 	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
@@ -83,7 +73,7 @@ public:
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(cereal::base_class<DataResource>(this), CEREAL_NVP(m_name));
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(m_name));
 	}
 
 	/**

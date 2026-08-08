@@ -118,17 +118,12 @@ ImageData::ImageData(const std::string& path)
 	LoadFromPath(path);
 }
 
-void ImageData::ReloadContent(const std::string& assetDir)
+void ImageData::ReloadContent()
 {
 	if (m_path.empty())
 		return;
 
-	const bool absolute = (m_path.size() >= 2 && m_path[1] == ':')
-		|| m_path[0] == '/' || m_path[0] == '\\';
-	const std::string fullPath = (assetDir.empty() || absolute)
-		? m_path
-		: assetDir + "/" + m_path;
-	LoadFromPath(fullPath);
+	LoadFromPath(m_path);
 }
 
 ImageData::ImageData(const void* data, uint32_t w, uint32_t h, PixelFormat fmt,

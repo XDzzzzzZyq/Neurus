@@ -199,8 +199,7 @@ Neurus/
 │   │       ├── IndexBuffer.h/cpp    # Index buffer (inherits GPUBuffer)
 │   │       └── BufferLayout.h/cpp   # Vertex input layout description
 │   ├── core/              # Core layer (identity + resource pool)
-│   │   ├── UID.h/cpp              # Generic unique identifier primitive
-│   │   ├── DataResource.h         # UID + ReloadContent(assetDir) for path-based data
+│   │   ├── UID.h/cpp              # Generic unique identifier primitive (resource base)
 │   │   ├── ResourceManager.h/cpp # Single factory + UID pool (Load<T>, polymorphic serialize)
 │   │   ├── Log.h                  # NEURUS_LOG / NEURUS_ERR macros
 │   │   ├── Graph.h                # Generic DAG template
@@ -263,9 +262,9 @@ Neurus/
 │   │   │   └── HistoryComponent.h/cpp   # Undo/redo-stack adapter (wraps OperationManager)
 │   │   ├── registrations/           # cereal polymorphic registration (data resources)
 │   │   │   └── DataRegistration.h/cpp   # MeshData, ImageData (force-init)
-│   │   ├── data/                     # CPU-side data containers (DataResource-derived)
-│   │   │   ├── MeshData.h/cpp        # CPU-side mesh geometry (DataResource, path-based reload)
-│   │   │   └── ImageData.h/cpp       # CPU-side image pixels (DataResource, path-based reload)
+│   │   ├── data/                     # CPU-side data containers (UID-derived pooled resources)
+│   │   │   ├── MeshData.h/cpp        # CPU-side mesh geometry (UID, self-serializing)
+│   │   │   └── ImageData.h/cpp       # CPU-side image pixels (UID, self-serializing)
 │   ├── scene/              # Scene layer (Vulkan-free)
 │   │   ├── Camera.h        # Camera object
 │   │   ├── Light.h         # Light objects (PointLight, SunLight)

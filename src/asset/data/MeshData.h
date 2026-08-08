@@ -10,7 +10,7 @@
 #include <cereal/types/base_class.hpp>
 #include <cereal/types/string.hpp>
 
-#include "core/DataResource.h"
+#include "core/UID.h"
 
 namespace neurus {
 
@@ -22,13 +22,12 @@ namespace neurus {
  *
  * Pure CPU data - no Vulkan/GPU resources.
  *
- * Resource identity: MeshData is a pooled data resource (DataResource). Its
- * content is loaded from an OBJ path relative to the pool's asset directory;
- * serialize() stores only the UID + path (content stays path-based, per the
- * resource-manager design). Non-copyable/non-movable (UID semantics) - held
- * via shared_ptr (Mesh::o_mesh).
+ * Resource identity: MeshData is a pooled resource (UID base). It serializes
+ * itself (UID + source path); content is loaded from the path on construction
+ * and re-loaded in serialize(load). Non-copyable/non-movable (UID semantics) -
+ * held via shared_ptr (Mesh::o_mesh).
  */
-class MeshData : public DataResource
+class MeshData : public UID
 {
 public:
 	/**
@@ -45,13 +44,13 @@ public:
 	MeshData() = default;
 
 	/**
-	 * @brief Path-only constructor: stores the source path, content loads later.
+	 * @brief Path constructor: stores the source path and loads content.
 	 *
-	 * Stores the OBJ path relative to the pool's asset directory; the actual
-	 * parse happens in ReloadContent(assetDir), triggered by
-	 * ResourceManager::Load<MeshData>(path).
+	 * The path is used as-is (absolute or resolvable from the working
+	 * directory). Content is loaded immediately so the resource is ready
+	 * after ResourceManager::Load<MeshData>(path).
 	 *
-	 * @param path OBJ file path (relative to the asset dir).
+	 * @param path OBJ file path.
 	 */
 	explicit MeshData(const std::string& path);
 
@@ -76,25 +75,31 @@ public:
 	bool LoadObjFromString(const std::string& objContent);
 
 	/**
-	 * @brief (Re)loads the OBJ content from disk (DataResource hook).
+	 * @brief (Re)loads the OBJ content from disk.
 	 *
-	 * Resolves `assetDir + "/" + m_path` and parses. Logs a warning on failure
-	 * and leaves the resource empty (identity shell). No-op when m_path is
-	 * empty (procedural/test data).
-	 *
-	 * @param assetDir Project asset directory (absolute, may be empty).
+	 * Called on construction (path ctor) and at the end of serialize(load),
+	 * so a pooled MeshData restores its content after deserialization. No-op
+	 * when m_path is empty (procedural/test data).
 	 */
-	void ReloadContent(const std::string& assetDir) override;
+	void ReloadContent();
 
 	/**
-	 * @brief Cereal serialization - UID + source path (content stays path-based).
+	 * @brief Cereal serialization - UID + source path, then content reload.
+	 *
+	 * On load, restores identity + path and re-parses the OBJ from disk
+	 * (self-contained; no pool hook needed).
+	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
 	 */
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(cereal::base_class<DataResource>(this), CEREAL_NVP(m_path));
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(m_path));
+		if constexpr (Archive::is_loading::value)
+		{
+			ReloadContent();
+		}
 	}
 
 	/**

@@ -107,6 +107,7 @@ TEST(DefaultProject, HasCamera)
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_GE(scene.cam_list.size(), 1u);
+	ASSERT_GE(scene.cam_list.size(), 1u);
 	auto* cam = scene.cam_list.begin()->second.get();
 	ASSERT_NE(cam, nullptr);
 	EXPECT_EQ(cam->o_type, ObjectID::GOType::GO_CAM);
@@ -133,6 +134,7 @@ TEST(DefaultProject, HasMesh)
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_GE(scene.mesh_list.size(), 1u);
+	ASSERT_GE(scene.mesh_list.size(), 1u);
 	auto* mesh = scene.mesh_list.begin()->second.get();
 	ASSERT_NE(mesh, nullptr);
 	EXPECT_EQ(mesh->o_type, ObjectID::GOType::GO_MESH);
@@ -160,6 +162,7 @@ TEST(DefaultProject, HasLight)
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_GE(scene.light_list.size(), 1u);
+	ASSERT_GE(scene.light_list.size(), 1u);
 	auto* light = scene.light_list.begin()->second.get();
 	ASSERT_NE(light, nullptr);
 	EXPECT_EQ(light->o_type, ObjectID::GOType::GO_LIGHT);

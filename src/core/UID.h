@@ -4,12 +4,14 @@
  *
  * Provides the base UID class for unique ID generation. Every object that
  * needs identity tracking inherits from UID: scene graph objects via
- * ObjectID (scene layer), and data resources via DataResource (core layer).
+ * ObjectID (scene layer), and data resources (MeshData, ImageData, Shader)
+ * directly.
  *
  * Architecture:
  * - UID provides globally unique integer IDs (sequential, not thread-safe)
  * - ObjectID (scene/ObjectID.h) extends UID with scene-specific metadata
- * - DataResource (core/DataResource.h) extends UID for path-based data
+ * - Data resources inherit UID directly and serialize themselves, bound by
+ *   UID + cereal polymorphism in the ResourceManager pool
  * - ID-based lookups enable efficient object management
  */
 

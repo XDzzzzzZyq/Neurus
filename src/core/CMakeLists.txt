@@ -6,7 +6,6 @@
 add_library(neurus_core STATIC
 	UID.h
 	UID.cpp
-	DataResource.h
 	ResourceManager.h
 	ResourceManager.cpp
 )

@@ -77,13 +77,12 @@ TEST(SceneSerialize, FullRoundtrip)
 		Scene scene;
 		RenderConfig config;
 		ResourceManager resources;
-		resources.SetAssetDir("res");
 
 		auto camera = resources.Load<Camera>();
 		camera->cam_tar = glm::vec3(0.0f, 1.0f, 0.0f);
 		scene.UseCamera(camera);
 
-		auto meshData = resources.Load<MeshData>("obj/sphere.obj");
+		auto meshData = resources.Load<MeshData>("res/obj/sphere.obj");
 		meshDataUid = meshData->GetObjectID();
 		auto mesh = resources.Load<Mesh>(meshData);
 		auto shader = resources.Load<RenderShader>("TestShader", "", "");
@@ -95,7 +94,7 @@ TEST(SceneSerialize, FullRoundtrip)
 		auto light = resources.Load<Light>(SUNLIGHT, 3.0f, glm::vec3(1.0f));
 		scene.UseLight(light);
 
-		auto imageData = resources.Load<ImageData>("tex/hdr/room.hdr");
+		auto imageData = resources.Load<ImageData>("res/tex/hdr/room.hdr");
 		auto env = resources.Load<Environment>(imageData, "tex/hdr/room.hdr");
 		scene.UseEnvironment(env);
 		envUid = env->GetObjectID();
@@ -114,7 +113,6 @@ TEST(SceneSerialize, FullRoundtrip)
 	Scene loadedScene;
 	RenderConfig loadedConfig;
 	ResourceManager loadedResources;
-	loadedResources.SetAssetDir("res");
 	{
 		project::Project p;
 		p.Register<project::ResourceComponent>(loadedResources);

@@ -83,7 +83,7 @@ public:
 	Mesh();
 	/**
 	 * @brief Constructs a mesh referencing pooled geometry.
-	 * @param meshData Shared MeshData (pooled DataResource) to reference.
+	 * @param meshData Shared MeshData (pooled resource) to reference.
 	 * @note Sets o_mesh and o_meshDataId; the mesh is registered in the pool
 	 *       separately via ResourceManager::Load<Mesh>(meshData).
 	 */

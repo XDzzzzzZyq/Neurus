@@ -16,7 +16,7 @@
 #include <cereal/types/base_class.hpp>
 #include <cereal/types/string.hpp>
 
-#include "core/DataResource.h"
+#include "core/UID.h"
 
 #include <cstdint>
 #include <cstring>
@@ -26,14 +26,13 @@
 namespace neurus {
 
 /**
- * @brief CPU-side image data (pooled data resource).
+ * @brief CPU-side image data (pooled resource).
  *
- * Inherits UID identity via DataResource; held via shared_ptr (e.g.
- * Environment::o_equirectData). Content stays path-based: serialize() stores
- * only the UID + source path; ReloadContent(assetDir) re-loads from disk.
- * Non-copyable/non-movable (UID semantics).
+ * Inherits UID identity; held via shared_ptr (e.g. Environment::o_equirectData).
+ * Serializes itself (UID + source path); content loads on construction and is
+ * re-loaded in serialize(load). Non-copyable/non-movable (UID semantics).
  */
-class ImageData : public DataResource
+class ImageData : public UID
 {
 public:
 	/**
@@ -71,24 +70,30 @@ public:
 	bool IsValid() const { return im_width > 0 && im_height > 0 && !im_pixelData.empty(); }
 
 	/**
-	 * @brief (Re)loads the image content from disk (DataResource hook).
+	 * @brief (Re)loads the image content from disk.
 	 *
-	 * Resolves `assetDir + "/" + m_path` (or m_path directly if absolute or
-	 * assetDir is empty). No-op when m_path is empty (procedural data).
-	 *
-	 * @param assetDir Project asset directory (absolute, may be empty).
+	 * Called on construction (path ctor) and at the end of serialize(load).
+	 * No-op when m_path is empty (procedural data).
 	 */
-	void ReloadContent(const std::string& assetDir) override;
+	void ReloadContent();
 
 	/**
-	 * @brief Cereal serialization - UID + source path (content stays path-based).
+	 * @brief Cereal serialization - UID + source path, then content reload.
+	 *
+	 * On load, restores identity + path and re-loads the image from disk
+	 * (self-contained; no pool hook needed).
+	 *
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
 	 */
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(cereal::base_class<DataResource>(this), CEREAL_NVP(m_path));
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(m_path));
+		if constexpr (Archive::is_loading::value)
+		{
+			ReloadContent();
+		}
 	}
 
 	// --- Getters ---

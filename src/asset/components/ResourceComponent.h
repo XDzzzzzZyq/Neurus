@@ -4,9 +4,8 @@
  *
  * Mirrors SceneComponent/ConfigComponent: it implements project::Serializable
  * and wraps a non-owning ResourceManager pointer. Save writes the whole UID
- * pool (scene objects + data resources) polymorphically; Load restores it and
- * triggers DataResource::ReloadContent for every pooled data resource (path-
- * based content reload).
+ * pool (scene objects + data resources) polymorphically; Load restores it
+ * (each pooled object's own serialize(load) restores its content).
  *
  * Ordering: this component is registered FIRST in BuildProject so the pool is
  * restored before SceneComponent resolves the Scene's ID references against it.

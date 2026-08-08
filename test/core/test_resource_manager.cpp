@@ -53,11 +53,10 @@ TEST(ResourceManagerTest, LoadConstructsAndRegisters)
 }
 
 /**
- * @test Load<T> with a DataResource type triggers content reload.
+ * @test Load<T> with a data-resource type (UID-derived) registers it.
  *
- * Load<MeshData>(path) stores the path and reloads content from the pool's
- * asset dir. With an empty asset dir and an empty path, the resource stays an
- * identity shell but IS registered.
+ * Load<MeshData>(path) constructs the resource; with an empty path the
+ * resource stays an identity shell (no content) but IS registered.
  */
 TEST(ResourceManagerTest, LoadDataResource)
 {

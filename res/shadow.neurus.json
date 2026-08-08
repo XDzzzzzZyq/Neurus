@@ -60,9 +60,7 @@
                             "id": 2147483650,
                             "data": {
                                 "value0": {
-                                    "value0": {
-                                        "o_id": 14
-                                    }
+                                    "o_id": 14
                                 },
                                 "m_path": "D:/Projects/Neurus/.omo/feature-resource-manager/build/Debug/res/obj/sphere.obj"
                             }
@@ -173,11 +171,9 @@
                             "id": 2147483653,
                             "data": {
                                 "value0": {
-                                    "value0": {
-                                        "o_id": 17
-                                    }
+                                    "o_id": 17
                                 },
-                                "m_path": "tex/hdr/room.hdr"
+                                "m_path": "D:/Projects/Neurus/.omo/feature-resource-manager/build/Debug/res//tex/hdr/room.hdr"
                             }
                         }
                     }
