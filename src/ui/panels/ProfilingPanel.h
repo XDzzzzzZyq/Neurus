@@ -24,9 +24,11 @@
 #pragma once
 
 #include "UIPanel.h"
+#include "items/ProfilingRow.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 class QTreeWidget;
@@ -72,13 +74,18 @@ private:
 	 * Rows are recycled across frames (never destroyed), mirroring the
 	 * Outliner/OutlinerRow pool pattern — no per-frame `new QTreeWidgetItem`.
 	 */
-	void EnsureRowPool(std::size_t needed);
+	bool EnsureRowPool(std::size_t needed);
 
-	QTreeWidget*     m_tree      = nullptr;
-	QTreeWidgetItem* m_frameItem = nullptr; ///< Persistent bold "Frame" totals row.
+	QTreeWidget* m_tree = nullptr;
+
+	/// Persistent bold "Frame" totals row - dirty-checked columns.
+	std::unique_ptr<ProfilingHead> m_frameHead;
 
 	/// Persistent per-pass child rows — grows as needed, never shrinks.
-	std::vector<QTreeWidgetItem*> m_rowPool;
+	/// Each ProfilingRow wraps a QTreeWidgetItem and dirty-checks its columns
+	/// so the steady-state per-frame repopulate skips redundant setText calls
+	/// (see ui-system.instructions.md -> "Lazy Updates via Logical State Tracking").
+	std::vector<std::unique_ptr<ProfilingRow>> m_rowPool;
 
 	// --- Change detection: repopulate only when a new profile arrived ---
 	bool     m_hasProfile   = false;
