@@ -5,8 +5,43 @@
 
 #include "Scene.h"
 
+#include "core/Log.h"
+#include "core/ResourceManager.h"
+#include "asset/data/ImageData.h"
+#include "asset/data/MeshData.h"
+#include "render/shaders/Shader.h"
+
 namespace neurus
 {
+
+namespace
+{
+
+/**
+ * @brief Fills a typed scene pool from the pending ID list by fetching + casting.
+ *
+ * @tparam T Scene object type (Camera, Mesh, Light, ...).
+ * @param resources The ResourceManager pool.
+ * @param ids Pending object UIDs read from the project file.
+ * @param pool The scene's typed pool to fill.
+ */
+template<typename T>
+void ResolvePool(ResourceManager& resources, const std::vector<int>& ids, Scene::ResPool<T>& pool)
+{
+	for (int id : ids)
+	{
+		auto resource = resources.Get<UID>(id);
+		auto typed = std::dynamic_pointer_cast<T>(resource);
+		if (!typed)
+		{
+			NEURUS_LOG("[Scene] ResolveReferences: stale/missing object UID " << id);
+			continue;
+		}
+		pool[id] = typed;
+	}
+}
+
+} // anonymous namespace
 
 // ---------------------------------------------------------------------------
 // Construction / destruction
@@ -15,6 +50,59 @@ namespace neurus
 Scene::Scene() = default;
 
 Scene::~Scene() = default;
+
+// ---------------------------------------------------------------------------
+// Reference resolution (pool-first load ordering)
+// ---------------------------------------------------------------------------
+
+void Scene::ClearPendingReferences()
+{
+	m_pendingCamIds.clear();
+	m_pendingMeshIds.clear();
+	m_pendingLightIds.clear();
+	m_pendingSpriteIds.clear();
+	m_pendingDLineIds.clear();
+	m_pendingDPointsIds.clear();
+	m_pendingEnvIds.clear();
+	m_pendingSelectedUids.clear();
+	m_pendingActiveUid = 0;
+}
+
+void Scene::ResolveReferences(ResourceManager& resources)
+{
+	ResolvePool<Camera>(resources, m_pendingCamIds, cam_list);
+	ResolvePool<Mesh>(resources, m_pendingMeshIds, mesh_list);
+	ResolvePool<Light>(resources, m_pendingLightIds, light_list);
+	ResolvePool<Sprite>(resources, m_pendingSpriteIds, sprite_list);
+	ResolvePool<DebugLine>(resources, m_pendingDLineIds, dLine_list);
+	ResolvePool<DebugPoints>(resources, m_pendingDPointsIds, dPoints_list);
+	ResolvePool<Environment>(resources, m_pendingEnvIds, env_list);
+
+	ResolveDataReferences(resources);
+
+	// Rebuild obj_list from the now-populated typed pools, then restore the
+	// selection (mirrors the pre-resource-manager load behavior).
+	RebuildObjList();
+	RestoreSelectionUids(*this, m_pendingSelectedUids, m_pendingActiveUid);
+
+	ClearPendingReferences();
+}
+
+void Scene::ResolveDataReferences(ResourceManager& resources)
+{
+	for (auto& [id, mesh] : mesh_list)
+	{
+		if (mesh->o_meshDataId != 0)
+			mesh->o_mesh = resources.Get<MeshData>(mesh->o_meshDataId);
+		if (mesh->o_shaderId != 0)
+			mesh->o_shader = resources.Get<Shader>(mesh->o_shaderId);
+	}
+	for (auto& [id, env] : env_list)
+	{
+		if (env->o_imageDataId != 0)
+			env->SetEquirectData(resources.Get<ImageData>(env->o_imageDataId));
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Status tracking

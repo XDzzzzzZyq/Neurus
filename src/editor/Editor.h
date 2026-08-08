@@ -9,6 +9,7 @@
 #include "editor/events/EventBus.h"
 #include "editor/operations/HistoryView.h"
 #include "editor/operations/OperationManager.h"
+#include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
 #include "scene/EditorContext.h"
 
@@ -18,6 +19,7 @@ class DeferredRenderer;
 class Scene;
 class Environment;
 class UploadManager;
+struct ShaderCreateRequested;
 }
 
 namespace neurus {
@@ -55,7 +57,26 @@ public:
 	bool IsDirty() const { return m_dirty; }
 	void MarkDirty() { m_dirty = true; }
 	void ClearDirty() { m_dirty = false; }
-	void SetAssetDir(const std::string& dir) { m_assetDir = dir; }
+
+	/**
+	 * @brief Sets the asset directory for path-based resource reload.
+	 * @note Also forwards to the ResourceManager so pooled MeshData/ImageData/
+	 *       Shader resources reload content relative to the asset dir.
+	 */
+	void SetAssetDir(const std::string& dir)
+	{
+		m_assetDir = dir;
+		m_resources->SetAssetDir(dir);
+	}
+
+	/**
+	 * @brief Returns the app-scoped ResourceManager (UID object pool).
+	 *
+	 * The Application registers a project::ResourceComponent + SceneComponent
+	 * against this so the pool is saved first and the Scene resolves its ID
+	 * references against it on load.
+	 */
+	ResourceManager& GetResourceManager() { return *m_resources; }
 
 	/**
 	 * @brief Returns the shared editor state (scene + render config).
@@ -110,10 +131,12 @@ private:
 	void OnSunLightAdd();
 	void OnSpotLightAdd();
 	void OnIBLLoad();
+	void OnCreateShader(const ShaderCreateRequested& e);
 	void GenerateIBL(const std::shared_ptr<Environment>& env);
 
 	// --- Owned state ---
 	std::unique_ptr<Scene> m_scene;
+	std::unique_ptr<ResourceManager> m_resources;  ///< App-scoped UID object pool
 	RenderConfig          m_config;
 	std::string           m_assetDir;
 	bool                  m_dirty = false;

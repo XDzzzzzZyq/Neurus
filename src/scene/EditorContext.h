@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "scene/UID.h"
+#include "core/UID.h"
 
 namespace neurus
 {

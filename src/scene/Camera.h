@@ -18,7 +18,7 @@
 #pragma once
 
 #include "scene/Transform.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 
 #include <cereal/types/base_class.hpp>
 #include <cereal/types/vector.hpp>

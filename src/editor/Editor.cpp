@@ -23,9 +23,12 @@
 #include "render/resources/MeshGPU.h"
 
 #include "render/RenderContext.h"
+#include "render/shaders/RenderShader.h"
+#include "render/shaders/ShaderLibrary.h"
 #include "ui/UIContext.h"
 
 #include "core/Log.h"
+#include "asset/data/MeshData.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
 #include "scene/Light.h"
@@ -63,6 +66,7 @@ namespace neurus {
 
 Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
 	: m_scene(std::make_unique<Scene>())
+	, m_resources(std::make_unique<ResourceManager>())
 	, ed_operations(ed_eventBus, [this]() -> Scene* { return m_scene.get(); })
 	, ed_renderer(renderer)
 	, ed_uploadManager(uploadManager)
@@ -98,6 +102,14 @@ void Editor::Initialize()
 	ed_eventBus.subscribe<SpotLightAddEvent>([this](const SpotLightAddEvent&) {
 		ed_eventBus.enqueue(RenderResetEvent{});
 		OnSpotLightAdd();
+	});
+
+	// Shader creation constructs a pooled RenderShader, so it is Editor-owned
+	// (like mesh/light/camera adds). ShaderController keeps only pool-free
+	// handlers (compile, code/struct edits, undo/redo replay).
+	ed_eventBus.subscribe<ShaderCreateRequested>([this](const ShaderCreateRequested& e) {
+		ed_eventBus.enqueue(RenderResetEvent{});
+		OnCreateShader(e);
 	});
 
 	// Undo/redo replay their inverse events synchronously (never queued), so
@@ -228,23 +240,25 @@ EditorContext Editor::GetContext() const
 void Editor::CreateDefaultScene(const std::string& objPath)
 {
 	m_scene = std::make_unique<Scene>();
+	m_resources->Clear();
 	m_config = RenderConfig{};
 
-	auto camera = std::make_shared<Camera>();
+	auto camera = m_resources->Load<Camera>();
 	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 	camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 	m_scene->UseCamera(camera);
 
-	auto mesh = std::make_shared<Mesh>(objPath);
+	auto meshData = m_resources->Load<MeshData>(objPath);
+	auto mesh = m_resources->Load<Mesh>(meshData);
 	m_scene->UseMesh(mesh);
 
-	auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
+	auto light = m_resources->Load<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
 	light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 	light->SetRadius(0.01f);
 	m_scene->UseLight(light);
 
-	auto env = std::make_shared<Environment>();
-	env->SetEquirectPath("tex/hdr/room.hdr");
+	auto imageData = m_resources->Load<ImageData>("tex/hdr/room.hdr");
+	auto env = m_resources->Load<Environment>(imageData, "tex/hdr/room.hdr");
 	m_scene->UseEnvironment(env);
 
 	m_dirty = true;
@@ -261,6 +275,7 @@ void Editor::NewScene()
 		}
 
 		m_scene = std::make_unique<Scene>();
+		m_resources->Clear(); // No stale pooled object may leak into a save.
 		m_config = RenderConfig{};
 		m_dirty = false;
 		ed_operations.Clear(); // History does not span scenes.
@@ -284,6 +299,7 @@ void Editor::BeginLoad()
 		ed_renderer->WaitIdle();
 
 	m_scene = std::make_unique<Scene>();
+	m_resources->Clear(); // Pool is restored from the project file next.
 	m_config = RenderConfig{};
 	ed_operations.Clear(); // History does not span scenes.
 	// Application deserializes into GetScene()/GetRenderConfig() before FinishLoad().
@@ -291,9 +307,8 @@ void Editor::BeginLoad()
 
 void Editor::FinishLoad()
 {
-	for (auto& [id, mesh] : m_scene->mesh_list)
-		mesh->ReloadMeshData(m_assetDir);
-
+	// Meshes now resolve their pooled MeshData via Scene::ResolveDataReferences
+	// (SceneComponent), so no path-based reload loop is needed here.
 	m_dirty = false;
 	UploadSceneResources();
 	OnIBLLoad();
@@ -303,7 +318,8 @@ void Editor::FinishLoad()
 void Editor::OnMeshImport(const std::string& path)
 {
 	try {
-		auto mesh = std::make_shared<neurus::Mesh>(path);
+		auto meshData = m_resources->Load<MeshData>(path);
+		auto mesh = m_resources->Load<Mesh>(meshData);
 		m_scene->UseMesh(mesh);
 
 		// Upload to GPU immediately via UploadManager
@@ -324,7 +340,7 @@ void Editor::OnMeshImport(const std::string& path)
 void Editor::OnCameraAdd()
 {
 	try {
-		auto camera = std::make_shared<neurus::Camera>();
+		auto camera = m_resources->Load<Camera>();
 		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
 		m_scene->UseCamera(camera);
@@ -339,7 +355,7 @@ void Editor::OnCameraAdd()
 void Editor::OnLightAdd()
 {
 	try {
-		auto light = std::make_shared<neurus::Light>(
+		auto light = m_resources->Load<Light>(
 			neurus::POINTLIGHT, 10.0f, glm::vec3(1.0f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.01f);
@@ -363,7 +379,7 @@ void Editor::OnLightAdd()
 void Editor::OnSunLightAdd()
 {
 	try {
-		auto light = std::make_shared<neurus::Light>(
+		auto light = m_resources->Load<Light>(
 			neurus::SUNLIGHT, 5.0f, glm::vec3(1.0f, 0.95f, 0.8f));
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 10.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
@@ -388,7 +404,7 @@ void Editor::OnSunLightAdd()
 void Editor::OnSpotLightAdd()
 {
 	try {
-		auto light = std::make_shared<neurus::Light>(
+		auto light = m_resources->Load<Light>(
 			neurus::SPOTLIGHT, 30.0f, glm::vec3(1.0f, 0.75f, 0.4f));
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 6.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
@@ -410,6 +426,67 @@ void Editor::OnSpotLightAdd()
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to add spot light: " << e.what());
+	}
+}
+
+void Editor::OnCreateShader(const ShaderCreateRequested& e)
+{
+	auto* mesh = Mesh::As(e.object);
+	if (!mesh)
+	{
+		NEURUS_ERR("[Editor] OnCreateShader: not a mesh");
+		return;
+	}
+	if (mesh->o_shader)
+	{
+		NEURUS_LOG("[Editor] Mesh already has a shader");
+		return;
+	}
+
+	const int objectId = mesh->GetObjectID();
+	const std::string shaderName = "MeshShader_" + std::to_string(objectId);
+
+	try
+	{
+		// Load<T> constructs + registers the RenderShader (pooled UID) and
+		// triggers ReloadContent(assetDir) -> ParseAndGenerate for both stages.
+		// Paths are relative to the pool's asset dir.
+		auto shader = m_resources->Load<RenderShader>(
+			shaderName, "shaders/render/gbuffer.vert", "shaders/render/gbuffer.frag");
+		if (!shader->HasStage(ShaderType::VERTEX) || !shader->HasStage(ShaderType::FRAGMENT))
+		{
+			NEURUS_ERR("[Editor] Failed to create default shader for mesh " << objectId);
+			m_resources->Remove(shader->GetObjectID());
+			return;
+		}
+
+		mesh->SetObjShader(shader); // o_shader + o_shaderId (pooled reference)
+
+		// Compile both stages to SPIR-V and bump version on success.
+		auto& s = *mesh->o_shader;
+		bool allOk = true;
+		if (s.HasStage(ShaderType::VERTEX))
+		{
+			auto& unit = s.GetStage(ShaderType::VERTEX);
+			unit.spv = ShaderLibrary::Compile(unit, ShaderType::VERTEX, s.GetName());
+			if (unit.spv.empty()) { allOk = false; }
+			else { unit.BumpVersion(); }
+		}
+		if (s.HasStage(ShaderType::FRAGMENT))
+		{
+			auto& unit = s.GetStage(ShaderType::FRAGMENT);
+			unit.spv = ShaderLibrary::Compile(unit, ShaderType::FRAGMENT, s.GetName());
+			if (unit.spv.empty()) { allOk = false; }
+			else { unit.BumpVersion(); }
+		}
+		if (allOk)
+			s.BumpVersion();
+
+		NEURUS_LOG("[Editor] Created shader for mesh " << objectId << ": " << shaderName);
+	}
+	catch (const std::exception& ex)
+	{
+		NEURUS_ERR("[Editor] Exception creating shader: " << ex.what());
 	}
 }
 

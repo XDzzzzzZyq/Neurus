@@ -12,30 +12,23 @@ Mesh::Mesh()
 	o_name = "Mesh";
 }
 
-Mesh::Mesh(const std::string& path)
+Mesh::Mesh(std::shared_ptr<MeshData> meshData)
 	: Mesh()
 {
-	o_meshPath = path;
-	if (path.empty()) return;
-	auto meshData = std::make_shared<MeshData>();
-	if (meshData->LoadObj(path)) o_mesh = meshData;
+	o_mesh = std::move(meshData);
+	if (o_mesh)
+		o_meshDataId = o_mesh->GetObjectID();
 }
 
 Mesh::~Mesh()
 {
 }
 
-void Mesh::ReloadMeshData(const std::string& assetDir)
+void Mesh::SetObjShader(std::shared_ptr<Shader> shader)
 {
-	if (!o_meshPath.empty() && !o_mesh)
-	{
-		const std::string fullPath = assetDir.empty() ? o_meshPath : assetDir + "/" + o_meshPath;
-		auto meshData = std::make_shared<MeshData>();
-		if (meshData->LoadObj(fullPath)) o_mesh = meshData;
-	}
+	o_shader = std::move(shader);
+	o_shaderId = o_shader ? o_shader->GetObjectID() : 0;
 }
-
-void Mesh::SetObjShader(std::shared_ptr<Shader> shader) { o_shader = std::move(shader); }
 
 void* Mesh::GetShaderUnit(int shaderType) const
 {

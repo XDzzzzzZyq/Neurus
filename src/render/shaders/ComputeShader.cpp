@@ -26,6 +26,12 @@ ComputeShader::ComputeShader(std::string name, std::string compPath)
 	NEURUS_LOG("[ComputeShader] Created '" << m_name << "'");
 }
 
+void ComputeShader::ReloadContent(const std::string& /*assetDir*/)
+{
+	// ComputeShader is never pooled (pass shaders only) - parsing happens on
+	// construction / explicit ParseAndGenerate(). No-op content reload.
+}
+
 // =========================================================================
 // Shader interface
 // =========================================================================

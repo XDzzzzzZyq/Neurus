@@ -8,6 +8,7 @@
 
 #include "scene/DefaultScene.h"
 
+#include "asset/data/MeshData.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
@@ -34,7 +35,9 @@ std::shared_ptr<Scene> CreateDefaultScene(const std::string& objPath)
 
 	// --- Mesh ---
 	NEURUS_LOG("[DefaultScene] Loading mesh: " << objPath);
-	auto mesh = std::make_shared<Mesh>(objPath);
+	auto meshData = std::make_shared<MeshData>();
+	meshData->LoadObj(objPath);
+	auto mesh = std::make_shared<Mesh>(meshData);
 	scene->UseMesh(mesh);
 
 	// --- Light ---

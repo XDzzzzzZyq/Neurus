@@ -22,7 +22,7 @@
 #include <cereal/types/base_class.hpp>
 
 #include "scene/Transform.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 
 namespace neurus
 {

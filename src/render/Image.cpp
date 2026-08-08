@@ -426,19 +426,19 @@ void Image::UploadImageData(const vk::raii::Device& device,
 // GPU readback
 // ---------------------------------------------------------------------------
 
-ImageData Image::ReadImageData(const vk::raii::Device& device,
-                                const vk::raii::PhysicalDevice& physicalDevice,
-                                vk::Queue queue,
-                                uint32_t queueFamilyIndex,
-                                const vk::ImageSubresourceRange* subresourceRange,
-                                vk::Extent2D readExtent)
+std::shared_ptr<ImageData> Image::ReadImageData(const vk::raii::Device& device,
+                                                const vk::raii::PhysicalDevice& physicalDevice,
+                                                vk::Queue queue,
+                                                uint32_t queueFamilyIndex,
+                                                const vk::ImageSubresourceRange* subresourceRange,
+                                                vk::Extent2D readExtent)
 {
 	const uint32_t bytesPerPixel = PixelByteSize(im_format);
 
 	if (bytesPerPixel == 0)
 	{
 		NEURUS_ERR("[Image] ReadImageData: unsupported format " << vk::to_string(im_format));
-		return ImageData();
+		return nullptr;
 	}
 
 	// Extent to read: explicit override or full image
@@ -487,7 +487,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 
 	void* mapped = staging.Map();
 	const PixelFormat pf = FromVkFormat(im_format);
-	ImageData result(mapped, copyExtent.width, copyExtent.height, pf, layerCount);
+	auto result = std::make_shared<ImageData>(mapped, copyExtent.width, copyExtent.height, pf, layerCount);
 	staging.Unmap();
 
 	return result;

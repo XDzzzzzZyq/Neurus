@@ -317,7 +317,7 @@ TEST_F(ShadowCubemapTest, AllFacesDepth)
 			auto data = shadowCubemap.ReadImageData(
 				*m_device, pd, m_queue, m_graphicsQueueFamily,
 				&layerRange, {kRes, kRes});
-			const float* depthData = reinterpret_cast<const float*>(data.GetPixelData().data());
+			const float* depthData = reinterpret_cast<const float*>(data->GetPixelData().data());
 
 			// Debug: depth range summary
 			{

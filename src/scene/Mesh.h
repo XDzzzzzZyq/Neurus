@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file Mesh.h
  * @brief 3D mesh object for renderable geometry in the scene hierarchy.
  *
@@ -26,7 +26,7 @@
 
 #include <cereal/types/base_class.hpp>
 
-#include "UID.h"
+#include "scene/ObjectID.h"
 #include "Transform.h"
 
 namespace neurus
@@ -71,11 +71,23 @@ public:
 	bool using_sdf      = true;
 	bool is_closure     = true;
 
-	/// OBJ file path for serialization and asset recovery
+	/// Pooled-resource references (0 = none). The ResourceManager owns the
+	/// objects; these IDs let Scene::ResolveDataReferences re-wire them on load.
+	int o_meshDataId = 0;      ///< Pooled MeshData UID (geometry source)
+	int o_shaderId   = 0;      ///< Pooled Shader (RenderShader) UID
+
+	/// OBJ file path - LEGACY serialized field for old project files only;
+	/// runtime construction never sets it (geometry comes via MeshData).
 	std::string o_meshPath;
 
 	Mesh();
-	explicit Mesh(const std::string& path);
+	/**
+	 * @brief Constructs a mesh referencing pooled geometry.
+	 * @param meshData Shared MeshData (pooled DataResource) to reference.
+	 * @note Sets o_mesh and o_meshDataId; the mesh is registered in the pool
+	 *       separately via ResourceManager::Load<Mesh>(meshData).
+	 */
+	explicit Mesh(std::shared_ptr<MeshData> meshData);
 	~Mesh() override;
 
 	template<class Archive>
@@ -84,6 +96,7 @@ public:
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
 		   CEREAL_NVP(o_meshPath),
+		   CEREAL_NVP(o_meshDataId), CEREAL_NVP(o_shaderId),
 		   CEREAL_NVP(using_shadow), CEREAL_NVP(using_material),
 		   CEREAL_NVP(using_sdf), CEREAL_NVP(is_closure));
 	}
@@ -92,8 +105,6 @@ public:
 	Mesh& operator=(const Mesh&) = delete;
 	Mesh(Mesh&&) = delete;
 	Mesh& operator=(Mesh&&) = delete;
-
-	void ReloadMeshData(const std::string& assetDir = "");
 
 	void SetObjShader(std::shared_ptr<Shader> shader);
 	void SetTex(int _type, const std::string& _name);

@@ -78,8 +78,9 @@ UI Layer (Qt6) → UIEvents (Qt Signals) → Editor → EventQueue (typed events
   `EnvironmentGPU` via `RenderCache`; consumes read-only scene data; must not
   mutate application-level state.
 - **Editor**: application logic and scene mutation; owns Scene, RenderConfig,
-  and Controllers; communicates via Context, UIEvents (Qt signals), and
-  EventQueue (typed events). Exposes `SetRenderConfig()` for UI→editor sync.
+  Controllers, and the ResourceManager (app-scoped UID object pool);
+  communicates via Context, UIEvents (Qt signals), and EventQueue (typed
+  events). Exposes `SetRenderConfig()` for UI→editor sync.
 - **UI**: Qt6 Widgets presentation only; owns surface; emits signals.
 - **Asset** (`src/asset/`): Vulkan-free CPU-side asset loading (MeshData,
   ImageData, PixelFormat enum). No GPU resources.
@@ -197,6 +198,14 @@ Neurus/
 │   │       ├── VertexBuffer.h/cpp   # Vertex buffer (inherits GPUBuffer)
 │   │       ├── IndexBuffer.h/cpp    # Index buffer (inherits GPUBuffer)
 │   │       └── BufferLayout.h/cpp   # Vertex input layout description
+│   ├── core/              # Core layer (identity + resource pool)
+│   │   ├── UID.h/cpp              # Generic unique identifier primitive
+│   │   ├── DataResource.h         # UID + ReloadContent(assetDir) for path-based data
+│   │   ├── ResourceManager.h/cpp # Single factory + UID pool (Load<T>, polymorphic serialize)
+│   │   ├── Log.h                  # NEURUS_LOG / NEURUS_ERR macros
+│   │   ├── Graph.h                # Generic DAG template
+│   │   ├── Selections.h           # Selection state container
+│   │   └── Timer.h                # Scoped timer
 │   ├── editor/             # Editor layer (logic, controllers)
 │   │   ├── events/          # Event system (UIEvents + typed EventQueue)
 │   │   │   ├── UIEvents.h/cpp    # Qt signal bus for UI↔Editor
@@ -248,19 +257,24 @@ Neurus/
 │   │   ├── PixelFormat.h            # Vulkan-free format enum + helpers
 │   │   ├── components/              # project::Serializable adapters
 │   │   │   ├── ConfigComponent.h/cpp    # RenderConfig serialization adapter
-│   │   │   ├── SceneComponent.h/cpp     # Scene serialization adapter
+│   │   │   ├── SceneComponent.h/cpp     # Scene serialization adapter (holds ResourceManager*)
+│   │   │   ├── ResourceComponent.h/cpp  # ResourceManager pool persistence (registered first)
 │   │   │   ├── UIComponent.h/cpp        # UI-state serialization adapter
 │   │   │   └── HistoryComponent.h/cpp   # Undo/redo-stack adapter (wraps OperationManager)
-│   │   ├── data/                     # CPU-side data containers
-│   │   │   ├── MeshData.h/cpp        # CPU-side mesh geometry (no Vulkan)
-│   │   │   └── ImageData.h/cpp       # CPU-side image pixels (no Vulkan)
+│   │   ├── registrations/           # cereal polymorphic registration (data resources)
+│   │   │   └── DataRegistration.h/cpp   # MeshData, ImageData (force-init)
+│   │   ├── data/                     # CPU-side data containers (DataResource-derived)
+│   │   │   ├── MeshData.h/cpp        # CPU-side mesh geometry (DataResource, path-based reload)
+│   │   │   └── ImageData.h/cpp       # CPU-side image pixels (DataResource, path-based reload)
 │   ├── scene/              # Scene layer (Vulkan-free)
 │   │   ├── Camera.h        # Camera object
 │   │   ├── Light.h         # Light objects (PointLight, SunLight)
-│   │   ├── Mesh.h          # Mesh + Transform (no GPU buffers)
+│   │   ├── Mesh.h          # Mesh + Transform (no GPU buffers; pooled MeshData/Shader refs)
+│   │   ├── ObjectID.h      # Scene identity + metadata (ObjectID : UID)
 │   │   ├── Transform.h     # Spatial transform
 │   │   └── registrations/           # cereal polymorphic registration
-│   │       └── TypeRegistration.cpp  # scene object types
+│   │       ├── TypeRegistration.h/cpp  # scene types + UID-level relations (force-init)
+│   │       └── TypeRegistration.cpp    # scene object types
 │   └── main.cpp            # Application entry point
 ├── test/
 │   ├── render/             # Renderer GPU tests

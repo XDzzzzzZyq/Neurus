@@ -21,9 +21,10 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
-#include "UID.h"
+#include "scene/ObjectID.h"
 #include "Transform.h"
 #include "asset/data/ImageData.h"
 
@@ -38,8 +39,9 @@ namespace neurus
  * owned by RenderCache and created lazily via CreateEnvironmentGPU().
  *
  * Resource Ownership:
- * - o_equirectData:   Owned ImageData (CPU-side equirectangular pixels)
- * - o_equirectPath:   Owned string (serialized, used for GPU reload)
+ * - o_equirectData:   Shared ImageData (CPU-side equirectangular pixels; may be
+ *                     a pooled DataResource from the ResourceManager)
+ * - o_equirectPath:   Owned string (serialized, used for GPU reload / legacy)
  * - Transform3D:      Owned directly (skybox orientation rotation)
  *
  * @note Inheritance: ObjectID for scene identity, Transform3D for rotation.
@@ -52,6 +54,15 @@ public:
 	 * @brief Constructs an Environment with default IBL parameters.
 	 */
 	Environment();
+
+	/**
+	 * @brief Constructs an environment referencing pooled equirect data.
+	 * @param data Shared ImageData (pooled DataResource) for the equirect map.
+	 * @param path Legacy source path (kept for serialization compatibility).
+	 * @note Sets o_equirectData + o_imageDataId; the environment is registered
+	 *       in the pool separately via ResourceManager::Load<Environment>.
+	 */
+	explicit Environment(std::shared_ptr<ImageData> data, std::string path);
 
 	/**
 	 * @brief Virtual destructor for polymorphic cleanup.
@@ -67,17 +78,21 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Returns a const reference to the CPU-side equirectangular pixel data.
+	 * @brief Returns the CPU-side equirectangular pixel data (shared).
 	 * @note Loaded from o_equirectPath on construction or via SetEquirectPath().
 	 */
-	const ImageData& GetEquirectData() const { return o_equirectData; }
+	std::shared_ptr<ImageData> GetEquirectData() const { return o_equirectData; }
 
 	/**
-	 * @brief Directly sets the CPU-side equirectangular pixel data (for tests/procedural data).
-	 * @param data ImageData to copy into the environment.
-	 * @note Bypasses file loading; not serialized.
+	 * @brief Directly sets the CPU-side equirectangular pixel data (for tests/pooled data).
+	 * @param data Shared ImageData to reference.
+	 * @note Bypasses file loading; records the pooled ID for persistence.
 	 */
-	void SetEquirectData(const ImageData& data) { o_equirectData = data; }
+	void SetEquirectData(std::shared_ptr<ImageData> data)
+	{
+		o_equirectData = std::move(data);
+		o_imageDataId = o_equirectData ? o_equirectData->GetObjectID() : 0;
+	}
 
 	// -----------------------------------------------------------------------
 	// File path
@@ -171,6 +186,9 @@ public:
 		return static_cast<Environment*>(const_cast<ObjectID*>(obj));
 	}
 
+	/// Pooled ImageData UID (0 = none); Scene::ResolveDataReferences wires it.
+	int o_imageDataId = 0;
+
 	// -----------------------------------------------------------------------
 	// Serialization (Cereal)
 	// -----------------------------------------------------------------------
@@ -191,6 +209,7 @@ public:
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
 		   cereal::make_nvp("m_equirectPath", o_equirectPath),
+		   CEREAL_NVP(o_imageDataId),
 		   cereal::make_nvp("m_intensity", o_intensity),
 		   cereal::make_nvp("m_rotation", o_rotation));
 	}
@@ -200,7 +219,7 @@ private:
 	float       o_intensity = 1.0f;   ///< IBL intensity multiplier
 	float       o_rotation  = 0.0f;   ///< Y-axis rotation in degrees
 
-	ImageData   o_equirectData;       ///< CPU-side equirectangular pixel data
+	std::shared_ptr<ImageData> o_equirectData;  ///< CPU-side equirectangular pixel data
 };
 
 } // namespace neurus

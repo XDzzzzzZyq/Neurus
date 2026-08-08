@@ -29,6 +29,26 @@ RenderShader::RenderShader(std::string name, std::string vertPath, std::string f
 	NEURUS_LOG("[RenderShader] Created '" << m_name << "'");
 }
 
+void RenderShader::ReloadContent(const std::string& assetDir)
+{
+	if (m_vertPath.empty() && m_fragPath.empty())
+		return;   // identity shell (empty paths)
+
+	// Resolve assetDir-relative source paths into the ShaderUnits without
+	// mutating the persisted (relative) m_vertPath/m_fragPath.
+	auto resolve = [&assetDir](const std::string& p) -> std::string
+	{
+		if (p.empty())
+			return p;
+		const bool absolute = (p.size() >= 2 && p[1] == ':') || p[0] == '/' || p[0] == '\\';
+		return (assetDir.empty() || absolute) ? p : assetDir + "/" + p;
+	};
+
+	m_stages[ShaderType::VERTEX].path   = resolve(m_vertPath);
+	m_stages[ShaderType::FRAGMENT].path = resolve(m_fragPath);
+	ParseAndGenerate();
+}
+
 // =========================================================================
 // Shader interface - ParseAndGenerate
 // =========================================================================

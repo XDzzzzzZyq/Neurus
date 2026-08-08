@@ -24,7 +24,7 @@
 #include <scene/Mesh.h>
 #include <scene/Scene.h>
 #include <scene/Sprite.h>
-#include <scene/UID.h>
+#include <scene/ObjectID.h>
 
 using namespace neurus;
 

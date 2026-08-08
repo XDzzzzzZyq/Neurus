@@ -7,6 +7,11 @@
 
 #include <glm/glm.hpp>
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/string.hpp>
+
+#include "core/DataResource.h"
+
 namespace neurus {
 
 /**
@@ -16,8 +21,14 @@ namespace neurus {
  * Vertex layout (14 floats): position(3), normal(3), uv(2), tangent(3), bitangent(3).
  *
  * Pure CPU data - no Vulkan/GPU resources.
+ *
+ * Resource identity: MeshData is a pooled data resource (DataResource). Its
+ * content is loaded from an OBJ path relative to the pool's asset directory;
+ * serialize() stores only the UID + path (content stays path-based, per the
+ * resource-manager design). Non-copyable/non-movable (UID semantics) - held
+ * via shared_ptr (Mesh::o_mesh).
  */
-class MeshData
+class MeshData : public DataResource
 {
 public:
 	/**
@@ -34,6 +45,23 @@ public:
 	MeshData() = default;
 
 	/**
+	 * @brief Path-only constructor: stores the source path, content loads later.
+	 *
+	 * Stores the OBJ path relative to the pool's asset directory; the actual
+	 * parse happens in ReloadContent(assetDir), triggered by
+	 * ResourceManager::Load<MeshData>(path).
+	 *
+	 * @param path OBJ file path (relative to the asset dir).
+	 */
+	explicit MeshData(const std::string& path);
+
+	// Non-copyable / non-movable (UID identity).
+	MeshData(const MeshData&) = delete;
+	MeshData& operator=(const MeshData&) = delete;
+	MeshData(MeshData&&) = delete;
+	MeshData& operator=(MeshData&&) = delete;
+
+	/**
 	 * @brief Load OBJ from a file path.
 	 * @param path File path to .obj file.
 	 * @return true if parsing succeeded.
@@ -46,6 +74,28 @@ public:
 	 * @return true if parsing succeeded.
 	 */
 	bool LoadObjFromString(const std::string& objContent);
+
+	/**
+	 * @brief (Re)loads the OBJ content from disk (DataResource hook).
+	 *
+	 * Resolves `assetDir + "/" + m_path` and parses. Logs a warning on failure
+	 * and leaves the resource empty (identity shell). No-op when m_path is
+	 * empty (procedural/test data).
+	 *
+	 * @param assetDir Project asset directory (absolute, may be empty).
+	 */
+	void ReloadContent(const std::string& assetDir) override;
+
+	/**
+	 * @brief Cereal serialization - UID + source path (content stays path-based).
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<DataResource>(this), CEREAL_NVP(m_path));
+	}
 
 	/**
 	 * @brief Get read-only access to the parsed mesh data.
@@ -73,6 +123,7 @@ public:
 	size_t GetIndexCount() const;
 
 private:
+	std::string m_path;       ///< Source OBJ path (relative to asset dir; serialized)
 	ByteArray me_meshData;
 
 	// --- Parsing helpers ---

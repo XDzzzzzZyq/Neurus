@@ -13,6 +13,11 @@
 
 #include "asset/PixelFormat.h"
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/string.hpp>
+
+#include "core/DataResource.h"
+
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -20,7 +25,15 @@
 
 namespace neurus {
 
-class ImageData
+/**
+ * @brief CPU-side image data (pooled data resource).
+ *
+ * Inherits UID identity via DataResource; held via shared_ptr (e.g.
+ * Environment::o_equirectData). Content stays path-based: serialize() stores
+ * only the UID + source path; ReloadContent(assetDir) re-loads from disk.
+ * Non-copyable/non-movable (UID semantics).
+ */
+class ImageData : public DataResource
 {
 public:
 	/**
@@ -34,6 +47,7 @@ public:
 	 * Auto-detects HDR vs LDR format using stb_is_hdr().
 	 * HDR images (.hdr) are loaded as RGBA32F.
 	 * LDR images (.png, .bmp, .jpg, .tga) are loaded as RGBA8S.
+	 * Stores the path for later ReloadContent(assetDir) use.
 	 *
 	 * @param path File path to the image.
 	 */
@@ -55,6 +69,27 @@ public:
 
 	/** @brief True if a valid image is loaded (non-zero dimensions, non-empty pixel data). */
 	bool IsValid() const { return im_width > 0 && im_height > 0 && !im_pixelData.empty(); }
+
+	/**
+	 * @brief (Re)loads the image content from disk (DataResource hook).
+	 *
+	 * Resolves `assetDir + "/" + m_path` (or m_path directly if absolute or
+	 * assetDir is empty). No-op when m_path is empty (procedural data).
+	 *
+	 * @param assetDir Project asset directory (absolute, may be empty).
+	 */
+	void ReloadContent(const std::string& assetDir) override;
+
+	/**
+	 * @brief Cereal serialization - UID + source path (content stays path-based).
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<DataResource>(this), CEREAL_NVP(m_path));
+	}
 
 	// --- Getters ---
 
@@ -125,6 +160,7 @@ private:
 
 	// --- Data ---
 
+	std::string m_path;               ///< Source image path (relative to asset dir; serialized)
 	std::vector<uint8_t> im_pixelData;  ///< Owning pixel data (raw bytes, format-dependent byte count)
 	uint32_t im_width = 0;
 	uint32_t im_height = 0;

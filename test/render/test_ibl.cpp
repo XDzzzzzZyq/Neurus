@@ -354,7 +354,7 @@ TEST_F(IBLConversionTest, E2C_C2E_Roundtrip_ProducesMatchingPixels)
 	// Read back result
 	auto resultData = m_outputEquirect->ReadImageData(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily);
-	const float* resultPixels = reinterpret_cast<const float*>(resultData.GetPixelData().data());
+	const float* resultPixels = reinterpret_cast<const float*>(resultData->GetPixelData().data());
 
 	// Compare with tolerance (bilinear filtering in both directions causes precision loss)
 	const float kTolerance = 0.15f;
@@ -400,7 +400,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsHDR_ProducesValidFiles)
 	vk::ImageSubresourceRange cubeAll(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
 	auto cubeData = m_cubemapImage->ReadImageData(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily, &cubeAll);
-	const float* cubeFloats = reinterpret_cast<const float*>(cubeData.GetPixelData().data());
+	const float* cubeFloats = reinterpret_cast<const float*>(cubeData->GetPixelData().data());
 	const size_t faceFloats = static_cast<size_t>(kCubeFaceRes) * kCubeFaceRes * 4;
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
@@ -483,7 +483,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 	vk::ImageSubresourceRange cubeAll(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
 	auto cubeData = m_cubemapImage->ReadImageData(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily, &cubeAll);
-	const auto* halfData = reinterpret_cast<const uint16_t*>(cubeData.GetPixelData().data());
+	const auto* halfData = reinterpret_cast<const uint16_t*>(cubeData->GetPixelData().data());
 	const size_t facePixelCount = static_cast<size_t>(kCubeFaceRes) * kCubeFaceRes;
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };

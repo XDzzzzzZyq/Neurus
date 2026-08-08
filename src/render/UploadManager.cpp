@@ -140,16 +140,16 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env,
 	// --- 1. Load equirectangular ImageData (CPU-side) ---
 	// Use directly-set ImageData first (for tests/procedural), then try path loading,
 	// fall back to pink-purple gradient
-	ImageData equirectData = env.GetEquirectData();
-	if (!equirectData.IsValid())
+	std::shared_ptr<ImageData> equirectData = env.GetEquirectData();
+	if (!equirectData || !equirectData->IsValid())
 	{
 		const std::string& eqPath = env.GetEquirectPath();
 		if (!eqPath.empty())
 		{
-			equirectData = ImageData(eqPath);
+			equirectData = std::make_shared<ImageData>(eqPath);
 		}
 	}
-	if (!equirectData.IsValid())
+	if (!equirectData || !equirectData->IsValid())
 	{
 		// Generate pink-purple fallback equirect (64x32)
 		constexpr uint32_t kFallbackW = 64;
@@ -162,7 +162,8 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env,
 			pixels[i + 2] = 0.5f;   // B
 			pixels[i + 3] = 1.0f;   // A
 		}
-		equirectData = ImageData(pixels.data(), kFallbackW, kFallbackH, PixelFormat::RGBA32F);
+		equirectData = std::make_shared<ImageData>(
+			pixels.data(), kFallbackW, kFallbackH, PixelFormat::RGBA32F);
 		NEURUS_LOG("[UploadManager] Using pink-purple fallback equirect");
 	}
 
@@ -170,7 +171,7 @@ EnvironmentGPU UploadManager::UploadEnvironment(const Environment& env,
 	auto equirectImage = Image::FromImageData(
 		*um_device, *um_physicalDevice,
 		um_transferQueue, um_transferQueueFamily,
-		equirectData,
+		*equirectData,
 		"Env_Equirect",
 		vk::ImageUsageFlagBits::eStorage);
 	if (equirectImage.State() == ImageState::Invalid)

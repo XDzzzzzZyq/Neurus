@@ -21,7 +21,7 @@
 #include "items/OutlinerRow.h"
 
 #include "scene/Scene.h"
-#include "scene/UID.h"  // ObjectID, GOType
+#include "scene/ObjectID.h"  // ObjectID, GOType
 
 #include <QGroupBox>
 #include <QLabel>

@@ -328,7 +328,7 @@ bool Texture::SaveImage(Image& image,
 	// --- 2. Read back ---
 	auto imageData = image.ReadImageData(device, physicalDevice, queue, queueFamilyIndex);
 
-	if (!imageData.IsValid()) return false;
+	if (!imageData || !imageData->IsValid()) return false;
 
 	// --- 3. Transition back ---
 	if (prevState != ImageState::Undefined)
@@ -351,7 +351,7 @@ bool Texture::SaveImage(Image& image,
 	}
 
 	// --- 4. Save pixel data ---
-	return imageData.SavePNG(path, remapSigned);
+	return imageData->SavePNG(path, remapSigned);
 }
 
 // ===========================================================================

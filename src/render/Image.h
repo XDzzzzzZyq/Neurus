@@ -171,14 +171,16 @@ public:
 	 * @param readExtent        Extent to read (default {0,0} = full image extent).
 	 *                          Useful for reading a subregion of a larger image
 	 *                          (e.g. 256x256 from a 1024x1024 shadow cubemap).
-	 * @return ImageData with the pixel content, or default-constructed on failure.
+	 * @return shared_ptr to ImageData with the pixel content, or nullptr on failure.
+	 * @note Returns shared_ptr because ImageData is a non-movable UID-derived
+	 *       data resource; readbacks are transient (not pooled) heap objects.
 	 */
-	ImageData ReadImageData(const vk::raii::Device& device,
-	                        const vk::raii::PhysicalDevice& physicalDevice,
-	                        vk::Queue queue,
-	                        uint32_t queueFamilyIndex,
-	                        const vk::ImageSubresourceRange* subresourceRange = nullptr,
-	                        vk::Extent2D readExtent = {});
+	std::shared_ptr<ImageData> ReadImageData(const vk::raii::Device& device,
+	                                         const vk::raii::PhysicalDevice& physicalDevice,
+	                                         vk::Queue queue,
+	                                         uint32_t queueFamilyIndex,
+	                                         const vk::ImageSubresourceRange* subresourceRange = nullptr,
+	                                         vk::Extent2D readExtent = {});
 
 	/**
 	 * @brief Reads back a single pixel at the specified coordinates from the GPU.

@@ -33,6 +33,7 @@
 #include "editor/events/InputEvents.h"
 #include "asset/Project.h"
 #include "asset/components/SceneComponent.h"
+#include "asset/components/ResourceComponent.h"
 #include "asset/components/ConfigComponent.h"
 #include "asset/components/UIComponent.h"
 #include "asset/components/HistoryComponent.h"
@@ -77,13 +78,18 @@ static QString resolveResourcePath(const char* relativePath)
 	return QCoreApplication::applicationDirPath() + "/res/" + relativePath;
 }
 
-// Registers the three cross-layer components against live data each call:
-// Scene + RenderConfig (Editor-owned) and the UI-state blob (Application-owned).
+// Registers the cross-layer components against live data each call:
+// Scene + RenderConfig (Editor-owned), the ResourceManager pool (Editor-owned,
+// registered FIRST so it deserializes before the Scene resolves references),
+// and the UI-state blob (Application-owned).
 static void BuildProject(neurus::project::Project& proj,
                          neurus::Editor& editor,
                          std::string& uiLayout)
 {
-	proj.Register<neurus::project::SceneComponent>(editor.GetScene());
+	// Resource pool first: the Scene's ID references resolve against it.
+	proj.Register<neurus::project::ResourceComponent>(editor.GetResourceManager());
+	proj.Register<neurus::project::SceneComponent>(editor.GetScene(),
+	                                                editor.GetResourceManager());
 	proj.Register<neurus::project::ConfigComponent>(editor.GetRenderConfig());
 	proj.Register<neurus::project::UIComponent>(uiLayout);
 	// History last: legacy files without an "m_history" node load cleanly

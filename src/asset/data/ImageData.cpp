@@ -113,8 +113,22 @@ void ImageData::SwizzleBGRtoRGB(void* data, uint32_t width,
 // ===========================================================================
 
 ImageData::ImageData(const std::string& path)
+	: m_path(path)
 {
 	LoadFromPath(path);
+}
+
+void ImageData::ReloadContent(const std::string& assetDir)
+{
+	if (m_path.empty())
+		return;
+
+	const bool absolute = (m_path.size() >= 2 && m_path[1] == ':')
+		|| m_path[0] == '/' || m_path[0] == '\\';
+	const std::string fullPath = (assetDir.empty() || absolute)
+		? m_path
+		: assetDir + "/" + m_path;
+	LoadFromPath(fullPath);
 }
 
 ImageData::ImageData(const void* data, uint32_t w, uint32_t h, PixelFormat fmt,

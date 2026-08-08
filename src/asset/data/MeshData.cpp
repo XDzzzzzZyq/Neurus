@@ -13,6 +13,40 @@
 
 namespace neurus {
 
+namespace {
+
+/** @brief True for Windows drive (C:) or absolute root (/ or \) paths. */
+bool IsAbsolutePath(const std::string& path)
+{
+	return (path.size() >= 2 && path[1] == ':')
+		|| (!path.empty() && (path[0] == '/' || path[0] == '\\'));
+}
+
+} // anonymous namespace
+
+// ---------------------------------------------------------------------------
+// Construction / DataResource reload
+// ---------------------------------------------------------------------------
+
+MeshData::MeshData(const std::string& path)
+	: m_path(path)
+{
+}
+
+void MeshData::ReloadContent(const std::string& assetDir)
+{
+	if (m_path.empty())
+		return;
+
+	const std::string fullPath = (assetDir.empty() || IsAbsolutePath(m_path))
+		? m_path
+		: assetDir + "/" + m_path;
+	if (!LoadObj(fullPath))
+	{
+		NEURUS_ERR("[MeshData] ReloadContent failed to load: " << fullPath);
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Helper: resolve OBJ index (1-based or negative relative → 0-based)
 // ---------------------------------------------------------------------------

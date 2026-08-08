@@ -24,7 +24,7 @@
 #include <cereal/types/base_class.hpp>
 #include <cereal/types/vector.hpp>
 
-#include "UID.h"
+#include "scene/ObjectID.h"
 #include "Transform.h"
 
 namespace neurus

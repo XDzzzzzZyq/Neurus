@@ -13,6 +13,10 @@ add_library(neurus_asset STATIC
 	components/UIComponent.cpp
 	components/HistoryComponent.h
 	components/HistoryComponent.cpp
+	components/ResourceComponent.h
+	components/ResourceComponent.cpp
+	registrations/DataRegistration.h
+	registrations/DataRegistration.cpp
 	data/ImageData.h
 	data/ImageData.cpp
 	data/MeshData.h

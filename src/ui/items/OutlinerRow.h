@@ -23,7 +23,7 @@
 #include <QWidget>
 
 #include "editor/events/SceneEvents.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 
 #include <cstdint>
 

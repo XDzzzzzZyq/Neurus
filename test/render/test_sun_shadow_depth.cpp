@@ -134,7 +134,7 @@ TEST_F(SunShadowDepthTest, OrthoDepthMap)
 		ASSERT_NE(lgpu->shadowDepthMap, nullptr);
 		auto& sm = *lgpu->shadowDepthMap;
 		auto data=sm.ReadImageData(*m_device,pd,m_queue,m_graphicsQueueFamily,nullptr,{kRes,kRes});
-		const float* rd=reinterpret_cast<const float*>(data.GetPixelData().data());
+		const float* rd=reinterpret_cast<const float*>(data->GetPixelData().data());
 		dd.assign(rd,rd+kRes*kRes);
 		float mn=rd[0],mx=rd[0]; int zc=0,oc=0;
 		for (uint32_t i=0,n=kRes*kRes;i<n;++i){

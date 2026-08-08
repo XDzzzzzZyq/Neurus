@@ -73,13 +73,22 @@ public:
 
 	~ComputeShader() override = default;
 
-	// Non-copyable (inherits from Shader)
+	// Non-copyable / non-movable (inherits UID semantics).
 	ComputeShader(const ComputeShader&) = delete;
 	ComputeShader& operator=(const ComputeShader&) = delete;
+	ComputeShader(ComputeShader&&) = delete;
+	ComputeShader& operator=(ComputeShader&&) = delete;
 
-	// Movable
-	ComputeShader(ComputeShader&&) noexcept = default;
-	ComputeShader& operator=(ComputeShader&&) noexcept = default;
+	/**
+	 * @brief DataResource hook: re-runs ParseAndGenerate() from disk.
+	 *
+	 * ComputeShader instances are not pooled (pass shaders only), so this is a
+	 * no-op content reload for completeness; parsing happens on construction /
+	 * explicit ParseAndGenerate().
+	 *
+	 * @param assetDir Project asset directory (unused).
+	 */
+	void ReloadContent(const std::string& assetDir) override;
 
 	// ----------------------------------
 	// Shader interface (override)

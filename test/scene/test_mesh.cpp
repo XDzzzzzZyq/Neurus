@@ -13,7 +13,7 @@
 #include "scene/Mesh.h"
 #include "render/shaders/Shader.h"
 #include "scene/Transform.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 #include "asset/data/MeshData.h"
 #include "scene/Material.h"
 
@@ -307,11 +307,12 @@ TEST(Mesh, SetTexNoMaterialNoCrash)
 /**
  * @brief Constructing Mesh with empty string produces valid mesh with no data.
  */
-TEST(Mesh, ConstructorEmptyPath)
+TEST(Mesh, ConstructorEmptyMeshData)
 {
-	// An empty path is not a valid file → MeshData stays empty
-	Mesh mesh("");
+	// An empty MeshData reference produces a valid mesh with no geometry.
+	Mesh mesh(std::make_shared<MeshData>());
 	EXPECT_EQ(mesh.o_type, ObjectID::GOType::GO_MESH);
+	EXPECT_EQ(mesh.o_meshDataId, 0);
 	// MeshData may or may not be loaded depending on error handling
 	// The key requirement is no crash and valid Mesh object
 	SUCCEED();

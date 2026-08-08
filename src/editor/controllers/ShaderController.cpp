@@ -20,7 +20,7 @@
 #include "editor/operations/ShaderOperations.h"
 
 #include "scene/Mesh.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 
 #include "render/shaders/Shader.h"
 #include "render/shaders/ShaderUnit.h"
@@ -620,14 +620,12 @@ namespace neurus {
 
 void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 {
-	// Create/Compile bump the shader version -> pipeline rebuilds on the next
-	// frame, so temporal accumulation (shadow intensity) must reset. These stay
+	// Shader CREATE is handled by the Editor (it constructs a pooled
+	// RenderShader via ResourceManager::Load<RenderShader>); ShaderController
+	// keeps only pool-free lifecycle handlers.
+	// Compile bumps the shader version -> pipeline rebuilds on the next frame,
+	// so temporal accumulation (shadow intensity) must reset. These stay
 	// non-undoable lifecycle actions.
-	bus.subscribe<ShaderCreateRequested>(
-		[&bus](const ShaderCreateRequested& e) {
-			OnCreateShader(e);
-			bus.enqueue(RenderResetEvent{});
-		});
 	bus.subscribe<ShaderCompileRequested>(
 		[&bus](const ShaderCompileRequested& e) {
 			OnCompileShader(e);

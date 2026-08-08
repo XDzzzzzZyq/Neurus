@@ -31,7 +31,7 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 #include "scene/Transform.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 
 #include "core/Log.h"
 

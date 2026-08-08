@@ -44,21 +44,50 @@ class RenderShader : public Shader
 public:
 	/**
 	 * @brief Constructs a render shader with file paths to GLSL source.
+	 *
+	 * Default arguments make this the default ctor used by cereal's
+	 * polymorphic load; content loads later via ReloadContent(assetDir) (pool)
+	 * or an explicit ParseAndGenerate() call (ShaderLibrary).
+	 *
 	 * @param name     Human-readable shader name (for logging and cache keys).
 	 * @param vertPath Path to the vertex shader GLSL source file.
 	 * @param fragPath Path to the fragment shader GLSL source file.
 	 */
-	RenderShader(std::string name, std::string vertPath, std::string fragPath);
+	RenderShader(std::string name = "", std::string vertPath = "", std::string fragPath = "");
 
 	~RenderShader() override = default;
 
-	// Non-copyable (inherits from Shader)
+	// Non-copyable / non-movable (inherits UID semantics).
 	RenderShader(const RenderShader&) = delete;
 	RenderShader& operator=(const RenderShader&) = delete;
+	RenderShader(RenderShader&&) = delete;
+	RenderShader& operator=(RenderShader&&) = delete;
 
-	// Movable
-	RenderShader(RenderShader&&) noexcept = default;
-	RenderShader& operator=(RenderShader&&) noexcept = default;
+	/**
+	 * @brief DataResource hook: re-runs ParseAndGenerate() from disk.
+	 *
+	 * Resolves assetDir-relative source paths into the ShaderUnits and
+	 * re-parses + re-generates both stages. Called by ResourceManager after
+	 * pool deserialization. No-op for empty paths (identity shell).
+	 *
+	 * @param assetDir Project asset directory (may be empty).
+	 */
+	void ReloadContent(const std::string& assetDir) override;
+
+	/**
+	 * @brief Cereal serialization - name (via Shader) + both source paths.
+	 *
+	 * Content stays path-based: only the paths are persisted so ReloadContent
+	 * can re-parse after load.
+	 *
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<Shader>(this), CEREAL_NVP(m_vertPath), CEREAL_NVP(m_fragPath));
+	}
 
 	// ----------------------------------
 	// Shader interface (override)

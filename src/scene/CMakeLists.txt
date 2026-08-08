@@ -16,8 +16,7 @@
 	DefaultScene.cpp
 	Mesh.h
 	Mesh.cpp
-	UID.h
-	UID.cpp
+	ObjectID.h
 	Transform.h
 	Transform.cpp
 	Light.h
