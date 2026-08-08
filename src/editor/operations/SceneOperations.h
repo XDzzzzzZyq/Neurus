@@ -382,18 +382,19 @@ private:
 };
 
 /**
- * @brief Scene-membership toggle: add (or re-add) an object to the scene.
+ * @brief Scene-membership toggle: add (or re-add) / delete a batch of objects.
  *
- * Stores the target object UID plus an `add` flag. Apply() re-dispatches the
- * ORIGINATING membership event (SceneObjectAddRequested /
- * SceneObjectDeleteRequested), so replay runs the same controller handler as a
- * live edit; the handler's Submit is muted by OperationManager's
+ * Stores the target object UIDs plus an `add` flag. Apply() re-dispatches the
+ * ORIGINATING membership events (SceneObjectAddRequested per UID, or ONE
+ * batched SceneObjectDeleteRequested), so replay runs the same controller
+ * handler as a live edit; the handler's Submit is muted by OperationManager's
  * Phase::Replaying guard, so playback does not re-record. Inverse() flips the
- * flag, so the delete direction is the same op type (the AddShaderFieldOp
- * convention).
+ * flag — the inverse of Add is Delete and vice versa (the AddShaderFieldOp
+ * convention). Batching the delete direction keeps the composite light:
+ * delete-of-N records ONE op, not N.
  *
- * The pooled resource is NEVER removed — delete only drops the scene
- * reference, so the inverse re-registers without any reload from disk and
+ * The pooled resources are NEVER removed — delete only drops the scene
+ * references, so the inverse re-registers without any reload from disk and
  * survives project save/load (pool + history both persist).
  *
  * @note Replay re-enters the forward handler (harmless: Submit is muted). If
@@ -408,41 +409,46 @@ public:
 	SceneObjectAddOp() = default;
 
 	/**
-	 * @brief Constructs a membership toggle.
-	 * @param uid Target object UID (pooled resource).
-	 * @param add true = add/re-add; false = remove the scene reference.
+	 * @brief Constructs a membership toggle over a batch of objects.
+	 * @param uids Target object UIDs (pooled resources).
+	 * @param add true = add/re-add all; false = remove all scene references.
 	 */
-	SceneObjectAddOp(int uid, bool add)
-		: m_uid(uid)
+	SceneObjectAddOp(std::vector<int> uids, bool add)
+		: m_uids(std::move(uids))
 		, m_add(add)
 	{}
 
 	void Apply(OperationContext& ctx) override
 	{
 		if (m_add)
-			ctx.bus.emitNow(SceneObjectAddRequested{&ctx.scene, m_uid});
+		{
+			for (int uid : m_uids)
+				ctx.bus.emitNow(SceneObjectAddRequested{&ctx.scene, uid});
+		}
 		else
-			ctx.bus.emitNow(SceneObjectDeleteRequested{&ctx.scene, m_uid});
+		{
+			ctx.bus.emitNow(SceneObjectDeleteRequested{&ctx.scene, m_uids});
+		}
 	}
 
 	std::unique_ptr<Operation> Inverse() const override
 	{
-		return std::make_unique<SceneObjectAddOp>(m_uid, !m_add);
+		return std::make_unique<SceneObjectAddOp>(m_uids, !m_add);
 	}
 
 	std::string Label() const override { return m_add ? "Add Object" : "Delete Object"; }
 
-	/** @brief Serializes the target UID + membership direction. */
+	/** @brief Serializes the target UID list + membership direction. */
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(cereal::make_nvp("uid", m_uid),
+		ar(cereal::make_nvp("uids", m_uids),
 		   cereal::make_nvp("add", m_add));
 	}
 
 private:
-	int  m_uid = 0;    ///< Target object UID (serialized).
-	bool m_add = false; ///< true = add/re-add; false = remove (inverse direction).
+	std::vector<int> m_uids;   ///< Target object UIDs (serialized).
+	bool m_add = false;        ///< true = add/re-add; false = remove (inverse direction).
 };
 
 } // namespace neurus

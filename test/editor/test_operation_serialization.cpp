@@ -201,7 +201,7 @@ TEST_F(OperationSerializationTest, SceneObjectAddOp_RoundTrip)
 {
 	auto mesh = m_resources.Load<Mesh>(m_resources.Load<MeshData>());
 	const int uid = mesh->GetObjectID();
-	std::unique_ptr<Operation> op = std::make_unique<SceneObjectAddOp>(uid, true);
+	std::unique_ptr<Operation> op = std::make_unique<SceneObjectAddOp>(std::vector<int>{uid}, true);
 
 	auto restored = RoundTrip(op);
 	ASSERT_NE(restored, nullptr);
@@ -224,7 +224,7 @@ TEST_F(OperationSerializationTest, CompositeOp_RoundTrip)
 	SelectionState after{ { uid }, uid };
 
 	std::vector<std::unique_ptr<Operation>> seq;
-	seq.push_back(std::make_unique<SceneObjectAddOp>(uid, true));
+	seq.push_back(std::make_unique<SceneObjectAddOp>(std::vector<int>{uid}, true));
 	seq.push_back(std::make_unique<SetSelectionOp>(before, after));
 	std::unique_ptr<Operation> op = std::make_unique<CompositeOp>(std::move(seq));
 

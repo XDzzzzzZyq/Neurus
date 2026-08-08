@@ -83,11 +83,11 @@ value changes but must collapse to a single undo entry. Three strategies exist:
 - **Composite (one gesture → many primitive ops):** where one gesture spans
   several *distinct* edits, the controller records a single `CompositeOp`
   holding the primitive sequence. Scene add records
-  `CompositeOp[SceneObjectAddOp(u,true), SetSelectionOp(before→{u})]` (add AND
-  select = one undo entry); scene delete records
-  `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`
-  (deselect AND remove every selected object = one undo entry). Undo replays
-  the reversed, inverted sequence.
+  `CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(before→{u})]` (add
+  AND select = one undo entry); scene delete records
+  `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]`
+  (deselect AND remove every selected object in ONE batched op = one undo
+  entry). Undo replays the reversed, inverted sequence.
 
 For the concrete controller wiring (`CameraController`,
 `RenderConfigController`, `ShaderController`), see

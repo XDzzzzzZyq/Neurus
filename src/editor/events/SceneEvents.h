@@ -232,18 +232,18 @@ struct SceneObjectAddRequested
 };
 
 /**
- * @brief Removes ONE object's scene reference.
+ * @brief Removes a BATCH of objects' scene references.
  *
- * The SINGLE removal path: emitted by the delete gesture (deferred, one
- * event per selected object) AND by SceneObjectAddOp (delete direction) on
- * undo/redo replay. The handler removes exactly this UID — no selection
- * logic, no operation recording (the gesture records the composite; replay
- * is muted). The pooled resource is never removed from the pool.
+ * The SINGLE removal path: emitted by the delete gesture (one event carrying
+ * all selected UIDs) AND by SceneObjectAddOp (delete direction) on undo/redo
+ * replay. The handler removes exactly these UIDs — no selection logic, no
+ * operation recording (the gesture records the composite; replay is muted).
+ * The pooled resources are never removed from the pool.
  */
 struct SceneObjectDeleteRequested
 {
-	const UID* scene = nullptr;
-	int objectUid = 0;
+	const UID* scene = nullptr;    ///< Editor-owned Scene.
+	std::vector<int> uids;         ///< Object UIDs to remove (one or more).
 };
 
 /**
@@ -251,10 +251,12 @@ struct SceneObjectDeleteRequested
  *
  * Pure signal — panels emit the DEFAULT (scene = nullptr); the Editor
  * forwards the actual event with the active scene stamped
- * (Editor::OnObjectDeleteRequested). The SceneController snapshots the
- * selection, guards the last camera, deselects, removes every selected
- * object (via SceneObjectDeleteRequested), and records ONE composite
- * operation (selection-clear + per-object delete).
+ * (Editor::OnObjectDeleteRequested). This event is FORWARD-ONLY (the user
+ * intent entry point): the recorded composite replays via
+ * SceneObjectDeleteRequested, never this gesture event. The SceneController
+ * snapshots the selection, guards the last camera, deselects, removes every
+ * selected object (one batched SceneObjectDeleteRequested), and records ONE
+ * composite operation (selection-clear + batched delete).
  */
 struct ObjectDeleteRequested
 {

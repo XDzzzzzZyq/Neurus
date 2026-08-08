@@ -112,8 +112,8 @@ struct EnvironmentRotationChanged  { const ObjectID* object; float rotation; };
 
 // Scene membership (Add / Delete) — UID-carrying (replay-safe; see below)
 struct SceneObjectAddRequested { const UID* scene; int objectUid; };     // forward (Editor import) + replay
-struct SceneObjectDeleteRequested { const UID* scene; int objectUid; };  // single removal path (gesture + replay)
-struct ObjectDeleteRequested { const UID* scene; };                      // pure UI intent (Editor stamps scene)
+struct SceneObjectDeleteRequested { const UID* scene; std::vector<int> uids; };  // single BATCHED removal path (gesture + replay)
+struct ObjectDeleteRequested { const UID* scene; };                      // pure UI intent, FORWARD-ONLY (Editor stamps scene)
 ```
 
 **Scene Events Are Ephemeral**
@@ -139,20 +139,17 @@ LOG).
 `ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
 it is a **pure UI intent** — panels emit the default (no scene); the Editor
 stamps the active scene (`Editor::OnObjectDeleteRequested`) before enqueueing,
-so the UI layer stays decoupled from scene state. The SceneController
-snapshots the selection, guards the last camera, deselects, and DEFERS the
-actual removals as one `SceneObjectDeleteRequested` per selected object —
-so the per-uid handler is the SINGLE removal path shared by the gesture and
-by undo/redo replay (no replay-only handling), and records ONE composite
-(`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`). The
-forward add path records `CompositeOp[SceneObjectAddOp(u,true),
-SetSelectionOp(before→{u})]` — add AND select collapse to one undo entry.
-`ObjectDeleteRequested` is the user gesture (Delete key in Outliner/Viewport):
-the SceneController snapshots the selection, guards the last camera, deselects,
-removes every selected object, and records ONE composite operation
-(`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(u,false)...]`). The
-forward add path records `CompositeOp[SceneObjectAddOp(u,true),
-SetSelectionOp(before→{u})]` — add AND select collapse to one undo entry.
+so the UI layer stays decoupled from scene state. It is **forward-only** (the
+recorded composite replays via `SceneObjectDeleteRequested`, never this
+gesture event). The SceneController snapshots the selection, guards the last
+camera, deselects, and DEFERS the actual removals as ONE batched
+`SceneObjectDeleteRequested` carrying all selected UIDs — so the batched
+handler is the SINGLE removal path shared by the gesture and by undo/redo
+replay (no replay-only handling), and records ONE light composite
+(`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]` — a
+delete of N objects is ONE op, not N). The forward add path records
+`CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(before→{u})]` — add
+AND select collapse to one undo entry.
 
 ### EditorEvents.h
 
