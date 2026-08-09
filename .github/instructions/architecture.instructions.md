@@ -102,7 +102,7 @@ See `.github/instructions/events.instructions.md` for the complete event system
 template forwarding pattern).
 
 Event structs in `src/editor/events/` are split by domain:
-`SceneEvents.h` (ephemeral scene-domain events carrying `const UID*`:
+`SceneEvents.h` (scene-domain events carrying plain `int objectUid`:
 selection, transform, visibility, camera/mesh/light/env property edits),
 `EditorEvents.h` (cross-component events: RenderResetEvent,
 EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild,
@@ -113,14 +113,13 @@ dirty tracking; the Editor executes those uploads.
 
 Cross-layer traffic flows along three event paths (see events.instructions.md,
 "Three event paths"). On the UI->Editor path the UI emits PURE INPUT INTENTS
-(`InputEvents.h`: mouse events, `ObjectClicked { const UID* object }`,
-`DeleteRequested`) that carry no scene pointer; the Editor wraps them into
-dedicated scene events (`ObjectSelected`, `ObjectDeleteRequested`), and
-controllers handle complete scene mutations carrying `const UID* object`,
-casting back via `ObjectID::As<T>` / the untyped `ObjectID::As` (scene refs via
-`Scene::As`). The `const UID*` erasure - `UID` is the common base of `Scene`
-and `ObjectID` - lets a single pointer type cover both the Editor-owned scene
-and the objects being mutated.
+(`InputEvents.h`: mouse events, `ObjectClicked { int objectUid }`,
+`DeleteRequested`) that carry no scene; the Editor wraps them into dedicated
+scene events (`ObjectSelected`, `ObjectDeleteRequested`), and controllers
+handle complete scene mutations carrying `int objectUid`, resolving the UID to
+the live object via their `ControllerContext` (never raw pointers — a UID
+stays stable after deletion while a pointer would dangle). The scene itself is
+not carried in events: scene-scoped handlers obtain it from the context.
 
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals

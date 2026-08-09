@@ -8,7 +8,7 @@
  *   via OutlinerRow::setObject() from a growing pool.
  * - New rows are created when pool < scene objects, and connected to
  *   Outliner signals once. Extra rows are hidden (not destroyed).
- * - Signal lambdas on OutlinerRow read m_object at emission time,
+ * - Signal lambdas on OutlinerRow read m_objectUid at emission time,
  *   so recycling a row to a different object is transparent.
  * - Type icons are resolved from GOType via the Outliner-owned Icons cache
  *   and passed as icon names ("scene:camera", "scene:light", etc.).
@@ -108,7 +108,7 @@ void Outliner::EnsureRowPool(std::size_t needed)
 		auto* row = new OutlinerRow(m_sceneGroup);
 
 		// Connect row signals to Outliner signals once (permanent).
-		// Lambdas read m_object at emission time, so recycling
+		// Lambdas read m_objectUid at emission time, so recycling
 		// a row to a new object works without reconnecting.
 		QObject::connect(row, &OutlinerRow::objectClicked,
 			this, &Outliner::objectClicked);
@@ -142,15 +142,20 @@ void Outliner::Refresh(const UIContext& ctx)
 	// Ensure pool is large enough for valid objects.
 	EnsureRowPool(ids.size());
 
-	// Configure visible rows.
+	// Configure visible rows. Rows compare plain int UIDs for dirty checks, so
+	// recycling a row to a different object (or skipping an unchanged one) is a
+	// cheap integer comparison — no cached object pointers anywhere.
 	std::size_t poolIndex = 0;
-	for (const auto* obj : ids)
+	for (int id : ids)
 	{
-		// Phase 1 — bind object identity data (icon, name, pointer).
+		const ObjectID* obj = scene ? scene->GetObjectID(id) : nullptr;
+		if (!obj) continue; // stale id (should not happen: ids mirror obj_list)
+
+		// Phase 1 — bind object identity data (icon, name, UID).
 		m_rowPool[poolIndex]->setObject(
 			Icons::ObjectIcon(static_cast<int>(obj->o_type)),
 			QString::fromStdString(obj->o_name),
-			obj);
+			id);
 
 		// Sync visibility toggles to the object's actual flags.
 		m_rowPool[poolIndex]->setVisibilities(obj->is_viewport, obj->is_rendered);

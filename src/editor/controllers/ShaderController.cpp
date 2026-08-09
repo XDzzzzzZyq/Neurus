@@ -3,12 +3,12 @@
  * @brief Event-driven shader lifecycle: create, compile, code edit, struct edit.
  *
  * Stateless — all handlers are free functions in an anonymous namespace.
- * Each handler receives a discrete shader event, extracts the ObjectID*
- * pointer, casts it to Mesh* (the only object type that owns a shader),
+ * Each handler receives a discrete shader event carrying an integer object UID,
+ * resolves the target mesh against the current scene via the ControllerContext,
  * and applies the corresponding mutation to the Shader/ShaderUnit data.
  *
  * No Editor*, no DeferredRenderer*, no UploadManager* — pure shader logic.
- * The ObjectID* is provided by each event (resolved once by the
+ * The object UID is provided by each event (resolved once by the
  * ShaderEditorPanel from the active scene selection).
  */
 
@@ -20,6 +20,7 @@
 #include "editor/operations/ShaderOperations.h"
 
 #include "scene/Mesh.h"
+#include "scene/Scene.h"
 #include "scene/ObjectID.h"
 
 #include "render/shaders/Shader.h"
@@ -43,13 +44,24 @@ namespace {
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Resolves an (object, stage) pair to its live ShaderUnit.
- * @return Pointer to the stage's ShaderUnit, or nullptr if the object is not a
- *         mesh, has no shader, or lacks the requested stage.
+ * @brief Resolves an event's object UID to its live Mesh (via the scene).
+ * @return Non-owning Mesh*, or nullptr if the id is stale or not a mesh.
  */
-neurus::ShaderUnit* GetStageUnit(const neurus::UID* obj, int stage)
+neurus::Mesh* ResolveMesh(const neurus::ControllerContext& ctx, int objectUid)
 {
-	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(obj);
+	neurus::Scene* scene = ctx.scene();
+	if (!scene) return nullptr;
+	auto it = scene->mesh_list.find(objectUid);
+	return it == scene->mesh_list.end() ? nullptr : it->second.get();
+}
+
+/**
+ * @brief Resolves a mesh's (stage) pair to its live ShaderUnit.
+ * @return Pointer to the stage's ShaderUnit, or nullptr if the mesh has no
+ *         shader or lacks the requested stage.
+ */
+neurus::ShaderUnit* GetStageUnit(neurus::Mesh* mesh, int stage)
+{
 	if (!mesh || !mesh->o_shader) return nullptr;
 	auto type = static_cast<neurus::ShaderType>(stage);
 	if (!mesh->o_shader->HasStage(type)) return nullptr;
@@ -60,9 +72,9 @@ neurus::ShaderUnit* GetStageUnit(const neurus::UID* obj, int stage)
  * @brief Reads a stage's current GLSL code text.
  * @return true on success, false if the stage could not be resolved.
  */
-bool SnapshotCode(const neurus::UID* obj, int stage, std::string& out)
+bool SnapshotCode(neurus::Mesh* mesh, int stage, std::string& out)
 {
-	neurus::ShaderUnit* unit = GetStageUnit(obj, stage);
+	neurus::ShaderUnit* unit = GetStageUnit(mesh, stage);
 	if (!unit) return false;
 	out = unit->code;
 	return true;
@@ -198,9 +210,9 @@ void ApplyFieldEdit(neurus::S_StructDef& sd, int subFieldIndex,
  *   4. Compile both stages to SPIR-V
  *   5. Bump Shader::m_version on success
  */
-void OnCreateShader(const neurus::ShaderCreateRequested& e)
+void OnCreateShader(const neurus::ShaderCreateRequested& e, const neurus::ControllerContext& ctx)
 {
-	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
+	auto* mesh = ResolveMesh(ctx, e.objectUid);
 	if (!mesh)
 	{
 		NEURUS_ERR("[ShaderController] OnCreateShader: not a mesh");
@@ -265,9 +277,9 @@ void OnCreateShader(const neurus::ShaderCreateRequested& e)
  * Does NOT bump version — the user must press Compile (ShaderCompileRequested)
  * to apply the code change to the GPU pipeline.
  */
-void OnCodeEdited(const neurus::ShaderCodeEdited& e)
+void OnCodeEdited(const neurus::ShaderCodeEdited& e, const neurus::ControllerContext& ctx)
 {
-	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
+	auto* mesh = ResolveMesh(ctx, e.objectUid);
 	if (!mesh || !mesh->o_shader) return;
 
 	auto& shader = *mesh->o_shader;
@@ -293,9 +305,9 @@ void OnCodeEdited(const neurus::ShaderCodeEdited& e)
  *
  * Bumps ShaderUnit::m_version and Shader::m_version on success.
  */
-void OnCompileShader(const neurus::ShaderCompileRequested& e)
+void OnCompileShader(const neurus::ShaderCompileRequested& e, const neurus::ControllerContext& ctx)
 {
-	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
+	auto* mesh = ResolveMesh(ctx, e.objectUid);
 	if (!mesh || !mesh->o_shader)
 	{
 		NEURUS_ERR("[ShaderController] OnCompileShader: no shader on mesh");
@@ -520,9 +532,9 @@ bool RemoveLast(neurus::ShaderStruct& parsed, neurus::ShaderSection section, int
  * Overwrites ShaderUnit::code and bumps the ShaderUnit version so the editor
  * panel refreshes. CPU-only: does NOT recompile to SPIR-V.
  */
-void OnCodeRestored(const neurus::ShaderCodeRestored& e)
+void OnCodeRestored(const neurus::ShaderCodeRestored& e, const neurus::ControllerContext& ctx)
 {
-	neurus::ShaderUnit* unit = GetStageUnit(e.object, e.stage);
+	neurus::ShaderUnit* unit = GetStageUnit(ResolveMesh(ctx, e.objectUid), e.stage);
 	if (!unit) return; // Stale identity: shader gone, safe no-op.
 	unit->code = e.code;
 	unit->BumpVersion();
@@ -539,9 +551,9 @@ void OnCodeRestored(const neurus::ShaderCodeRestored& e)
  * active alternative must match the section's element type (it always does,
  * since the op captured it from that same section).
  */
-void OnFieldRestored(const neurus::ShaderFieldRestored& e)
+void OnFieldRestored(const neurus::ShaderFieldRestored& e, const neurus::ControllerContext& ctx)
 {
-	neurus::ShaderUnit* unit = GetStageUnit(e.object, e.stage);
+	neurus::ShaderUnit* unit = GetStageUnit(ResolveMesh(ctx, e.objectUid), e.stage);
 	if (!unit) return; // Stale identity: shader gone, safe no-op.
 
 	bool applied = false;
@@ -578,9 +590,9 @@ void OnFieldRestored(const neurus::ShaderFieldRestored& e)
  *
  * Bumps the ShaderUnit version so the editor panel refreshes.
  */
-void OnFieldAddRestored(const neurus::ShaderFieldAddRestored& e)
+void OnFieldAddRestored(const neurus::ShaderFieldAddRestored& e, const neurus::ControllerContext& ctx)
 {
-	neurus::ShaderUnit* unit = GetStageUnit(e.object, e.stage);
+	neurus::ShaderUnit* unit = GetStageUnit(ResolveMesh(ctx, e.objectUid), e.stage);
 	if (!unit) return; // Stale identity: shader gone, safe no-op.
 	if (!AppendDefault(unit->parsed, e.section, e.subFieldIndex))
 	{
@@ -596,9 +608,9 @@ void OnFieldAddRestored(const neurus::ShaderFieldAddRestored& e)
  *
  * Bumps the ShaderUnit version so the editor panel refreshes.
  */
-void OnFieldRemoved(const neurus::ShaderFieldRemoved& e)
+void OnFieldRemoved(const neurus::ShaderFieldRemoved& e, const neurus::ControllerContext& ctx)
 {
-	neurus::ShaderUnit* unit = GetStageUnit(e.object, e.stage);
+	neurus::ShaderUnit* unit = GetStageUnit(ResolveMesh(ctx, e.objectUid), e.stage);
 	if (!unit) return; // Stale identity: shader gone, safe no-op.
 	if (!RemoveLast(unit->parsed, e.section, e.subFieldIndex))
 	{
@@ -618,7 +630,7 @@ namespace neurus {
 // Init — subscribe to shader events
 // ---------------------------------------------------------------------------
 
-void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
+void ShaderController::Init(ControllerContext& ctx)
 {
 	// Shader CREATE is handled by the Editor (it constructs a pooled
 	// RenderShader via ResourceManager::Load<RenderShader>); ShaderController
@@ -626,51 +638,49 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 	// Compile bumps the shader version -> pipeline rebuilds on the next frame,
 	// so temporal accumulation (shadow intensity) must reset. These stay
 	// non-undoable lifecycle actions.
-	bus.subscribe<ShaderCompileRequested>(
-		[&bus](const ShaderCompileRequested& e) {
-			OnCompileShader(e);
-			bus.enqueue(RenderResetEvent{});
+	ctx.events.subscribe<ShaderCompileRequested>(
+		[ctx](const ShaderCompileRequested& e) {
+			OnCompileShader(e, ctx);
+			ctx.events.enqueue(RenderResetEvent{});
 		});
 
 	// Code edits apply live; recording is bracketed by the ShaderEditBegin/End
 	// gesture so a keystroke burst collapses to one SetShaderCodeOp on focus-out.
-	bus.subscribe<ShaderCodeEdited>(
-		[](const ShaderCodeEdited& e) {
-			OnCodeEdited(e);
+	ctx.events.subscribe<ShaderCodeEdited>(
+		[ctx](const ShaderCodeEdited& e) {
+			OnCodeEdited(e, ctx);
 		});
-	bus.subscribe<ShaderEditBegin>(
-		[this](const ShaderEditBegin& e) {
+	ctx.events.subscribe<ShaderEditBegin>(
+		[this, ctx](const ShaderEditBegin& e) {
 			std::string before;
-			if (!SnapshotCode(e.object, e.stage, before)) return;
+			if (!SnapshotCode(ResolveMesh(ctx, e.objectUid), e.stage, before)) return;
 			m_codeEditing = true;
-			m_editObject  = e.object;
-			m_editStage   = e.stage;
-			m_beforeCode  = std::move(before);
+			m_editObjectId = e.objectUid;
+			m_editStage = e.stage;
+			m_beforeCode = std::move(before);
 		});
-	bus.subscribe<ShaderEditEnd>(
-		[this, &ops](const ShaderEditEnd&) {
+	ctx.events.subscribe<ShaderEditEnd>(
+		[this, ctx](const ShaderEditEnd&) {
 			if (!m_codeEditing) return;
 			m_codeEditing = false;
 
-			const neurus::UID* obj = m_editObject;
+			const int objectUid = m_editObjectId;
 			const int stage = m_editStage;
-			m_editObject = nullptr;
+			m_editObjectId = 0;
 
+			neurus::Mesh* mesh = ResolveMesh(ctx, objectUid);
 			std::string after;
-			if (!SnapshotCode(obj, stage, after)) return;
+			if (!SnapshotCode(mesh, stage, after)) return;
 			if (after == m_beforeCode) return; // no net change -> no op
 
-			auto* mesh = ObjectID::As<Mesh>(obj);
-			if (!mesh) return;
-
-			ops.Submit(std::make_unique<SetShaderCodeOp>(
+			ctx.ops.Submit(std::make_unique<SetShaderCodeOp>(
 				mesh->GetObjectID(), stage, std::move(m_beforeCode), std::move(after)));
 		});
 
 	// Discrete struct edits: snapshot the element, apply the edit, diff, record.
-	bus.subscribe<ShaderStructEdited>(
-		[&ops](const ShaderStructEdited& e) {
-			ShaderUnit* unit = GetStageUnit(e.object, e.stage);
+	ctx.events.subscribe<ShaderStructEdited>(
+		[ctx](const ShaderStructEdited& e) {
+			ShaderUnit* unit = GetStageUnit(ResolveMesh(ctx, e.objectUid), e.stage);
 			if (!unit) return;
 
 			ShaderFieldValue before;
@@ -687,34 +697,34 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 			NEURUS_LOG("[ShaderController] Struct edited: section=" << static_cast<int>(e.section)
 			           << " idx=" << e.fieldIndex << " field=" << e.field << " value=" << e.value);
 
-			auto* mesh = ObjectID::As<Mesh>(e.object);
+			neurus::Mesh* mesh = ResolveMesh(ctx, e.objectUid);
 			if (!mesh) return;
-			ops.Submit(std::make_unique<SetShaderFieldOp>(
+			ctx.ops.Submit(std::make_unique<SetShaderFieldOp>(
 				mesh->GetObjectID(), e.stage, e.section, e.fieldIndex,
 				std::move(before), std::move(after)));
 		});
-	bus.subscribe<ShaderFieldAdded>(
-		[&ops](const ShaderFieldAdded& e) {
-			ShaderUnit* unit = GetStageUnit(e.object, e.stage);
+	ctx.events.subscribe<ShaderFieldAdded>(
+		[ctx](const ShaderFieldAdded& e) {
+			ShaderUnit* unit = GetStageUnit(ResolveMesh(ctx, e.objectUid), e.stage);
 			if (!unit) return;
 			if (!AppendDefault(unit->parsed, e.section, e.subFieldIndex)) return;
 
-			auto* mesh = ObjectID::As<Mesh>(e.object);
+			neurus::Mesh* mesh = ResolveMesh(ctx, e.objectUid);
 			if (!mesh) return;
-			ops.Submit(std::make_unique<AddShaderFieldOp>(
+			ctx.ops.Submit(std::make_unique<AddShaderFieldOp>(
 				mesh->GetObjectID(), e.stage, e.section, e.subFieldIndex, /*add=*/true));
 		});
 
 	// Undo/redo replay: re-apply one edit dimension + bump version so the panel
 	// refreshes. CPU-only, no recompile.
-	bus.subscribe<ShaderCodeRestored>(
-		[](const ShaderCodeRestored& e) { OnCodeRestored(e); });
-	bus.subscribe<ShaderFieldRestored>(
-		[](const ShaderFieldRestored& e) { OnFieldRestored(e); });
-	bus.subscribe<ShaderFieldAddRestored>(
-		[](const ShaderFieldAddRestored& e) { OnFieldAddRestored(e); });
-	bus.subscribe<ShaderFieldRemoved>(
-		[](const ShaderFieldRemoved& e) { OnFieldRemoved(e); });
+	ctx.events.subscribe<ShaderCodeRestored>(
+		[ctx](const ShaderCodeRestored& e) { OnCodeRestored(e, ctx); });
+	ctx.events.subscribe<ShaderFieldRestored>(
+		[ctx](const ShaderFieldRestored& e) { OnFieldRestored(e, ctx); });
+	ctx.events.subscribe<ShaderFieldAddRestored>(
+		[ctx](const ShaderFieldAddRestored& e) { OnFieldAddRestored(e, ctx); });
+	ctx.events.subscribe<ShaderFieldRemoved>(
+		[ctx](const ShaderFieldRemoved& e) { OnFieldRemoved(e, ctx); });
 }
 
 } // namespace neurus

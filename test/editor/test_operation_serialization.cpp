@@ -31,6 +31,7 @@
 #include "editor/Input.h"
 #include "asset/components/HistoryComponent.h"
 #include "core/ResourceManager.h"
+#include "render/RenderConfig.h"
 #include "asset/data/MeshData.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
@@ -66,7 +67,7 @@ class OperationSerializationTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_controller.Init(m_eventBus, m_operations);
+		m_controller.Init(m_ctx);
 
 		m_mesh   = std::make_shared<Mesh>();
 		m_light  = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
@@ -80,9 +81,13 @@ protected:
 
 	EventQueue m_eventBus;
 	Scene m_scene;
-	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	OperationManager m_operations{ m_eventBus };
 	ResourceManager m_resources;
-	SceneController m_controller{ [this]() -> ResourceManager* { return &m_resources; } };
+	RenderConfig m_config;
+	ControllerContext m_ctx{ m_eventBus, m_resources, m_operations,
+	                         [this]() { return &m_scene; },
+	                         [this]() { return &m_config; } };
+	SceneController m_controller;
 	std::shared_ptr<Mesh> m_mesh;
 	std::shared_ptr<Light> m_light;
 	std::shared_ptr<Camera> m_camera;
@@ -100,7 +105,7 @@ TEST_F(OperationSerializationTest, FloatOp_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetLightPowerOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);
 	EXPECT_FLOAT_EQ(m_light->light_power, 42.0f); // "after" survived
 
@@ -117,7 +122,7 @@ TEST_F(OperationSerializationTest, BoolOp_RoundTrip)
 	ASSERT_NE(restored, nullptr);
 	EXPECT_NE(dynamic_cast<SetLightShadowOp*>(restored.get()), nullptr);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);
 	EXPECT_FALSE(m_light->use_shadow);
 	restored->Inverse()->Apply(ctx);
@@ -134,7 +139,7 @@ TEST_F(OperationSerializationTest, Vec3Op_RoundTrip)
 	ASSERT_NE(restored, nullptr);
 	EXPECT_NE(dynamic_cast<SetPositionOp*>(restored.get()), nullptr);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);
 	EXPECT_EQ(m_mesh->GetPosition(), glm::vec3(1.0f, 2.0f, 3.0f));
 	restored->Inverse()->Apply(ctx);
@@ -151,7 +156,7 @@ TEST_F(OperationSerializationTest, VisibilityStateOp_RoundTrip)
 	ASSERT_NE(restored, nullptr);
 	EXPECT_NE(dynamic_cast<SetVisibilityOp*>(restored.get()), nullptr);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);
 	EXPECT_FALSE(m_mesh->is_viewport);
 	EXPECT_FALSE(m_mesh->is_rendered);
@@ -172,7 +177,7 @@ TEST_F(OperationSerializationTest, CameraPoseOp_RoundTrip)
 	ASSERT_NE(restored, nullptr);
 	EXPECT_NE(dynamic_cast<CameraTransformOp*>(restored.get()), nullptr);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);
 	EXPECT_EQ(m_camera->GetPosition(), pos);
 	EXPECT_EQ(m_camera->cam_tar, tar);
@@ -190,7 +195,7 @@ TEST_F(OperationSerializationTest, SelectionStateOp_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetSelectionOp*>(restored.get()), nullptr);
 	EXPECT_TRUE(restored->PreservesRedo());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_mesh.get()));
 	EXPECT_TRUE(m_scene.selections.IsSelected(m_light.get()));
@@ -208,7 +213,7 @@ TEST_F(OperationSerializationTest, SceneObjectAddOp_RoundTrip)
 	EXPECT_NE(dynamic_cast<SceneObjectAddOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), "Add Object");
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);                       // add survived
 	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
 
@@ -232,7 +237,7 @@ TEST_F(OperationSerializationTest, CompositeOp_RoundTrip)
 	ASSERT_NE(restored, nullptr);
 	EXPECT_NE(dynamic_cast<CompositeOp*>(restored.get()), nullptr);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx);                       // forward order: add then select
 	EXPECT_EQ(m_scene.mesh_list.count(uid), 1u);
 	EXPECT_TRUE(m_scene.selections.IsSelected(mesh.get()));
@@ -248,11 +253,11 @@ TEST_F(OperationSerializationTest, CompositeOp_RoundTrip)
 TEST_F(OperationSerializationTest, HistoryComponent_SaveLoad_BothStacks)
 {
 	// Record three edits, then undo one so BOTH stacks are populated.
-	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 20.0f });
+	m_eventBus.enqueue(LightPowerChanged{ m_light->GetObjectID(), 20.0f });
 	Process();
-	m_eventBus.enqueue(PositionChanged{ m_mesh.get(), 1.0f, 2.0f, 3.0f });
+	m_eventBus.enqueue(PositionChanged{ m_mesh->GetObjectID(), 1.0f, 2.0f, 3.0f });
 	Process();
-	m_eventBus.enqueue(CameraFovChanged{ m_camera.get(), 35.0f });
+	m_eventBus.enqueue(CameraFovChanged{ m_camera->GetObjectID(), 35.0f });
 	Process();
 	m_operations.Undo(); // camera fov edit → redo stack
 
@@ -268,8 +273,8 @@ TEST_F(OperationSerializationTest, HistoryComponent_SaveLoad_BothStacks)
 		saveComp.Save(out);
 	}
 
-	// Load into a completely fresh manager bound to the SAME scene.
-	OperationManager fresh{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	// Load into a completely fresh manager bound to the SAME event queue.
+	OperationManager fresh{ m_eventBus };
 	{
 		cereal::JSONInputArchive in(ss);
 		project::HistoryComponent loadComp(fresh);
@@ -291,7 +296,7 @@ TEST_F(OperationSerializationTest, HistoryComponent_Load_MissingNode_ClearsHisto
 {
 	// A project file without an "m_history" node (older format) must not throw
 	// and must leave the manager with empty stacks.
-	m_eventBus.enqueue(LightPowerChanged{ m_light.get(), 20.0f });
+	m_eventBus.enqueue(LightPowerChanged{ m_light->GetObjectID(), 20.0f });
 	Process();
 	ASSERT_TRUE(m_operations.CanUndo());
 

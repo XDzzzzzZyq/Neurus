@@ -85,7 +85,7 @@ void GenerateIBL(UploadManager& uploader, DeferredRenderer& renderer,
 Editor::Editor(DeferredRenderer* renderer, UploadManager* uploadManager)
 	: m_scene(std::make_unique<Scene>())
 	, m_resources(std::make_unique<ResourceManager>())
-	, ed_operations(ed_eventBus, [this]() -> Scene* { return m_scene.get(); })
+	, ed_operations(ed_eventBus)
 	, ed_renderer(renderer)
 	, ed_uploadManager(uploadManager)
 {}
@@ -98,7 +98,7 @@ Editor::~Editor()
 void Editor::Initialize()
 {
 	// Note: Mesh/light GPU upload happens AFTER window is shown and surface
-	// is ready — see UploadSceneResources() called from Application::Run()
+	// is ready 鈥?see UploadSceneResources() called from Application::Run()
 	// and from the scene load lifecycle (BeginLoad/FinishLoad, NewScene).
 
 	ed_eventBus.subscribe<MeshImportEvent>([this](const MeshImportEvent& e) {
@@ -143,29 +143,13 @@ void Editor::Initialize()
 	OnIBLLoad();
 
 	// --- Register controllers ---
+	// All four now take only the ControllerContext: no providers are needed
+	// because the context carries the event dispatch, the pooled-object lookup,
+	// the operation sink, the scene, and the render config.
 	RegisterController<CameraController>();
 	RegisterController<ShaderController>();
-
-	// SceneController needs the Editor-owned resource pool (UID -> object
-	// resolution for add/delete membership), which RegisterController<T>()
-	// can't supply — construct it manually with a provider.
-	{
-		auto sceneCtrl = std::make_unique<SceneController>(
-			[this]() -> ResourceManager* { return m_resources.get(); });
-		sceneCtrl->Init(ed_eventBus, ed_operations);
-		ed_controllers.push_back(std::move(sceneCtrl));
-	}
-
-	// RenderConfigController needs the Editor-owned RenderConfig, which
-	// RegisterController<T>() can't supply — construct it manually with a
-	// provider. It applies + records config edits (the single mutation path),
-	// replacing the inline RenderConfigChangedEvent handler removed above.
-	{
-		auto cfgCtrl = std::make_unique<RenderConfigController>(
-			[this]() -> RenderConfig* { return &m_config; });
-		cfgCtrl->Init(ed_eventBus, ed_operations);
-		ed_controllers.push_back(std::move(cfgCtrl));
-	}
+	RegisterController<SceneController>();
+	RegisterController<RenderConfigController>();
 
 	// --- Subscribe to EnvironmentChanged to regenerate IBL cubemaps on demand ---
 	ed_eventBus.subscribe<EnvironmentChanged>([this](const EnvironmentChanged& e) {
@@ -184,7 +168,7 @@ void Editor::Initialize()
 	// --- On-demand GPU upload for objects entering the scene (live add or
 	// undo/redo replay) and lights whose shadow was just enabled ---
 	ed_eventBus.subscribe<SceneObjectGpuUploadRequested>([this](const SceneObjectGpuUploadRequested& e) {
-		OnSceneObjectGpuUpload(e.object);
+		OnSceneObjectGpuUpload(e.objectUid);
 	});
 
 	ed_eventBus.subscribe<MouseMoveEvent>([this](const MouseMoveEvent& e) {
@@ -194,11 +178,11 @@ void Editor::Initialize()
 		if (e.middleHeld)
 		{
 			if (e.modifiers & Input::Mod_Ctrl)
-				ed_eventBus.enqueue(CameraPushEvent{cam, e.delta.x, e.delta.y});
+				ed_eventBus.enqueue(CameraPushEvent{cam->GetObjectID(), e.delta.x, e.delta.y});
 			else if (e.modifiers & Input::Mod_Shift)
-				ed_eventBus.enqueue(CameraSlideEvent{cam, e.delta.x, e.delta.y});
+				ed_eventBus.enqueue(CameraSlideEvent{cam->GetObjectID(), e.delta.x, e.delta.y});
 			else
-				ed_eventBus.enqueue(CameraRotateEvent{cam, e.delta.x, e.delta.y});
+				ed_eventBus.enqueue(CameraRotateEvent{cam->GetObjectID(), e.delta.x, e.delta.y});
 		}
 	});
 
@@ -208,12 +192,12 @@ void Editor::Initialize()
 	ed_eventBus.subscribe<MousePressEvent>([this](const MousePressEvent& e) {
 		if (e.button != Input::Middle) return;
 		if (auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera()))
-			ed_eventBus.enqueue(CameraDragBegin{cam});
+			ed_eventBus.enqueue(CameraDragBegin{cam->GetObjectID()});
 	});
 	ed_eventBus.subscribe<MouseReleaseEvent>([this](const MouseReleaseEvent& e) {
 		if (e.button != Input::Middle) return;
 		if (auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera()))
-			ed_eventBus.enqueue(CameraDragEnd{cam});
+			ed_eventBus.enqueue(CameraDragEnd{cam->GetObjectID()});
 	});
 
 	ed_eventBus.subscribe<MouseScrollEvent>([this](const MouseScrollEvent& e) {
@@ -221,15 +205,15 @@ void Editor::Initialize()
 		if (!cam) return;
 
 		if (std::abs(e.delta) > 0.001f)
-			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
+			ed_eventBus.enqueue(CameraZoomEvent{cam->GetObjectID(), e.delta});
 	});
 
 	// --- Pure UI->Editor intents: wrap the active scene, forward dedicated events ---
 	ed_eventBus.subscribe<ObjectClicked>([this](const ObjectClicked& e) {
-		ed_eventBus.enqueue(ObjectSelected{ m_scene.get(), e.object, e.modifiers });
+		ed_eventBus.enqueue(ObjectSelected{ e.objectUid, e.modifiers });
 	});
 	ed_eventBus.subscribe<DeleteRequested>([this](const DeleteRequested&) {
-		ed_eventBus.enqueue(ObjectDeleteRequested{ m_scene.get() });
+		ed_eventBus.enqueue(ObjectDeleteRequested{});
 	});
 
 	// --- Subscribe to RenderResetEvent to reset temporal accumulation ---
@@ -244,10 +228,10 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
-		auto* light = ObjectID::As<Light>(e.object);
+		auto light = m_resources->Get<Light>(e.objectUid);
 		if (!light) return;
 		auto gpuStruct = ed_uploadManager->UploadLighting(*light);
-		ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
+		ed_renderer->GetRenderCache().UpdateLight(e.objectUid, gpuStruct);
 	});
 
 	ed_eventBus.subscribe<LightingRebuild>([this](const LightingRebuild&) {
@@ -263,7 +247,7 @@ Scene& Editor::GetScene()
 }
 
 // =========================================================================
-// GetContext – shared editor state (scene + config) for Render/UI contexts
+// GetContext 鈥?shared editor state (scene + config) for Render/UI contexts
 // =========================================================================
 
 EditorContext Editor::GetContext() const
@@ -373,7 +357,7 @@ void Editor::OnMeshImport(const std::string& path)
 		auto meshData = m_resources->Load<MeshData>(path);
 		auto mesh = m_resources->Load<Mesh>(meshData);
 
-		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), mesh->GetObjectID()});
+		ed_eventBus.enqueue(SceneObjectAddRequested{mesh->GetObjectID()});
 		NEURUS_LOG("[Editor] Imported mesh: " << path);
 	}
 	catch (const std::exception& e) {
@@ -387,7 +371,7 @@ void Editor::OnCameraAdd()
 		auto camera = m_resources->Load<Camera>();
 		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
-		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), camera->GetObjectID()});
+		ed_eventBus.enqueue(SceneObjectAddRequested{camera->GetObjectID()});
 		NEURUS_LOG("[Editor] Added camera at (0, -5, 2)");
 	}
 	catch (const std::exception& e) {
@@ -406,7 +390,7 @@ void Editor::OnLightAdd()
 		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
 		// OnSceneObjectGpuUpload); the light SSBO rebuild happens via
 		// LightingRebuild after the controller registers the light in the scene.
-		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
+		ed_eventBus.enqueue(SceneObjectAddRequested{light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added point light at (3, 3, 3)");
 	}
 	catch (const std::exception& e) {
@@ -425,7 +409,7 @@ void Editor::OnSunLightAdd()
 		// Shadow-map GPU upload happens on demand when the add is processed
 		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
 		// OnSceneObjectGpuUpload); SSBO rebuild via LightingRebuild.
-		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
+		ed_eventBus.enqueue(SceneObjectAddRequested{light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added sun light at (0, 0, 10)");
 	}
 	catch (const std::exception& e) {
@@ -441,13 +425,13 @@ void Editor::OnSpotLightAdd()
 		light->SetPosition(glm::vec3(0.0f, 0.0f, 6.0f));
 		light->SetRotation(glm::vec3(-90.0f, 0.0f, 0.0f));
 		light->SetRadius(0.01f);
-		light->SetCutoff(0.95f);        // ~18° inner cone half-angle
-		light->SetOuterCutoff(0.85f);   // ~32° outer cone half-angle
+		light->SetCutoff(0.95f);        // ~18掳 inner cone half-angle
+		light->SetOuterCutoff(0.85f);   // ~32掳 outer cone half-angle
 		light->use_shadow = true;
 		// Shadow-map GPU upload happens on demand when the add is processed
 		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
 		// OnSceneObjectGpuUpload); SSBO rebuild via LightingRebuild.
-		ed_eventBus.enqueue(SceneObjectAddRequested{m_scene.get(), light->GetObjectID()});
+		ed_eventBus.enqueue(SceneObjectAddRequested{light->GetObjectID()});
 		NEURUS_LOG("[Editor] Added spot light at (0, 0, 6) pointing down");
 	}
 	catch (const std::exception& e) {
@@ -457,7 +441,7 @@ void Editor::OnSpotLightAdd()
 
 void Editor::OnCreateShader(const ShaderCreateRequested& e)
 {
-	auto* mesh = ObjectID::As<Mesh>(e.object);
+	auto mesh = m_resources->Get<Mesh>(e.objectUid);
 	if (!mesh)
 	{
 		NEURUS_ERR("[Editor] OnCreateShader: not a mesh");
@@ -527,22 +511,21 @@ void Editor::OnCreateShader(const ShaderCreateRequested& e)
  * shared helpers (skip if already cached). Light SSBO updates stay with
  * LightingRebuild.
  */
-void Editor::OnSceneObjectGpuUpload(const UID* object)
+void Editor::OnSceneObjectGpuUpload(int objectUid)
 {
-	if (!ed_uploadManager || !ed_renderer || !object) return;
+	if (!ed_uploadManager || !ed_renderer || objectUid == 0) return;
 
-	if (auto* mesh = ObjectID::As<Mesh>(object))
+	if (auto mesh = m_resources->Get<Mesh>(objectUid))
 	{
 		if (mesh->o_mesh) UploadMeshGpu(*ed_uploadManager, *ed_renderer, *mesh);
 	}
-	else if (auto* light = ObjectID::As<Light>(object))
+	else if (auto light = m_resources->Get<Light>(objectUid))
 	{
 		if (light->use_shadow) UploadLightGpu(*ed_uploadManager, *ed_renderer, *light);
 	}
-	else if (auto* env = ObjectID::As<Environment>(object))
+	else if (auto env = m_resources->Get<Environment>(objectUid))
 	{
-		auto envPtr = m_resources->Get<Environment>(env->GetObjectID());
-		if (envPtr) GenerateIBL(*ed_uploadManager, *ed_renderer, envPtr);
+		GenerateIBL(*ed_uploadManager, *ed_renderer, env);
 	}
 }
 
@@ -563,7 +546,7 @@ void Editor::OnIBLLoad()
 	// IBL is only enabled when the project provides an environment
 	if (scene->env_list.empty())
 	{
-		NEURUS_LOG("[Editor] No environment in scene — IBL disabled (black background)");
+		NEURUS_LOG("[Editor] No environment in scene 鈥?IBL disabled (black background)");
 		return;
 	}
 
@@ -620,7 +603,7 @@ void Editor::UploadLighting()
 }
 
 // =========================================================================
-// HandleResize() – dispatch CameraResizeEvent via event bus
+// HandleResize() 鈥?dispatch CameraResizeEvent via event bus
 // =========================================================================
 
 void Editor::HandleResize(uint32_t width, uint32_t height)
@@ -628,13 +611,13 @@ void Editor::HandleResize(uint32_t width, uint32_t height)
 	auto* cam = GetScene().GetActiveCamera();
 	if (!cam) return;
 
-	ed_eventBus.enqueue(CameraResizeEvent{const_cast<Camera*>(cam),
-	                                       static_cast<int>(width),
-	                                       static_cast<int>(height)});
+	ed_eventBus.enqueue(CameraResizeEvent{cam->GetObjectID(),
+	                                      static_cast<int>(width),
+	                                      static_cast<int>(height)});
 }
 
 // =========================================================================
-// Edit() — process all enqueued events (called from newFrame)
+// Edit() 鈥?process all enqueued events (called from newFrame)
 // =========================================================================
 
 void Editor::Edit()
@@ -643,3 +626,4 @@ void Editor::Edit()
 }
 
 } // namespace neurus
+

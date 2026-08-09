@@ -503,8 +503,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		                     // Forward to Editor; objectID=0 means background
 		                     // (handled by SelectObject → ClearSelection).
 		                     ObjectSelected selEvent {
-		                         &app_editor->GetScene(),
-		                         app_editor->GetScene().GetObjectID(static_cast<int>(objectID)),
+		                         static_cast<int>(objectID),
 		                         static_cast<int>(e.modifiers)
 		                     };
 		                     app_editor->OnUIEvent(selEvent);

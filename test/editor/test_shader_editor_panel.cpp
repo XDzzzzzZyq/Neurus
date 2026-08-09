@@ -27,6 +27,8 @@
 #include "editor/events/EventBus.h"
 #include "editor/events/ShaderEvents.h"
 #include "editor/operations/OperationManager.h"
+#include "core/ResourceManager.h"
+#include "render/RenderConfig.h"
 #include "render/shaders/RenderShader.h"
 #include "render/shaders/Shader.h"
 #include "render/shaders/ShaderUnit.h"
@@ -105,7 +107,7 @@ class ShaderEditorPanelTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_controller.Init(m_bus, m_operations);
+		m_controller.Init(m_ctx);
 
 		m_mesh = std::make_shared<Mesh>();
 		auto shader = std::make_shared<RenderShader>("TestShader", "v.vert", "f.frag");
@@ -116,7 +118,7 @@ protected:
 		m_scene.UseMesh(m_mesh);
 		m_scene.selections.Select(m_mesh.get(), /*increment=*/false);
 
-		m_ctx.editor.scene = &m_scene;
+		m_uiContext.editor.scene = &m_scene;
 
 		// Wire the panel exactly like Application::ConnectUIEvent: Qt signal
 		// -> EventQueue (deferred to the next Process()).
@@ -135,17 +137,22 @@ protected:
 	void Process() { m_bus.Process(); }
 
 	/** @brief One frame of UIManager::Refresh() — repopulates the tree. */
-	void RefreshPanel() { m_panel.Refresh(m_ctx); }
+	void RefreshPanel() { m_panel.Refresh(m_uiContext); }
 
 	/** @brief The live vertex ShaderUnit for assertions. */
 	ShaderUnit& VertexUnit() { return m_mesh->o_shader->GetStage(ShaderType::VERTEX); }
 
 	EventQueue m_bus;
 	Scene m_scene;
-	OperationManager m_operations{ m_bus, [this]() -> Scene* { return &m_scene; } };
+	OperationManager m_operations{ m_bus };
+	ResourceManager m_resources;
+	RenderConfig m_config;
+	ControllerContext m_ctx{ m_bus, m_resources, m_operations,
+	                         [this]() { return &m_scene; },
+	                         [this]() { return &m_config; } };
 	ShaderController m_controller;
 	std::shared_ptr<Mesh> m_mesh;
-	UIContext m_ctx;
+	UIContext m_uiContext;
 	ShaderEditorPanel m_panel;
 };
 

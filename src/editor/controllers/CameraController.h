@@ -28,8 +28,9 @@
  *   - Camera forward: derived from target - position
  *
  * Architecture:
- *   - bound to an EventQueue via Init() — no per-frame Update() polling
- *   - Operates on Camera* provided by each event
+ *   - bound to a ControllerContext via Init() — no per-frame Update() polling
+ *   - Events carry the camera's integer UID; handlers resolve it against the
+ *     current scene via the context (no raw Camera* in events)
  *
  * @note CameraController does not own the camera — it operates on a pointer.
  * @note Speed control is external — Editor scales deltas before enqueuing.
@@ -59,12 +60,12 @@ class Camera;
  * Usage:
  * @code
  *   CameraController controller;
- *   controller.Init(eventQueue(), operationSink());
+ *   controller.Init(ctx);
  *   // Editor enqueues events, EventQueue::Process() dispatches them
  * @endcode
  *
- * @note CameraController does not own the camera — it operates on a pointer
- *       provided by each event.
+ * @note CameraController does not own the camera — it resolves the camera UID
+ *       carried by each event against the current scene via the context.
  * @note Speed is controlled externally by scaling delta values before enqueuing.
  */
 class CameraController : public Controllers
@@ -73,22 +74,19 @@ public:
 	CameraController() = default;
 
 	/**
-	 * @brief Subscribes to camera events on the given EventQueue.
+	 * @brief Subscribes to camera events on the given context.
 	 *
 	 * Registers handlers for the drag gesture (begin/end), the continuous drag
 	 * moves (rotate/push/slide), scroll zoom, and resize. Must be called once
 	 * during initialization, before any events are enqueued.
 	 *
-	 * @param bus EventQueue to subscribe to.
-	 * @param ops Operation sink; a drag gesture records one coarse-grained
-	 *        CameraTransformOp on release, scroll zoom records a CameraZoomOp
-	 *        per-event (merged into one undo entry).
+	 * @param ctx Controller context (events, resources, ops, scene).
 	 */
-	void Init(EventQueue& bus, IOperationSink& ops) override;
+	void Init(ControllerContext& ctx) override;
 
 private:
 	bool m_dragging = false;   ///< True between CameraDragBegin and CameraDragEnd.
-	Camera* m_cam = nullptr;   ///< Camera captured at drag start (non-owning).
+	int m_camId = 0;           ///< Camera UID captured at drag start.
 	CameraPose m_before{};     ///< Pose captured at drag start (undo endpoint).
 };
 

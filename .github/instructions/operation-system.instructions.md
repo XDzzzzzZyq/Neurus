@@ -26,10 +26,13 @@ model, coalescing rules, and persistence.
 - `TransitionOp<Derived, TEvent, Value>` (CRTP) covers per-object value edits;
   `Inverse()` swaps before/after. `MergeKey()`/`MergeFrom()` coalesce a
   continuous manipulation (e.g. camera drag) into one undo entry.
-- **Replay is unchanged by the UID erasure**: ops re-dispatch via
-  `MakeEvent(const ObjectID*, const Value&)`, and `ObjectID` derives from `UID`,
-  so the returned events' `const UID* object` fields bind implicitly from the
-  `const ObjectID*` argument - no operation code changed.
+- **Replay is ID-only**: ops re-dispatch via
+  `MakeEvent(int objectUid, const Value&)`, producing events whose `int objectUid`
+  field binds directly from the stored UID. Operations NEVER resolve objects
+  themselves — the receiving controller handler resolves the UID against the
+  current scene/pool via its `ControllerContext` at replay time, so stale ids
+  no-op in the handler (matching the old `ctx.Resolve` behavior). The manager
+  therefore needs NO scene or resource access.
 - `Operation::PreservesRedo()` (default false): a branching edit clears the redo
   stack. **Selection** ops (`SetSelectionOp`) override it to `true` so navigating
   the selection appends to undo *without* discarding a pending redo — safe

@@ -20,9 +20,8 @@
  *     on focus-out if the code actually changed.
  *   - Discrete edit (struct-field / field-add): no gesture, recorded immediately.
  *
- * Replay requires a non-null Scene* (OperationManager replays through a scene
- * provider), so the fixture supplies a real scene holding the mesh so the op's
- * stored UID resolves back to the live object.
+ * The fixture supplies a real scene holding the mesh so the controller can
+ * resolve the event UIDs back to the live object at dispatch/replay time.
  *
  * Create/Compile stay non-undoable lifecycle actions and are not exercised here
  * (they require GPU compilation); only the undoable content-edit path is tested.
@@ -44,6 +43,8 @@
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/registrations/OperationRegistration.h"
 #include "editor/operations/ShaderOperations.h"
+#include "core/ResourceManager.h"
+#include "render/RenderConfig.h"
 #include "render/shaders/RenderShader.h"
 #include "render/shaders/Shader.h"
 #include "render/shaders/ShaderParser.h"
@@ -85,7 +86,7 @@ protected:
 
 	void SetUp() override
 	{
-		m_controller.Init(m_eventBus, m_operations);
+		m_controller.Init(m_ctx);
 
 		// Build a mesh with a CPU-only shader carrying seeded vertex+fragment
 		// stages. GetStage() default-inserts the stage, so HasStage() is true.
@@ -102,11 +103,17 @@ protected:
 	/** @brief The live vertex ShaderUnit for assertions. */
 	ShaderUnit& VertexUnit() { return m_mesh->o_shader->GetStage(ShaderType::VERTEX); }
 
-	const ObjectID* MeshObj() const { return m_mesh.get(); }
+	/** @brief The mesh's UID, used as the event payload. */
+	int MeshObj() const { return m_mesh->GetObjectID(); }
 
 	EventQueue m_eventBus;
-	Scene m_scene; // real scene so the op's stored UID resolves at replay
-	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	Scene m_scene; // real scene so event UIDs resolve at dispatch/replay
+	OperationManager m_operations{ m_eventBus };
+	ResourceManager m_resources;
+	RenderConfig m_config;
+	ControllerContext m_ctx{ m_eventBus, m_resources, m_operations,
+	                         [this]() { return &m_scene; },
+	                         [this]() { return &m_config; } };
 	ShaderController m_controller;
 	std::shared_ptr<Mesh> m_mesh;
 };
@@ -229,7 +236,7 @@ TEST_F(ShaderControllerTest, SetShaderCodeOp_Inverse_IsInvolution)
 
 	EXPECT_EQ(twice->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	twice->Apply(ctx); // (g⁻¹)⁻¹ reproduces the original forward effect.
 	EXPECT_EQ(VertexUnit().code, "CODE_B");
 }
@@ -240,7 +247,7 @@ TEST_F(ShaderControllerTest, SetShaderCodeOp_Inverse_AppliesBefore)
 	auto op = std::make_unique<SetShaderCodeOp>(uid, kVertex, "CODE_A", "CODE_B");
 	auto inv = op->Inverse();
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	inv->Apply(ctx); // inverse applies the "before" code.
 	EXPECT_EQ(VertexUnit().code, "CODE_A");
 }
@@ -256,7 +263,7 @@ TEST_F(ShaderControllerTest, SetShaderCodeOp_Serialize_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetShaderCodeOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx); // "after" survived
 	EXPECT_EQ(VertexUnit().code, "CODE_AFTER");
 
@@ -281,7 +288,7 @@ TEST_F(ShaderControllerTest, SetShaderFieldOp_Inverse_IsInvolution)
 
 	EXPECT_EQ(twice->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	twice->Apply(ctx); // reproduces the original forward effect.
 	EXPECT_EQ(VertexUnit().parsed.AB_list[0].name, "renamed");
 }
@@ -302,7 +309,7 @@ TEST_F(ShaderControllerTest, SetShaderFieldOp_Serialize_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetShaderFieldOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx); // "after" element + section + index survived
 	EXPECT_EQ(VertexUnit().parsed.AB_list[0].name, "renamed");
 
@@ -320,7 +327,7 @@ TEST_F(ShaderControllerTest, AddShaderFieldOp_Inverse_RemovesThenReadds)
 	auto op = std::make_unique<AddShaderFieldOp>(
 		uid, kVertex, ShaderSection::Attributes, /*subFieldIndex*/ -1, /*add*/ true);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	op->Apply(ctx); // re-append default
 	EXPECT_EQ(VertexUnit().parsed.AB_list.size(), 1u);
 
@@ -346,7 +353,7 @@ TEST_F(ShaderControllerTest, AddShaderFieldOp_Serialize_RoundTrip)
 	EXPECT_NE(dynamic_cast<AddShaderFieldOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx); // add flag + section survived -> appends
 	EXPECT_EQ(VertexUnit().parsed.AB_list.size(), 1u);
 

@@ -17,8 +17,6 @@
 
 namespace neurus {
 
-class UID;
-
 /**
  * @brief Emitted when the scene state changes in a way that invalidates
  *  temporal accumulation. Subscribe to this to reset any per-frame history
@@ -54,12 +52,12 @@ struct SceneModified
 /**
  * @brief Emitted by SceneController when a single light's GPU SSBO struct must
  *  be updated (power/radius/cutoff/outerCutoff changes).
- *  Editor subscribes, casts object back to Light* via Light::As, and calls
+ *  Editor subscribes, resolves the pooled Light by UID, and calls
  *  UploadLighting(*light) + RenderCache::UpdateLight(id, struct).
  */
 struct LightGpuChanged
 {
-	const UID* object = nullptr; ///< The changed light (cast via Light::As).
+	int objectUid = 0; ///< The changed light's UID (resolved via the pool).
 };
 
 /**
@@ -87,7 +85,7 @@ struct LightingRebuild
  */
 struct SceneObjectGpuUploadRequested
 {
-	const UID* object = nullptr; ///< The object entering the scene (or light with shadow just enabled).
+	int objectUid = 0; ///< The object entering the scene (or light with shadow just enabled).
 };
 
 } // namespace neurus

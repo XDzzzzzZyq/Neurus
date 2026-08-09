@@ -57,7 +57,7 @@ namespace neurus
 class Environment : public ObjectID, public Transform3D
 {
 public:
-	/** @brief GOType tag used by ObjectID::As<T> for typed event casts. */
+	/** @brief GOType tag for runtime type discrimination. */
 	static constexpr ObjectID::GOType Type = ObjectID::GOType::GO_ENVIR;
 
 	/**

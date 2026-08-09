@@ -22,9 +22,6 @@
 namespace neurus
 {
 
-// Forward declaration — no scene headers needed in UIContext.h.
-class ObjectID;
-
 /**
  * @brief Read-only context passed to UIPanel::Refresh() each frame.
  *
@@ -61,14 +58,16 @@ struct UIContext
 	const void* history = nullptr;
 
 	/**
-	 * @brief Returns all scene objects as const ObjectID* pointers.
+	 * @brief Returns all scene object UIDs in the scene's master obj_list.
 	 *
-	 * Casts editor.scene to const Scene* and collects every ObjectID from the
-	 * scene's master obj_list. Returns an empty vector if no scene is set.
+	 * Casts editor.scene to const Scene* and collects every object's integer
+	 * UID. Returns an empty vector if no scene is set. Panels resolve per-id
+	 * details (name/type/visibility) via the Scene and compare the plain ints
+	 * for dirty checks and lazy updates — no cached object pointers.
 	 *
-	 * @return Vector of const ObjectID* pointers (one per scene object).
+	 * @return Vector of int object UIDs (one per scene object).
 	 */
-	std::vector<const ObjectID*> GetObjectIDs() const;
+	std::vector<int> GetObjectIDs() const;
 };
 
 } // namespace neurus

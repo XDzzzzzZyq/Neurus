@@ -4,17 +4,17 @@
  *
  * An Operation is a value-only description of a scene edit. It never mutates
  * the scene directly: Apply() dispatches this operation's absolute-set event
- * synchronously on the EventQueue, so the existing controller handler performs
- * the actual mutation (single mutation path).
+ * synchronously on the event queue, so the existing controller handler performs
+ * the actual mutation (single mutation path). Operations carry only integer
+ * object UIDs plus absolute before/after values — no raw pointers — so they
+ * survive across scene mutations, serialize trivially, and safely no-op when
+ * the referenced object no longer exists (the controller handler resolves the
+ * UID at replay time and ignores stale ids).
  *
  * Undo/redo is group-theoretic (Design B): the undo stack holds the forward
  * operation `g`; undo emits `g.Inverse()` and pushes the inverse to redo; redo
  * emits `(g⁻¹).Inverse() = g`. This requires Inverse() to be an involution:
  * `Inverse()∘Inverse()` must yield an operation equivalent to the original.
- *
- * Operations store a scene object's integer UID (not a raw pointer) plus
- * absolute before/after values, so they survive across scene mutations and
- * safely no-op when the referenced object no longer exists (stale identity).
  */
 
 #pragma once
@@ -42,8 +42,9 @@ public:
 
 	/**
 	 * @brief Dispatches this operation's absolute-set event synchronously.
-	 * @param ctx Replay context (scene for UID resolution + event queue).
-	 * @note Must resolve its target by UID and no-op if the object is gone.
+	 * @param ctx Replay context (event queue for synchronous dispatch).
+	 * @note Emits an event carrying integer object UIDs; the receiving
+	 *       controller handler resolves them and no-ops stale ids.
 	 */
 	virtual void Apply(OperationContext& ctx) = 0;
 
@@ -109,7 +110,7 @@ public:
  * there is no stored function object, so an operation is trivially serializable.
  *
  * @tparam Derived Concrete subclass (CRTP); must provide
- *                 `TEvent MakeEvent(const ObjectID*, const Value&) const` and
+ *                 `TEvent MakeEvent(int objectUid, const Value&) const` and
  *                 `static constexpr const char* kLabel`.
  * @tparam TEvent  Scene event struct dispatched on replay.
  * @tparam Value   Stored value type (float, bool, glm::vec3, ...).
@@ -128,9 +129,10 @@ public:
 
 	void Apply(OperationContext& ctx) override
 	{
-		const ObjectID* obj = ctx.Resolve(m_uid);
-		if (!obj) return; // Stale identity: object gone, safe no-op.
-		ctx.bus.emitNow(static_cast<const Derived*>(this)->MakeEvent(obj, m_after));
+		// The replayed event carries the target UID; the controller handler
+		// resolves it and no-ops stale ids (object gone) — operations never
+		// resolve objects themselves.
+		ctx.events.emitNow(static_cast<const Derived*>(this)->MakeEvent(m_uid, m_after));
 	}
 
 	std::unique_ptr<Operation> Inverse() const override

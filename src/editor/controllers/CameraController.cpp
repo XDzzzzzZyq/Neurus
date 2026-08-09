@@ -15,6 +15,7 @@
 #include "editor/operations/IOperationSink.h"
 #include "editor/operations/SceneOperations.h"
 #include "scene/Camera.h"
+#include "scene/Scene.h"
 
 #include <algorithm>
 #include <cmath>
@@ -37,6 +38,18 @@ constexpr float kZoomSensitivity = 1.0f;
 
 /** @brief Base sensitivity for dolly translation (world units per pixel). */
 constexpr float kDollySensitivity = 0.05f;
+
+/**
+ * @brief Resolves a camera event's camId to its live Camera (via the scene).
+ * @return Non-owning Camera*, or nullptr if the id is stale.
+ */
+neurus::Camera* ResolveCamera(const neurus::ControllerContext& ctx, int camId)
+{
+	neurus::Scene* scene = ctx.scene();
+	if (!scene) return nullptr;
+	auto it = scene->cam_list.find(camId);
+	return it == scene->cam_list.end() ? nullptr : it->second.get();
+}
 
 // ---------------------------------------------------------------------------
 // Event notification
@@ -85,9 +98,11 @@ void RecordCameraPose(neurus::IOperationSink& ops, const neurus::Camera& camera,
 /**
  * @brief Handles CameraZoomEvent — moves camera toward/away from target.
  */
-void OnCameraZoom(const neurus::CameraZoomEvent& e)
+void OnCameraZoom(const neurus::CameraZoomEvent& e, const neurus::ControllerContext& ctx)
 {
-	neurus::Camera& camera = *e.cam;
+	neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+	if (!cam) return;
+	neurus::Camera& camera = *cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -114,9 +129,11 @@ void OnCameraZoom(const neurus::CameraZoomEvent& e)
 /**
  * @brief Handles CameraRotateEvent — orbits camera around target.
  */
-void OnCameraRotate(const neurus::CameraRotateEvent& e)
+void OnCameraRotate(const neurus::CameraRotateEvent& e, const neurus::ControllerContext& ctx)
 {
-	neurus::Camera& camera = *e.cam;
+	neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+	if (!cam) return;
+	neurus::Camera& camera = *cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -156,9 +173,11 @@ void OnCameraRotate(const neurus::CameraRotateEvent& e)
 /**
  * @brief Handles CameraPushEvent — dollies camera along view direction (Ctrl+MMB).
  */
-void OnCameraPush(const neurus::CameraPushEvent& e)
+void OnCameraPush(const neurus::CameraPushEvent& e, const neurus::ControllerContext& ctx)
 {
-	neurus::Camera& camera = *e.cam;
+	neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+	if (!cam) return;
+	neurus::Camera& camera = *cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -181,9 +200,11 @@ void OnCameraPush(const neurus::CameraPushEvent& e)
 /**
  * @brief Handles CameraSlideEvent — pans camera parallel to view plane (Shift+MMB).
  */
-void OnCameraSlide(const neurus::CameraSlideEvent& e)
+void OnCameraSlide(const neurus::CameraSlideEvent& e, const neurus::ControllerContext& ctx)
 {
-	neurus::Camera& camera = *e.cam;
+	neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+	if (!cam) return;
+	neurus::Camera& camera = *cam;
 
 	const glm::vec3 pos = camera.GetPosition();
 	const glm::vec3& target = camera.cam_tar;
@@ -220,9 +241,11 @@ void OnCameraSlide(const neurus::CameraSlideEvent& e)
 /**
  * @brief Handles CameraResizeEvent — updates camera aspect ratio on viewport resize.
  */
-void OnCameraResize(const neurus::CameraResizeEvent& e)
+void OnCameraResize(const neurus::CameraResizeEvent& e, const neurus::ControllerContext& ctx)
 {
-	neurus::Camera& camera = *e.cam;
+	neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+	if (!cam) return;
+	neurus::Camera& camera = *cam;
 	camera.ChangeCamRatio(static_cast<float>(e.width), static_cast<float>(e.height));
 	NotifyCameraChanged(camera);
 }
@@ -235,52 +258,57 @@ namespace neurus {
 // Init — subscribe to camera events
 // ---------------------------------------------------------------------------
 
-void CameraController::Init(EventQueue& bus, IOperationSink& ops)
+void CameraController::Init(ControllerContext& ctx)
 {
 	// --- Gesture boundaries: bound a continuous orbit/pan/dolly drag ---
-	bus.subscribe<CameraDragBegin>([this](const CameraDragBegin& e) {
+	ctx.events.subscribe<CameraDragBegin>([this, ctx](const CameraDragBegin& e) {
+		neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+		if (!cam) return;
 		m_dragging = true;
-		m_cam = e.cam;
-		m_before = CameraPose{ e.cam->GetPosition(), e.cam->cam_tar };
+		m_camId = e.camId;
+		m_before = CameraPose{ cam->GetPosition(), cam->cam_tar };
 	});
-	bus.subscribe<CameraDragEnd>([this, &ops](const CameraDragEnd& e) {
-		if (m_dragging && m_cam == e.cam)
+	ctx.events.subscribe<CameraDragEnd>([this, ctx](const CameraDragEnd& e) {
+		if (m_dragging && m_camId == e.camId)
 		{
 			// One op per gesture, non-mergeable: a following separate drag on
 			// the same camera stays its own undo entry.
-			RecordCameraPose<CameraTransformOp>(ops, *e.cam, m_before.position, m_before.target);
+			if (neurus::Camera* cam = ResolveCamera(ctx, e.camId))
+				RecordCameraPose<CameraTransformOp>(ctx.ops, *cam, m_before.position, m_before.target);
 		}
 		m_dragging = false;
-		m_cam = nullptr;
+		m_camId = 0;
 	});
 
 	// --- Continuous drag moves: mutate live, DO NOT record (bounded above) ---
-	bus.subscribe<CameraRotateEvent>([&bus](const CameraRotateEvent& e) {
-		OnCameraRotate(e);
-		bus.enqueue(RenderResetEvent{});
+	ctx.events.subscribe<CameraRotateEvent>([ctx](const CameraRotateEvent& e) {
+		OnCameraRotate(e, ctx);
+		ctx.events.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraPushEvent>([&bus](const CameraPushEvent& e) {
-		OnCameraPush(e);
-		bus.enqueue(RenderResetEvent{});
+	ctx.events.subscribe<CameraPushEvent>([ctx](const CameraPushEvent& e) {
+		OnCameraPush(e, ctx);
+		ctx.events.enqueue(RenderResetEvent{});
 	});
-	bus.subscribe<CameraSlideEvent>([&bus](const CameraSlideEvent& e) {
-		OnCameraSlide(e);
-		bus.enqueue(RenderResetEvent{});
+	ctx.events.subscribe<CameraSlideEvent>([ctx](const CameraSlideEvent& e) {
+		OnCameraSlide(e, ctx);
+		ctx.events.enqueue(RenderResetEvent{});
 	});
 
 	// --- Scroll zoom: no press/release, record per-event and merge via MergeKey ---
-	bus.subscribe<CameraZoomEvent>([&bus, &ops](const CameraZoomEvent& e) {
-		const glm::vec3 bp = e.cam->GetPosition();
-		const glm::vec3 bt = e.cam->cam_tar;
-		OnCameraZoom(e);
-		RecordCameraPose<CameraZoomOp>(ops, *e.cam, bp, bt);
-		bus.enqueue(RenderResetEvent{});
+	ctx.events.subscribe<CameraZoomEvent>([ctx](const CameraZoomEvent& e) {
+		neurus::Camera* cam = ResolveCamera(ctx, e.camId);
+		if (!cam) return;
+		const glm::vec3 bp = cam->GetPosition();
+		const glm::vec3 bt = cam->cam_tar;
+		OnCameraZoom(e, ctx);
+		RecordCameraPose<CameraZoomOp>(ctx.ops, *cam, bp, bt);
+		ctx.events.enqueue(RenderResetEvent{});
 	});
 
 	// Resize is viewport-driven (aspect ratio), not a user edit — not recorded.
-	bus.subscribe<CameraResizeEvent>([&bus](const CameraResizeEvent& e) {
-		OnCameraResize(e);
-		bus.enqueue(RenderResetEvent{});
+	ctx.events.subscribe<CameraResizeEvent>([ctx](const CameraResizeEvent& e) {
+		OnCameraResize(e, ctx);
+		ctx.events.enqueue(RenderResetEvent{});
 	});
 }
 

@@ -64,9 +64,9 @@ public:
 
 	void Apply(OperationContext& ctx) override
 	{
-		const ObjectID* obj = ctx.Resolve(m_uid);
-		if (!obj) return; // Stale identity: object (or its shader) gone, safe no-op.
-		ctx.bus.emitNow(ShaderCodeRestored{ obj, m_stage, m_afterCode });
+		// Replayed event carries the mesh UID; ShaderController resolves it
+		// against the current scene and no-ops stale ids.
+		ctx.events.emitNow(ShaderCodeRestored{ m_uid, m_stage, m_afterCode });
 	}
 
 	std::unique_ptr<Operation> Inverse() const override
@@ -119,10 +119,8 @@ public:
 
 	void Apply(OperationContext& ctx) override
 	{
-		const ObjectID* obj = ctx.Resolve(m_uid);
-		if (!obj) return; // Stale identity: object (or its shader) gone, safe no-op.
-		ctx.bus.emitNow(ShaderFieldRestored{
-			obj, m_stage, m_section, m_fieldIndex, m_after });
+		ctx.events.emitNow(ShaderFieldRestored{
+			m_uid, m_stage, m_section, m_fieldIndex, m_after });
 	}
 
 	std::unique_ptr<Operation> Inverse() const override
@@ -181,12 +179,10 @@ public:
 
 	void Apply(OperationContext& ctx) override
 	{
-		const ObjectID* obj = ctx.Resolve(m_uid);
-		if (!obj) return; // Stale identity: object (or its shader) gone, safe no-op.
 		if (m_add)
-			ctx.bus.emitNow(ShaderFieldAddRestored{ obj, m_stage, m_section, m_subFieldIndex });
+			ctx.events.emitNow(ShaderFieldAddRestored{ m_uid, m_stage, m_section, m_subFieldIndex });
 		else
-			ctx.bus.emitNow(ShaderFieldRemoved{ obj, m_stage, m_section, m_subFieldIndex });
+			ctx.events.emitNow(ShaderFieldRemoved{ m_uid, m_stage, m_section, m_subFieldIndex });
 	}
 
 	std::unique_ptr<Operation> Inverse() const override

@@ -16,23 +16,21 @@ Panel Qt signal (e.g. Outliner::objectClicked - pure input intent)
                     └── EventQueue::Process() → Editor wraps to ObjectSelected, then subscriber handles it
 ```
 
-**Ephemeral Events - the big idea of the event system**
+**ID-carrying events - the current event model**
 
 Every event in Neurus is ephemeral: enqueued and processed within a single
-frame, then destroyed once `EventQueue::Process()` returns. Because events live
-only as long as the objects they reference, they can safely carry raw pointers
-(`const UID*`, `Camera*`, and future `Shader*`, ...) instead of integer IDs.
-`UID` is the common base of `Scene` and `ObjectID`, so a single `const UID*`
-payload covers both the Editor-owned Scene (selection state) and the scene
-objects being mutated. Controllers therefore never re-fetch objects from the
-Scene by ID - the pointer IS the object. Controllers cast a `const UID*` back
-to the concrete type via the templated `ObjectID::As<T>()` (which compares
-`o_type` against `T::Type` and returns nullptr on mismatch) and the untyped
-`ObjectID::As()`, plus `Scene::As` for scene refs. The UI layer emits PURE
-INPUT INTENTS (mouse events, object clicks, delete requests); the Editor wraps
-them into complete scene events, stamping the scene it owns. This ephemerality
-is what makes pointer payloads safe, and it applies to the whole event system,
-not just scene events.
+frame, then destroyed once `EventQueue::Process()` returns. Events carry plain
+**integer object UIDs** (never raw `UID*`/`Camera*` pointers) — a raw pointer
+can dangle after the object is deleted, while a UID is a stable identity that
+controllers resolve against the current scene/pool at dispatch time. `UID` is
+the common base of `Scene` and `ObjectID`, so the same integer space covers
+both. Controllers resolve an event's `int objectUid` to the live object via
+their `ControllerContext` (scene lookup for property edits, pool lookup for
+membership) — see `editor.instructions.md`. The scene itself is NOT carried in
+events: scene-scoped handlers obtain the current Scene from the context, so a
+scene swap on New/Load can never leave an event holding a stale pointer. This
+id-based model is what makes pointer-free event payloads safe across frames,
+serialization, and undo/redo replay.
 
 ### Three event paths
 
@@ -40,28 +38,29 @@ Cross-layer traffic flows along three distinct paths, all still "UI emits,
 Editor wraps or forwards, controllers handle":
 
 1. **UI -> Editor pure intents** (`InputEvents.h`): the raw input stream -
-   mouse move/press/release/scroll plus `ObjectClicked { const UID* object; int modifiers; }`
-   and `DeleteRequested { }`. These carry no scene pointer; the UI does not
+   mouse move/press/release/scroll plus `ObjectClicked { int objectUid; int modifiers; }`
+   and `DeleteRequested { }`. These carry no scene; the UI does not
    hold or stamp the scene (`m_scene` is gone from the panels).
 2. **UI -> Controller editing events** (`SceneEvents.h`, `ShaderEvents.h`):
    complete scene mutations (selection, transform, visibility, property edits,
-   shader edits) carrying `const UID* object`. Panels emit these with the active
-   object's UID base pointer; `Editor::OnUIEvent` enqueues them unchanged and
-   controllers cast back via `ObjectID::As<T>` / the untyped `ObjectID::As`.
+   shader edits) carrying `int objectUid`. Panels emit these with the active
+   object's integer UID; `Editor::OnUIEvent` enqueues them unchanged and
+   controllers resolve the UID against the current scene via their
+   `ControllerContext`.
 3. **Editor -> Controller wrapped events**: `ObjectSelected` (the
    Editor subscribes to `ObjectClicked` and forwards
-   `ObjectSelected{ m_scene.get(), object, modifiers }`, and the Application
+   `ObjectSelected{ objectUid, modifiers }`, and the Application
    emits it for the viewport IDBuffer pick), `ObjectDeleteRequested` (the
    Editor subscribes to `DeleteRequested` and forwards
-   `ObjectDeleteRequested{ m_scene.get() }`), the membership events
-   (`SceneObjectAddRequested` / `SceneObjectDeleteRequested`), the replay /
-   restore events, and `CameraEvents` which still carry `Camera*`.
+   `ObjectDeleteRequested{ }`), the membership events
+   (`SceneObjectAddRequested` / `SceneObjectDeleteRequested`), and the replay /
+   restore events. `CameraEvents` carry `int camId` (resolved by the controller).
 
 ## Location
 
 | File | Purpose |
 |------|---------|
-| `src/editor/events/SceneEvents.h` | Scene-domain events (selection, transform, visibility, camera/mesh/light/env property changes) - ephemeral, carry `const UID*` |
+| `src/editor/events/SceneEvents.h` | Scene-domain events (selection, transform, visibility, camera/mesh/light/env property changes) - ephemeral, carry `int objectUid` |
 | `src/editor/events/EditorEvents.h` | Cross-component events only (RenderResetEvent, EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild, SceneObjectGpuUploadRequested) — pure data, no Qt |
 | `src/editor/events/CameraEvents.h` | Camera input events (rotate, push, slide, zoom, resize) |
 | `src/editor/events/InputEvents.h` | Viewport raw input events (mouse move, press, release, scroll) |
@@ -80,88 +79,87 @@ They are plain C++ structs passed by const reference through the system.
 
 ### SceneEvents.h
 
-Scene-domain events carry POINTERS (`const UID*` object, `const UID*` scene)
-instead of integer IDs. `UID` is the common base of `Scene` and `ObjectID`, so
-both payloads erase to the same type. Controllers cast these to the concrete
-type (Mesh*, Light*, Camera*, Environment*) via `ObjectID::As<T>` / the untyped
-`ObjectID::As` in the .cpp and mutate them directly - no Scene lookup by ID.
+Scene-domain events carry plain **integer object UIDs** (`int objectUid`,
+0 = none), never raw pointers. `UID` is the common base of `Scene` and
+`ObjectID`, so the same integer space covers both scene and objects. The
+scene itself is NOT carried in events — scene-scoped handlers obtain the
+current `Scene` from their `ControllerContext`. Controllers resolve
+`objectUid` to the concrete type (Mesh*, Light*, Camera*, Environment*) via
+the context (typed scene-pool lookup) and mutate the object directly.
 
 ```cpp
 // Selection
 struct ObjectSelected {
-    const UID*   scene  = nullptr;  // Editor-owned Scene (selection state)
-    const UID* object = nullptr;  // Selected object (nullptr = background click)
-    int   modifiers = 0;            // Input::Modifiers bitmask
+    int objectUid = 0;          // Selected object UID (0 = background click)
+    int modifiers = 0;          // Input::Modifiers bitmask
 };
 
 struct ObjectDeselected {
-    const UID*   scene  = nullptr;
-    const UID* object = nullptr;
+    int objectUid = 0;          // Object UID to deselect
 };
 
 // Selection replay (dispatched only by SetSelectionOp on undo/redo): absolute
 // selection-set restore by UID. Live selection uses the incremental events above.
 struct SelectionChanged {
-    const UID*       scene = nullptr;   // Editor-owned Scene (selection state)
     std::vector<int> selectedUids;      // Ordered selected object UIDs
     int              activeUid = 0;     // Active object UID (0 = none)
 };
 
 // Visibility
 struct VisibilityChanged {
-    const UID* object = nullptr;
+    int objectUid = 0;
     bool viewportVisible = true;
     bool renderVisible   = true;
 };
 
 // Transform
-struct PositionChanged { const UID* object; float posX, posY, posZ; };
-struct RotationChanged { const UID* object; float rotX, rotY, rotZ; };
-struct ScaleChanged    { const UID* object; float sclX, sclY, sclZ; };
+struct PositionChanged { int objectUid; float posX, posY, posZ; };
+struct RotationChanged { int objectUid; float rotX, rotY, rotZ; };
+struct ScaleChanged    { int objectUid; float sclX, sclY, sclZ; };
 
 // Camera properties
-struct CameraTargetChanged { const UID* object; float targetX, targetY, targetZ; };
-struct CameraFovChanged    { const UID* object; float fov; };
+struct CameraTargetChanged { int objectUid; float targetX, targetY, targetZ; };
+struct CameraFovChanged    { int objectUid; float fov; };
 // Absolute camera pose (position + target) — replay only, dispatched by
 // CameraTransformOp on undo/redo (live navigation carries relative deltas).
-struct CameraPoseChanged   { const UID* object; float posX, posY, posZ, tarX, tarY, tarZ; };
+struct CameraPoseChanged   { int objectUid; float posX, posY, posZ, tarX, tarY, tarZ; };
 
 // Mesh properties
-struct MeshShadowChanged  { const UID* object; bool enabled; };
-struct MeshMaterialChanged { const UID* object; bool enabled; };
+struct MeshShadowChanged  { int objectUid; bool enabled; };
+struct MeshMaterialChanged { int objectUid; bool enabled; };
 
 // Light properties
-struct LightPowerChanged      { const UID* object; float power; };
-struct LightRadiusChanged     { const UID* object; float radius; };
-struct LightShadowChanged     { const UID* object; bool enabled; };
-struct LightCutoffChanged     { const UID* object; float cutoff; };
-struct LightOuterCutoffChanged { const UID* object; float outerCutoff; };
+struct LightPowerChanged      { int objectUid; float power; };
+struct LightRadiusChanged     { int objectUid; float radius; };
+struct LightShadowChanged     { int objectUid; bool enabled; };
+struct LightCutoffChanged     { int objectUid; float cutoff; };
+struct LightOuterCutoffChanged { int objectUid; float outerCutoff; };
 
 // Environment properties
-struct EnvironmentIntensityChanged { const UID* object; float intensity; };
-struct EnvironmentRotationChanged  { const UID* object; float rotation; };
+struct EnvironmentIntensityChanged { int objectUid; float intensity; };
+struct EnvironmentRotationChanged  { int objectUid; float rotation; };
 
 // Scene membership (Add / Delete) — UID-carrying (replay-safe; see below)
-struct SceneObjectAddRequested { const UID* scene; int objectUid; };     // forward (Editor import) + replay
-struct SceneObjectDeleteRequested { const UID* scene; std::vector<int> uids; };  // single BATCHED removal path (gesture + replay)
-struct ObjectDeleteRequested { const UID* scene; };                      // Editor-wrapped Delete gesture, FORWARD-ONLY (Editor stamps scene)
+struct SceneObjectAddRequested { int objectUid; };                          // forward (Editor import) + replay
+struct SceneObjectDeleteRequested { std::vector<int> uids; };               // single BATCHED removal path (gesture + replay)
+struct ObjectDeleteRequested { };                                           // Editor-wrapped Delete gesture, FORWARD-ONLY
 ```
 
-**Scene Events Are Ephemeral**
+**Scene Events Carry Integer UIDs**
 
-Scene-domain events follow the system-wide ephemeral rule (see Overview above):
-they carry pointers, never integer IDs. Controllers cast the event's `const UID*`
-to the concrete type via `ObjectID::As<T>` (comparing `o_type` against `T::Type`)
-or the untyped `ObjectID::As` and mutate the object directly - no Scene lookup
-by ID. `Editor::OnUIEvent` just enqueues them unchanged.
+Scene-domain events follow the system-wide id-carrying rule (see Overview
+above): they carry `int objectUid`, never object pointers. Controllers resolve
+the UID against the current Scene (typed pool lookup, e.g. `mesh_list.find`)
+via their `ControllerContext` and mutate the object directly — no pointer
+payload to dangle. `Editor::OnUIEvent` just enqueues them unchanged.
 
-**Membership events are the exception: they carry UIDs.** Add/Delete is split
+**Membership events carry UIDs too (no scene payload).** Add/Delete is split
 into **Import** (Editor: `Load` the resource into the pool — `OnMeshImport`,
 `OnCameraAdd`, `OnLightAdd`, ...) and **Add** (SceneController: fetch the
 pooled object by UID and register it). The membership events carry the object
-UID instead of a pointer because they double as replay events for the
-`SceneObjectAddOp` undo operation (see operation-system.instructions.md): a
-serialized op replays by UID, and the pool is the single owner of the object.
+UID because they double as replay events for the `SceneObjectAddOp` undo
+operation (see operation-system.instructions.md): a serialized op replays by
+UID, and the pool is the single owner of the object.
 `SceneObjectAddOp` re-dispatches the originating add/delete events on replay,
 so undo/redo runs the same controller handlers as live edits; the handler's
 `Submit` is muted by `OperationManager`'s `Phase::Replaying` guard, so
@@ -169,15 +167,14 @@ playback does not re-record (the expected "Submit suppressed during replay"
 LOG).
 `ObjectDeleteRequested` is the Editor-wrapped Delete gesture: the Editor
 subscribes to the pure `DeleteRequested` intent (Delete key in
-Outliner/Viewport) and forwards `ObjectDeleteRequested{ m_scene.get() }` -
-the UI no longer stamps the scene. It is **forward-only** (the recorded
-composite replays via `SceneObjectDeleteRequested`, never this gesture
-event). The SceneController snapshots the selection, guards the last
-camera, deselects, and DEFERS the actual removals as ONE batched
-`SceneObjectDeleteRequested` carrying all selected UIDs — so the batched
-handler is the SINGLE removal path shared by the gesture and by undo/redo
-replay (no replay-only handling), and records ONE light composite
-(`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]` — a
+Outliner/Viewport) and forwards `ObjectDeleteRequested{}` — the UI no longer
+stamps the scene. It is **forward-only** (the recorded composite replays via
+`SceneObjectDeleteRequested`, never this gesture event). The SceneController
+snapshots the selection, guards the last camera, deselects, and DEFERS the
+actual removals as ONE batched `SceneObjectDeleteRequested` carrying all
+selected UIDs — so the batched handler is the SINGLE removal path shared by
+the gesture and by undo/redo replay (no replay-only handling), and records ONE
+light composite (`CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]` — a
 delete of N objects is ONE op, not N). The forward add path records
 `CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(before→{u})]` — add
 AND select collapse to one undo entry.
@@ -191,33 +188,36 @@ live in SceneEvents.h.
 ```cpp
 // Cross-component events (SceneController -> Editor, Editor -> Renderer)
 struct SceneModified {};                       // mark project dirty
-struct LightGpuChanged { const UID* object; };  // single light SSBO update
+struct LightGpuChanged { int objectUid; };     // single light SSBO update
 struct LightingRebuild {};                     // full light SSBO dict rebuild
-struct SceneObjectGpuUploadRequested { const UID* object; };  // on-demand MeshGPU/LightGPU/EnvironmentGPU upload (scene add + shadow toggle)
+struct SceneObjectGpuUploadRequested { int objectUid; };  // on-demand MeshGPU/LightGPU/EnvironmentGPU upload (scene add + shadow toggle)
 struct RenderResetEvent {};                    // temporal accumulation reset
 ```
 
 ### CameraEvents.h
 
 ```cpp
-struct CameraRotateEvent  { Camera* cam; float mouse_delta_x, mouse_delta_y; };
-struct CameraZoomEvent    { Camera* cam; float scroll_dir; };
-struct CameraPushEvent    { Camera* cam; float mouse_delta_x, mouse_delta_y; };
-struct CameraSlideEvent   { Camera* cam; float mouse_delta_x, mouse_delta_y; };
-struct CameraSpinEvent    { Camera* cam; float mouse_delta_x, mouse_delta_y; };
-struct CameraResizeEvent  { Camera* cam; int width; int height; };
+struct CameraRotateEvent  { int camId; float mouse_delta_x, mouse_delta_y; };
+struct CameraZoomEvent    { int camId; float scroll_dir; };
+struct CameraPushEvent    { int camId; float mouse_delta_x, mouse_delta_y; };
+struct CameraSlideEvent   { int camId; float mouse_delta_x, mouse_delta_y; };
+struct CameraSpinEvent    { int camId; float mouse_delta_x, mouse_delta_y; };
+struct CameraResizeEvent  { int camId; int width; int height; };
 
 // Drag-gesture boundaries — bracket a continuous orbit/pan/dolly manipulation
 // so it collapses to ONE undo entry (controller-owned gesture, see
 // editor.instructions.md → Undo/Redo). CameraController captures the "before"
 // pose on begin, mutates live during the drag WITHOUT recording, and records
 // one CameraTransformOp on end.
-struct CameraDragBegin { Camera* cam; };
-struct CameraDragEnd   { Camera* cam; };
+struct CameraDragBegin { int camId; };
+struct CameraDragEnd   { int camId; };
 ```
 
+Camera events carry the camera's integer UID (never a raw `Camera*` — the
+camera could be deleted mid-drag; a UID stays stable). CameraController resolves
+`camId` against the current scene's `cam_list` via its `ControllerContext`.
 Scroll zoom has no press/release, so it is NOT bracketed: `CameraZoomEvent`
-records per-event and relies on `CameraTransformOp::MergeKey()` to coalesce a
+records per-event and relies on `CameraZoomOp::MergeKey()` to coalesce a
 scroll burst into one undo step.
 
 ### InputEvents.h
@@ -229,8 +229,8 @@ struct MouseReleaseEvent{ int x, y; MouseButton btn; Modifiers mods; };
 struct MouseScrollEvent { int x, y; float delta; Modifiers mods; };
 
 // Pure UI->Editor intents (no scene pointer - the Editor wraps them):
-struct ObjectClicked    { const UID* object; int modifiers; };  // Outliner row click
-struct DeleteRequested  { };                                     // Delete key (Outliner/Viewport)
+struct ObjectClicked    { int objectUid; int modifiers; };  // Outliner row click
+struct DeleteRequested  { };                                 // Delete key (Outliner/Viewport)
 ```
 
 ### ConfigEvents.h
@@ -251,8 +251,9 @@ struct ConfigEditEnd   {};
 ### ShaderEvents.h
 
 Events for the shader editor pipeline (UI → Editor → ShaderController). All events
-carry a `const UID*` resolved once by the ShaderEditorPanel from the active
-scene selection. `ShaderSection` identifies which `ShaderStruct` container is edited.
+carry an `int objectUid` (the target mesh's UID, resolved once by the
+ShaderEditorPanel from the active scene selection). `ShaderSection` identifies
+which `ShaderStruct` container is edited.
 
 ```cpp
 enum class ShaderSection : int {
@@ -260,22 +261,22 @@ enum class ShaderSection : int {
     Uniforms = 4, StructDefs = 5, Functions = 6, PushConstants = 7
 };
 
-struct ShaderCreateRequested  { const UID* object; };
-struct ShaderCompileRequested { const UID* object; int stage; int unitType; };  // 0=Code path, 1=Struct path
-struct ShaderCodeEdited       { const UID* object; int stage; std::string code; };
-struct ShaderStructEdited     { const UID* object; int stage; ShaderSection section;
+struct ShaderCreateRequested  { int objectUid; };
+struct ShaderCompileRequested { int objectUid; int stage; int unitType; };  // 0=Code path, 1=Struct path
+struct ShaderCodeEdited       { int objectUid; int stage; std::string code; };
+struct ShaderStructEdited     { int objectUid; int stage; ShaderSection section;
                                 int fieldIndex; int subFieldIndex; std::string field; std::string value; };
-struct ShaderFieldAdded       { const UID* object; int stage; ShaderSection section; int subFieldIndex; };
+struct ShaderFieldAdded       { int objectUid; int stage; ShaderSection section; int subFieldIndex; };
 
 // Undo/redo wiring (content edits only — see operation-system.instructions.md)
-struct ShaderEditBegin        { const UID* object; int stage; };  // gesture start: snapshot "before" code
-struct ShaderEditEnd          { const UID* object; int stage; };  // gesture end: record one SetShaderCodeOp if changed
+struct ShaderEditBegin        { int objectUid; int stage; };  // gesture start: snapshot "before" code
+struct ShaderEditEnd          { int objectUid; int stage; };  // gesture end: record one SetShaderCodeOp if changed
 // Replayed restore events (mirror the forward edit events 1:1, but bump version)
-struct ShaderCodeRestored     { const UID* object; int stage; std::string code; };
-struct ShaderFieldRestored    { const UID* object; int stage; ShaderSection section;
+struct ShaderCodeRestored     { int objectUid; int stage; std::string code; };
+struct ShaderFieldRestored    { int objectUid; int stage; ShaderSection section;
                                 int fieldIndex; ShaderFieldValue value; };  // whole element to assign back
-struct ShaderFieldAddRestored { const UID* object; int stage; ShaderSection section; int subFieldIndex; };  // redo of an add
-struct ShaderFieldRemoved     { const UID* object; int stage; ShaderSection section; int subFieldIndex; };  // undo of an add
+struct ShaderFieldAddRestored { int objectUid; int stage; ShaderSection section; int subFieldIndex; };  // redo of an add
+struct ShaderFieldRemoved     { int objectUid; int stage; ShaderSection section; int subFieldIndex; };  // undo of an add
 ```
 
 **Version flow:** Only `ShaderCreateRequested` and `ShaderCompileRequested` bump
@@ -334,11 +335,11 @@ Events are enqueued and batch-processed via `Process()`.
 ```cpp
 // Subscribe to typed events
 eventBus.subscribe<LightGpuChanged>([](const LightGpuChanged& e) {
-    uploadSingleLight(ObjectID::As<Light>(e.object));
+    uploadSingleLight(/* resolve e.objectUid via the pool */);
 });
 
 // Enqueue events (deferred dispatch)
-eventBus.enqueue(LightGpuChanged{lightPtr});
+eventBus.enqueue(LightGpuChanged{lightUid});
 
 // Process all queued events (call once per frame or on input)
 eventBus.Process();
@@ -402,19 +403,19 @@ void OnUIEvent(const Event& e) {
 
 ```cpp
 // SceneController::Init() — handles scene-domain events via free-function handlers
-bus.subscribe<ObjectSelected>([&bus](const ObjectSelected& e) {
-    OnObjectSelected(e, bus);
+ctx.events.subscribe<ObjectSelected>([ctx](const ObjectSelected& e) {
+    OnObjectSelected(e, ctx);
 });
-bus.subscribe<VisibilityChanged>([&bus](const VisibilityChanged& e) {
-    OnVisibilityChanged(e, bus);
+ctx.events.subscribe<VisibilityChanged>([ctx](const VisibilityChanged& e) {
+    OnVisibilityChanged(e, ctx);
 });
 
 // Editor::Initialize() — handles cross-component GPU-sync events
 ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
-    auto* light = ObjectID::As<Light>(e.object);
+    auto light = m_resources->Get<Light>(e.objectUid);
     if (!light) return;
     auto gpuStruct = ed_uploadManager->UploadLighting(*light);
-    ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
+    ed_renderer->GetRenderCache().UpdateLight(e.objectUid, gpuStruct);
 });
 ed_eventBus.subscribe<LightingRebuild>([this](const LightingRebuild&) {
     UploadLighting();
@@ -485,20 +486,21 @@ Scene mutations that affect GPU resources follow a three-tier event pattern:
 
 ```
 SceneController mutation handler
-  ├── Mutates the scene object directly (via ObjectID::As<T> from the event's const UID*)
+  ├── Resolves the object UID from the event's int objectUid against the
+  │   current Scene (via the ControllerContext) and mutates the object
   └── Enqueues one or more EditorEvents:
         ├── SceneModified{} → Editor marks project dirty
         ├── RenderResetEvent{} → DeferredRenderer resets temporal accumulation
         │
         ├── Scene object enters scene (add / undo-redo re-add) or light
-        │   shadow toggled ON → SceneObjectGpuUploadRequested{object}
+        │   shadow toggled ON → SceneObjectGpuUploadRequested{objectUid}
         │     └── Editor::OnSceneObjectGpuUpload handler:
-        │         casts to Mesh*/Light*/Environment* and uploads on demand
+        │         resolves the pooled object by UID and uploads on demand
         │         (MeshGPU / LightGPU shadow maps / IBL), skip-if-cached
         │
-        ├── Light property change → LightGpuChanged{lightPtr}
+        ├── Light property change → LightGpuChanged{objectUid}
         │     └── Editor::LightGpuChanged handler:
-        │         casts to Light*, calls UploadLighting(*light),
+        │         resolves the pooled Light*, calls UploadLighting(*light),
         │         calls RenderCache::UpdateLight(id, gpuStruct)
         │         → single SSBO struct updated
         │

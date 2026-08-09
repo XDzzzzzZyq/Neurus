@@ -1,37 +1,42 @@
 #pragma once
 
-#include "scene/Camera.h"
-
 namespace neurus {
 
+/**
+ * @brief Camera navigation events carry the camera's integer UID (not a raw
+ * Camera* pointer — the camera could be deleted mid-drag; a UID stays a stable
+ * identity). CameraController resolves the id against the current scene at
+ * dispatch time.
+ */
+
 struct CameraZoomEvent {
-    Camera* cam;
-    float scroll_dir;
+	int camId;
+	float scroll_dir;
 };
 
 struct CameraRotateEvent {
-    Camera* cam;
-    float mouse_delta_x, mouse_delta_y;
+	int camId;
+	float mouse_delta_x, mouse_delta_y;
 };
 
 struct CameraPushEvent {
-    Camera* cam;
-    float mouse_delta_x, mouse_delta_y;
+	int camId;
+	float mouse_delta_x, mouse_delta_y;
 };
 
 struct CameraSlideEvent {
-    Camera* cam;
-    float mouse_delta_x, mouse_delta_y;
+	int camId;
+	float mouse_delta_x, mouse_delta_y;
 };
 
 struct CameraSpinEvent {
-    Camera* cam;
-    float mouse_delta_x, mouse_delta_y;
+	int camId;
+	float mouse_delta_x, mouse_delta_y;
 };
 
 struct CameraResizeEvent {
-    Camera* cam;
-    int width; int height;
+	int camId;
+	int width; int height;
 };
 
 /**
@@ -43,7 +48,7 @@ struct CameraResizeEvent {
  * committed on CameraDragEnd.
  */
 struct CameraDragBegin {
-    Camera* cam;
+	int camId;
 };
 
 /**
@@ -53,7 +58,7 @@ struct CameraDragBegin {
  * at CameraDragBegin through the current pose, if the pose actually changed.
  */
 struct CameraDragEnd {
-    Camera* cam;
+	int camId;
 };
 
 } // namespace neurus

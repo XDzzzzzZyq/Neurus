@@ -85,33 +85,6 @@ public:
 	}
 
 	/**
-	 * @brief Casts a const UID* back to ObjectID* (no type check - the caller
-	 *        knows the event's object payload is an ObjectID-derived object).
-	 * @param uid Base UID pointer from an event payload.
-	 * @return Non-owning ObjectID*, or nullptr if null.
-	 */
-	static ObjectID* As(const UID* uid)
-	{
-		if (!uid) return nullptr;
-		return static_cast<ObjectID*>(const_cast<UID*>(uid));
-	}
-
-	/**
-	 * @brief Typed cast: casts a const UID* to T* iff o_type matches T::Type.
-	 * @tparam T ObjectID-derived type declaring `static constexpr ObjectID::GOType Type`.
-	 * @param uid Base UID pointer from an event payload.
-	 * @return Non-owning T*, or nullptr if null or the type does not match.
-	 */
-	template<typename T>
-	static T* As(const UID* uid)
-	{
-		if (!uid) return nullptr;
-		const ObjectID* oid = static_cast<const ObjectID*>(uid);
-		if (oid->o_type != T::Type) return nullptr;
-		return static_cast<T*>(const_cast<ObjectID*>(oid));
-	}
-
-	/**
 	 * @brief Returns pointer to object's shader, if applicable.
 	 * @return Void pointer cast to Shader*, or nullptr if no shader.
 	 * @note Override in derived classes that own shaders (Mesh, Material, etc.).

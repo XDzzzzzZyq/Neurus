@@ -16,8 +16,8 @@ using namespace neurus;
  * These tests validate the typed event dispatch system: subscribe, emit,
  * deferred Process(), independent event channels, and handler ordering.
  *
- * ObjectSelected / ObjectDeselected carry const ObjectID* (ephemeral pointer
- * payloads), so tests hold scene objects in unique_ptr holders via NewObject().
+ * ObjectSelected / ObjectDeselected carry integer object UIDs; NewObject()
+ * supplies fresh ObjectIDs (held by the fixture so their UIDs stay stable).
  */
 class TypedEventQueueTest : public ::testing::Test
 {
@@ -74,10 +74,10 @@ TEST_F(TypedEventQueueTest, SubscribeAndEmit_HandlerReceivesEvent)
 	m_queue->subscribe<ObjectSelected>(
 		[&](const ObjectSelected& e) {
 			received = true;
-			receivedId = e.object->GetObjectID();
+			receivedId = e.objectUid;
 		});
 
-	m_queue->enqueue(ObjectSelected{nullptr, obj, 0});
+	m_queue->enqueue(ObjectSelected{obj->GetObjectID(), 0});
 
 	// Not received yet - deferred dispatch
 	EXPECT_FALSE(received);
@@ -96,7 +96,7 @@ TEST_F(TypedEventQueueTest, Emit_MultipleHandlersAllReceive)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { callCount++; });
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { callCount++; });
 
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(callCount, 3);
@@ -111,7 +111,7 @@ TEST_F(TypedEventQueueTest, Process_EmptyQueueIsNoOp)
 TEST_F(TypedEventQueueTest, Emit_WithoutSubscribersIsNoOp)
 {
 	EXPECT_NO_THROW({
-		m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+		m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
 		m_queue->Process();
 	});
 }
@@ -128,8 +128,8 @@ TEST_F(TypedEventQueueTest, DifferentEventTypes_IndependentChannels)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { objectSelectedCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { objectDeselectedCount++; });
 
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(objectSelectedCount, 2);
@@ -144,8 +144,8 @@ TEST_F(TypedEventQueueTest, MultipleEventTypes_EmitAndProcess)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
 
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
-	m_queue->enqueue(ObjectDeselected{nullptr, NewObject()});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
+	m_queue->enqueue(ObjectDeselected{NewObject()->GetObjectID()});
 
 	m_queue->Process();
 
@@ -165,11 +165,11 @@ TEST_F(TypedEventQueueTest, MultipleEmits_ProcessedInOrder)
 	std::vector<int> receivedIds;
 
 	m_queue->subscribe<ObjectSelected>(
-		[&](const ObjectSelected& e) { receivedIds.push_back(e.object->GetObjectID()); });
+		[&](const ObjectSelected& e) { receivedIds.push_back(e.objectUid); });
 
-	m_queue->enqueue(ObjectSelected{nullptr, o1, 0});
-	m_queue->enqueue(ObjectSelected{nullptr, o2, 0});
-	m_queue->enqueue(ObjectSelected{nullptr, o3, 0});
+	m_queue->enqueue(ObjectSelected{o1->GetObjectID(), 0});
+	m_queue->enqueue(ObjectSelected{o2->GetObjectID(), 0});
+	m_queue->enqueue(ObjectSelected{o3->GetObjectID(), 0});
 
 	m_queue->Process();
 
@@ -191,14 +191,14 @@ TEST_F(TypedEventQueueTest, ReentrantEmit_HandlerEmitsDuringProcess)
 
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) {
 		outerCount++;
-		m_queue->enqueue(ObjectDeselected{nullptr, obj});
+		m_queue->enqueue(ObjectDeselected{obj->GetObjectID()});
 	});
 
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) {
 		innerCount++;
 	});
 
-	m_queue->enqueue(ObjectSelected{nullptr, obj, 0});
+	m_queue->enqueue(ObjectSelected{obj->GetObjectID(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(outerCount, 1);
@@ -213,11 +213,11 @@ TEST_F(TypedEventQueueTest, ReentrantEmit_SameTypeCreatesChain)
 		callCount++;
 		if (callCount < 5)
 		{
-			m_queue->enqueue(ObjectSelected{nullptr, nullptr, 0});
+			m_queue->enqueue(ObjectSelected{0, 0});
 		}
 	});
 
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
 	m_queue->Process();
 
 	EXPECT_EQ(callCount, 5);
@@ -230,10 +230,10 @@ TEST_F(TypedEventQueueTest, ReentrantEmit_SameTypeCreatesChain)
 TEST_F(TypedEventQueueTest, Process_MaxEventsCapPreventsInfiniteLoop)
 {
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) {
-		m_queue->enqueue(ObjectSelected{nullptr, nullptr, 0});
+		m_queue->enqueue(ObjectSelected{0, 0});
 	});
 
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
 
 	EXPECT_NO_THROW({ m_queue->Process(10); });
 }
@@ -252,7 +252,7 @@ TEST_F(TypedEventQueueTest, EventQueueIsNotCopyable)
 }
 
 // ===========================================================================
-// Expanded tests (pointer payloads)
+// Expanded tests (UID payloads)
 // ===========================================================================
 
 TEST_F(TypedEventQueueExpandedTest, ObjectSelected_MultipleEmits)
@@ -263,11 +263,11 @@ TEST_F(TypedEventQueueExpandedTest, ObjectSelected_MultipleEmits)
 	std::vector<int> receivedIds;
 
 	m_queue->subscribe<ObjectSelected>(
-		[&](const ObjectSelected& e) { receivedIds.push_back(e.object->GetObjectID()); });
+		[&](const ObjectSelected& e) { receivedIds.push_back(e.objectUid); });
 
-	m_queue->enqueue(ObjectSelected{nullptr, o1, 0});
-	m_queue->enqueue(ObjectSelected{nullptr, o2, 0});
-	m_queue->enqueue(ObjectSelected{nullptr, o3, 0});
+	m_queue->enqueue(ObjectSelected{o1->GetObjectID(), 0});
+	m_queue->enqueue(ObjectSelected{o2->GetObjectID(), 0});
+	m_queue->enqueue(ObjectSelected{o3->GetObjectID(), 0});
 
 	m_queue->Process();
 
@@ -285,7 +285,7 @@ TEST_F(TypedEventQueueExpandedTest, ObjectDeselected_NoCrossContamination)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
 
-	m_queue->enqueue(ObjectDeselected{nullptr, NewObject()});
+	m_queue->enqueue(ObjectDeselected{NewObject()->GetObjectID()});
 	m_queue->Process();
 
 	EXPECT_EQ(selectCount, 0);
@@ -298,9 +298,9 @@ TEST_F(TypedEventQueueExpandedTest, ObjectDeselected_EmitReceivesCorrectId)
 	int receivedId = 0;
 
 	m_queue->subscribe<ObjectDeselected>(
-		[&](const ObjectDeselected& e) { receivedId = e.object->GetObjectID(); });
+		[&](const ObjectDeselected& e) { receivedId = e.objectUid; });
 
-	m_queue->enqueue(ObjectDeselected{nullptr, obj});
+	m_queue->enqueue(ObjectDeselected{obj->GetObjectID()});
 	m_queue->Process();
 
 	EXPECT_EQ(receivedId, obj->GetObjectID());
@@ -318,8 +318,8 @@ TEST_F(TypedEventQueueExpandedTest, AllNewSignals_IndependentChannels)
 	m_queue->subscribe<ObjectSelected>([&](const ObjectSelected&) { selectCount++; });
 	m_queue->subscribe<ObjectDeselected>([&](const ObjectDeselected&) { deselectCount++; });
 
-	m_queue->enqueue(ObjectSelected{nullptr, NewObject(), 0});
-	m_queue->enqueue(ObjectDeselected{nullptr, NewObject()});
+	m_queue->enqueue(ObjectSelected{NewObject()->GetObjectID(), 0});
+	m_queue->enqueue(ObjectDeselected{NewObject()->GetObjectID()});
 
 	m_queue->Process();
 

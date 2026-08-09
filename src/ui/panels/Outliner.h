@@ -11,7 +11,7 @@
  * - Rows are OutlinerRow widgets managed via a pool
  * - Pool grows as needed; extra rows are hidden (not destroyed)
  * - Each recycled row calls setObject() — signal lambdas read the current
- *   m_object at emission time, so no manual rewire needed
+ *   m_objectUid at emission time, so no manual rewire needed
  * - Row signals forwarded via Outliner::objectClicked / visibilityChanged
  * - Reads scene data via UIContext — no Renderer or Vulkan headers
  */

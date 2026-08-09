@@ -38,6 +38,7 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/unordered_map.hpp>
 
+#include "core/IResourceLookup.h"
 #include "core/UID.h"
 
 namespace neurus
@@ -49,8 +50,11 @@ namespace neurus
  * Owned by the Editor (app-scoped). Cleared on project new/open so no stale
  * object leaks into a save. Serializes the whole pool polymorphically via
  * cereal; each pooled object's own serialize(load) restores its content.
+ *
+ * Implements IResourceLookup (fetch/lookup only) so controllers can resolve
+ * object references by integer id without depending on the concrete pool.
  */
-class ResourceManager
+class ResourceManager : public IResourceLookup
 {
 public:
 	ResourceManager() = default;
@@ -93,6 +97,26 @@ public:
 	 */
 	int Register(std::shared_ptr<UID> obj);
 
+	// --- IResourceLookup ---
+
+	/**
+	 * @brief Looks up a pooled resource by ID (base, untyped fetch).
+	 * @param id Resource UID.
+	 * @return Shared pointer to the UID base, or nullptr if absent.
+	 */
+	std::shared_ptr<UID> Get(int id) const override
+	{
+		auto it = resources_.find(id);
+		if (it == resources_.end())
+			return nullptr;
+		return it->second;
+	}
+
+	/**
+	 * @brief True if a resource with the given ID is registered.
+	 */
+	bool Contains(int id) const override { return resources_.count(id) != 0; }
+
 	/**
 	 * @brief Looks up a pooled resource by ID with type checking.
 	 * @tparam T Requested type (may be a base like UID/ObjectID).
@@ -102,16 +126,8 @@ public:
 	template<class T>
 	std::shared_ptr<T> Get(int id) const
 	{
-		auto it = resources_.find(id);
-		if (it == resources_.end())
-			return nullptr;
-		return std::dynamic_pointer_cast<T>(it->second);
+		return std::dynamic_pointer_cast<T>(Get(id));
 	}
-
-	/**
-	 * @brief True if a resource with the given ID is registered.
-	 */
-	bool Contains(int id) const { return resources_.count(id) != 0; }
 
 	/**
 	 * @brief Invokes @p fn on every pooled object of type T.

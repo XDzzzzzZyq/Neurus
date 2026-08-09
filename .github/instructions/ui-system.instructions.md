@@ -191,28 +191,30 @@ polled in `Refresh()`):
 ### Outliner, Viewport, and PropertyPanel (Scene-Event Panels)
 
 `Outliner`, `Viewport`, and `PropertyPanel` emit scene-domain events that
-carry `const UID*` (the active object's UID base pointer) instead of integer
-IDs. Panels hold the active object as `const UID*` during `Refresh()` and
+carry plain **integer object UIDs** (`int objectUid`, 0 = none). Panels hold
+the active object's UID as an `int` across `Refresh()` calls and compare the
+ints for dirty checks and lazy updates — no cached object pointers (a raw
+pointer could dangle after the object is deleted; a UID stays stable). Panels
 emit PURE INPUT INTENTS on the UI->Editor path - they no longer hold or
 stamp the scene (`m_scene` is gone). The Editor wraps the intents into
 complete scene events (see events.instructions.md, "Three event paths").
 
-- `Outliner::Refresh()` reads the object list from `UIContext` and
+- `Outliner::Refresh()` reads the object UID list from `UIContext` and
   reconfigures pooled `OutlinerRow`s via `setObject()` /
   `setVisibilities()` / `setSelectionMode()`. The panel emits
   `objectClicked(const ObjectClicked&)`, `visibilityChanged(const
   VisibilityChanged&)`, and `deleteRequested(const DeleteRequested&)`.
-- `OutlinerRow` emits `ObjectClicked{m_object, mods}`; signal lambdas
-  read the row's `m_object` (the `const UID*` base pointer) at emission
-  time, so pooled rows stay correct when recycled to a different object.
+- `OutlinerRow` emits `ObjectClicked{m_objectUid, mods}`; signal lambdas
+  read the row's `m_objectUid` (an `int`) at emission time, so pooled rows
+  stay correct when recycled to a different object.
 - `Viewport` emits the raw mouse-input intents (`mouseMoved`,
   `mousePressed`, `mouseReleased`, `mouseScrolled`) plus
   `deleteRequested(const DeleteRequested&)` on the Delete key.
-- `PropertyPanel::Refresh()` reads `scene->selections.GetActiveObject()`
-  and emits transform events (`PositionChanged`, `RotationChanged`,
-  `ScaleChanged`) plus camera/mesh/light/environment property events,
-  all carrying the active object's `const UID*`; it casts the pointer
-  back to `ObjectID` (via the untyped `ObjectID::As`) for reads.
+- `PropertyPanel::Refresh()` reads `scene->selections.GetActiveObject()`,
+  stores its `int` UID (lazy header update), and emits transform events
+  (`PositionChanged`, `RotationChanged`, `ScaleChanged`) plus
+  camera/mesh/light/environment property events, all carrying the active
+  object's `int objectUid`; it resolves per-id data via `Scene::GetObjectID`.
 
 ### ShaderEditorPanel
 

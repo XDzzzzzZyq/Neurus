@@ -18,7 +18,6 @@ namespace neurus {
 class DeferredRenderer;
 class Scene;
 class UploadManager;
-class UID;
 struct ShaderCreateRequested;
 }
 
@@ -108,7 +107,7 @@ public:
 	void RegisterController()
 	{
 		auto ctrl = std::make_unique<T>();
-		ctrl->Init(ed_eventBus, ed_operations);
+		ctrl->Init(m_ctx);
 		ed_controllers.push_back(std::move(ctrl));
 	}
 
@@ -132,7 +131,7 @@ private:
 	void OnSpotLightAdd();
 	void OnIBLLoad();
 	void OnCreateShader(const ShaderCreateRequested& e);
-	void OnSceneObjectGpuUpload(const UID* object);
+	void OnSceneObjectGpuUpload(int objectUid);
 
 	// --- Owned state ---
 	std::unique_ptr<Scene> m_scene;
@@ -144,6 +143,18 @@ private:
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
 	OperationManager ed_operations;                ///< Undo/redo history over event-replay ops.
+
+	/**
+	 * @brief The three controller-facing interfaces + editor singleton access.
+	 *
+	 * Declared AFTER the pieces it references (bus, operations, pool, scene,
+	 * config) and BEFORE the controller list, so it outlives the controllers'
+	 * event subscriptions (handler lambdas capture it by value).
+	 */
+	ControllerContext m_ctx{ ed_eventBus, *m_resources, ed_operations,
+	                         [this]() { return m_scene.get(); },
+	                         [this]() { return &m_config; } };
+
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---
