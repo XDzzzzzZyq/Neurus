@@ -466,7 +466,7 @@
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,
-            "r_transparent": false,
+            "r_transparent": true,
             "r_fxaa_subpix": 0.75,
             "r_fxaa_edge_threshold": 0.16599999368190765,
             "r_fxaa_edge_threshold_min": 0.08330000191926956,
