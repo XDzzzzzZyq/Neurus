@@ -57,6 +57,9 @@ namespace neurus
 class Environment : public ObjectID, public Transform3D
 {
 public:
+	/** @brief GOType tag used by ObjectID::As<T> for typed event casts. */
+	static constexpr ObjectID::GOType Type = ObjectID::GOType::GO_ENVIR;
+
 	/**
 	 * @brief Constructs an Environment with default IBL parameters.
 	 */
@@ -164,14 +167,6 @@ public:
 	void* GetMaterial() override
 	{
 		return nullptr;
-	}
-
-	/** @brief Casts a const ObjectID* to an Environment* if its type is GO_ENVIR, else nullptr. */
-	static Environment* As(const ObjectID* obj)
-	{
-		if (!obj || obj->o_type != ObjectID::GOType::GO_ENVIR)
-			return nullptr;
-		return static_cast<Environment*>(const_cast<ObjectID*>(obj));
 	}
 
 	/// Pooled ImageData UID (0 = none); Scene::ResolveDataReferences wires it.

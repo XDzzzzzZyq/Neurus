@@ -77,7 +77,7 @@ OutlinerRow::OutlinerRow(QWidget* parent)
 	// Lambda reads m_object at emission time — works after setObject
 	QObject::connect(m_nameBtn, &QPushButton::clicked, this, [this]() {
 		const auto mods = Input::GetModifiers(static_cast<uint32_t>(QGuiApplication::queryKeyboardModifiers().toInt()));
-		emit objectSelected(ObjectSelected{nullptr, m_object, mods});
+		emit objectClicked(ObjectClicked{m_object, mods});
 	});
 	rowLayout->addWidget(m_nameBtn);
 
@@ -162,7 +162,7 @@ void OutlinerRow::setRenderBtnColor()
 // =========================================================================
 
 void OutlinerRow::setObject(const QIcon& icon,
-                            const QString& name, const ObjectID* object)
+                            const QString& name, const UID* object)
 {
 	// Update name text
 	m_nameBtn->setText(name);

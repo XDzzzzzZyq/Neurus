@@ -3,10 +3,10 @@
  * @brief Event-driven scene mutation handlers (selection, transforms, props).
  *
  * Stateless -- all handlers are free functions in an anonymous namespace.
- * Each handler receives a discrete scene event, extracts the const ObjectID*
- * pointer, casts it to the concrete object type (Mesh*, Light*, Camera*, ...),
- * and applies the mutation. Scene-owned state (selection) uses the const UID*
- * cast to Scene*.
+ * Each handler receives a discrete scene event carrying const UID*, casts it
+ * to the concrete object type (Mesh*, Light*, Camera*, ...) via ObjectID::As<T>
+ * (or the untyped ObjectID::As), and applies the mutation. Scene-owned state
+ * (selection) uses the const UID* cast to Scene*.
  *
  * GPU uploads are delegated to Editor via EditorEvents:
  *   - LightGpuChanged{object} -> single light SSBO struct update
@@ -51,7 +51,7 @@ void Mutated(neurus::EventQueue& bus)
 }
 
 /** @brief Single-light SSBO struct change. */
-void LightStructChanged(const neurus::ObjectID* object, neurus::EventQueue& bus)
+void LightStructChanged(const neurus::UID* object, neurus::EventQueue& bus)
 {
 	bus.enqueue(neurus::LightGpuChanged{object});
 	Mutated(bus);
@@ -101,7 +101,7 @@ void OnObjectSelected(const neurus::ObjectSelected& e, neurus::EventQueue&, neur
 	}
 	else
 	{
-		scene->selections.Select(e.object, increment);
+		scene->selections.Select(neurus::ObjectID::As(e.object), increment);
 	}
 
 	RecordSelection(*scene, std::move(before), ops);
@@ -113,7 +113,7 @@ void OnObjectDeselected(const neurus::ObjectDeselected& e, neurus::EventQueue&, 
 	if (!scene || !e.object) return;
 
 	neurus::SelectionState before = SnapshotSelection(*scene);
-	scene->selections.Deselect(e.object, false);
+	scene->selections.Deselect(neurus::ObjectID::As(e.object), false);
 	RecordSelection(*scene, std::move(before), ops);
 }
 
@@ -133,7 +133,7 @@ void OnSelectionChanged(const neurus::SelectionChanged& e, neurus::EventQueue&)
 
 void OnVisibilityChanged(const neurus::VisibilityChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
+	neurus::ObjectID* obj = neurus::ObjectID::As(e.object);
 	if (!obj) return;
 
 	const neurus::VisibilityState before{ obj->is_viewport, obj->is_rendered };
@@ -158,7 +158,7 @@ void OnVisibilityChanged(const neurus::VisibilityChanged& e, neurus::EventQueue&
 
 void OnPositionChanged(const neurus::PositionChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
+	neurus::ObjectID* obj = neurus::ObjectID::As(e.object);
 	if (!obj) return;
 	void* transformPtr = obj->GetTransform();
 	if (!transformPtr) return;
@@ -178,7 +178,7 @@ void OnPositionChanged(const neurus::PositionChanged& e, neurus::EventQueue& bus
 
 void OnRotationChanged(const neurus::RotationChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
+	neurus::ObjectID* obj = neurus::ObjectID::As(e.object);
 	if (!obj) return;
 	void* transformPtr = obj->GetTransform();
 	if (!transformPtr) return;
@@ -198,7 +198,7 @@ void OnRotationChanged(const neurus::RotationChanged& e, neurus::EventQueue& bus
 
 void OnScaleChanged(const neurus::ScaleChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::ObjectID* obj = const_cast<neurus::ObjectID*>(e.object);
+	neurus::ObjectID* obj = neurus::ObjectID::As(e.object);
 	if (!obj) return;
 	void* transformPtr = obj->GetTransform();
 	if (!transformPtr) return;
@@ -222,7 +222,7 @@ void OnScaleChanged(const neurus::ScaleChanged& e, neurus::EventQueue& bus, neur
 
 void OnCameraTargetChanged(const neurus::CameraTargetChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Camera* cam = neurus::Camera::As(e.object);
+	neurus::Camera* cam = neurus::ObjectID::As<neurus::Camera>(e.object);
 	if (!cam) return;
 	const glm::vec3 pos = cam->GetPosition();
 	const glm::vec3 before = cam->cam_tar;
@@ -239,7 +239,7 @@ void OnCameraTargetChanged(const neurus::CameraTargetChanged& e, neurus::EventQu
 
 void OnCameraFovChanged(const neurus::CameraFovChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Camera* cam = neurus::Camera::As(e.object);
+	neurus::Camera* cam = neurus::ObjectID::As<neurus::Camera>(e.object);
 	if (!cam) return;
 	const float before = cam->cam_pers;
 	cam->ChangeCamPersp(e.fov);
@@ -249,7 +249,7 @@ void OnCameraFovChanged(const neurus::CameraFovChanged& e, neurus::EventQueue& b
 
 void OnCameraPoseChanged(const neurus::CameraPoseChanged& e, neurus::EventQueue& bus)
 {
-	neurus::Camera* cam = neurus::Camera::As(e.object);
+	neurus::Camera* cam = neurus::ObjectID::As<neurus::Camera>(e.object);
 	if (!cam) return;
 	// Replay path for CameraTransformOp: apply the absolute pose. Non-recording;
 	// live navigation records the op, this handler only re-applies endpoints.
@@ -264,7 +264,7 @@ void OnCameraPoseChanged(const neurus::CameraPoseChanged& e, neurus::EventQueue&
 
 void OnMeshShadowChanged(const neurus::MeshShadowChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Mesh* mesh = neurus::Mesh::As(e.object);
+	neurus::Mesh* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
 	if (!mesh) return;
 	const bool before = mesh->using_shadow;
 	mesh->EnableShadow(e.enabled);
@@ -274,7 +274,7 @@ void OnMeshShadowChanged(const neurus::MeshShadowChanged& e, neurus::EventQueue&
 
 void OnMeshMaterialChanged(const neurus::MeshMaterialChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Mesh* mesh = neurus::Mesh::As(e.object);
+	neurus::Mesh* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
 	if (!mesh) return;
 	const bool before = mesh->using_material;
 	mesh->EnableMaterial(e.enabled);
@@ -288,7 +288,7 @@ void OnMeshMaterialChanged(const neurus::MeshMaterialChanged& e, neurus::EventQu
 
 void OnLightPowerChanged(const neurus::LightPowerChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Light* light = neurus::Light::As(e.object);
+	neurus::Light* light = neurus::ObjectID::As<neurus::Light>(e.object);
 	if (!light) return;
 	const float before = light->light_power;
 	light->SetPower(e.power);
@@ -298,7 +298,7 @@ void OnLightPowerChanged(const neurus::LightPowerChanged& e, neurus::EventQueue&
 
 void OnLightColorChanged(const neurus::LightColorChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Light* light = neurus::Light::As(e.object);
+	neurus::Light* light = neurus::ObjectID::As<neurus::Light>(e.object);
 	if (!light) return;
 	const glm::vec3 before = light->light_color;
 	const glm::vec3 after(e.r, e.g, e.b);
@@ -309,7 +309,7 @@ void OnLightColorChanged(const neurus::LightColorChanged& e, neurus::EventQueue&
 
 void OnLightRadiusChanged(const neurus::LightRadiusChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Light* light = neurus::Light::As(e.object);
+	neurus::Light* light = neurus::ObjectID::As<neurus::Light>(e.object);
 	if (!light) return;
 	const float before = light->light_radius;
 	light->SetRadius(e.radius);
@@ -319,7 +319,7 @@ void OnLightRadiusChanged(const neurus::LightRadiusChanged& e, neurus::EventQueu
 
 void OnLightShadowChanged(const neurus::LightShadowChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Light* light = neurus::Light::As(e.object);
+	neurus::Light* light = neurus::ObjectID::As<neurus::Light>(e.object);
 	if (!light) return;
 	const bool before = light->use_shadow;
 	light->SetShadow(e.enabled);
@@ -334,7 +334,7 @@ void OnLightShadowChanged(const neurus::LightShadowChanged& e, neurus::EventQueu
 
 void OnLightCutoffChanged(const neurus::LightCutoffChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Light* light = neurus::Light::As(e.object);
+	neurus::Light* light = neurus::ObjectID::As<neurus::Light>(e.object);
 	if (!light) return;
 	const float before = light->spot_cutoff;
 	light->SetCutoff(e.cutoff);
@@ -344,7 +344,7 @@ void OnLightCutoffChanged(const neurus::LightCutoffChanged& e, neurus::EventQueu
 
 void OnLightOuterCutoffChanged(const neurus::LightOuterCutoffChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Light* light = neurus::Light::As(e.object);
+	neurus::Light* light = neurus::ObjectID::As<neurus::Light>(e.object);
 	if (!light) return;
 	const float before = light->spot_outer_cutoff;
 	light->SetOuterCutoff(e.outerCutoff);
@@ -358,7 +358,7 @@ void OnLightOuterCutoffChanged(const neurus::LightOuterCutoffChanged& e, neurus:
 
 void OnEnvironmentIntensityChanged(const neurus::EnvironmentIntensityChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Environment* env = neurus::Environment::As(e.object);
+	neurus::Environment* env = neurus::ObjectID::As<neurus::Environment>(e.object);
 	if (!env) return;
 	const float before = env->GetIntensity();
 	env->SetIntensity(e.intensity);
@@ -368,7 +368,7 @@ void OnEnvironmentIntensityChanged(const neurus::EnvironmentIntensityChanged& e,
 
 void OnEnvironmentRotationChanged(const neurus::EnvironmentRotationChanged& e, neurus::EventQueue& bus, neurus::IOperationSink& ops)
 {
-	neurus::Environment* env = neurus::Environment::As(e.object);
+	neurus::Environment* env = neurus::ObjectID::As<neurus::Environment>(e.object);
 	if (!env) return;
 	const float before = env->GetRotation();
 	env->SetRotation(e.rotation);

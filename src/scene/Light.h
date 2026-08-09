@@ -60,6 +60,9 @@ enum LightType : int
 class Light : public ObjectID, public Transform3D
 {
 public:
+	/** @brief GOType tag used by ObjectID::As<T> for typed event casts. */
+	static constexpr ObjectID::GOType Type = ObjectID::GOType::GO_LIGHT;
+
 	// -----------------------------------------------------------------------
 	// Public members (light state)
 	// -----------------------------------------------------------------------
@@ -240,16 +243,6 @@ public:
 	void* GetTransform() override
 	{
 		return GetTransformPtr();
-	}
-
-	/** @brief Casts a const ObjectID* to a Light* if its type is GO_LIGHT/GO_POLYLIGHT, else nullptr. */
-	static Light* As(const ObjectID* obj)
-	{
-		if (!obj) return nullptr;
-		if (obj->o_type != ObjectID::GOType::GO_LIGHT &&
-		    obj->o_type != ObjectID::GOType::GO_POLYLIGHT)
-			return nullptr;
-		return static_cast<Light*>(const_cast<ObjectID*>(obj));
 	}
 };
 

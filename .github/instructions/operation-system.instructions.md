@@ -26,6 +26,10 @@ model, coalescing rules, and persistence.
 - `TransitionOp<Derived, TEvent, Value>` (CRTP) covers per-object value edits;
   `Inverse()` swaps before/after. `MergeKey()`/`MergeFrom()` coalesce a
   continuous manipulation (e.g. camera drag) into one undo entry.
+- **Replay is unchanged by the UID erasure**: ops re-dispatch via
+  `MakeEvent(const ObjectID*, const Value&)`, and `ObjectID` derives from `UID`,
+  so the returned events' `const UID* object` fields bind implicitly from the
+  `const ObjectID*` argument - no operation code changed.
 - `Operation::PreservesRedo()` (default false): a branching edit clears the redo
   stack. **Selection** ops (`SetSelectionOp`) override it to `true` so navigating
   the selection appends to undo *without* discarding a pending redo — safe

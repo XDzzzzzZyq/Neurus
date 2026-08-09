@@ -81,7 +81,7 @@ private:
 	void SetEnabled(bool enabled);
 
 	// --- State ---
-	const ObjectID* m_activeObject = nullptr;
+	const UID* m_activeObject = nullptr;
 
 	// --- Header ---
 	QWidget* m_headerWidget = nullptr;

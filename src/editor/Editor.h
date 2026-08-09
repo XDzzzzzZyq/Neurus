@@ -18,7 +18,7 @@ namespace neurus {
 class DeferredRenderer;
 class Scene;
 class UploadManager;
-class ObjectID;
+class UID;
 struct ShaderCreateRequested;
 }
 
@@ -132,7 +132,7 @@ private:
 	void OnSpotLightAdd();
 	void OnIBLLoad();
 	void OnCreateShader(const ShaderCreateRequested& e);
-	void OnSceneObjectGpuUpload(const ObjectID* object);
+	void OnSceneObjectGpuUpload(const UID* object);
 
 	// --- Owned state ---
 	std::unique_ptr<Scene> m_scene;

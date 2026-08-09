@@ -4,8 +4,6 @@
 #include "core/Log.h"
 #include "editor/events/UIEvents.h"
 
-#include "scene/Scene.h"
-
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPaintEvent>
@@ -35,12 +33,12 @@ Viewport::Viewport(QWidget* parent)
 
 Viewport::~Viewport() = default;
 
-void Viewport::Refresh(const UIContext& ctx)
+void Viewport::Refresh(const UIContext& /*ctx*/)
 {
-	// Cache the Editor-owned scene pointer (UI state) so the Delete key can
-	// stamp a complete ObjectDeleteRequested event. The viewport itself is
-	// event-driven (input forwarding + Vulkan rendering).
-	m_scene = static_cast<const Scene*>(ctx.editor.scene);
+	// The viewport is pure input forwarding + Vulkan rendering - it holds no
+	// scene state. All events it emits (mouse, Delete) are pure intents; the
+	// Editor wraps the active scene and forwards dedicated events to
+	// controllers.
 }
 
 void Viewport::paintEvent(QPaintEvent* /*event*/)
@@ -61,11 +59,11 @@ void Viewport::resizeEvent(QResizeEvent* event)
 
 void Viewport::keyPressEvent(QKeyEvent* event)
 {
-	if (event->key() == Qt::Key_Delete && m_scene)
+	if (event->key() == Qt::Key_Delete)
 	{
-		// Delete: remove ALL selected objects (complete event, scene stamped
-		// as UI state — matching the ObjectSelected pattern).
-		emit objectDeleteRequested(ObjectDeleteRequested{m_scene});
+		// Delete: pure intent - remove ALL selected objects. The Editor wraps
+		// the active scene and forwards the batched ObjectDeleteRequested.
+		emit deleteRequested(DeleteRequested{});
 		event->accept();
 		return;
 	}

@@ -102,17 +102,29 @@ See `.github/instructions/events.instructions.md` for the complete event system
 template forwarding pattern).
 
 Event structs in `src/editor/events/` are split by domain:
-`SceneEvents.h` (ephemeral scene-domain events carrying `const ObjectID*` /
-`const UID*`: selection, transform, visibility, camera/mesh/light/env property
-edits), `EditorEvents.h` (cross-component events: RenderResetEvent,
-EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild, SceneObjectGpuUploadRequested), and
+`SceneEvents.h` (ephemeral scene-domain events carrying `const UID*`:
+selection, transform, visibility, camera/mesh/light/env property edits),
+`EditorEvents.h` (cross-component events: RenderResetEvent,
+EnvironmentChanged, SceneModified, LightGpuChanged, LightingRebuild,
+SceneObjectGpuUploadRequested), and
 `AssetEvents.h` (asset add/import: mesh/camera/light adds). Scene mutations are
 handled by `SceneController`, which emits `EditorEvents` for GPU uploads and
 dirty tracking; the Editor executes those uploads.
 
+Cross-layer traffic flows along three event paths (see events.instructions.md,
+"Three event paths"). On the UI->Editor path the UI emits PURE INPUT INTENTS
+(`InputEvents.h`: mouse events, `ObjectClicked { const UID* object }`,
+`DeleteRequested`) that carry no scene pointer; the Editor wraps them into
+dedicated scene events (`ObjectSelected`, `ObjectDeleteRequested`), and
+controllers handle complete scene mutations carrying `const UID* object`,
+casting back via `ObjectID::As<T>` / the untyped `ObjectID::As` (scene refs via
+`Scene::As`). The `const UID*` erasure - `UID` is the common base of `Scene`
+and `ObjectID` - lets a single pointer type cover both the Editor-owned scene
+and the objects being mutated.
+
 **UIEvents System** (Qt Signals)
 - QObject singleton with typed Qt signals
-- UI panels emit their own signals (e.g. `Outliner::objectSelected`, `RenderConfigPanel::configValueChanged`)
+- UI panels emit their own signals (e.g. `Outliner::objectClicked`, `RenderConfigPanel::configValueChanged`)
 - `Application::ConnectUIEvent<T>` template bridges panel signals → `Editor::OnUIEvent<T>` → `EventQueue::enqueue<T>`
 
 **EventQueue System** (Typed Event Dispatcher)

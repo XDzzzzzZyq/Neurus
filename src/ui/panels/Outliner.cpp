@@ -86,10 +86,11 @@ QGroupBox* Outliner::AddCategoryGroup(const QString& title)
 
 void Outliner::keyPressEvent(QKeyEvent* event)
 {
-	if (event->key() == Qt::Key_Delete && m_scene)
+	if (event->key() == Qt::Key_Delete)
 	{
-		// UI emits complete events: stamp the Editor-owned scene (UI state).
-		emit objectDeleteRequested(ObjectDeleteRequested{m_scene});
+		// Pure intent: the Editor wraps the active scene and forwards the
+		// batched ObjectDeleteRequested to the SceneController.
+		emit deleteRequested(DeleteRequested{});
 		event->accept();
 		return;
 	}
@@ -109,11 +110,8 @@ void Outliner::EnsureRowPool(std::size_t needed)
 		// Connect row signals to Outliner signals once (permanent).
 		// Lambdas read m_object at emission time, so recycling
 		// a row to a new object works without reconnecting.
-		QObject::connect(row, &OutlinerRow::objectSelected,
-			this, [this](const ObjectSelected& e) {
-				// UI emits complete events: stamp the Editor-owned scene (UI state).
-				emit objectSelected(ObjectSelected{m_scene, e.object, e.modifiers});
-			});
+		QObject::connect(row, &OutlinerRow::objectClicked,
+			this, &Outliner::objectClicked);
 		QObject::connect(row, &OutlinerRow::visibilityChanged,
 			this, &Outliner::visibilityChanged);
 
@@ -140,7 +138,6 @@ void Outliner::Refresh(const UIContext& ctx)
 
 	// --- Query selection state from the scene's Selections<const ObjectID*> ---
 	const Scene* scene = static_cast<const Scene*>(ctx.editor.scene);
-	m_scene = scene;
 
 	// Ensure pool is large enough for valid objects.
 	EnsureRowPool(ids.size());

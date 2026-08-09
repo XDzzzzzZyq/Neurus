@@ -589,7 +589,9 @@ These patterns were established during deferred PBR development and apply to all
   enqueues `LightingRebuild`), environment intensity/rotation, scene-add GPU sync
   (mesh/light/env add enqueues `SceneObjectGpuUploadRequested`, camera does not;
   shadow-enable enqueues it, shadow-disable does not), and dirty semantics
-  (`SceneModified` on property changes, never on selection). Run in CI.
+  (`SceneModified` on property changes, never on selection). Payload-capture
+  variables for `LightGpuChanged` / `SceneObjectGpuUploadRequested` are typed
+  `const UID*` (the events carry the UID base pointer). Run in CI.
 - **Log Buffer Tests** (`test/core/test_log_buffer.cpp`, `test/ui/test_log_model.cpp`): Non-GPU tests that run in CI.
   `LogBufferTest` (core) covers ring capacity + wrap (drops oldest), per-level
   counts (Info/Error) including wrap adjustment, Clear() resets size/counts/seq,

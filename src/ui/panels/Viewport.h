@@ -14,8 +14,6 @@ class QWheelEvent;
 
 namespace neurus {
 
-class Scene;
-
 /**
  * @brief A QWidget subclass that exposes a native window handle
  *        for Vulkan surface creation.
@@ -53,10 +51,9 @@ public:
 	/**
 	 * @brief Refreshes the panel from a UIContext snapshot.
 	 *
-	 * Caches the Editor-owned scene pointer (UI state) so the Delete key can
-	 * stamp a complete ObjectDeleteRequested event (matching ObjectSelected).
-	 * The viewport itself is event-driven (input forwarding) and renders via
-	 * Vulkan outside the Qt widget hierarchy.
+	 * The viewport is pure input forwarding + Vulkan rendering; it holds no
+	 * scene state. Mouse/Delete events are pure intents - the Editor wraps
+	 * the active scene and forwards dedicated events to controllers.
 	 *
 	 * @param ctx Read-only UI context (scene snapshot).
 	 */
@@ -115,9 +112,9 @@ signals:
 
 	/**
 	 * @brief Emitted when the Delete key is pressed while the viewport has focus.
-	 * @note Carries the scene pointer (UI state); deletes ALL selected objects.
+	 * @note Pure intent - the Editor wraps the active scene and deletes ALL selected objects.
 	 */
-	void objectDeleteRequested(const neurus::ObjectDeleteRequested& event);
+	void deleteRequested(const neurus::DeleteRequested& event);
 
 protected:
 	/**
@@ -197,9 +194,6 @@ private:
 	bool    m_leftHeld = false;   ///< Left mouse button held.
 	bool    m_middleHeld = false; ///< Middle mouse button held.
 	bool    m_rightHeld = false;  ///< Right mouse button held.
-
-	/// Editor-owned scene pointer (UI state, set each Refresh) for Delete events.
-	const Scene* m_scene = nullptr;
 };
 
 } // namespace neurus

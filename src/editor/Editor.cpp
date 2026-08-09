@@ -224,6 +224,14 @@ void Editor::Initialize()
 			ed_eventBus.enqueue(CameraZoomEvent{cam, e.delta});
 	});
 
+	// --- Pure UI->Editor intents: wrap the active scene, forward dedicated events ---
+	ed_eventBus.subscribe<ObjectClicked>([this](const ObjectClicked& e) {
+		ed_eventBus.enqueue(ObjectSelected{ m_scene.get(), e.object, e.modifiers });
+	});
+	ed_eventBus.subscribe<DeleteRequested>([this](const DeleteRequested&) {
+		ed_eventBus.enqueue(ObjectDeleteRequested{ m_scene.get() });
+	});
+
 	// --- Subscribe to RenderResetEvent to reset temporal accumulation ---
 	ed_eventBus.subscribe<RenderResetEvent>([this](const RenderResetEvent&) {
 		if (ed_renderer)
@@ -236,7 +244,7 @@ void Editor::Initialize()
 	});
 
 	ed_eventBus.subscribe<LightGpuChanged>([this](const LightGpuChanged& e) {
-		auto* light = Light::As(e.object);
+		auto* light = ObjectID::As<Light>(e.object);
 		if (!light) return;
 		auto gpuStruct = ed_uploadManager->UploadLighting(*light);
 		ed_renderer->GetRenderCache().UpdateLight(e.object->GetObjectID(), gpuStruct);
@@ -449,7 +457,7 @@ void Editor::OnSpotLightAdd()
 
 void Editor::OnCreateShader(const ShaderCreateRequested& e)
 {
-	auto* mesh = Mesh::As(e.object);
+	auto* mesh = ObjectID::As<Mesh>(e.object);
 	if (!mesh)
 	{
 		NEURUS_ERR("[Editor] OnCreateShader: not a mesh");
@@ -519,19 +527,19 @@ void Editor::OnCreateShader(const ShaderCreateRequested& e)
  * shared helpers (skip if already cached). Light SSBO updates stay with
  * LightingRebuild.
  */
-void Editor::OnSceneObjectGpuUpload(const ObjectID* object)
+void Editor::OnSceneObjectGpuUpload(const UID* object)
 {
 	if (!ed_uploadManager || !ed_renderer || !object) return;
 
-	if (auto* mesh = Mesh::As(object))
+	if (auto* mesh = ObjectID::As<Mesh>(object))
 	{
 		if (mesh->o_mesh) UploadMeshGpu(*ed_uploadManager, *ed_renderer, *mesh);
 	}
-	else if (auto* light = Light::As(object))
+	else if (auto* light = ObjectID::As<Light>(object))
 	{
 		if (light->use_shadow) UploadLightGpu(*ed_uploadManager, *ed_renderer, *light);
 	}
-	else if (auto* env = Environment::As(object))
+	else if (auto* env = ObjectID::As<Environment>(object))
 	{
 		auto envPtr = m_resources->Get<Environment>(env->GetObjectID());
 		if (envPtr) GenerateIBL(*ed_uploadManager, *ed_renderer, envPtr);

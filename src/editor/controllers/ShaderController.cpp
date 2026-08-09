@@ -47,9 +47,9 @@ namespace {
  * @return Pointer to the stage's ShaderUnit, or nullptr if the object is not a
  *         mesh, has no shader, or lacks the requested stage.
  */
-neurus::ShaderUnit* GetStageUnit(const neurus::ObjectID* obj, int stage)
+neurus::ShaderUnit* GetStageUnit(const neurus::UID* obj, int stage)
 {
-	auto* mesh = neurus::Mesh::As(obj);
+	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(obj);
 	if (!mesh || !mesh->o_shader) return nullptr;
 	auto type = static_cast<neurus::ShaderType>(stage);
 	if (!mesh->o_shader->HasStage(type)) return nullptr;
@@ -60,7 +60,7 @@ neurus::ShaderUnit* GetStageUnit(const neurus::ObjectID* obj, int stage)
  * @brief Reads a stage's current GLSL code text.
  * @return true on success, false if the stage could not be resolved.
  */
-bool SnapshotCode(const neurus::ObjectID* obj, int stage, std::string& out)
+bool SnapshotCode(const neurus::UID* obj, int stage, std::string& out)
 {
 	neurus::ShaderUnit* unit = GetStageUnit(obj, stage);
 	if (!unit) return false;
@@ -200,7 +200,7 @@ void ApplyFieldEdit(neurus::S_StructDef& sd, int subFieldIndex,
  */
 void OnCreateShader(const neurus::ShaderCreateRequested& e)
 {
-	auto* mesh = neurus::Mesh::As(e.object);
+	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
 	if (!mesh)
 	{
 		NEURUS_ERR("[ShaderController] OnCreateShader: not a mesh");
@@ -267,7 +267,7 @@ void OnCreateShader(const neurus::ShaderCreateRequested& e)
  */
 void OnCodeEdited(const neurus::ShaderCodeEdited& e)
 {
-	auto* mesh = neurus::Mesh::As(e.object);
+	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
 	if (!mesh || !mesh->o_shader) return;
 
 	auto& shader = *mesh->o_shader;
@@ -295,7 +295,7 @@ void OnCodeEdited(const neurus::ShaderCodeEdited& e)
  */
 void OnCompileShader(const neurus::ShaderCompileRequested& e)
 {
-	auto* mesh = neurus::Mesh::As(e.object);
+	auto* mesh = neurus::ObjectID::As<neurus::Mesh>(e.object);
 	if (!mesh || !mesh->o_shader)
 	{
 		NEURUS_ERR("[ShaderController] OnCompileShader: no shader on mesh");
@@ -652,7 +652,7 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 			if (!m_codeEditing) return;
 			m_codeEditing = false;
 
-			const ObjectID* obj = m_editObject;
+			const neurus::UID* obj = m_editObject;
 			const int stage = m_editStage;
 			m_editObject = nullptr;
 
@@ -660,7 +660,7 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 			if (!SnapshotCode(obj, stage, after)) return;
 			if (after == m_beforeCode) return; // no net change -> no op
 
-			auto* mesh = Mesh::As(obj);
+			auto* mesh = ObjectID::As<Mesh>(obj);
 			if (!mesh) return;
 
 			ops.Submit(std::make_unique<SetShaderCodeOp>(
@@ -687,7 +687,7 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 			NEURUS_LOG("[ShaderController] Struct edited: section=" << static_cast<int>(e.section)
 			           << " idx=" << e.fieldIndex << " field=" << e.field << " value=" << e.value);
 
-			auto* mesh = Mesh::As(e.object);
+			auto* mesh = ObjectID::As<Mesh>(e.object);
 			if (!mesh) return;
 			ops.Submit(std::make_unique<SetShaderFieldOp>(
 				mesh->GetObjectID(), e.stage, e.section, e.fieldIndex,
@@ -699,7 +699,7 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 			if (!unit) return;
 			if (!AppendDefault(unit->parsed, e.section, e.subFieldIndex)) return;
 
-			auto* mesh = Mesh::As(e.object);
+			auto* mesh = ObjectID::As<Mesh>(e.object);
 			if (!mesh) return;
 			ops.Submit(std::make_unique<AddShaderFieldOp>(
 				mesh->GetObjectID(), e.stage, e.section, e.subFieldIndex, /*add=*/true));

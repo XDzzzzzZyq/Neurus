@@ -450,9 +450,9 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
-		ConnectUIEvent(outliner, &neurus::Outliner::objectSelected);
+		ConnectUIEvent(outliner, &neurus::Outliner::objectClicked);
 		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
-		ConnectUIEvent(outliner, &neurus::Outliner::objectDeleteRequested);
+		ConnectUIEvent(outliner, &neurus::Outliner::deleteRequested);
 	}
 
 	// --- Viewport signals: resize + camera control + pixel selection ---
@@ -478,7 +478,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseReleased);
 
 		// Forward the Delete key (remove all selected objects).
-		ConnectUIEvent(viewport, &neurus::Viewport::objectDeleteRequested);
+		ConnectUIEvent(viewport, &neurus::Viewport::deleteRequested);
 
 		// Handle left-click for pixel-perfect object selection via IDBuffer
 		QObject::connect(viewport, &neurus::Viewport::mousePressed,

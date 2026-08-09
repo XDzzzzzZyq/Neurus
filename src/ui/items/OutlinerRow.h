@@ -22,6 +22,7 @@
 #include <QIcon>
 #include <QWidget>
 
+#include "editor/events/InputEvents.h"
 #include "editor/events/SceneEvents.h"
 #include "scene/ObjectID.h"
 
@@ -77,7 +78,7 @@ public:
 	 * @param name     Display name shown in the row.
 	 * @param object   Scene object pointer (non-owning).
 	 */
-	void setObject(const QIcon& icon, const QString& name, const ObjectID* object);
+	void setObject(const QIcon& icon, const QString& name, const UID* object);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
@@ -114,11 +115,11 @@ public:
 	void setRowIndex(int rowIndex);
 
 	/** @brief Returns the bound object pointer (nullptr if none). */
-	const ObjectID* getObject() const { return m_object; }
+	const UID* getObject() const { return m_object; }
 
 signals:
 	/** @brief Emitted when the name button is clicked. */
-	void objectSelected(const ObjectSelected& e);
+	void objectClicked(const ObjectClicked& e);
 
 	/** @brief Emitted when either visibility toggle changes. */
 	void visibilityChanged(const VisibilityChanged& e);
@@ -134,7 +135,7 @@ private:
 	QPushButton* m_nameBtn       = nullptr;
 	QPushButton* m_eyeBtn        = nullptr;
 	QPushButton* m_renderBtn     = nullptr;
-	const ObjectID* m_object = nullptr;
+	const UID* m_object = nullptr;
 	int 		 m_mode          = -1;
 	int 		 m_idx           = -1;
 	bool         m_eyeVisible    = true;

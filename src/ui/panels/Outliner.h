@@ -12,7 +12,7 @@
  * - Pool grows as needed; extra rows are hidden (not destroyed)
  * - Each recycled row calls setObject() — signal lambdas read the current
  *   m_object at emission time, so no manual rewire needed
- * - Row signals forwarded via Outliner::objectSelected / visibilityChanged
+ * - Row signals forwarded via Outliner::objectClicked / visibilityChanged
  * - Reads scene data via UIContext — no Renderer or Vulkan headers
  */
 
@@ -20,6 +20,7 @@
 
 #include "UIPanel.h"
 
+#include "editor/events/InputEvents.h"
 #include "editor/events/SceneEvents.h"
 
 #include <cstddef>
@@ -34,7 +35,6 @@ namespace neurus
 {
 
 class OutlinerRow;
-class Scene;
 
 class Outliner : public UIPanel
 {
@@ -61,16 +61,16 @@ public:
 
 signals:
 	/** @brief Emitted when a user clicks on a scene object row in the outliner. */
-	void objectSelected(const ObjectSelected& e);
+	void objectClicked(const ObjectClicked& e);
 
 	/** @brief Emitted when visibility toggles change for an object. */
 	void visibilityChanged(const VisibilityChanged& e);
 
 	/**
 	 * @brief Emitted when the Delete key is pressed while the outliner has focus.
-	 * @note Carries the scene pointer (UI state); deletes ALL selected objects.
+	 * @note Pure intent - the Editor wraps the active scene and deletes ALL selected objects.
 	 */
-	void objectDeleteRequested(const ObjectDeleteRequested& e);
+	void deleteRequested(const DeleteRequested& e);
 
 protected:
 	/**
@@ -105,9 +105,6 @@ private:
 
 	/// Row pool — grows as needed, never shrinks.
 	std::vector<OutlinerRow*> m_rowPool;
-
-	/// Scene pointer held as UI state (set each Refresh) for stamping ObjectSelected.
-	const Scene* m_scene = nullptr;
 };
 
 } // namespace neurus

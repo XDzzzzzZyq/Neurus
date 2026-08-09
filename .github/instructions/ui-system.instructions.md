@@ -188,29 +188,31 @@ polled in `Refresh()`):
 - **Release behavior**: `NEURUS_LOG` compiles out, so only `NEURUS_ERR` lines
   appear and the count reflects that.
 
-### Outliner and PropertyPanel (Scene-Event Panels)
+### Outliner, Viewport, and PropertyPanel (Scene-Event Panels)
 
-`Outliner` and `PropertyPanel` emit scene-domain events that carry
-`const ObjectID*` (the mutated object) and, for selection, `const UID*`
-(the Editor-owned Scene) instead of integer IDs. Both panels hold the
-scene pointer as UI state during `Refresh()` and stamp it into the
-events they emit, so the Editor enqueues COMPLETE events without any
-Scene lookup (see events.instructions.md, "Scene Events Are Ephemeral").
+`Outliner`, `Viewport`, and `PropertyPanel` emit scene-domain events that
+carry `const UID*` (the active object's UID base pointer) instead of integer
+IDs. Panels hold the active object as `const UID*` during `Refresh()` and
+emit PURE INPUT INTENTS on the UI->Editor path - they no longer hold or
+stamp the scene (`m_scene` is gone). The Editor wraps the intents into
+complete scene events (see events.instructions.md, "Three event paths").
 
-- `Outliner::Refresh()` reads the object list from `UIContext`, caches
-  the scene as `m_scene`, and reconfigures pooled `OutlinerRow`s via
-  `setObject()` / `setVisibilities()` / `setSelectionMode()`. Rows emit
-  `ObjectSelected` / `VisibilityChanged`; the Outliner re-stamps the
-  scene pointer into `ObjectSelected` before forwarding
-  (`ObjectSelected{m_scene, e.object, e.modifiers}`).
-- `OutlinerRow` emits `ObjectSelected{nullptr, m_object, mods}` and
-  `VisibilityChanged{m_object, viewportVisible, renderVisible}`; signal
-  lambdas read the row's `m_object` at emission time, so pooled rows
-  stay correct when recycled to a different object.
+- `Outliner::Refresh()` reads the object list from `UIContext` and
+  reconfigures pooled `OutlinerRow`s via `setObject()` /
+  `setVisibilities()` / `setSelectionMode()`. The panel emits
+  `objectClicked(const ObjectClicked&)`, `visibilityChanged(const
+  VisibilityChanged&)`, and `deleteRequested(const DeleteRequested&)`.
+- `OutlinerRow` emits `ObjectClicked{m_object, mods}`; signal lambdas
+  read the row's `m_object` (the `const UID*` base pointer) at emission
+  time, so pooled rows stay correct when recycled to a different object.
+- `Viewport` emits the raw mouse-input intents (`mouseMoved`,
+  `mousePressed`, `mouseReleased`, `mouseScrolled`) plus
+  `deleteRequested(const DeleteRequested&)` on the Delete key.
 - `PropertyPanel::Refresh()` reads `scene->selections.GetActiveObject()`
   and emits transform events (`PositionChanged`, `RotationChanged`,
   `ScaleChanged`) plus camera/mesh/light/environment property events,
-  all carrying the active object's `const ObjectID*`.
+  all carrying the active object's `const UID*`; it casts the pointer
+  back to `ObjectID` (via the untyped `ObjectID::As`) for reads.
 
 ### ShaderEditorPanel
 

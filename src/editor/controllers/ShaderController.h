@@ -64,7 +64,7 @@ public:
 private:
 	// --- Code-edit gesture state (ShaderEditBegin -> ShaderEditEnd) ---
 	bool            m_codeEditing = false;   ///< True between begin and end.
-	const ObjectID* m_editObject  = nullptr; ///< Object captured at gesture start.
+	const neurus::UID* m_editObject = nullptr; ///< Object captured at gesture start.
 	int             m_editStage   = 0;       ///< Stage captured at gesture start.
 	std::string     m_beforeCode;            ///< Code snapshot at gesture start.
 };

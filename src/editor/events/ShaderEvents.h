@@ -2,9 +2,10 @@
  * @file ShaderEvents.h
  * @brief Event structs for the shader editor pipeline (UI -> Editor -> ShaderController).
  *
- * All events carry a const ObjectID* resolved once by the ShaderEditorPanel
- * from the active scene selection. The ShaderController casts it to Mesh*
- * (in the .cpp only) and operates on the shader data directly.
+ * All events carry a const UID* resolved once by the ShaderEditorPanel
+ * from the active scene selection. The ShaderController casts it back to
+ * Mesh* via ObjectID::As<Mesh> (in the .cpp only) and operates on the shader
+ * data directly.
  *
  * Architecture:
  * - Pure data structs, no Qt headers, no Vulkan headers.
@@ -27,7 +28,7 @@
 
 namespace neurus {
 
-class ObjectID;
+class UID;
 
 /**
  * @brief One ShaderStruct element payload (the granularity of an undoable edit).
@@ -67,7 +68,7 @@ enum class ShaderSection : int
  */
 struct ShaderCreateRequested
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 };
 
 /**
@@ -78,7 +79,7 @@ struct ShaderCreateRequested
  */
 struct ShaderCodeEdited
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int (0=VERTEX, 1=FRAGMENT)
 	std::string code;         ///< New GLSL source text
 };
@@ -96,7 +97,7 @@ struct ShaderCodeEdited
  */
 struct ShaderStructEdited
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	ShaderSection section;    ///< Which ShaderStruct container
 	int fieldIndex = 0;       ///< Index into the section's vector
@@ -116,7 +117,7 @@ struct ShaderStructEdited
  */
 struct ShaderFieldAdded
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	ShaderSection section;    ///< Which ShaderStruct container to append to
 	int subFieldIndex = -1;   ///< For StructDefs: which struct def to add a member to
@@ -133,7 +134,7 @@ struct ShaderFieldAdded
  */
 struct ShaderCompileRequested
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	int unitType = 0;         ///< 0 = Code path, 1 = Struct path
 };
@@ -148,7 +149,7 @@ struct ShaderCompileRequested
  */
 struct ShaderEditBegin
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 };
 
@@ -160,7 +161,7 @@ struct ShaderEditBegin
  */
 struct ShaderEditEnd
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 };
 
@@ -182,7 +183,7 @@ struct ShaderEditEnd
  */
 struct ShaderCodeRestored
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	std::string code;         ///< Absolute GLSL text to restore
 };
@@ -197,7 +198,7 @@ struct ShaderCodeRestored
  */
 struct ShaderFieldRestored
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	ShaderSection section;    ///< Which ShaderStruct container
 	int fieldIndex = 0;       ///< Index into the section's vector
@@ -212,7 +213,7 @@ struct ShaderFieldRestored
  */
 struct ShaderFieldAddRestored
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	ShaderSection section;    ///< Which ShaderStruct container to append to
 	int subFieldIndex = -1;   ///< For StructDefs: which struct def to add a member to
@@ -227,7 +228,7 @@ struct ShaderFieldAddRestored
  */
 struct ShaderFieldRemoved
 {
-	const ObjectID* object = nullptr;
+	const UID* object = nullptr;
 	int stage = 0;            ///< ShaderType as int
 	ShaderSection section;    ///< Which ShaderStruct container to remove from
 	int subFieldIndex = -1;   ///< For StructDefs: which struct def to remove a member from

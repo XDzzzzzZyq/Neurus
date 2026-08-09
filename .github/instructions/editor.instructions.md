@@ -39,8 +39,9 @@ changes through the event system.
    - `Editor::RegisterController<T>(EventQueue& bus)` — template factory that creates controller, calls `Init(bus)`, stores in `m_controllers`
    - `CameraController` — event-driven orbit/zoom/dolly/pan via `CameraEvents` (rotate, push, slide, zoom)
    - `SceneController` — event-driven scene mutations (selection, transform, visibility, camera/mesh/light/env property edits, scene membership add/delete); stateless with free-function handlers in the .cpp; constructed manually with a `ResourceManager*` provider (UID → object resolution, the `RenderConfigController` pattern); emits `EditorEvents` (SceneModified, LightGpuChanged, LightingRebuild, RenderResetEvent) for GPU uploads and dirty tracking; see events.instructions.md for the GPU-sync flow
-   - **Import/Add split**: `Editor::OnMeshImport`/`OnCameraAdd`/`OnLightAdd`/... only LOAD the resource into the pool and forward the object UID via `SceneObjectAddRequested`; the SceneController fetches the pooled object by UID, registers it, selects it, and records `CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(...)]`. The Delete gesture (`ObjectDeleteRequested`, Delete key in Outliner/Viewport) carries the scene pointer as UI state (the `ObjectSelected` pattern) and is **forward-only**: the SceneController snapshots the selection, guards the last camera, deselects, then DEFERS the removals as ONE batched `SceneObjectDeleteRequested` carrying all selected UIDs — so the batched handler is the single removal path shared with replay (no replay-only handling) — and records `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]` (delete of N = one op). Light membership changes enqueue `LightingRebuild` (the SSBO is a scene projection). GPU caches (MeshGPU, shadow maps) are scene-scoped: `UploadSceneResources` uploads only objects present at load, and an object entering the scene (live add or undo/redo replay) or a light whose shadow was just enabled enqueues `SceneObjectGpuUploadRequested`, which the Editor resolves with an on-demand upload (skip-if-cached).
+   - **Import/Add split**: `Editor::OnMeshImport`/`OnCameraAdd`/`OnLightAdd`/... only LOAD the resource into the pool and forward the object UID via `SceneObjectAddRequested`; the SceneController fetches the pooled object by UID, registers it, selects it, and records `CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(...)]`. The Delete gesture (`ObjectDeleteRequested` - the Editor wraps the UI's `DeleteRequested` intent and stamps `m_scene.get()`) is **forward-only**: the SceneController snapshots the selection, guards the last camera, deselects, then DEFERS the removals as ONE batched `SceneObjectDeleteRequested` carrying all selected UIDs — so the batched handler is the single removal path shared with replay (no replay-only handling) — and records `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]` (delete of N = one op). Light membership changes enqueue `LightingRebuild` (the SSBO is a scene projection). GPU caches (MeshGPU, shadow maps) are scene-scoped: `UploadSceneResources` uploads only objects present at load, and an object entering the scene (live add or undo/redo replay) or a light whose shadow was just enabled enqueues `SceneObjectGpuUploadRequested`, which the Editor resolves with an on-demand upload (skip-if-cached).
    - `ShaderController` — event-driven shader lifecycle via `ShaderEvents` (create, compile, code/struct edit, field add); enqueues `RenderResetEvent` after create/compile so temporal accumulation resets
+   - **Pure-intent wrapping**: the Editor subscribes to the UI's `ObjectClicked` and `DeleteRequested` intents and forwards the dedicated scene events `ObjectSelected{ m_scene.get(), object, modifiers }` and `ObjectDeleteRequested{ m_scene.get() }` (the two wrap subscriptions in `Editor::Initialize`). Panels never stamp the scene.
    - Controllers receive discrete events (not per-frame polling); `Editor::Edit()` dispatches all enqueued events via `EventQueue::Process()`
 
 4. **GPU Upload & Asset Import**
@@ -159,9 +160,9 @@ void SceneController::Init(EventQueue& bus)
 
 **Design:**
 - Stateless: all handlers are free functions in an anonymous namespace
-- Events carry `const ObjectID*`; handlers cast to the concrete type via the
-  class static `As()` helpers (e.g. `Mesh::As(...)`) and mutate directly - no
-  Scene lookup by ID
+- Events carry `const UID*`; handlers cast to the concrete type via
+  `ObjectID::As<T>` (comparing `o_type` against `T::Type`) or the untyped
+  `ObjectID::As`, and mutate directly - no Scene lookup by ID
 - Selection events (`ObjectSelected`, `ObjectDeselected`) use `const UID*`
   cast to `Scene*` via `Scene::As(...)`
 - GPU uploads delegated to Editor via EditorEvents (`LightGpuChanged`,
@@ -206,8 +207,8 @@ void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
 - Mutation handlers are free functions in an anonymous namespace; gesture state
   (`m_codeEditing`, `m_editObject`, `m_editStage`, `m_beforeCode`,
   `m_beforeParsed`) lives on the controller so begin/end can bracket a burst
-- Handlers cast the event's `const ObjectID*` to `Mesh*` (the only shader-owning
-  object) and mutate `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
+- Handlers cast the event's `const UID*` to `Mesh*` via `ObjectID::As<Mesh>`
+  (the only shader-owning object) and mutate `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
 - Create/Compile bump `Shader::m_version` on success (pipeline rebuild) and stay
   **non-undoable** lifecycle actions; content edits (code/struct/field) only mutate
   CPU IR/code and require the user to press Compile to reach the GPU

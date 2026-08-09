@@ -170,7 +170,7 @@ TEST_F(SceneControllerTest, MeshMaterialChanged_Applies)
 
 TEST_F(SceneControllerTest, LightPowerChanged_AppliesAndEnqueuesGpuEvent)
 {
-	const ObjectID* gpuObject = nullptr;
+	const UID* gpuObject = nullptr;
 	m_eventBus.subscribe<LightGpuChanged>([&](const LightGpuChanged& e) { gpuObject = e.object; });
 	m_eventBus.enqueue(LightPowerChanged{m_light.get(), 42.0f});
 	Process();
@@ -397,7 +397,7 @@ TEST_F(SceneControllerTest, DeleteRequested_Light_EnqueuesLightingRebuild)
 
 TEST_F(SceneControllerTest, SceneObjectAdd_Mesh_EnqueuesGpuUpload)
 {
-	const ObjectID* uploaded = nullptr;
+	const UID* uploaded = nullptr;
 	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
 		uploaded = e.object;
 	});
@@ -413,7 +413,7 @@ TEST_F(SceneControllerTest, SceneObjectAdd_Mesh_EnqueuesGpuUpload)
 
 TEST_F(SceneControllerTest, SceneObjectAdd_Light_EnqueuesGpuUpload)
 {
-	const ObjectID* uploaded = nullptr;
+	const UID* uploaded = nullptr;
 	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
 		uploaded = e.object;
 	});
@@ -429,7 +429,7 @@ TEST_F(SceneControllerTest, SceneObjectAdd_Light_EnqueuesGpuUpload)
 
 TEST_F(SceneControllerTest, SceneObjectAdd_Environment_EnqueuesGpuUpload)
 {
-	const ObjectID* uploaded = nullptr;
+	const UID* uploaded = nullptr;
 	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
 		uploaded = e.object;
 	});
@@ -460,7 +460,7 @@ TEST_F(SceneControllerTest, SceneObjectAdd_Camera_DoesNotEnqueueGpuUpload)
 
 TEST_F(SceneControllerTest, LightShadowChanged_Enabled_EnqueuesGpuUpload)
 {
-	const ObjectID* uploaded = nullptr;
+	const UID* uploaded = nullptr;
 	m_eventBus.subscribe<SceneObjectGpuUploadRequested>([&](const SceneObjectGpuUploadRequested& e) {
 		uploaded = e.object;
 	});

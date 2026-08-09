@@ -43,6 +43,9 @@ namespace neurus {
 class Camera : public ObjectID, public Transform3D
 {
 public:
+	/** @brief GOType tag used by ObjectID::As<T> for typed event casts. */
+	static constexpr ObjectID::GOType Type = ObjectID::GOType::GO_CAM;
+
 	/** @brief Viewport width in pixels. */
 	float cam_w = 1.0f;
 
@@ -188,14 +191,6 @@ public:
 	 * @note Overrides ObjectID::GetTransform().
 	 */
 	void* GetTransform() override;
-
-	/** @brief Casts a const ObjectID* to a Camera* if its type is GO_CAM, else nullptr. */
-	static Camera* As(const ObjectID* obj)
-	{
-		if (!obj || obj->o_type != ObjectID::GOType::GO_CAM)
-			return nullptr;
-		return static_cast<Camera*>(const_cast<ObjectID*>(obj));
-	}
 
 private:
 	/** @brief Recomputes view and projection matrices from current parameters. */
