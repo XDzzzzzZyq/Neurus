@@ -37,6 +37,9 @@
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/registrations/OperationRegistration.h"
 #include "editor/operations/SceneOperations.h"
+#include "editor/events/ShaderEvents.h"
+#include "editor/operations/ShaderOperations.h"
+#include "render/shaders/RenderShader.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
@@ -75,6 +78,10 @@ protected:
 		m_scene.UseMesh(m_mesh);
 		m_scene.UseLight(m_light);
 		m_scene.UseCamera(m_camera);
+
+		// The ShaderLinkOp restore handlers resolve the mesh via the POOL (the
+		// Editor pattern), so the fixture mesh must also be pooled.
+		m_resources.Register(m_mesh);
 	}
 
 	void Process() { m_eventBus.Process(); }
@@ -219,6 +226,39 @@ TEST_F(OperationSerializationTest, SceneObjectAddOp_RoundTrip)
 
 	restored->Inverse()->Apply(ctx);            // uid + flag survived: delete inverse
 	EXPECT_EQ(m_scene.mesh_list.count(uid), 0u);
+}
+
+TEST_F(OperationSerializationTest, ShaderLinkOp_RoundTrip)
+{
+	// Editor-style restore handlers (mirror Editor::Initialize).
+	m_eventBus.subscribe<ShaderLinkRestored>([this](const ShaderLinkRestored& e) {
+		auto mesh = m_resources.Get<Mesh>(e.objectUid);
+		if (!mesh) return;
+		mesh->SetObjShader(m_resources.Get<RenderShader>(e.shaderId));
+	});
+	m_eventBus.subscribe<ShaderUnlinkRestored>([this](const ShaderUnlinkRestored& e) {
+		auto mesh = m_resources.Get<Mesh>(e.objectUid);
+		if (!mesh) return;
+		mesh->SetObjShader(nullptr);
+	});
+
+	auto shader = m_resources.Load<RenderShader>("MeshShader_2", "v.vert", "f.frag");
+	const int shaderId = shader->GetObjectID();
+	std::unique_ptr<Operation> op =
+		std::make_unique<ShaderLinkOp>(m_mesh->GetObjectID(), shaderId, true);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<ShaderLinkOp*>(restored.get()), nullptr);
+	EXPECT_EQ(restored->Label(), "Create Shader");
+
+	OperationContext ctx{ m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId); // link + shaderId survived
+
+	restored->Inverse()->Apply(ctx);
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);        // uid + flag survived
 }
 
 TEST_F(OperationSerializationTest, CompositeOp_RoundTrip)

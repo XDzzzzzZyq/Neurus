@@ -174,6 +174,9 @@ void SceneController::Init(ControllerContext& ctx)
 void ShaderController::Init(ControllerContext& ctx)
 {
     // Lifecycle (non-undoable): bump Shader::m_version + reset accumulation.
+    // (Shader CREATE is handled by the Editor, which constructs the pooled
+    // RenderShader and records a ShaderLinkOp - see the Undo/redo controllers
+    // section. ShaderController keeps only pool-free handlers.)
     ctx.events.subscribe<ShaderCompileRequested>( [ctx](const ShaderCompileRequested& e) {
         OnCompileShader(e, ctx);
         ctx.events.enqueue(RenderResetEvent{});  // pipeline rebuilt -> reset accumulation
@@ -204,9 +207,12 @@ void ShaderController::Init(ControllerContext& ctx)
 - Handlers resolve the event's `int objectUid` to `Mesh*` (via the current
   scene's `mesh_list`, the only shader-owning object type) and mutate
   `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
-- Create/Compile bump `Shader::m_version` on success (pipeline rebuild) and stay
-  **non-undoable** lifecycle actions; content edits (code/struct/field) only mutate
-  CPU IR/code and require the user to press Compile to reach the GPU
+- Create/Compile bump `Shader::m_version` on success (pipeline rebuild). Create
+  is **undoable** (the Editor records `ShaderLinkOp` - undo drops the pooled
+  reference, redo relinks it via `ShaderLinkRestored`/`ShaderUnlinkRestored`);
+  Compile stays a **non-undoable** lifecycle
+  action. Content edits (code/struct/field) only mutate CPU IR/code and require
+  the user to press Compile to reach the GPU
 - Only Create/Compile enqueue `RenderResetEvent` (temporal accumulation reset)
 - Undo/redo of content edits is CPU-only: `OnRestoreSource` overwrites the stage's
   `code` + `parsed` IR and bumps `ShaderUnit::m_version` (panel refresh) — it does
@@ -334,6 +340,8 @@ event):
   while live forward edits do NOT (avoids cursor-jump mid-typing). Restore is
   **CPU-only, no recompile to SPIR-V**; the user presses Compile to push
   restored source to the GPU. All three ops are deliberately non-mergeable
-  (empty `MergeKey`). Shader Create and Compile stay non-undoable lifecycle
-  actions.
+  (empty `MergeKey`). Shader Create is undoable via `ShaderLinkOp` (recorded by
+  the Editor; a pool-preserving membership toggle - see
+  operation-system.instructions.md); Compile stays a non-undoable lifecycle
+  action.
 

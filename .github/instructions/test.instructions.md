@@ -594,6 +594,17 @@ These patterns were established during deferred PBR development and apply to all
   (`SceneModified` on property changes, never on selection). Payload-capture
   variables for `LightGpuChanged` / `SceneObjectGpuUploadRequested` are plain
   `int` (the events carry `objectUid`). Run in CI.
+- **ShaderLinkOp tests** (`test/editor/test_shader_controller.cpp`
+  `ShaderCreateUndoTest`, `test/editor/test_operation_serialization.cpp`
+  `OperationSerializationTest.ShaderLinkOp_RoundTrip`): Non-GPU tests that
+  verify Create Shader is undoable as a pool-preserving membership toggle.
+  A fixture mirrors `Editor::Initialize`'s `ShaderLinkRestored` /
+  `ShaderUnlinkRestored` subscriptions (pooled mesh + pooled `RenderShader`;
+  the restore events carry `int objectUid`); asserts: submit `ShaderLinkOp` →
+  mesh linked; undo → `o_shader`/`o_shaderId`
+  cleared while the pool keeps the shader; redo → the SAME pooled shader
+  relinked (no new object minted); stale mesh UID no-ops; and the op
+  round-trips through a cereal JSON archive. Run in CI.
 - **Log Buffer Tests** (`test/core/test_log_buffer.cpp`, `test/ui/test_log_model.cpp`): Non-GPU tests that run in CI.
   `LogBufferTest` (core) covers ring capacity + wrap (drops oldest), per-level
   counts (Info/Error) including wrap adjustment, Clear() resets size/counts/seq,

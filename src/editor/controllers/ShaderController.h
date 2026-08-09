@@ -23,7 +23,9 @@
  *     ShaderFieldRestored / ShaderFieldAddRestored / ShaderFieldRemoved): each
  *     re-applies one edit dimension and bumps the ShaderUnit version so the
  *     panel refreshes. CPU-only, no recompile.
- *   - Create/Compile stay non-undoable lifecycle actions.
+ *   - Compile stays a non-undoable lifecycle action; Create Shader is
+ *     undoable via ShaderLinkOp (the Editor records it; undo drops the pooled
+ *     reference, redo relinks it - see editor.instructions.md).
  *
  * Architecture:
  *   - Bound to a ControllerContext via Init() — no per-frame Update() polling.

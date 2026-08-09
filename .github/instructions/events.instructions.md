@@ -277,6 +277,9 @@ struct ShaderFieldRestored    { int objectUid; int stage; ShaderSection section;
                                 int fieldIndex; ShaderFieldValue value; };  // whole element to assign back
 struct ShaderFieldAddRestored { int objectUid; int stage; ShaderSection section; int subFieldIndex; };  // redo of an add
 struct ShaderFieldRemoved     { int objectUid; int stage; ShaderSection section; int subFieldIndex; };  // undo of an add
+// Undo/redo of Create Shader (replayed by ShaderLinkOp; Editor-handled)
+struct ShaderLinkRestored   { int objectUid; int shaderId; };  // redo: relink pooled shader
+struct ShaderUnlinkRestored { int objectUid; };                // undo: drop the reference
 ```
 
 **Version flow:** Only `ShaderCreateRequested` and `ShaderCompileRequested` bump
@@ -298,7 +301,9 @@ Undo/redo replays a dedicated restore event
 (`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
 `ShaderFieldRemoved`) that re-applies one edit dimension and bumps
 `ShaderUnit::m_version` (panel refresh) — CPU-only, no recompile to SPIR-V.
-Create/Compile stay non-undoable. See
+Create Shader IS undoable via `ShaderLinkOp` (pool-preserving membership
+toggle - undo drops the reference, redo relinks the pooled shader by UID, via
+`ShaderLinkRestored` / `ShaderUnlinkRestored`); Compile stays non-undoable. See
 [operation-system.instructions.md](operation-system.instructions.md).
 
 ## UIEvents (Qt Signal Bus)

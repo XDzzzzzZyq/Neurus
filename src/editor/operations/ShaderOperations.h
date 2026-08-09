@@ -21,8 +21,10 @@
  * on undo/redo (forward live edits deliberately skip the bump to avoid a
  * cursor-jumping panel reload mid-typing).
  *
- * Scope: content edits only. Shader Create/Compile remain non-undoable lifecycle
- * actions. Replay restores CPU-side source only and bumps the ShaderUnit version
+ * Scope: content edits plus the Create-Shader membership toggle (ShaderLinkOp,
+ * a pool-preserving link/unlink - see below). Compile remains a non-undoable
+ * lifecycle action. Replay restores CPU-side source only and bumps the
+ * ShaderUnit version
  * so the editor panel refreshes; it does NOT recompile to SPIR-V (the user
  * presses Compile to push to the GPU), matching the "content edits don't compile"
  * model.
@@ -209,6 +211,74 @@ private:
 	ShaderSection m_section{};           ///< Which ShaderStruct container (serialized).
 	int           m_subFieldIndex = -1;  ///< StructDefs target struct-def index (-1 = top-level) (serialized).
 	bool          m_add = true;          ///< true = append default, false = remove last (serialized).
+};
+
+/**
+ * @brief Undoable Create Shader - a pool-preserving membership toggle.
+ *
+ * Follows the SceneObjectAddOp convention: stores the target mesh UID + the
+ * pooled RenderShader UID + a direction flag. Apply() dispatches a dedicated
+ * restore event (ShaderLinkRestored when linking, ShaderUnlinkRestored when
+ * unlinking) so replay NEVER re-enters the forward create handler (which would
+ * reload, re-parse, recompile, and mint a NEW pooled shader). The pooled
+ * shader is never removed - undo only drops the mesh's reference, so redo
+ * relinks the SAME object by UID and the op survives project save/load
+ * (pool + history both persist).
+ *
+ * Inverse() flips the flag (the SceneObjectAddOp / AddShaderFieldOp
+ * convention), making the op its own logical inverse.
+ */
+class ShaderLinkOp : public Operation
+{
+public:
+	ShaderLinkOp() = default;
+
+	/**
+	 * @brief Constructs a link/unlink toggle over a mesh's pooled shader.
+	 * @param uid Target mesh UID.
+	 * @param shaderId Pooled RenderShader UID to link (unlink ignores it).
+	 * @param add true = link (redo), false = unlink (undo).
+	 */
+	ShaderLinkOp(int uid, int shaderId, bool add)
+		: m_uid(uid)
+		, m_shaderId(shaderId)
+		, m_add(add)
+	{}
+
+	void Apply(OperationContext& ctx) override
+	{
+		// Replayed events carry the mesh UID + pooled shader UID; the Editor
+		// resolves them (mesh via the pool, shader via the pool) and no-ops
+		// stale ids.
+		if (m_add)
+			ctx.events.emitNow(ShaderLinkRestored{ m_uid, m_shaderId });
+		else
+			ctx.events.emitNow(ShaderUnlinkRestored{ m_uid });
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		return std::make_unique<ShaderLinkOp>(m_uid, m_shaderId, !m_add);
+	}
+
+	std::string Label() const override
+	{
+		return m_add ? "Create Shader" : "Remove Shader";
+	}
+
+	/** @brief Serializes {uid, shaderId, add}. */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("uid", m_uid),
+		   cereal::make_nvp("shaderId", m_shaderId),
+		   cereal::make_nvp("add", m_add));
+	}
+
+private:
+	int  m_uid = 0;      ///< Target mesh UID (serialized).
+	int  m_shaderId = 0; ///< Pooled RenderShader UID to link/unlink (serialized).
+	bool m_add = false;  ///< true = link; false = unlink (serialized).
 };
 
 } // namespace neurus
