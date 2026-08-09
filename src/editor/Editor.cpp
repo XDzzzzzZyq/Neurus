@@ -13,6 +13,7 @@
 #include "editor/controllers/RenderConfigController.h"
 #include "editor/controllers/ShaderController.h"
 #include "editor/controllers/SceneController.h"
+#include "editor/operations/ShaderOperations.h"
 #include "editor/events/EventBus.h"
 
 #include "render/DeferredRenderer.h"
@@ -128,6 +129,30 @@ void Editor::Initialize()
 	ed_eventBus.subscribe<ShaderCreateRequested>([this](const ShaderCreateRequested& e) {
 		ed_eventBus.enqueue(RenderResetEvent{});
 		OnCreateShader(e);
+	});
+
+	// Undo/redo of Create Shader (ShaderLinkOp replay): redo relinks the pooled
+	// RenderShader by UID; undo drops the reference (the pool keeps the shader).
+	// Editor-owned like the create path - pool access + RenderResetEvent. No
+	// version bump: the panel dirty-check (-1 sentinel) and the per-mesh
+	// (objectId, version) pipeline cache handle the relink.
+	ed_eventBus.subscribe<ShaderLinkRestored>([this](const ShaderLinkRestored& e) {
+		auto* mesh = ObjectID::As<Mesh>(e.object);
+		if (!mesh) return;
+		auto shader = m_resources->Get<RenderShader>(e.shaderId);
+		if (!shader)
+		{
+			NEURUS_ERR("[Editor] ShaderLinkRestored: shader " << e.shaderId << " not pooled");
+			return;
+		}
+		mesh->SetObjShader(shader);
+		ed_eventBus.enqueue(RenderResetEvent{});
+	});
+	ed_eventBus.subscribe<ShaderUnlinkRestored>([this](const ShaderUnlinkRestored& e) {
+		auto* mesh = ObjectID::As<Mesh>(e.object);
+		if (!mesh) return;
+		mesh->SetObjShader(nullptr);
+		ed_eventBus.enqueue(RenderResetEvent{});
 	});
 
 	// Undo/redo replay their inverse events synchronously (never queued), so
@@ -488,6 +513,12 @@ void Editor::OnCreateShader(const ShaderCreateRequested& e)
 		}
 
 		mesh->SetObjShader(shader); // o_shader + o_shaderId (pooled reference)
+
+		// The link is the undoable fact (independent of compile outcome): record
+		// a pool-preserving membership toggle - undo drops the reference (pool
+		// keeps the shader), redo relinks it by UID.
+		ed_operations.Submit(std::make_unique<ShaderLinkOp>(
+			mesh->GetObjectID(), shader->GetObjectID(), true));
 
 		// Compile both stages to SPIR-V and bump version on success.
 		auto& s = *mesh->o_shader;

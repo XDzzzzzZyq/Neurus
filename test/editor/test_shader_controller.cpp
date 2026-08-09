@@ -24,8 +24,9 @@
  * provider), so the fixture supplies a real scene holding the mesh so the op's
  * stored UID resolves back to the live object.
  *
- * Create/Compile stay non-undoable lifecycle actions and are not exercised here
- * (they require GPU compilation); only the undoable content-edit path is tested.
+ * Create Shader IS undoable via ShaderLinkOp (pool-preserving membership
+ * toggle) and is exercised in ShaderCreateUndoTest below; Compile stays a
+ * non-undoable lifecycle action (GPU compilation not exercised here).
  */
 
 #include <gtest/gtest.h>
@@ -50,6 +51,7 @@
 #include "render/shaders/ShaderUnit.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
+#include "core/ResourceManager.h"
 
 #include <fstream>
 #include <sstream>
@@ -548,4 +550,99 @@ TEST_F(ShaderControllerTest, FieldAdd_RealGbufferVert_AttributesAndPassOutputs_U
 	// The surviving entries are untouched — LIFO removal hit the right lists.
 	EXPECT_EQ(VertexUnit().parsed.AB_list.front().name, "inPosition");
 	EXPECT_EQ(VertexUnit().parsed.pass_list.front().name, "fragWorldPos");
+}
+
+// ---------------------------------------------------------------------------
+// Create Shader undo/redo (ShaderLinkOp) - pool-preserving membership toggle
+// ---------------------------------------------------------------------------
+
+class ShaderCreateUndoTest : public ::testing::Test
+{
+protected:
+	void SetUp() override
+	{
+		// Pooled mesh registered in a real scene (so the op's stored UID
+		// resolves at replay) + a pooled RenderShader the restore handlers
+		// relink by UID. Subscriptions mirror Editor::Initialize's
+		// ShaderLinkRestored / ShaderUnlinkRestored handlers (RenderResetEvent
+		// omitted - not needed in a unit test).
+		m_mesh = m_pool.Load<Mesh>();
+		m_scene.UseMesh(m_mesh);
+		m_shader = m_pool.Load<RenderShader>("MeshShader_1", "v.vert", "f.frag");
+
+		m_eventBus.subscribe<ShaderLinkRestored>([this](const ShaderLinkRestored& e) {
+			auto* mesh = ObjectID::As<Mesh>(e.object);
+			if (!mesh) return;
+			mesh->SetObjShader(m_pool.Get<RenderShader>(e.shaderId));
+		});
+		m_eventBus.subscribe<ShaderUnlinkRestored>([this](const ShaderUnlinkRestored& e) {
+			auto* mesh = ObjectID::As<Mesh>(e.object);
+			if (!mesh) return;
+			mesh->SetObjShader(nullptr);
+		});
+	}
+
+	EventQueue m_eventBus;
+	Scene m_scene;
+	ResourceManager m_pool;
+	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	std::shared_ptr<Mesh> m_mesh;
+	std::shared_ptr<RenderShader> m_shader;
+};
+
+TEST_F(ShaderCreateUndoTest, UndoDropsRedoRelinksSamePooledShader)
+{
+	const int shaderId = m_shader->GetObjectID();
+
+	// Mirror Editor::OnCreateShader: link the pooled shader, then record.
+	m_mesh->SetObjShader(m_shader);
+	m_operations.Submit(std::make_unique<ShaderLinkOp>(m_mesh->GetObjectID(), shaderId, true));
+
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId);
+
+	// Undo: reference dropped, pool keeps the shader.
+	m_operations.Undo();
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);
+	EXPECT_NE(m_pool.Get<RenderShader>(shaderId), nullptr);
+
+	// Redo: same pooled shader relinked (no new pooled object minted).
+	m_operations.Redo();
+	ASSERT_NE(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId);
+	EXPECT_EQ(m_mesh->o_shader->GetObjectID(), shaderId);
+}
+
+TEST_F(ShaderCreateUndoTest, StaleMeshUidNoOps)
+{
+	// A mesh that no longer exists resolves to null and must no-op safely.
+	m_operations.Submit(std::make_unique<ShaderLinkOp>(123456, m_shader->GetObjectID(), true));
+	EXPECT_NO_THROW(m_operations.Undo());
+	EXPECT_NO_THROW(m_operations.Redo());
+	// Stacks advance like any other op (stale-UID no-op does not alter them);
+	// the unresolved mesh is never linked.
+	EXPECT_TRUE(m_operations.CanUndo());
+	EXPECT_FALSE(m_operations.CanRedo());
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);
+}
+
+TEST_F(ShaderCreateUndoTest, RoundTripsThroughCereal)
+{
+	const int shaderId = m_shader->GetObjectID();
+	std::unique_ptr<Operation> op =
+		std::make_unique<ShaderLinkOp>(m_mesh->GetObjectID(), shaderId, true);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<ShaderLinkOp*>(restored.get()), nullptr);
+	EXPECT_EQ(restored->Label(), "Create Shader");
+
+	OperationContext ctx{ m_scene, m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId);
+
+	restored->Inverse()->Apply(ctx);
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);
 }

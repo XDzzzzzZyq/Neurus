@@ -111,6 +111,15 @@ op immediately per change. The ops are deliberately non-mergeable (empty
 event (`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
 `ShaderFieldRemoved`) that re-applies one edit dimension and bumps
 `ShaderUnit::m_version`, never recompiling to SPIR-V.
+Shader **Create** is recorded by the Editor (`Editor::OnCreateShader`), not the
+controller, as a pool-preserving membership toggle `ShaderLinkOp`
+(`{mesh UID, pooled shader UID, add}` flag - the `SceneObjectAddOp`
+convention): undo drops the mesh's shader reference (the pooled `RenderShader`
+is never removed), redo relinks the same pooled shader by UID. Replay dispatches
+dedicated restore events (`ShaderLinkRestored` / `ShaderUnlinkRestored`,
+Editor-handled - it owns the pool) so it never re-enters the forward create
+handler (no reload/recompile, no duplicate pooled shader). Compile stays
+non-undoable.
 
 ## Persisting the history stacks
 

@@ -63,8 +63,11 @@ enum class ShaderSection : int
 /**
  * @brief Emitted when the user clicks "Create Shader" for a mesh with no shader.
  *
- * ShaderController loads default gbuffer shaders, parses, generates, compiles
- * all stages, and assigns the result to mesh->o_shader. Bumps version on success.
+ * The Editor (which owns the pool) loads a pooled RenderShader via
+ * ResourceManager::Load<RenderShader>, links it to the mesh via
+ * Mesh::SetObjShader, compiles all stages to SPIR-V, bumps the version, and
+ * records a ShaderLinkOp so the create is undoable. ShaderController does NOT
+ * handle this event.
  */
 struct ShaderCreateRequested
 {
@@ -232,6 +235,34 @@ struct ShaderFieldRemoved
 	int stage = 0;            ///< ShaderType as int
 	ShaderSection section;    ///< Which ShaderStruct container to remove from
 	int subFieldIndex = -1;   ///< For StructDefs: which struct def to remove a member from
+};
+
+/**
+ * @brief Relinks a mesh to its pooled shader by UID (redo of Create Shader).
+ *
+ * Replayed by ShaderLinkOp when re-applying a create. The Editor resolves the
+ * pooled RenderShader by UID and calls Mesh::SetObjShader - no reload, no
+ * re-parse, no recompile, no new pooled object. The ShaderEditorPanel refresh
+ * is driven by the per-frame dirty check (null -> real unit version) and the
+ * GeometryPass per-mesh pipeline is cached by (objectId, shader version), so
+ * the relinked shader reuses its cached pipeline.
+ */
+struct ShaderLinkRestored
+{
+	const UID* object = nullptr;
+	int shaderId = 0;   ///< Pooled RenderShader UID to relink.
+};
+
+/**
+ * @brief Drops a mesh's shader reference (undo of Create Shader).
+ *
+ * Replayed by ShaderLinkOp when inverting a create. The Editor calls
+ * Mesh::SetObjShader(nullptr); the pooled RenderShader stays in the pool for
+ * redo, and the mesh falls back to the default pass shader.
+ */
+struct ShaderUnlinkRestored
+{
+	const UID* object = nullptr;
 };
 
 } // namespace neurus

@@ -47,6 +47,7 @@ CEREAL_REGISTER_TYPE(neurus::SetRenderConfigOp)
 CEREAL_REGISTER_TYPE(neurus::SetShaderCodeOp)
 CEREAL_REGISTER_TYPE(neurus::SetShaderFieldOp)
 CEREAL_REGISTER_TYPE(neurus::AddShaderFieldOp)
+CEREAL_REGISTER_TYPE(neurus::ShaderLinkOp)
 
 // --- Polymorphic relations (Operation base → concrete derived) ---
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, neurus::SetLightPowerOp)
@@ -73,6 +74,7 @@ CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, neurus::SetRenderConfigO
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, neurus::SetShaderCodeOp)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, neurus::SetShaderFieldOp)
 CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, neurus::AddShaderFieldOp)
+CEREAL_REGISTER_POLYMORPHIC_RELATION(neurus::Operation, neurus::ShaderLinkOp)
 
 // Forces this TU's registration to link when built into a static library.
 // Serialization sites include OperationRegistration.h (CEREAL_FORCE_DYNAMIC_INIT)
