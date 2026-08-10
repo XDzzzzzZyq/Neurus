@@ -12,7 +12,7 @@ changes through the event system.
 - `src/editor/Editor.h` - Editor orchestrator (owns Scene, RenderConfig, Context, Controllers)
   - Exposes an explicit scene-load lifecycle for Application-driven persistence:
     `NewScene()` (empty project), `BeginLoad()` (WaitIdle + fresh Scene/RenderConfig)
-    and `FinishLoad()` (reload mesh data, upload, IBL). Editor no longer owns the
+    and `FinishLoad()` (upload scene resources, IBL). Editor no longer owns the
     project file path or performs Save/LoadProject — `Application` coordinates
     persistence and owns the project path + dirty aggregation (`Editor::IsDirty()` /
     `ClearDirty()` still track scene/config edits).
@@ -35,11 +35,14 @@ changes through the event system.
    - Updated by Editor logic, read by other layers
 
 3. **Controller Orchestration**
-   - `Controllers` base class: `virtual Init(EventQueue& bus)` to bind controller to event bus
-   - `Editor::RegisterController<T>(EventQueue& bus)` — template factory that creates controller, calls `Init(bus)`, stores in `m_controllers`
-   - `CameraController` — event-driven orbit/zoom/dolly/pan via `CameraEvents` (rotate, push, slide, zoom)
-   - `SceneController` — event-driven scene mutations (selection, transform, visibility, camera/mesh/light/env property edits); stateless with free-function handlers in the .cpp; emits `EditorEvents` (SceneModified, LightGpuChanged, LightingRebuild, RenderResetEvent) for GPU uploads and dirty tracking; see events.instructions.md for the GPU-sync flow
+   - `Controllers` base class: `virtual Init(ControllerContext& ctx)` binds the controller to the controller context
+   - `Editor::RegisterController<T>()` — template factory that creates controller, calls `Init(m_ctx)`, stores in `ed_controllers`
+   - **`ControllerContext`** (`src/editor/controllers/ControllerContext.h`) — the ONLY thing a controller depends on: it bundles the three controller-facing interfaces (`IEventQueue&` for subscribe/enqueue/emitNow, `IResourceLookup&` for pooled-object lookup by id, `IOperationSink&` for recording undoable operations) plus providers for the two Editor-owned singletons that are NOT pooled UID objects (`scene` — the current Scene, re-queried per use because New/Load swaps it; `config` — the live RenderConfig). Controllers MUST NOT store the context or any of its members; handler lambdas capture it by value.
+   - `CameraController` — event-driven orbit/zoom/dolly/pan via `CameraEvents` (rotate, push, slide, zoom); events carry `int camId` resolved against the scene's `cam_list`
+   - `SceneController` — event-driven scene mutations (selection, transform, visibility, camera/mesh/light/env property edits, scene membership add/delete); stateless with free-function handlers in the .cpp; each handler resolves the event's `int objectUid` against the current Scene (typed pool lookup) and mutates the object directly; emits `EditorEvents` (SceneModified, LightGpuChanged, LightingRebuild, RenderResetEvent) for GPU uploads and dirty tracking; see events.instructions.md for the GPU-sync flow
+   - **Import/Add split**: `Editor::OnMeshImport`/`OnCameraAdd`/`OnLightAdd`/... only LOAD the resource into the pool and forward the object UID via `SceneObjectAddRequested`; the SceneController fetches the pooled object by UID, registers it, selects it, and records `CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(...)]`. The Delete gesture (`ObjectDeleteRequested` - the Editor wraps the UI's `DeleteRequested` intent) is **forward-only**: the SceneController snapshots the selection, guards the last camera, deselects, then DEFERS the removals as ONE batched `SceneObjectDeleteRequested` carrying all selected UIDs — so the batched handler is the single removal path shared with replay (no replay-only handling) — and records `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]` (delete of N = one op). Light membership changes enqueue `LightingRebuild` (the SSBO is a scene projection). GPU caches (MeshGPU, shadow maps) are scene-scoped: `UploadSceneResources` uploads only objects present at load, and an object entering the scene (live add or undo/redo replay) or a light whose shadow was just enabled enqueues `SceneObjectGpuUploadRequested`, which the Editor resolves with an on-demand upload (skip-if-cached).
    - `ShaderController` — event-driven shader lifecycle via `ShaderEvents` (create, compile, code/struct edit, field add); enqueues `RenderResetEvent` after create/compile so temporal accumulation resets
+   - **Pure-intent wrapping**: the Editor subscribes to the UI's `ObjectClicked` and `DeleteRequested` intents and forwards the dedicated scene events `ObjectSelected{ objectUid, modifiers }` and `ObjectDeleteRequested{}` (the two wrap subscriptions in `Editor::Initialize`). Panels never stamp the scene.
    - Controllers receive discrete events (not per-frame polling); `Editor::Edit()` dispatches all enqueued events via `EventQueue::Process()`
 
 4. **GPU Upload & Asset Import**
@@ -82,31 +85,31 @@ class Controllers
 {
 public:
     virtual ~Controllers() = default;
-    virtual void Init(EventQueue& bus) = 0;
+    virtual void Init(ControllerContext& ctx) = 0;
 };
 ```
 
 **Design:**
 - Pure virtual base class for all editor controllers
-- `Init(EventQueue& bus)` receives the event bus for subscription
-- Derived classes subscribe to typed events in `Init()` (e.g. `bus.subscribe<CameraEvents>()`)
+- `Init(ControllerContext& ctx)` receives the controller context (event dispatch, pooled-object lookup, operation sink, scene/config providers)
+- Derived classes subscribe to typed events in `Init()` (e.g. `ctx.events.subscribe<CameraEvents>()`); handler lambdas capture the context BY VALUE so they are fully self-contained
 - Stored via `std::unique_ptr<Controllers>` in Editor's controller list
 
 ### Editor::RegisterController<T>()
 
 ```cpp
 template<typename T>
-void Editor::RegisterController(EventQueue& bus)
+void Editor::RegisterController()
 {
     auto ctrl = std::make_unique<T>();
-    ctrl->Init(bus);
-    m_controllers.push_back(std::move(ctrl));
+    ctrl->Init(m_ctx);
+    ed_controllers.push_back(std::move(ctrl));
 }
 ```
 
 **Design:**
-- Template factory: creates controller, calls `Init(bus)`, stores ownership
-- Called during Editor initialization for each controller type (CameraController, ShaderController, SceneController)
+- Template factory: creates controller, calls `Init(m_ctx)`, stores ownership
+- The context carries everything a controller needs — event dispatch, pool lookup, operation sink, scene, and render config — so ALL controllers (including SceneController and RenderConfigController) are now registered uniformly via `RegisterController<T>()`; no providers are constructed manually (see `Editor::Initialize`).
 - Controllers are event-driven — no per-frame polling required
 
 ### Editor::Edit() — Event Dispatch
@@ -127,26 +130,26 @@ Editor::Edit()
 ### CameraController (Event-Driven)
 
 ```cpp
-void CameraController::Init(EventQueue& bus)
+void CameraController::Init(ControllerContext& ctx)
 {
-    bus.subscribe<CameraZoomEvent>([this](const CameraZoomEvent& e) { Zoom(e); });
-    bus.subscribe<CameraRotateEvent>([this](const CameraRotateEvent& e) { Rotate(e); });
-    bus.subscribe<CameraPushEvent>([this](const CameraPushEvent& e) { Push(e); });
-    bus.subscribe<CameraSlideEvent>([this](const CameraSlideEvent& e) { Slide(e); });
+    ctx.events.subscribe<CameraZoomEvent>([ctx](const CameraZoomEvent& e) { Zoom(e, ctx); });
+    ctx.events.subscribe<CameraRotateEvent>([ctx](const CameraRotateEvent& e) { Orbit(e, ctx); });
+    ctx.events.subscribe<CameraPushEvent>([ctx](const CameraPushEvent& e) { Dolly(e, ctx); });
+    ctx.events.subscribe<CameraSlideEvent>([ctx](const CameraSlideEvent& e) { Pan(e, ctx); });
 }
 ```
 
 **Design:**
 - Event-driven: no per-frame `Update()` polling needed
 - Receives discrete camera events (rotate, zoom, push, slide) from Editor
-- Each event carries the camera pointer and delta magnitude
-- Operates on Camera* provided by each event — does not own the camera
+- Each event carries the camera's integer UID (`camId`) + delta magnitude; the handler resolves it against the current scene's `cam_list` via the context
+- Does not own the camera — resolves the camera by UID per event
 - Located in `src/editor/controllers/CameraController.h`
 
 ### SceneController (Event-Driven)
 
 ```cpp
-void SceneController::Init(EventQueue& bus)
+void SceneController::Init(ControllerContext& ctx)
 {
     // Selection, visibility, transform, camera/mesh/light/env property events
     // (17 subscriptions total; see SceneEvents.h)
@@ -155,11 +158,11 @@ void SceneController::Init(EventQueue& bus)
 
 **Design:**
 - Stateless: all handlers are free functions in an anonymous namespace
-- Events carry `const ObjectID*`; handlers cast to the concrete type via the
-  class static `As()` helpers (e.g. `Mesh::As(...)`) and mutate directly - no
-  Scene lookup by ID
-- Selection events (`ObjectSelected`, `ObjectDeselected`) use `const UID*`
-  cast to `Scene*` via `Scene::As(...)`
+- Events carry `int objectUid`; handlers resolve the UID against the current
+  Scene (typed pool lookup, e.g. `mesh_list.find(objectUid)`) via the
+  ControllerContext and mutate the object directly
+- Scene-owned state (selection, membership) is reached through the context's
+  scene provider — events never carry the scene
 - GPU uploads delegated to Editor via EditorEvents (`LightGpuChanged`,
   `LightingRebuild`, `SceneModified`, `RenderResetEvent`) which Editor
   subscribes to and executes against its `DeferredRenderer`/`UploadManager`
@@ -168,45 +171,48 @@ void SceneController::Init(EventQueue& bus)
 ### ShaderController (Event-Driven)
 
 ```cpp
-void ShaderController::Init(EventQueue& bus, IOperationSink& ops)
+void ShaderController::Init(ControllerContext& ctx)
 {
     // Lifecycle (non-undoable): bump Shader::m_version + reset accumulation.
-    bus.subscribe<ShaderCreateRequested>( [&bus](const ShaderCreateRequested& e) {
-        OnCreateShader(e);
-        bus.enqueue(RenderResetEvent{});  // pipeline created -> reset accumulation
-    });
-    bus.subscribe<ShaderCompileRequested>( [&bus](const ShaderCompileRequested& e) {
-        OnCompileShader(e);
-        bus.enqueue(RenderResetEvent{});  // pipeline rebuilt -> reset accumulation
+    // (Shader CREATE is handled by the Editor, which constructs the pooled
+    // RenderShader and records a ShaderLinkOp - see the Undo/redo controllers
+    // section. ShaderController keeps only pool-free handlers.)
+    ctx.events.subscribe<ShaderCompileRequested>( [ctx](const ShaderCompileRequested& e) {
+        OnCompileShader(e, ctx);
+        ctx.events.enqueue(RenderResetEvent{});  // pipeline rebuilt -> reset accumulation
     });
 
     // Code edits apply live; recording is bracketed by ShaderEditBegin/End so a
     // keystroke burst collapses to ONE undo entry on focus-out.
-    bus.subscribe<ShaderCodeEdited>( [](const ShaderCodeEdited& e) { OnCodeEdited(e); });
-    bus.subscribe<ShaderEditBegin>( /* capture m_beforeCode */ );
-    bus.subscribe<ShaderEditEnd>( /* record SetShaderCodeOp if code changed */ );
+    ctx.events.subscribe<ShaderCodeEdited>( [ctx](const ShaderCodeEdited& e) { OnCodeEdited(e, ctx); });
+    ctx.events.subscribe<ShaderEditBegin>( /* capture m_beforeCode + m_editObjectId */ );
+    ctx.events.subscribe<ShaderEditEnd>( /* record SetShaderCodeOp if code changed */ );
 
     // Discrete struct/field edits: snapshot the element, apply the edit, record one delta op each.
-    bus.subscribe<ShaderStructEdited>( /* VisitElement + ApplyFieldEdit; Submit SetShaderFieldOp if before != after */ );
-    bus.subscribe<ShaderFieldAdded>( /* AppendDefault + Submit AddShaderFieldOp */ );
+    ctx.events.subscribe<ShaderStructEdited>( /* VisitElement + ApplyFieldEdit; Submit SetShaderFieldOp if before != after */ );
+    ctx.events.subscribe<ShaderFieldAdded>( /* AppendDefault + Submit AddShaderFieldOp */ );
 
     // Undo/redo replay: re-apply one edit dimension + bump version (panel refresh).
-    bus.subscribe<ShaderCodeRestored>(     [](const ShaderCodeRestored& e)     { OnCodeRestored(e); });
-    bus.subscribe<ShaderFieldRestored>(    [](const ShaderFieldRestored& e)    { OnFieldRestored(e); });
-    bus.subscribe<ShaderFieldAddRestored>( [](const ShaderFieldAddRestored& e) { OnFieldAddRestored(e); });
-    bus.subscribe<ShaderFieldRemoved>(     [](const ShaderFieldRemoved& e)     { OnFieldRemoved(e); });
+    ctx.events.subscribe<ShaderCodeRestored>(     [ctx](const ShaderCodeRestored& e)     { OnCodeRestored(e, ctx); });
+    ctx.events.subscribe<ShaderFieldRestored>(    [ctx](const ShaderFieldRestored& e)    { OnFieldRestored(e, ctx); });
+    ctx.events.subscribe<ShaderFieldAddRestored>( [ctx](const ShaderFieldAddRestored& e) { OnFieldAddRestored(e, ctx); });
+    ctx.events.subscribe<ShaderFieldRemoved>(     [ctx](const ShaderFieldRemoved& e)     { OnFieldRemoved(e, ctx); });
 }
 ```
 
 **Design:**
 - Mutation handlers are free functions in an anonymous namespace; gesture state
-  (`m_codeEditing`, `m_editObject`, `m_editStage`, `m_beforeCode`,
-  `m_beforeParsed`) lives on the controller so begin/end can bracket a burst
-- Handlers cast the event's `const ObjectID*` to `Mesh*` (the only shader-owning
-  object) and mutate `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
-- Create/Compile bump `Shader::m_version` on success (pipeline rebuild) and stay
-  **non-undoable** lifecycle actions; content edits (code/struct/field) only mutate
-  CPU IR/code and require the user to press Compile to reach the GPU
+  (`m_codeEditing`, `m_editObjectId`, `m_editStage`, `m_beforeCode`) lives on
+  the controller so begin/end can bracket a burst
+- Handlers resolve the event's `int objectUid` to `Mesh*` (via the current
+  scene's `mesh_list`, the only shader-owning object type) and mutate
+  `mesh->o_shader` data directly — no Editor, Renderer, or GPU state
+- Create/Compile bump `Shader::m_version` on success (pipeline rebuild). Create
+  is **undoable** (the Editor records `ShaderLinkOp` - undo drops the pooled
+  reference, redo relinks it via `ShaderLinkRestored`/`ShaderUnlinkRestored`);
+  Compile stays a **non-undoable** lifecycle
+  action. Content edits (code/struct/field) only mutate CPU IR/code and require
+  the user to press Compile to reach the GPU
 - Only Create/Compile enqueue `RenderResetEvent` (temporal accumulation reset)
 - Undo/redo of content edits is CPU-only: `OnRestoreSource` overwrites the stage's
   `code` + `parsed` IR and bumps `ShaderUnit::m_version` (panel refresh) — it does
@@ -277,8 +283,8 @@ UIEvents::newFrame() → Editor::Edit(input) → Renderer::DrawFrame(scene)
 - EventQueue typed event dispatcher for Editor↔Renderer events
 - EditorContext stub (empty, placeholder for future scene state)
 - Editor orchestrator with `RegisterController<T>()` and `Edit()` for input translation
-- Controllers base class with `Init(EventQueue& bus)` virtual interface
-- CameraController: event-driven orbit/zoom/dolly/pan via CameraEvents
+- Controllers base class with `Init(ControllerContext&)` virtual interface (IEventQueue + IResourceLookup + IOperationSink + scene/config providers)
+- CameraController: event-driven orbit/zoom/dolly/pan via CameraEvents (int camId payloads)
 - Input system: `GetInputState()` returns complete `InputState` for `Edit()` consumption
 
 ## Future Enhancements
@@ -306,8 +312,8 @@ event):
   Two op types instead of one boolean flag: the gesture boundary vs. burst
   coalescing are distinct behaviors that belong to distinct ops.
 - **`RenderConfigController`** — the single mutation path for the Editor-owned
-  `RenderConfig`, reached through a `std::function<RenderConfig*()>` provider so
-  it never includes Editor internals (constructed manually in `Editor`, not via
+  `RenderConfig`, reached through the ControllerContext's `config` provider so
+  it never includes Editor internals (registered uniformly via
   `RegisterController<T>`). `ConfigEditBegin` captures the config,
   `RenderConfigChangedEvent` applies live, `ConfigEditEnd` records one
   `SetRenderConfigOp`. Discrete edits (checkbox/combo) arrive without a gesture
@@ -334,6 +340,8 @@ event):
   while live forward edits do NOT (avoids cursor-jump mid-typing). Restore is
   **CPU-only, no recompile to SPIR-V**; the user presses Compile to push
   restored source to the GPU. All three ops are deliberately non-mergeable
-  (empty `MergeKey`). Shader Create and Compile stay non-undoable lifecycle
-  actions.
+  (empty `MergeKey`). Shader Create is undoable via `ShaderLinkOp` (recorded by
+  the Editor; a pool-preserving membership toggle - see
+  operation-system.instructions.md); Compile stays a non-undoable lifecycle
+  action.
 

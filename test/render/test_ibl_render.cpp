@@ -155,7 +155,8 @@ protected:
 
 	// Set up procedural colourful gradient equirect data
 	auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
-	ImageData imgData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
+	auto imgData = std::make_shared<ImageData>(
+		gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
 	m_env->SetEquirectData(imgData);
 
 	// Inline EnvironmentGPU creation (was RenderCache::CreateEnvironmentGPU)
@@ -167,7 +168,7 @@ protected:
 		// 1. Upload equirect to GPU
 		auto equirectImage = std::make_shared<Image>(Image::FromImageData(
 			dev, pd, m_queue, m_graphicsQueueFamily,
-			imgData, "Env_Equirect",
+			*imgData, "Env_Equirect",
 			vk::ImageUsageFlagBits::eStorage));
 		ASSERT_NE(equirectImage->State(), ImageState::Invalid) << "Failed to upload equirect";
 
@@ -495,10 +496,11 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 	// 2f. Re-create Environment (CPU-only) + generate IBL cubemaps.
 	SCOPED_TRACE("Recreate IBL resources");
 	m_env = std::make_shared<Environment>();
-	ImageData imgData; // moved out of narrow scope for inline IBL creation below
+	std::shared_ptr<ImageData> imgData; // moved out of narrow scope for inline IBL creation below
 	{
 		auto gradientPixels = GenerateColorfulGradient(kEquiWidth, kEquiHeight);
-		imgData = ImageData(gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
+		imgData = std::make_shared<ImageData>(
+			gradientPixels.data(), kEquiWidth, kEquiHeight, PixelFormat::RGBA32F);
 		m_env->SetEquirectData(imgData);
 	}
 
@@ -512,7 +514,7 @@ TEST_F(IBLRenderTest, Reload_Environment_NoValidationErrors)
 		// 1. Upload equirect to GPU
 		auto equirectImage = std::make_shared<Image>(Image::FromImageData(
 			device, physDev, m_queue, m_graphicsQueueFamily,
-			imgData, "Env_Equirect",
+			*imgData, "Env_Equirect",
 			vk::ImageUsageFlagBits::eStorage));
 		ASSERT_NE(equirectImage->State(), ImageState::Invalid) << "Failed to upload equirect";
 

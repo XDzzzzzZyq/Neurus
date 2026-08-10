@@ -20,17 +20,19 @@ Environment::Environment()
 	o_name = "Environment";
 }
 
+Environment::Environment(std::shared_ptr<ImageData> data)
+{
+	o_type = ObjectID::GOType::GO_ENVIR;
+	o_name = "Environment";
+	SetEquirectData(std::move(data));
+}
+
 Environment::~Environment() = default;
 
-// -----------------------------------------------------------------------
-// File path
-// -----------------------------------------------------------------------
-
-void Environment::SetEquirectPath(const std::string& path)
+void Environment::SetEquirectData(std::shared_ptr<ImageData> data)
 {
-	o_equirectPath = path;
-	if (!path.empty())
-		o_equirectData = ImageData(path);
+	o_equirectData = std::move(data);
+	o_imageDataId = o_equirectData ? o_equirectData->GetObjectID() : 0;
 }
 
 } // namespace neurus

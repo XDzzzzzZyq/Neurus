@@ -1,4 +1,5 @@
 #include "asset/data/MeshData.h"
+#include "asset/data/AssetPath.h"
 
 #include "core/Log.h"
 #include "core/Timer.h"
@@ -12,6 +13,28 @@
 #include <vector>
 
 namespace neurus {
+
+// ---------------------------------------------------------------------------
+// Construction / content reload
+// ---------------------------------------------------------------------------
+
+MeshData::MeshData(const std::string& path)
+	: m_path(path)
+{
+	ReloadContent();
+}
+
+void MeshData::ReloadContent()
+{
+	if (m_path.empty())
+		return;
+
+	const std::string resolved = ResolveAssetPath(m_path);
+	if (!LoadObj(resolved))
+	{
+		NEURUS_ERR("[MeshData] ReloadContent failed to load: " << resolved);
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Helper: resolve OBJ index (1-based or negative relative → 0-based)

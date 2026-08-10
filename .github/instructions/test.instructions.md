@@ -581,13 +581,30 @@ These patterns were established during deferred PBR development and apply to all
   for both FixedEMA (alpha=1/8) and MovingAvg (alpha=1/(frameCount+1)) modes, verifying
   frame 0 always returns alpha=1 (overwrite). Run in CI.
 - **SceneController tests** (`test/editor/test_scene_controller.cpp`): Non-GPU tests
-  that drive `SceneController` through the `EventQueue`. Cover selection (select /
+  that drive `SceneController` through the `EventQueue` (events carry `int
+  objectUid` payloads; the controller resolves them against the fixture's Scene
+  via a `ControllerContext`). Cover selection (select /
   background-clear / shift-add / deselect), visibility flags (light visibility
   enqueues `LightingRebuild`), transform (position/scale; light transform enqueues
   `LightingRebuild`), camera target/FOV, mesh shadow/material, light
   power/radius/shadow/cutoff (power/radius/cutoff enqueue `LightGpuChanged`, shadow
-  enqueues `LightingRebuild`), environment intensity/rotation, and dirty semantics
-  (`SceneModified` on property changes, never on selection). Run in CI.
+  enqueues `LightingRebuild`), environment intensity/rotation, scene-add GPU sync
+  (mesh/light/env add enqueues `SceneObjectGpuUploadRequested`, camera does not;
+  shadow-enable enqueues it, shadow-disable does not), and dirty semantics
+  (`SceneModified` on property changes, never on selection). Payload-capture
+  variables for `LightGpuChanged` / `SceneObjectGpuUploadRequested` are plain
+  `int` (the events carry `objectUid`). Run in CI.
+- **ShaderLinkOp tests** (`test/editor/test_shader_controller.cpp`
+  `ShaderCreateUndoTest`, `test/editor/test_operation_serialization.cpp`
+  `OperationSerializationTest.ShaderLinkOp_RoundTrip`): Non-GPU tests that
+  verify Create Shader is undoable as a pool-preserving membership toggle.
+  A fixture mirrors `Editor::Initialize`'s `ShaderLinkRestored` /
+  `ShaderUnlinkRestored` subscriptions (pooled mesh + pooled `RenderShader`;
+  the restore events carry `int objectUid`); asserts: submit `ShaderLinkOp` →
+  mesh linked; undo → `o_shader`/`o_shaderId`
+  cleared while the pool keeps the shader; redo → the SAME pooled shader
+  relinked (no new object minted); stale mesh UID no-ops; and the op
+  round-trips through a cereal JSON archive. Run in CI.
 - **Log Buffer Tests** (`test/core/test_log_buffer.cpp`, `test/ui/test_log_model.cpp`): Non-GPU tests that run in CI.
   `LogBufferTest` (core) covers ring capacity + wrap (drops oldest), per-level
   counts (Info/Error) including wrap adjustment, Clear() resets size/counts/seq,

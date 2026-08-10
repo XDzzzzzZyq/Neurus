@@ -14,7 +14,9 @@
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
 #include "scene/Transform.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
+#include "asset/data/ImageData.h"
+#include "asset/data/MeshData.h"
 
 #include <QGridLayout>
 
@@ -90,7 +92,7 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 	if (!scene)
 	{
 		SetEnabled(false);
-		m_activeObject = nullptr;
+		m_activeObjectId = 0;
 		return;
 	}
 
@@ -98,17 +100,17 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 	if (!activeObj)
 	{
 		SetEnabled(false);
-		m_activeObject = nullptr;
+		m_activeObjectId = 0;
 		return;
 	}
 
 	int objectId = activeObj->GetObjectID();
 
-	// --- Header: icon + name ---
-	if (m_activeObject != activeObj){
+	// --- Header: icon + name (lazy: only when the active UID changed) ---
+	if (m_activeObjectId != objectId){
 		m_iconLabel->setPixmap(Icons::ObjectIcon(static_cast<int>(activeObj->o_type)).pixmap(20, 20));
 		m_nameLabel->setText(QString::fromStdString(activeObj->o_name));
-		m_activeObject = activeObj;
+		m_activeObjectId = objectId;
 	}
 
 	// --- Transform ---
@@ -156,7 +158,8 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 		{
 			auto* mesh = it->second.get();
 			m_meshProps->setObjectId(objectId);
-			m_meshProps->setMeshPath(mesh->o_meshPath);
+			// Path is owned by the pooled MeshData (data layer).
+			m_meshProps->setMeshPath(mesh->o_mesh ? mesh->o_mesh->GetPath() : "");
 			m_meshProps->setShadowEnabled(mesh->using_shadow);
 			m_meshProps->setMaterialEnabled(mesh->using_material);
 		}
@@ -189,7 +192,9 @@ void PropertyPanel::Refresh(const UIContext& ctx)
 			m_envProps->setObjectId(objectId);
 			m_envProps->setIntensity(env->GetIntensity());
 			m_envProps->setRotation(env->GetRotation());
-			m_envProps->setEquirectPath(env->GetEquirectPath());
+			// Path is owned by the pooled ImageData (data layer).
+			auto eqData = env->GetEquirectData();
+			m_envProps->setEquirectPath(eqData ? eqData->GetPath() : "");
 		}
 		break;
 	}
@@ -250,20 +255,20 @@ void PropertyPanel::BuildTransformEditor()
 	// Each Vec3Spin emits valueChanged(x, y, z); one signal per transform component.
 	QObject::connect(m_posSpin, &Vec3Spin::valueChanged, this,
 		[this](float x, float y, float z) {
-			if (!m_activeObject) return;
-			emit positionChanged(PositionChanged{m_activeObject, x, y, z});
+			if (m_activeObjectId == 0) return;
+			emit positionChanged(PositionChanged{m_activeObjectId, x, y, z});
 		});
 
 	QObject::connect(m_rotSpin, &Vec3Spin::valueChanged, this,
 		[this](float x, float y, float z) {
-			if (!m_activeObject) return;
-			emit rotationChanged(RotationChanged{m_activeObject, x, y, z});
+			if (m_activeObjectId == 0) return;
+			emit rotationChanged(RotationChanged{m_activeObjectId, x, y, z});
 		});
 
 	QObject::connect(m_sclSpin, &Vec3Spin::valueChanged, this,
 		[this](float x, float y, float z) {
-			if (!m_activeObject) return;
-			emit scaleChanged(ScaleChanged{m_activeObject, x, y, z});
+			if (m_activeObjectId == 0) return;
+			emit scaleChanged(ScaleChanged{m_activeObjectId, x, y, z});
 		});
 
 	// --- Reset button ---
@@ -272,11 +277,11 @@ void PropertyPanel::BuildTransformEditor()
 		m_rotSpin->setValue(0.0, 0.0, 0.0);
 		m_sclSpin->setValue(1.0, 1.0, 1.0);
 
-		if (m_activeObject)
+		if (m_activeObjectId != 0)
 		{
-			emit positionChanged(PositionChanged{m_activeObject, 0.0f, 0.0f, 0.0f});
-			emit rotationChanged(RotationChanged{m_activeObject, 0.0f, 0.0f, 0.0f});
-			emit scaleChanged(ScaleChanged{m_activeObject, 1.0f, 1.0f, 1.0f});
+			emit positionChanged(PositionChanged{m_activeObjectId, 0.0f, 0.0f, 0.0f});
+			emit rotationChanged(RotationChanged{m_activeObjectId, 0.0f, 0.0f, 0.0f});
+			emit scaleChanged(ScaleChanged{m_activeObjectId, 1.0f, 1.0f, 1.0f});
 		}
 	});
 }
@@ -314,53 +319,53 @@ void PropertyPanel::BuildTypeSubpanels()
 	// Camera
 	QObject::connect(m_cameraProps, &CameraProperties::targetChanged, this,
 		[this](int /*objectId*/, float x, float y, float z) {
-			emit cameraTargetChanged(CameraTargetChanged{m_activeObject, x, y, z});
+			emit cameraTargetChanged(CameraTargetChanged{m_activeObjectId, x, y, z});
 		});
 	QObject::connect(m_cameraProps, &CameraProperties::fovChanged, this,
 		[this](int /*objectId*/, float fov) {
-			emit cameraFovChanged(CameraFovChanged{m_activeObject, fov});
+			emit cameraFovChanged(CameraFovChanged{m_activeObjectId, fov});
 		});
 
 	// Mesh
 	QObject::connect(m_meshProps, &MeshProperties::shadowChanged, this,
 		[this](int /*objectId*/, bool enabled) {
-			emit meshShadowChanged(MeshShadowChanged{m_activeObject, enabled});
+			emit meshShadowChanged(MeshShadowChanged{m_activeObjectId, enabled});
 		});
 	QObject::connect(m_meshProps, &MeshProperties::materialChanged, this,
 		[this](int /*objectId*/, bool enabled) {
-			emit meshMaterialChanged(MeshMaterialChanged{m_activeObject, enabled});
+			emit meshMaterialChanged(MeshMaterialChanged{m_activeObjectId, enabled});
 		});
 
 	// Light
 	QObject::connect(m_lightProps, &LightProperties::powerChanged, this,
 		[this](int /*objectId*/, float power) {
-			emit lightPowerChanged(LightPowerChanged{m_activeObject, power});
+			emit lightPowerChanged(LightPowerChanged{m_activeObjectId, power});
 		});
 	QObject::connect(m_lightProps, &LightProperties::radiusChanged, this,
 		[this](int /*objectId*/, float radius) {
-			emit lightRadiusChanged(LightRadiusChanged{m_activeObject, radius});
+			emit lightRadiusChanged(LightRadiusChanged{m_activeObjectId, radius});
 		});
 	QObject::connect(m_lightProps, &LightProperties::shadowChanged, this,
 		[this](int /*objectId*/, bool enabled) {
-			emit lightShadowChanged(LightShadowChanged{m_activeObject, enabled});
+			emit lightShadowChanged(LightShadowChanged{m_activeObjectId, enabled});
 		});
 	QObject::connect(m_lightProps, &LightProperties::cutoffChanged, this,
 		[this](int /*objectId*/, float cosine) {
-			emit lightCutoffChanged(LightCutoffChanged{m_activeObject, cosine});
+			emit lightCutoffChanged(LightCutoffChanged{m_activeObjectId, cosine});
 		});
 	QObject::connect(m_lightProps, &LightProperties::outerCutoffChanged, this,
 		[this](int /*objectId*/, float cosine) {
-			emit lightOuterCutoffChanged(LightOuterCutoffChanged{m_activeObject, cosine});
+			emit lightOuterCutoffChanged(LightOuterCutoffChanged{m_activeObjectId, cosine});
 		});
 
 	// Environment
 	QObject::connect(m_envProps, &EnvironmentProperties::intensityChanged, this,
 		[this](int /*objectId*/, float intensity) {
-			emit envIntensityChanged(EnvironmentIntensityChanged{m_activeObject, intensity});
+			emit envIntensityChanged(EnvironmentIntensityChanged{m_activeObjectId, intensity});
 		});
 	QObject::connect(m_envProps, &EnvironmentProperties::rotationChanged, this,
 		[this](int /*objectId*/, float rotation) {
-			emit envRotationChanged(EnvironmentRotationChanged{m_activeObject, rotation});
+			emit envRotationChanged(EnvironmentRotationChanged{m_activeObjectId, rotation});
 		});
 
 	// Start with all hidden

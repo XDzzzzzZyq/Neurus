@@ -56,6 +56,7 @@ add_executable(neurus_test
 	scene/test_sprite.cpp
 	scene/test_scene.cpp
 	scene/test_scene_integration.cpp
+	scene/test_scene_serialize.cpp
 	scene/test_debug.cpp
 	asset/test_project_roundtrip.cpp
 	asset/test_default_project.cpp
@@ -63,6 +64,8 @@ add_executable(neurus_test
 	core/test_graph.cpp
 	core/test_selections.cpp
 	core/test_log_buffer.cpp
+	core/test_uid.cpp
+	core/test_resource_manager.cpp
 	ui/test_log_model.cpp
 )
 

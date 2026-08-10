@@ -5,9 +5,14 @@
  * Verifies that Project::Save() followed by Project::Load() preserves
  * all scene data (cameras, meshes, lights) with exact parameter matching.
  *
- * Tests create bare Scene+RenderConfig objects, register them with a
- * Project serializer via SceneComponent and ConfigComponent, then
- * Save/Load through the Project.
+ * The project now stores the ResourceManager pool FIRST (real objects,
+ * polymorphically), then the Scene's ID references, which SceneComponent
+ * resolves against the pool after load. These tests drive the same
+ * component ordering as Application::BuildProject.
+ *
+ * Tests create bare Scene+RenderConfig+ResourceManager objects, register
+ * them with a Project serializer via ResourceComponent/SceneComponent/
+ * ConfigComponent, then Save/Load through the Project.
  *
  * TDD: RED (test written first) -> GREEN (implementation verified).
  * All tests are pure CPU -- no GPU required.
@@ -19,7 +24,10 @@
 
 #include "asset/Project.h"
 #include "asset/components/SceneComponent.h"
+#include "asset/components/ResourceComponent.h"
 #include "asset/components/ConfigComponent.h"
+#include "asset/data/MeshData.h"
+#include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
 #include "scene/Camera.h"
 #include "scene/Light.h"
@@ -50,19 +58,19 @@ struct TempFile
 // -----------------------------------------------------------------------
 
 /**
- * @brief Creates a Project serializer with SceneComponent + ConfigComponent bound.
+ * @brief Creates a Project serializer with ResourceComponent + SceneComponent
+ *        + ConfigComponent bound (mirrors Application::BuildProject ordering).
  *
- * This is the standard pattern for roundtrip tests: register both components
- * so that Save stores and Load restores the scene and config together.
- *
- * @param scene   Scene object to serialize.
- * @param config  RenderConfig object to serialize.
+ * @param scene     Scene object to serialize.
+ * @param config    RenderConfig object to serialize.
+ * @param resources ResourceManager pool (registered first).
  * @return Initialised project::Project ready for Save/Load.
  */
-static project::Project MakeProject(Scene& scene, RenderConfig& config)
+static project::Project MakeProject(Scene& scene, RenderConfig& config, ResourceManager& resources)
 {
 	project::Project p;
-	p.Register<project::SceneComponent>(scene);
+	p.Register<project::ResourceComponent>(resources);
+	p.Register<project::SceneComponent>(scene, resources);
 	p.Register<project::ConfigComponent>(config);
 	return p;
 }
@@ -72,7 +80,8 @@ static project::Project MakeProject(Scene& scene, RenderConfig& config)
 // -----------------------------------------------------------------------
 
 /**
- * @test Save an empty project, load it back -- all pools still empty.
+ * @test Save an empty project, load it back -- the default-camera fallback
+ *       produces a single pooled camera; all other pools stay empty.
  */
 TEST(ProjectRoundtrip, EmptyScene)
 {
@@ -80,13 +89,15 @@ TEST(ProjectRoundtrip, EmptyScene)
 	{
 		Scene scene;
 		RenderConfig config;
-		auto p = MakeProject(scene, config);
+		ResourceManager resources;
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 	EXPECT_EQ(loadedScene.cam_list.size(), 1u);
@@ -110,20 +121,22 @@ TEST(ProjectRoundtrip, CameraOnly)
 	{
 		Scene scene;
 		RenderConfig config;
-		auto camera = std::make_shared<Camera>();
+		ResourceManager resources;
+		auto camera = resources.Load<Camera>();
 		camera->cam_pers = 60.0f;
 		camera->cam_near = 0.1f;
 		camera->cam_far = 100.0f;
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 1.0f);
 		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
 		scene.UseCamera(camera);
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 	ASSERT_EQ(loadedScene.cam_list.size(), 1u);
@@ -138,40 +151,50 @@ TEST(ProjectRoundtrip, CameraOnly)
 }
 
 // -----------------------------------------------------------------------
-// Roundtrip: Mesh with OBJ path
+// Roundtrip: Mesh with pooled MeshData
 // -----------------------------------------------------------------------
 
 /**
- * @test Create scene with a mesh, save, load -- o_meshPath and flags match.
+ * @test Create scene with a mesh referencing pooled MeshData, save, load --
+ *       o_meshDataId, flags and name match, and o_mesh re-wires to the pool.
  */
 TEST(ProjectRoundtrip, MeshWithOBJ)
 {
 	TempFile tmp("test_rt_mesh.neurus.json");
+	int meshDataId = 0;
 	{
 		Scene scene;
 		RenderConfig config;
-		auto mesh = std::make_shared<Mesh>("obj/sphere.obj");
+		ResourceManager resources;
+		auto meshData = resources.Load<MeshData>("res/obj/sphere.obj");
+		meshDataId = meshData->GetObjectID();
+		auto mesh = resources.Load<Mesh>(meshData);
 		mesh->using_shadow = false;
 		mesh->using_sdf = false;
 		mesh->o_name = "TestSphere";
 		scene.UseMesh(mesh);
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 	ASSERT_EQ(loadedScene.mesh_list.size(), 1u);
 	auto* loadedMesh = loadedScene.mesh_list.begin()->second.get();
 	ASSERT_NE(loadedMesh, nullptr);
-	EXPECT_EQ(loadedMesh->o_meshPath, "obj/sphere.obj");
+	EXPECT_EQ(loadedMesh->o_meshDataId, meshDataId);
 	EXPECT_FALSE(loadedMesh->using_shadow);
 	EXPECT_FALSE(loadedMesh->using_sdf);
 	EXPECT_EQ(loadedMesh->o_name, "TestSphere");
 	EXPECT_EQ(loadedMesh->o_type, ObjectID::GOType::GO_MESH);
+	// The pooled MeshData is re-wired and its content reloaded from disk.
+	ASSERT_NE(loadedMesh->o_mesh, nullptr);
+	EXPECT_EQ(loadedMesh->o_mesh->GetObjectID(), meshDataId);
+	EXPECT_TRUE(loadedMesh->o_mesh->GetVertexCount() > 0);
 }
 
 // -----------------------------------------------------------------------
@@ -187,17 +210,19 @@ TEST(ProjectRoundtrip, LightPoint)
 	{
 		Scene scene;
 		RenderConfig config;
-		auto light = std::make_shared<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f, 0.8f, 0.6f));
+		ResourceManager resources;
+		auto light = resources.Load<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f, 0.8f, 0.6f));
 		light->SetPosition(glm::vec3(3.0f, 3.0f, 3.0f));
 		light->SetRadius(0.01f);
 		scene.UseLight(light);
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 	ASSERT_EQ(loadedScene.light_list.size(), 1u);
@@ -225,32 +250,35 @@ TEST(ProjectRoundtrip, FullScene)
 	{
 		Scene scene;
 		RenderConfig config;
+		ResourceManager resources;
 
 		// Camera
-		auto camera = std::make_shared<Camera>();
+		auto camera = resources.Load<Camera>();
 		camera->SetPosition(glm::vec3(0.0f, 10.0f, 3.0f));
 		camera->cam_tar = glm::vec3(0.0f, 0.0f, 1.0f);
 		camera->cam_pers = 45.0f;
 		scene.UseCamera(camera);
 
 		// Mesh
-		auto mesh = std::make_shared<Mesh>("obj/cube.obj");
+		auto meshData = resources.Load<MeshData>("obj/cube.obj");
+		auto mesh = resources.Load<Mesh>(meshData);
 		mesh->SetPosition(glm::vec3(1.0f, 0.0f, 0.0f));
 		scene.UseMesh(mesh);
 
 		// Light
-		auto light = std::make_shared<Light>(POINTLIGHT, 20.0f, glm::vec3(0.2f, 0.5f, 1.0f));
+		auto light = resources.Load<Light>(POINTLIGHT, 20.0f, glm::vec3(0.2f, 0.5f, 1.0f));
 		light->SetPosition(glm::vec3(-2.0f, 0.0f, 5.0f));
 		light->SetRadius(0.1f);
 		scene.UseLight(light);
 
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 
@@ -270,7 +298,7 @@ TEST(ProjectRoundtrip, FullScene)
 	// --- Mesh validation ---
 	auto* loadedMesh = loadedScene.mesh_list.begin()->second.get();
 	ASSERT_NE(loadedMesh, nullptr);
-	EXPECT_EQ(loadedMesh->o_meshPath, "obj/cube.obj");
+	EXPECT_NE(loadedMesh->o_meshDataId, 0);
 	EXPECT_EQ(loadedMesh->GetPosition(), glm::vec3(1.0f, 0.0f, 0.0f));
 	EXPECT_EQ(loadedMesh->o_type, ObjectID::GOType::GO_MESH);
 
@@ -302,12 +330,14 @@ TEST(ProjectRoundtrip, SelectionState)
 	{
 		Scene scene;
 		RenderConfig config;
+		ResourceManager resources;
 
-		auto mesh = std::make_shared<Mesh>("obj/cube.obj");
+		auto meshData = resources.Load<MeshData>("obj/cube.obj");
+		auto mesh = resources.Load<Mesh>(meshData);
 		scene.UseMesh(mesh);
 		meshUid = mesh->GetObjectID();
 
-		auto light = std::make_shared<Light>(POINTLIGHT, 5.0f, glm::vec3(1.0f));
+		auto light = resources.Load<Light>(POINTLIGHT, 5.0f, glm::vec3(1.0f));
 		scene.UseLight(light);
 		lightUid = light->GetObjectID();
 
@@ -315,13 +345,14 @@ TEST(ProjectRoundtrip, SelectionState)
 		scene.selections.Select(mesh.get(), false);
 		scene.selections.Select(light.get(), true);
 
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 
@@ -350,15 +381,18 @@ TEST(ProjectRoundtrip, EmptySelection)
 	{
 		Scene scene;
 		RenderConfig config;
-		auto mesh = std::make_shared<Mesh>("obj/cube.obj");
+		ResourceManager resources;
+		auto meshData = resources.Load<MeshData>("obj/cube.obj");
+		auto mesh = resources.Load<Mesh>(meshData);
 		scene.UseMesh(mesh);
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Save(tmp.path);
 	}
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	{
-		auto p = MakeProject(loadedScene, loadedConfig);
+		auto p = MakeProject(loadedScene, loadedConfig, loadedResources);
 		p.Load(tmp.path);
 	}
 	EXPECT_EQ(loadedScene.selections.GetSelectionCount(), 0u);

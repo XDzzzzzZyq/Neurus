@@ -17,7 +17,9 @@
 #include "asset/Project.h"
 #include "asset/components/UIComponent.h"
 #include "asset/components/SceneComponent.h"
+#include "asset/components/ResourceComponent.h"
 #include "asset/components/ConfigComponent.h"
+#include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
 #include "scene/Scene.h"
 
@@ -101,9 +103,11 @@ TEST(UIComponentRoundtrip, CoexistsWithSceneAndConfig)
 	{
 		Scene scene;
 		RenderConfig config;
+		ResourceManager resources;
 		std::string ui = blob;
 		project::Project p;
-		p.Register<project::SceneComponent>(scene);
+		p.Register<project::ResourceComponent>(resources);
+		p.Register<project::SceneComponent>(scene, resources);
 		p.Register<project::ConfigComponent>(config);
 		p.Register<project::UIComponent>(ui);
 		p.Save(tmp.path);
@@ -111,10 +115,12 @@ TEST(UIComponentRoundtrip, CoexistsWithSceneAndConfig)
 
 	Scene loadedScene;
 	RenderConfig loadedConfig;
+	ResourceManager loadedResources;
 	std::string loadedUi;
 	{
 		project::Project p;
-		p.Register<project::SceneComponent>(loadedScene);
+		p.Register<project::ResourceComponent>(loadedResources);
+		p.Register<project::SceneComponent>(loadedScene, loadedResources);
 		p.Register<project::ConfigComponent>(loadedConfig);
 		p.Register<project::UIComponent>(loadedUi);
 		p.Load(tmp.path);
@@ -135,8 +141,10 @@ TEST(UIComponentRoundtrip, OldFormatMissingUiNode)
 	{
 		Scene scene;
 		RenderConfig config;
+		ResourceManager resources;
 		project::Project p;
-		p.Register<project::SceneComponent>(scene);
+		p.Register<project::ResourceComponent>(resources);
+		p.Register<project::SceneComponent>(scene, resources);
 		p.Register<project::ConfigComponent>(config);
 		p.Save(tmp.path);
 	}
@@ -147,8 +155,10 @@ TEST(UIComponentRoundtrip, OldFormatMissingUiNode)
 	{
 		Scene loadedScene;
 		RenderConfig loadedConfig;
+		ResourceManager loadedResources;
 		project::Project p;
-		p.Register<project::SceneComponent>(loadedScene);
+		p.Register<project::ResourceComponent>(loadedResources);
+		p.Register<project::SceneComponent>(loadedScene, loadedResources);
 		p.Register<project::ConfigComponent>(loadedConfig);
 		p.Register<project::UIComponent>(loadedUi);
 		EXPECT_NO_THROW(p.Load(tmp.path));

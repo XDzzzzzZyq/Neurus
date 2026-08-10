@@ -1,9 +1,9 @@
 /**
  * @file UID.cpp
- * @brief Implementation of UID and ObjectID base classes.
+ * @brief Implementation of the UID base class.
  */
 
-#include <scene/UID.h>
+#include "core/UID.h"
 
 namespace neurus
 {
@@ -16,17 +16,6 @@ int UID::s_count = 0;
 
 UID::UID()
 	: o_id(s_count++)
-{
-}
-
-// --- ObjectID -------------------------------------------------------------
-
-ObjectID::ObjectID()
-	: UID()
-{
-}
-
-ObjectID::~ObjectID()
 {
 }
 

@@ -63,7 +63,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Power";
 
-	LightPowerChanged MakeEvent(const ObjectID* o, const float& v) const
+	LightPowerChanged MakeEvent(int o, const float& v) const
 	{
 		return LightPowerChanged{ o, v };
 	}
@@ -76,7 +76,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Color";
 
-	LightColorChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
+	LightColorChanged MakeEvent(int o, const glm::vec3& v) const
 	{
 		return LightColorChanged{ o, v.r, v.g, v.b };
 	}
@@ -89,7 +89,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Toggle Light Shadow";
 
-	LightShadowChanged MakeEvent(const ObjectID* o, const bool& v) const
+	LightShadowChanged MakeEvent(int o, const bool& v) const
 	{
 		return LightShadowChanged{ o, v };
 	}
@@ -102,7 +102,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Move";
 
-	PositionChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
+	PositionChanged MakeEvent(int o, const glm::vec3& v) const
 	{
 		return PositionChanged{ o, v.x, v.y, v.z };
 	}
@@ -115,7 +115,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Rotate";
 
-	RotationChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
+	RotationChanged MakeEvent(int o, const glm::vec3& v) const
 	{
 		return RotationChanged{ o, v.x, v.y, v.z };
 	}
@@ -128,7 +128,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Scale";
 
-	ScaleChanged MakeEvent(const ObjectID* o, const glm::vec3& v) const
+	ScaleChanged MakeEvent(int o, const glm::vec3& v) const
 	{
 		return ScaleChanged{ o, v.x, v.y, v.z };
 	}
@@ -141,7 +141,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Visibility";
 
-	VisibilityChanged MakeEvent(const ObjectID* o, const VisibilityState& v) const
+	VisibilityChanged MakeEvent(int o, const VisibilityState& v) const
 	{
 		return VisibilityChanged{ o, v.viewportVisible, v.renderVisible };
 	}
@@ -154,7 +154,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Radius";
 
-	LightRadiusChanged MakeEvent(const ObjectID* o, const float& v) const
+	LightRadiusChanged MakeEvent(int o, const float& v) const
 	{
 		return LightRadiusChanged{ o, v };
 	}
@@ -167,7 +167,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Cutoff";
 
-	LightCutoffChanged MakeEvent(const ObjectID* o, const float& v) const
+	LightCutoffChanged MakeEvent(int o, const float& v) const
 	{
 		return LightCutoffChanged{ o, v };
 	}
@@ -180,7 +180,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Light Outer Cutoff";
 
-	LightOuterCutoffChanged MakeEvent(const ObjectID* o, const float& v) const
+	LightOuterCutoffChanged MakeEvent(int o, const float& v) const
 	{
 		return LightOuterCutoffChanged{ o, v };
 	}
@@ -193,7 +193,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Toggle Mesh Shadow";
 
-	MeshShadowChanged MakeEvent(const ObjectID* o, const bool& v) const
+	MeshShadowChanged MakeEvent(int o, const bool& v) const
 	{
 		return MeshShadowChanged{ o, v };
 	}
@@ -206,7 +206,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Toggle Mesh Material";
 
-	MeshMaterialChanged MakeEvent(const ObjectID* o, const bool& v) const
+	MeshMaterialChanged MakeEvent(int o, const bool& v) const
 	{
 		return MeshMaterialChanged{ o, v };
 	}
@@ -219,7 +219,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Environment Intensity";
 
-	EnvironmentIntensityChanged MakeEvent(const ObjectID* o, const float& v) const
+	EnvironmentIntensityChanged MakeEvent(int o, const float& v) const
 	{
 		return EnvironmentIntensityChanged{ o, v };
 	}
@@ -232,7 +232,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Set Environment Rotation";
 
-	EnvironmentRotationChanged MakeEvent(const ObjectID* o, const float& v) const
+	EnvironmentRotationChanged MakeEvent(int o, const float& v) const
 	{
 		return EnvironmentRotationChanged{ o, v };
 	}
@@ -258,7 +258,7 @@ public:
 	using TransitionOp::TransitionOp;
 	static constexpr const char* kLabel = "Camera Transform";
 
-	CameraPoseChanged MakeEvent(const ObjectID* o, const CameraPose& v) const
+	CameraPoseChanged MakeEvent(int o, const CameraPose& v) const
 	{
 		return CameraPoseChanged{ o,
 			v.position.x, v.position.y, v.position.z,
@@ -295,7 +295,7 @@ public:
 		return "camera_zoom:" + std::to_string(m_uid) + ":" + dir;
 	}
 
-	CameraPoseChanged MakeEvent(const ObjectID* o, const CameraPose& v) const
+	CameraPoseChanged MakeEvent(int o, const CameraPose& v) const
 	{
 		return CameraPoseChanged{ o,
 			v.position.x, v.position.y, v.position.z,
@@ -312,7 +312,7 @@ public:
 
 	std::string MergeKey() const override { return "camera_fov:" + std::to_string(m_uid); }
 
-	CameraFovChanged MakeEvent(const ObjectID* o, const float& v) const
+	CameraFovChanged MakeEvent(int o, const float& v) const
 	{
 		return CameraFovChanged{ o, v };
 	}
@@ -356,7 +356,7 @@ public:
 
 	void Apply(OperationContext& ctx) override
 	{
-		ctx.bus.emitNow(SelectionChanged{ &ctx.scene, m_after.selectedUids, m_after.activeUid });
+		ctx.events.emitNow(SelectionChanged{ m_after.selectedUids, m_after.activeUid });
 	}
 
 	std::unique_ptr<Operation> Inverse() const override
@@ -379,6 +379,76 @@ public:
 private:
 	SelectionState m_before;
 	SelectionState m_after;
+};
+
+/**
+ * @brief Scene-membership toggle: add (or re-add) / delete a batch of objects.
+ *
+ * Stores the target object UIDs plus an `add` flag. Apply() re-dispatches the
+ * ORIGINATING membership events (SceneObjectAddRequested per UID, or ONE
+ * batched SceneObjectDeleteRequested), so replay runs the same controller
+ * handler as a live edit; the handler's Submit is muted by OperationManager's
+ * Phase::Replaying guard, so playback does not re-record. Inverse() flips the
+ * flag — the inverse of Add is Delete and vice versa (the AddShaderFieldOp
+ * convention). Batching the delete direction keeps the composite light:
+ * delete-of-N records ONE op, not N.
+ *
+ * The pooled resources are NEVER removed — delete only drops the scene
+ * references, so the inverse re-registers without any reload from disk and
+ * survives project save/load (pool + history both persist).
+ *
+ * @note Replay re-enters the forward handler (harmless: Submit is muted). If
+ *       a handler carries gesture side effects (selection, gesture state)
+ *       that must NOT re-run on replay, give it a dedicated restore event
+ *       (ShaderCodeRestored convention) instead of the forward event — but
+ *       keep ops minimal by default.
+ */
+class SceneObjectAddOp : public Operation
+{
+public:
+	SceneObjectAddOp() = default;
+
+	/**
+	 * @brief Constructs a membership toggle over a batch of objects.
+	 * @param uids Target object UIDs (pooled resources).
+	 * @param add true = add/re-add all; false = remove all scene references.
+	 */
+	SceneObjectAddOp(std::vector<int> uids, bool add)
+		: m_uids(std::move(uids))
+		, m_add(add)
+	{}
+
+	void Apply(OperationContext& ctx) override
+	{
+		if (m_add)
+		{
+			for (int uid : m_uids)
+				ctx.events.emitNow(SceneObjectAddRequested{ uid });
+		}
+		else
+		{
+			ctx.events.emitNow(SceneObjectDeleteRequested{ m_uids });
+		}
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		return std::make_unique<SceneObjectAddOp>(m_uids, !m_add);
+	}
+
+	std::string Label() const override { return m_add ? "Add Object" : "Delete Object"; }
+
+	/** @brief Serializes the target UID list + membership direction. */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::make_nvp("uids", m_uids),
+		   cereal::make_nvp("add", m_add));
+	}
+
+private:
+	std::vector<int> m_uids;   ///< Target object UIDs (serialized).
+	bool m_add = false;        ///< true = add/re-add; false = remove (inverse direction).
 };
 
 } // namespace neurus

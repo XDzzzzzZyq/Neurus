@@ -4,8 +4,8 @@
  *
  * Environment represents a dome light / skybox that provides image-based
  * lighting via diffuse irradiance and specular prefiltered cubemaps.
- * It stores the source equirectangular HDR as CPU-side ImageData and
- * serialisable parameters (path, intensity, rotation).
+ * It wraps the source equirectangular HDR as CPU-side ImageData and holds
+ * serialisable parameters (intensity, rotation).
  *
  * CPU-only - GPU resources are owned by RenderCache (EnvironmentGPU).
  *
@@ -15,43 +15,65 @@
  * - Renderer reads EnvironmentGPU from RenderCache per-frame
  * - Editor mutates environment properties via events and controllers
  *
- * @note Serialization stores only the equirectangular path, not GPU textures.
+ * Layer isolation: Environment holds NO file paths. The source image path is
+ * a data-layer (ImageData) concern; Environment only wraps a shared
+ * ImageData (typically a pooled ResourceManager entry), so the pool tracks
+ * the ImageData's usage and lifetime.
+ *
+ * @note Serialization stores the pooled ImageData UID, not GPU textures.
  * @note Only one Environment is typically active per scene.
  */
 
 #pragma once
 
+#include <memory>
 #include <string>
 
-#include "UID.h"
+#include "scene/ObjectID.h"
 #include "Transform.h"
-#include "asset/data/ImageData.h"
 
 namespace neurus
 {
+	
+class ImageData;
 
 /**
  * @brief IBL environment map providing image-based lighting for the scene.
  *
- * Environment stores file paths, parameters, and CPU-side pixel data for
- * an HDR equirectangular map.  GPU resources (cubemaps, samplers) are
- * owned by RenderCache and created lazily via CreateEnvironmentGPU().
+ * Environment stores CPU-side pixel data for an HDR equirectangular map and
+ * serializable parameters. GPU resources (cubemaps, samplers) are owned by
+ * RenderCache and created lazily via CreateEnvironmentGPU().
  *
  * Resource Ownership:
- * - o_equirectData:   Owned ImageData (CPU-side equirectangular pixels)
- * - o_equirectPath:   Owned string (serialized, used for GPU reload)
+ * - o_equirectData:   Shared ImageData (CPU-side equirectangular pixels; must
+ *                     be a pooled resource from the ResourceManager)
  * - Transform3D:      Owned directly (skybox orientation rotation)
  *
+ * @note Environment has ZERO knowledge of file paths - the source path lives
+ *       in the data layer (ImageData). Load an ImageData through the
+ *       ResourceManager and wrap it here.
  * @note Inheritance: ObjectID for scene identity, Transform3D for rotation.
  * @note Thread-safety: Not thread-safe. Access from main thread only.
  */
 class Environment : public ObjectID, public Transform3D
 {
 public:
+	/** @brief GOType tag for runtime type discrimination. */
+	static constexpr ObjectID::GOType Type = ObjectID::GOType::GO_ENVIR;
+
 	/**
 	 * @brief Constructs an Environment with default IBL parameters.
 	 */
 	Environment();
+
+	/**
+	 * @brief Constructs an environment wrapping pooled equirect data.
+	 * @param data Shared ImageData (pooled resource) for the equirect map.
+	 * @note Sets o_equirectData + o_imageDataId; the environment is registered
+	 *       in the pool separately via ResourceManager::Load<Environment>.
+	 * @note No path is accepted - file paths belong to the data layer.
+	 */
+	explicit Environment(std::shared_ptr<ImageData> data);
 
 	/**
 	 * @brief Virtual destructor for polymorphic cleanup.
@@ -67,37 +89,19 @@ public:
 	// -----------------------------------------------------------------------
 
 	/**
-	 * @brief Returns a const reference to the CPU-side equirectangular pixel data.
-	 * @note Loaded from o_equirectPath on construction or via SetEquirectPath().
+	 * @brief Returns the CPU-side equirectangular pixel data (shared).
+	 * @note Set via SetEquirectData() (pooled ImageData) only - never loaded
+	 *       from a path inside the scene layer.
 	 */
-	const ImageData& GetEquirectData() const { return o_equirectData; }
+	std::shared_ptr<ImageData> GetEquirectData() const { return o_equirectData; }
 
 	/**
-	 * @brief Directly sets the CPU-side equirectangular pixel data (for tests/procedural data).
-	 * @param data ImageData to copy into the environment.
-	 * @note Bypasses file loading; not serialized.
+	 * @brief Directly sets the CPU-side equirectangular pixel data.
+	 * @param data Shared ImageData to reference (pooled resource).
+	 * @note No file loading; records the pooled ID for persistence.
+	 * @note Out-of-line: needs the complete ImageData type (GetObjectID).
 	 */
-	void SetEquirectData(const ImageData& data) { o_equirectData = data; }
-
-	// -----------------------------------------------------------------------
-	// File path
-	// -----------------------------------------------------------------------
-
-	/**
-	 * @brief Sets the equirectangular HDR source file path.
-	 *
-	 * The ImageData is NOT reloaded eagerly — UploadManager::UploadEnvironment()
-	 * handles lazy loading via GetEquirectData() with GetEquirectPath() fallback.
-	 *
-	 * @param path Path to the .hdr equirectangular map.
-	 */
-	void SetEquirectPath(const std::string& path);
-
-	/**
-	 * @brief Returns the current equirectangular HDR source file path.
-	 * @return Const reference to the path string.
-	 */
-	const std::string& GetEquirectPath() const { return o_equirectPath; }
+	void SetEquirectData(std::shared_ptr<ImageData> data);
 
 	// -----------------------------------------------------------------------
 	// Intensity
@@ -163,13 +167,8 @@ public:
 		return nullptr;
 	}
 
-	/** @brief Casts a const ObjectID* to an Environment* if its type is GO_ENVIR, else nullptr. */
-	static Environment* As(const ObjectID* obj)
-	{
-		if (!obj || obj->o_type != ObjectID::GOType::GO_ENVIR)
-			return nullptr;
-		return static_cast<Environment*>(const_cast<ObjectID*>(obj));
-	}
+	/// Pooled ImageData UID (0 = none); Scene::ResolveDataReferences wires it.
+	int o_imageDataId = 0;
 
 	// -----------------------------------------------------------------------
 	// Serialization (Cereal)
@@ -190,17 +189,16 @@ public:
 	{
 		ar(cereal::base_class<ObjectID>(this),
 		   cereal::make_nvp("transform", cereal::base_class<Transform3D>(this)),
-		   cereal::make_nvp("m_equirectPath", o_equirectPath),
+		   CEREAL_NVP(o_imageDataId),
 		   cereal::make_nvp("m_intensity", o_intensity),
 		   cereal::make_nvp("m_rotation", o_rotation));
 	}
 
 private:
-	std::string o_equirectPath;       ///< Source equirectangular HDR file path
 	float       o_intensity = 1.0f;   ///< IBL intensity multiplier
 	float       o_rotation  = 0.0f;   ///< Y-axis rotation in degrees
 
-	ImageData   o_equirectData;       ///< CPU-side equirectangular pixel data
+	std::shared_ptr<ImageData> o_equirectData;  ///< CPU-side equirectangular pixel data
 };
 
 } // namespace neurus

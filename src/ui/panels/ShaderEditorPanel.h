@@ -85,7 +85,7 @@ private:
 	QPushButton* m_createBtn  = nullptr;
 
 	// --- State ---
-	const ObjectID* m_activeObject    = nullptr;
+	int  m_activeObjectId     = 0;   // Active mesh UID (0 = none); compared for lazy updates.
 	int  m_cachedStageType      = 0;   // 0=VERTEX, 1=FRAGMENT
 	int  m_cachedShaderVersion  = -1;  // ShaderUnit::m_version; -1 = no shader
 	bool m_showingCreateButton  = false;

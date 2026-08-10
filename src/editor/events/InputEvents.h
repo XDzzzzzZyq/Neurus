@@ -45,4 +45,21 @@ struct MouseScrollEvent
 	bool              rightHeld; ///< Right mouse button is currently held.
 };
 
+/**
+ * @brief Pure UI->Editor intent: user clicked a scene-object row in the Outliner.
+ *
+ * Carries the object's integer UID only. The Editor wraps the intent and
+ * forwards the dedicated ObjectSelected event to controllers.
+ */
+struct ObjectClicked
+{
+	int objectUid = 0; ///< Clicked object UID (0 = none).
+	int modifiers = 0; ///< Input::Modifiers bitmask.
+};
+
+/** @brief Pure UI->Editor intent: user pressed Delete (Outliner or Viewport). */
+struct DeleteRequested
+{
+};
+
 } // namespace neurus

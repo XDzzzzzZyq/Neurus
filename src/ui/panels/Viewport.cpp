@@ -35,8 +35,10 @@ Viewport::~Viewport() = default;
 
 void Viewport::Refresh(const UIContext& /*ctx*/)
 {
-	// Viewport is event-driven: input forwarding and Vulkan rendering
-	// are handled outside the Qt widget refresh cycle.
+	// The viewport is pure input forwarding + Vulkan rendering - it holds no
+	// scene state. All events it emits (mouse, Delete) are pure intents; the
+	// Editor wraps the active scene and forwards dedicated events to
+	// controllers.
 }
 
 void Viewport::paintEvent(QPaintEvent* /*event*/)
@@ -57,6 +59,15 @@ void Viewport::resizeEvent(QResizeEvent* event)
 
 void Viewport::keyPressEvent(QKeyEvent* event)
 {
+	if (event->key() == Qt::Key_Delete)
+	{
+		// Delete: pure intent - remove ALL selected objects. The Editor wraps
+		// the active scene and forwards the batched ObjectDeleteRequested.
+		emit deleteRequested(DeleteRequested{});
+		event->accept();
+		return;
+	}
+
 	if (event->key() == Qt::Key_F12)
 	{
 		if (event->modifiers() == Qt::NoModifier)

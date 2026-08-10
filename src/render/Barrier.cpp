@@ -164,6 +164,38 @@ void Barrier::Transition(VkCommandBuffer cmd,
 }
 
 // ---------------------------------------------------------------------------
+// ReleaseToRead (transfer-queue upload release — no graphics dstStage)
+// ---------------------------------------------------------------------------
+
+void Barrier::ReleaseToRead(VkCommandBuffer cmd,
+                            vk::Image image,
+                            ImageState before,
+                            const vk::ImageSubresourceRange& subresourceRange)
+{
+	const auto beforeState = ToVulkanImageState(before);
+
+	// Make transfer writes available to subsequent graphics usage WITHOUT a
+	// graphics-stage dstStageMask, which is invalid on transfer-only command
+	// pools (VUID-vkCmdPipelineBarrier2-dstStageMask-09676). The layout still
+	// becomes ShaderReadOnlyOptimal so the graphics side can sample the image;
+	// the consuming pass re-transitions it on first use.
+	const vk::ImageMemoryBarrier2 barrier(
+		beforeState.stage,
+		beforeState.access,
+		vk::PipelineStageFlagBits2::eBottomOfPipe,
+		vk::AccessFlagBits2::eNone,
+		beforeState.layout,
+		vk::ImageLayout::eShaderReadOnlyOptimal,
+		VK_QUEUE_FAMILY_IGNORED,
+		VK_QUEUE_FAMILY_IGNORED,
+		image,
+		subresourceRange);
+
+	const vk::DependencyInfo depInfo({}, {}, {}, barrier);
+	vk::CommandBuffer(cmd).pipelineBarrier2(depInfo);
+}
+
+// ---------------------------------------------------------------------------
 // Buffer state → Vulkan mapping
 // ---------------------------------------------------------------------------
 

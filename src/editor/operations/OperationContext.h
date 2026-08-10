@@ -2,37 +2,29 @@
  * @file OperationContext.h
  * @brief Per-replay context passed to Operation::Apply().
  *
- * Bundles the live Scene (for resolving an operation's stored UID back to the
- * current object) and the EventQueue used to replay the operation's event.
- * Constructed fresh by OperationManager on each Undo/Redo, so it always
- * references the current scene even after a scene swap (New/Load).
+ * Operations are pure value descriptors: they replay by dispatching their
+ * absolute-set event SYNCHRONOUSLY on the event queue, carrying integer object
+ * UIDs. They never resolve objects themselves — the controller handler that
+ * receives the replayed event resolves the UID against the current scene/pool
+ * via its ControllerContext (stale UIDs no-op there). The OperationManager
+ * therefore needs no scene or resource access at replay time.
  *
- * Following EditorContext, `scene` is held as its `UID` base so this header does
- * not pull in the heavier scene/Scene.h; the UID -> object resolution downcast
- * lives in OperationContext.cpp.
+ * Constructed fresh by OperationManager on each Undo/Redo from its EventQueue.
  */
 
 #pragma once
 
-#include "editor/events/EventBus.h"
-#include "scene/UID.h"
+#include "editor/events/IEventQueue.h"
 
 namespace neurus {
 
 /**
- * @brief Context for replaying an operation (scene + event queue).
+ * @brief Context for replaying an operation (event dispatch only).
  */
 struct OperationContext
 {
-	UID& scene;      ///< Live scene (upcast to UID base), for UID -> object resolution.
-	EventQueue& bus; ///< Queue the operation replays its event on (via emitNow).
-
-	/**
-	 * @brief Resolves a stored UID to the current scene object.
-	 * @param uid Object UID captured when the operation was recorded.
-	 * @return Non-owning object pointer, or nullptr if no longer present.
-	 */
-	ObjectID* Resolve(int uid) const;
+	/// @brief Queue the operation replays its event on (via emitNow).
+	IEventQueue& events;
 };
 
 } // namespace neurus

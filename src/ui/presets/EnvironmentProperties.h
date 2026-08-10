@@ -2,9 +2,10 @@
  * @file EnvironmentProperties.h
  * @brief Environment (IBL) property editor subpanel.
  *
- * Displays o_intensity and o_rotation as ScalarSliders, and
- * o_equirectPath as a read-only label. All edits emit signals
- * carrying the object ID for routing through the Editor event system.
+ * Displays o_intensity and o_rotation as ScalarSliders, and the pooled
+ * ImageData source path as a read-only label (fed via setEquirectPath()).
+ * All edits emit signals carrying the object ID for routing through the
+ * Editor event system.
  *
  * Architecture:
  * - QWidget subclass with two QGroupBox sections: "Equirectangular Map"
@@ -34,8 +35,8 @@ class ScalarSlider;
  *
  * Layout:
  *   [Equirectangular Map group]
- *     o_equirectPath  (readonly QLabel, gray, smaller font, word-wrapped,
- *                      text-selectable)
+ *     Source path   (readonly QLabel, gray, smaller font, word-wrapped,
+ *                    text-selectable; path owned by the pooled ImageData)
  *   [IBL Parameters group]
  *     Intensity       (ScalarSlider: 0–10, initial 1.0)
  *     Rotation (°)    (ScalarSlider: 0–360, initial 0.0)

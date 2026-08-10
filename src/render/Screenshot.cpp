@@ -314,13 +314,13 @@ std::string Screenshot::ExportShadowDepthEquirect(RenderCache& renderCache,
 	auto equirectData = equirectImage.ReadImageData(
 		m_device, m_physicalDevice, m_queue, m_queueFamilyIndex);
 
-	if (!equirectData.IsValid())
+	if (!equirectData || !equirectData->IsValid())
 	{
 		NEURUS_ERR("[ExportShadowDepthEquirect] Readback failed for lightUID=" << lightUID);
 		return {};
 	}
 
-	const auto& rawPixelData = equirectData.GetPixelData();
+	const auto& rawPixelData = equirectData->GetPixelData();
 	const size_t pixelCount = static_cast<size_t>(equiWidth) * equiHeight;
 	std::vector<uint8_t> grayPixels(pixelCount);
 
@@ -370,14 +370,14 @@ std::string Screenshot::ExportShadowDepth(RenderCache& renderCache,
 	auto depthData = depthMap.ReadImageData(
 		m_device, m_physicalDevice, m_queue, m_queueFamilyIndex);
 
-	if (!depthData.IsValid())
+	if (!depthData || !depthData->IsValid())
 	{
 		NEURUS_ERR("[ExportShadowDepth] Readback failed for 2D sun shadow lightUID=" << lightUID);
 		return {};
 	}
 
 	// Convert D32 float depth → R8 grayscale
-	const auto& rawPixels = depthData.GetPixelData();
+	const auto& rawPixels = depthData->GetPixelData();
 	const size_t pixelCount = static_cast<size_t>(extent.width) * extent.height;
 	std::vector<uint8_t> grayPixels(pixelCount);
 
@@ -667,13 +667,13 @@ bool Screenshot::CaptureImageLayer(const vk::raii::Device& device,
 	auto imageData = vulkanImage.ReadImageData(
 		device, physicalDevice, queue, queueFamilyIndex, &layerRange);
 
-	if (!imageData.IsValid())
+	if (!imageData || !imageData->IsValid())
 	{
 		NEURUS_ERR("[Screenshot] CaptureImageLayer: readback failed for layer " << layerIndex);
 		return false;
 	}
 
-	const bool saved = imageData.SavePNG(path);
+	const bool saved = imageData->SavePNG(path);
 
 	// Restore original layout so rendering can continue without validation errors.
 	// ReadImageData transitions to TransferSrc but the image must be returned

@@ -73,13 +73,11 @@ public:
 
 	~ComputeShader() override = default;
 
-	// Non-copyable (inherits from Shader)
+	// Non-copyable / non-movable (inherits UID semantics).
 	ComputeShader(const ComputeShader&) = delete;
 	ComputeShader& operator=(const ComputeShader&) = delete;
-
-	// Movable
-	ComputeShader(ComputeShader&&) noexcept = default;
-	ComputeShader& operator=(ComputeShader&&) noexcept = default;
+	ComputeShader(ComputeShader&&) = delete;
+	ComputeShader& operator=(ComputeShader&&) = delete;
 
 	// ----------------------------------
 	// Shader interface (override)

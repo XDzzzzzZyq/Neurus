@@ -33,6 +33,7 @@
 #include "editor/events/InputEvents.h"
 #include "asset/Project.h"
 #include "asset/components/SceneComponent.h"
+#include "asset/components/ResourceComponent.h"
 #include "asset/components/ConfigComponent.h"
 #include "asset/components/UIComponent.h"
 #include "asset/components/HistoryComponent.h"
@@ -77,13 +78,18 @@ static QString resolveResourcePath(const char* relativePath)
 	return QCoreApplication::applicationDirPath() + "/res/" + relativePath;
 }
 
-// Registers the three cross-layer components against live data each call:
-// Scene + RenderConfig (Editor-owned) and the UI-state blob (Application-owned).
+// Registers the cross-layer components against live data each call:
+// Scene + RenderConfig (Editor-owned), the ResourceManager pool (Editor-owned,
+// registered FIRST so it deserializes before the Scene resolves references),
+// and the UI-state blob (Application-owned).
 static void BuildProject(neurus::project::Project& proj,
                          neurus::Editor& editor,
                          std::string& uiLayout)
 {
-	proj.Register<neurus::project::SceneComponent>(editor.GetScene());
+	// Resource pool first: the Scene's ID references resolve against it.
+	proj.Register<neurus::project::ResourceComponent>(editor.GetResourceManager());
+	proj.Register<neurus::project::SceneComponent>(editor.GetScene(),
+	                                                editor.GetResourceManager());
 	proj.Register<neurus::project::ConfigComponent>(editor.GetRenderConfig());
 	proj.Register<neurus::project::UIComponent>(uiLayout);
 	// History last: legacy files without an "m_history" node load cleanly
@@ -151,9 +157,9 @@ int Application::Run()
 	InitEditor();
 
 	const auto projectPath = resolveResourcePath("shadow.neurus.json").toStdString();
-	const auto assetDir = resolveResourcePath("").toStdString();
-	const auto objPath = resolveResourcePath("obj/sphere.obj").toStdString();
-	app_editor->SetAssetDir(assetDir);
+	// Relative path: pooled resources store relative "res/..." paths so project
+	// files stay portable; the asset layer resolves them against the res dir.
+	const std::string objPath = "res/obj/sphere.obj";
 
 	try
 	{
@@ -174,10 +180,8 @@ int Application::Run()
 	{
 		NEURUS_LOG("[Application] Project file not found, creating default: " << e.what());
 		app_editor->CreateDefaultScene(objPath);
-		// Store relative paths in the project file for portability
-		for (auto& [id, mesh] : app_editor->GetScene().mesh_list)
-			mesh->o_meshPath = "obj/sphere.obj";
-		// Save for future runs (captures the current default UI layout too)
+		// Save for future runs (captures the current default UI layout too);
+		// relative res/... paths are stored inside the pooled data resources.
 		OnProjectSave(projectPath);
 	}
 
@@ -444,8 +448,9 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 	// --- Outliner selection → Editor (via ConnectUIEvent → EventQueue) ---
 	if (auto* outliner = app_mainWindow->GetPanel<neurus::Outliner>())
 	{
-		ConnectUIEvent(outliner, &neurus::Outliner::objectSelected);
+		ConnectUIEvent(outliner, &neurus::Outliner::objectClicked);
 		ConnectUIEvent(outliner, &neurus::Outliner::visibilityChanged);
+		ConnectUIEvent(outliner, &neurus::Outliner::deleteRequested);
 	}
 
 	// --- Viewport signals: resize + camera control + pixel selection ---
@@ -470,6 +475,9 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		ConnectUIEvent(viewport, &neurus::Viewport::mousePressed);
 		ConnectUIEvent(viewport, &neurus::Viewport::mouseReleased);
 
+		// Forward the Delete key (remove all selected objects).
+		ConnectUIEvent(viewport, &neurus::Viewport::deleteRequested);
+
 		// Handle left-click for pixel-perfect object selection via IDBuffer
 		QObject::connect(viewport, &neurus::Viewport::mousePressed,
 		                 [this, viewport](const neurus::MousePressEvent& e) {
@@ -493,8 +501,7 @@ void Application::PanelSignals(neurus::UIEvents& uiEvents)
 		                     // Forward to Editor; objectID=0 means background
 		                     // (handled by SelectObject → ClearSelection).
 		                     ObjectSelected selEvent {
-		                         &app_editor->GetScene(),
-		                         app_editor->GetScene().GetObjectID(static_cast<int>(objectID)),
+		                         static_cast<int>(objectID),
 		                         static_cast<int>(e.modifiers)
 		                     };
 		                     app_editor->OnUIEvent(selEvent);

@@ -26,7 +26,10 @@
 #include "editor/controllers/CameraController.h"
 #include "editor/events/CameraEvents.h"
 #include "editor/operations/OperationManager.h"
+#include "core/ResourceManager.h"
 #include "scene/Camera.h"
+#include "scene/Scene.h"
+#include "render/RenderConfig.h"
 
 using namespace neurus;
 
@@ -51,9 +54,10 @@ class CameraControllerTest : public ::testing::Test
 	protected:
 	void SetUp() override
 	{
-		m_camera = std::make_unique<Camera>();
+		m_camera = std::make_shared<Camera>();
+		m_scene.UseCamera(m_camera);
 		m_controller = std::make_unique<CameraController>();
-		m_controller->Init(m_eventBus, m_operations);
+		m_controller->Init(m_ctx);
 	}
 
 	void TearDown() override
@@ -62,8 +66,14 @@ class CameraControllerTest : public ::testing::Test
 	}
 
 	EventQueue m_eventBus;
-	OperationManager m_operations{ m_eventBus, []() -> Scene* { return nullptr; } };
-	std::unique_ptr<Camera> m_camera;
+	Scene m_scene;
+	OperationManager m_operations{ m_eventBus };
+	ResourceManager m_resources;
+	RenderConfig m_config;
+	ControllerContext m_ctx{ m_eventBus, m_resources, m_operations,
+	                         [this]() { return &m_scene; },
+	                         [this]() { return &m_config; } };
+	std::shared_ptr<Camera> m_camera;
 	std::unique_ptr<CameraController> m_controller;
 };
 
@@ -84,7 +94,7 @@ TEST_F(CameraControllerTest, Orbit_MMB_Right_Drag_AzimuthIncreases)
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraRotateEvent e{m_camera.get(), 10.0f, 0.0f};
+	CameraRotateEvent e{m_camera->GetObjectID(), 10.0f, 0.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -108,7 +118,7 @@ TEST_F(CameraControllerTest, Orbit_MMB_Up_Drag_ElevationIncreases)
 	const float initialZ = m_camera->GetPosition().z;
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraRotateEvent e{m_camera.get(), 0.0f, -10.0f}; // deltaY negative = drag up = look down
+	CameraRotateEvent e{m_camera->GetObjectID(), 0.0f, -10.0f}; // deltaY negative = drag up = look down
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -130,7 +140,7 @@ TEST_F(CameraControllerTest, Orbit_Clamp_Elevation_89_Degrees)
 	m_camera->SetPosition(glm::vec3(0.0f, 0.0f, 5.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	CameraRotateEvent e{m_camera.get(), 0.0f, 1000.0f};
+	CameraRotateEvent e{m_camera->GetObjectID(), 0.0f, 1000.0f};
 
 	// Should not crash or assert
 	EXPECT_NO_FATAL_FAILURE(
@@ -171,7 +181,7 @@ TEST_F(CameraControllerTest, Zoom_ScrollUp_Decreases_Distance)
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraZoomEvent e{m_camera.get(), 1.0f};
+	CameraZoomEvent e{m_camera->GetObjectID(), 1.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -193,7 +203,7 @@ TEST_F(CameraControllerTest, Zoom_ScrollDown_Increases_Distance)
 	const float initialDist = DistanceToTarget(*m_camera);
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraZoomEvent e{m_camera.get(), -1.0f};
+	CameraZoomEvent e{m_camera->GetObjectID(), -1.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -213,7 +223,7 @@ TEST_F(CameraControllerTest, Zoom_Clamp_MinRadius)
 	m_camera->SetPosition(glm::vec3(0.0f, 0.01f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	CameraZoomEvent e{m_camera.get(), 1.0f}; // Try to zoom in more
+	CameraZoomEvent e{m_camera->GetObjectID(), 1.0f}; // Try to zoom in more
 
 	EXPECT_NO_FATAL_FAILURE(
 		m_eventBus.enqueue(e);
@@ -244,7 +254,7 @@ TEST_F(CameraControllerTest, Dolly_CtrlMMB_MovesAlongForward)
 	const float initialY = m_camera->GetPosition().y;
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraPushEvent e{m_camera.get(), 0.0f, 10.0f};
+	CameraPushEvent e{m_camera->GetObjectID(), 0.0f, 10.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -293,7 +303,7 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Right_MovesCameraAndTarget)
 	const glm::vec3 initialPos = m_camera->GetPosition();
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
-	CameraSlideEvent e{m_camera.get(), 10.0f, 0.0f};
+	CameraSlideEvent e{m_camera->GetObjectID(), 10.0f, 0.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -323,7 +333,7 @@ TEST_F(CameraControllerTest, Pan_ShiftMMB_Up_MovesUp)
 	const float initialZ = m_camera->GetPosition().z;
 	const float initialTarZ = m_camera->cam_tar.z;
 
-	CameraSlideEvent e{m_camera.get(), 0.0f, 10.0f};
+	CameraSlideEvent e{m_camera->GetObjectID(), 0.0f, 10.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -350,8 +360,8 @@ TEST_F(CameraControllerTest, Edge_CameraAtTarget_NoCrash)
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
 	EXPECT_NO_FATAL_FAILURE(
-		m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 10.0f});
-		m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), 5.0f});
+		m_eventBus.enqueue(CameraRotateEvent{m_camera->GetObjectID(), 10.0f, 10.0f});
+		m_eventBus.enqueue(CameraZoomEvent{m_camera->GetObjectID(), 5.0f});
 		m_eventBus.Process();
 	);
 
@@ -393,7 +403,7 @@ TEST_F(CameraControllerTest, Edge_ModifierConflict_CtrlWins)
 	const glm::vec3 initialTar = m_camera->cam_tar;
 
 	// Ctrl wins → CameraPushEvent (dolly), not CameraSlideEvent (pan)
-	CameraPushEvent e{m_camera.get(), 0.0f, 10.0f};
+	CameraPushEvent e{m_camera->GetObjectID(), 0.0f, 10.0f};
 	m_eventBus.enqueue(e);
 	m_eventBus.Process();
 
@@ -425,10 +435,10 @@ TEST_F(CameraControllerTest, DragGesture_RecordsSingleUndoEntry)
 	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	m_eventBus.enqueue(CameraDragBegin{m_camera.get()});
-	m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
-	m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
-	m_eventBus.enqueue(CameraDragEnd{m_camera.get()});
+	m_eventBus.enqueue(CameraDragBegin{m_camera->GetObjectID()});
+	m_eventBus.enqueue(CameraRotateEvent{m_camera->GetObjectID(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraRotateEvent{m_camera->GetObjectID(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraDragEnd{m_camera->GetObjectID()});
 	m_eventBus.Process();
 
 	ASSERT_TRUE(m_operations.CanUndo());
@@ -453,9 +463,9 @@ TEST_F(CameraControllerTest, ThreeDragGestures_RecordThreeSeparateEntries)
 
 	for (int i = 0; i < 3; ++i)
 	{
-		m_eventBus.enqueue(CameraDragBegin{m_camera.get()});
-		m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
-		m_eventBus.enqueue(CameraDragEnd{m_camera.get()});
+		m_eventBus.enqueue(CameraDragBegin{m_camera->GetObjectID()});
+		m_eventBus.enqueue(CameraRotateEvent{m_camera->GetObjectID(), 10.0f, 0.0f});
+		m_eventBus.enqueue(CameraDragEnd{m_camera->GetObjectID()});
 		m_eventBus.Process();
 	}
 
@@ -482,9 +492,9 @@ TEST_F(CameraControllerTest, DragMoves_WithoutGesture_RecordNothing)
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	const glm::vec3 posBefore = m_camera->GetPosition();
 
-	m_eventBus.enqueue(CameraRotateEvent{m_camera.get(), 10.0f, 0.0f});
-	m_eventBus.enqueue(CameraSlideEvent{m_camera.get(), 10.0f, 0.0f});
-	m_eventBus.enqueue(CameraPushEvent{m_camera.get(), 0.0f, 10.0f});
+	m_eventBus.enqueue(CameraRotateEvent{m_camera->GetObjectID(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraSlideEvent{m_camera->GetObjectID(), 10.0f, 0.0f});
+	m_eventBus.enqueue(CameraPushEvent{m_camera->GetObjectID(), 0.0f, 10.0f});
 	m_eventBus.Process();
 
 	// Camera moved live...
@@ -504,8 +514,8 @@ TEST_F(CameraControllerTest, DragGesture_NoMovement_RecordsNothing)
 	m_camera->SetPosition(glm::vec3(5.0f, 0.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	m_eventBus.enqueue(CameraDragBegin{m_camera.get()});
-	m_eventBus.enqueue(CameraDragEnd{m_camera.get()});
+	m_eventBus.enqueue(CameraDragBegin{m_camera->GetObjectID()});
+	m_eventBus.enqueue(CameraDragEnd{m_camera->GetObjectID()});
 	m_eventBus.Process();
 
 	EXPECT_FALSE(m_operations.CanUndo());
@@ -523,7 +533,7 @@ TEST_F(CameraControllerTest, ScrollZoom_RecordsPerEvent_WithoutGesture)
 	m_camera->SetPosition(glm::vec3(0.0f, 5.0f, 0.0f));
 	m_camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 
-	m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), 1.0f});
+	m_eventBus.enqueue(CameraZoomEvent{m_camera->GetObjectID(), 1.0f});
 	m_eventBus.Process();
 
 	EXPECT_TRUE(m_operations.CanUndo());
@@ -545,15 +555,15 @@ TEST_F(CameraControllerTest, ScrollZoom_DirectionChangeBreaksMerge)
 
 	// Three zoom-in notches -> one merged undo entry.
 	for (int i = 0; i < 3; ++i)
-		m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), 1.0f});
+		m_eventBus.enqueue(CameraZoomEvent{m_camera->GetObjectID(), 1.0f});
 	m_eventBus.Process();
 
 	// One zoom-out notch -> direction changed, so a NEW entry is recorded.
-	m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), -1.0f});
+	m_eventBus.enqueue(CameraZoomEvent{m_camera->GetObjectID(), -1.0f});
 	m_eventBus.Process();
 
 	// Another zoom-out notch -> same direction as the previous, merges with it.
-	m_eventBus.enqueue(CameraZoomEvent{m_camera.get(), -1.0f});
+	m_eventBus.enqueue(CameraZoomEvent{m_camera->GetObjectID(), -1.0f});
 	m_eventBus.Process();
 
 	// Still exactly two entries: the merged zoom-in run and the merged

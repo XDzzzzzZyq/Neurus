@@ -19,8 +19,9 @@ class EnvironmentProperties;
  * @brief Property Panel displaying type/name header, editable transform, and
  *        type-specific property subpanels for the active scene object.
  *
- * Refresh() reads the active object from UIContext::scene→selections each frame,
- * displaying its o_name with type icon and populating the Position / Rotation / Scale
+ * Refresh() reads the active object's integer UID from UIContext::scene→
+ * selections each frame (comparing the int for lazy header updates), displaying
+ * its o_name with type icon and populating the Position / Rotation / Scale
  * Vec3Spin widgets from its Transform3D. Additionally, shows/hides a type-specific
  * subpanel (Camera, Mesh, Light, Environment) based on GOType.
  *
@@ -81,7 +82,7 @@ private:
 	void SetEnabled(bool enabled);
 
 	// --- State ---
-	const ObjectID* m_activeObject = nullptr;
+	int m_activeObjectId = 0;  ///< Active object UID (0 = none); compared for lazy updates.
 
 	// --- Header ---
 	QWidget* m_headerWidget = nullptr;

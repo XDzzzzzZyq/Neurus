@@ -297,11 +297,12 @@ std::vector<float> VulkanTestShared::ReadbackHdrOutput(
 	                                  vk::Extent2D{renderWidth, renderHeight});
 
 	auto imgData = hdrColor.ReadImageData(device, pd, queue, qfi);
+	if (!imgData) return {};
 
 	// Convert half-float → float
 	const uint32_t pixelCount = renderWidth * renderHeight;
 	std::vector<float> result(pixelCount * 4);
-	const auto* src = reinterpret_cast<const uint16_t*>(imgData.GetPixelData().data());
+	const auto* src = reinterpret_cast<const uint16_t*>(imgData->GetPixelData().data());
 	for (size_t i = 0; i < pixelCount * 4; ++i)
 	{
 		result[i] = HalfToFloat(src[i]);

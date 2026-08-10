@@ -1,17 +1,21 @@
 /**
  * @file SceneEvents.h
- * @brief Ephemeral scene-domain events (UI -> Editor -> SceneController).
+ * @brief Scene-domain events (UI -> Editor -> SceneController).
  *
- * Events are ephemeral: they are enqueued and processed within a single frame
- * and destroyed after execution. They carry object/scene POINTERS instead of
- * IDs so controllers never re-fetch objects from the Scene by ID:
- * - const ObjectID* object — the scene object being mutated (cast to the
- *   concrete type in the controller .cpp via the class static As() helper).
- * - const UID* scene       — the Editor-owned Scene, only for events whose
- *   handler touches scene-owned state (selection).
+ * Events are ephemeral value structs that carry plain INTEGER ids instead of
+ * object/scene pointers: raw pointers can dangle after an object is deleted,
+ * while a UID stays a stable identity that controllers resolve against the
+ * current scene/pool at dispatch time.
  *
- * The UI layer emits COMPLETE events (panels hold the scene pointer as UI
- * state, set during Refresh()); Editor::OnUIEvent just enqueues them unchanged.
+ * - int objectUid - the scene object being mutated (0 = none). Controllers
+ *   resolve it to a live object via the ControllerContext (scene lookup for
+ *   property edits, pool lookup for membership).
+ * - The scene is NOT carried in events: scene-scoped handlers obtain the
+ *   current Scene from the ControllerContext, so a scene swap on New/Load can
+ *   never leave an event holding a stale scene pointer.
+ *
+ * The UI layer emits PURE INPUT INTENTS on the UI->Editor path; scene editing
+ * events carry int objectUid and Editor::OnUIEvent enqueues them unchanged.
  */
 
 #pragma once
@@ -21,9 +25,6 @@
 
 namespace neurus {
 
-class ObjectID;
-class UID;
-
 // ---------------------------------------------------------------------------
 // Selection
 // ---------------------------------------------------------------------------
@@ -31,16 +32,14 @@ class UID;
 /** @brief Emitted when a scene object is selected (outliner click / viewport pick). */
 struct ObjectSelected
 {
-	const UID* scene = nullptr;       ///< Editor-owned Scene (selection state).
-	const ObjectID* object = nullptr; ///< Selected object (nullptr = background click).
-	int modifiers = 0;                ///< Input::Modifiers bitmask.
+	int objectUid = 0; ///< Selected object UID (0 = background click).
+	int modifiers = 0; ///< Input::Modifiers bitmask.
 };
 
 /** @brief Emitted when a scene object is deselected. */
 struct ObjectDeselected
 {
-	const UID* scene = nullptr;
-	const ObjectID* object = nullptr;
+	int objectUid = 0; ///< Object UID to deselect.
 };
 
 /**
@@ -53,9 +52,8 @@ struct ObjectDeselected
  */
 struct SelectionChanged
 {
-	const UID* scene = nullptr;       ///< Editor-owned Scene (selection state).
-	std::vector<int> selectedUids;    ///< Ordered selected object UIDs.
-	int activeUid = 0;                ///< Active object UID (0 = none).
+	std::vector<int> selectedUids; ///< Ordered selected object UIDs.
+	int activeUid = 0;             ///< Active object UID (0 = none).
 };
 
 // ---------------------------------------------------------------------------
@@ -65,9 +63,9 @@ struct SelectionChanged
 /** @brief Emitted when object visibility toggles change in the outliner. */
 struct VisibilityChanged
 {
-	const ObjectID* object = nullptr;     ///< Object handle.
-	bool viewportVisible = true;          ///< Viewport (editor) visibility.
-	bool renderVisible = true;            ///< Render (pipeline) visibility.
+	int objectUid = 0; ///< Object UID.
+	bool viewportVisible = true; ///< Viewport (editor) visibility.
+	bool renderVisible = true;   ///< Render (pipeline) visibility.
 };
 
 // ---------------------------------------------------------------------------
@@ -77,7 +75,7 @@ struct VisibilityChanged
 /** @brief Emitted when the position of an object is edited. */
 struct PositionChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float posX = 0.0f;
 	float posY = 0.0f;
 	float posZ = 0.0f;
@@ -86,7 +84,7 @@ struct PositionChanged
 /** @brief Emitted when the rotation of an object is edited (degrees, Z-up Euler). */
 struct RotationChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float rotX = 0.0f;
 	float rotY = 0.0f;
 	float rotZ = 0.0f;
@@ -95,7 +93,7 @@ struct RotationChanged
 /** @brief Emitted when the scale of an object is edited. */
 struct ScaleChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float sclX = 1.0f;
 	float sclY = 1.0f;
 	float sclZ = 1.0f;
@@ -107,7 +105,7 @@ struct ScaleChanged
 
 struct CameraTargetChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float targetX = 0.0f;
 	float targetY = 0.0f;
 	float targetZ = 0.0f;
@@ -115,7 +113,7 @@ struct CameraTargetChanged
 
 struct CameraFovChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float fov = 60.0f;
 };
 
@@ -128,7 +126,7 @@ struct CameraFovChanged
  */
 struct CameraPoseChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float posX = 0.0f;
 	float posY = 0.0f;
 	float posZ = 0.0f;
@@ -143,13 +141,13 @@ struct CameraPoseChanged
 
 struct MeshShadowChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	bool enabled = true;
 };
 
 struct MeshMaterialChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	bool enabled = true;
 };
 
@@ -159,13 +157,13 @@ struct MeshMaterialChanged
 
 struct LightPowerChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float power = 10.0f;
 };
 
 struct LightColorChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float r = 1.0f;
 	float g = 1.0f;
 	float b = 1.0f;
@@ -173,25 +171,25 @@ struct LightColorChanged
 
 struct LightRadiusChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float radius = 0.05f;
 };
 
 struct LightShadowChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	bool enabled = true;
 };
 
 struct LightCutoffChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float cutoff = 0.9f;
 };
 
 struct LightOuterCutoffChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float outerCutoff = 0.8f;
 };
 
@@ -201,14 +199,61 @@ struct LightOuterCutoffChanged
 
 struct EnvironmentIntensityChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float intensity = 1.0f;
 };
 
 struct EnvironmentRotationChanged
 {
-	const ObjectID* object = nullptr;
+	int objectUid = 0;
 	float rotation = 0.0f;
+};
+
+// ---------------------------------------------------------------------------
+// Scene membership (Add / Delete)
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Adds an object to the scene.
+ *
+ * Emitted by the Editor after loading a resource into the pool (mesh import,
+ * camera/light add) AND by SceneObjectAddOp on undo/redo replay (the
+ * originating event — replay runs the same handler as a live edit; the
+ * handler's Submit is muted by Phase::Replaying). Carries the object UID; the
+ * SceneController fetches the pooled object from the resource pool by UID,
+ * registers it, selects it, and records the composite operation.
+ */
+struct SceneObjectAddRequested
+{
+	int objectUid = 0; ///< Pooled object UID.
+};
+
+/**
+ * @brief Removes a BATCH of objects' scene references.
+ *
+ * The SINGLE removal path: emitted by the delete gesture (one event carrying
+ * all selected UIDs) AND by SceneObjectAddOp (delete direction) on undo/redo
+ * replay. The handler removes exactly these UIDs — no selection logic, no
+ * operation recording (the gesture records the composite; replay is muted).
+ * The pooled resources are never removed from the pool.
+ */
+struct SceneObjectDeleteRequested
+{
+	std::vector<int> uids; ///< Object UIDs to remove (one or more).
+};
+
+/**
+ * @brief Editor->Controller delete gesture: delete ALL selected objects (Delete key).
+ *
+ * Dedicated Editor->Controller event: the Editor emits it (wrapping the pure
+ * DeleteRequested input intent). FORWARD-ONLY: the recorded composite replays
+ * via SceneObjectDeleteRequested, never this gesture event. The SceneController
+ * snapshots the selection, guards the last camera, deselects, removes every
+ * selected object (one batched SceneObjectDeleteRequested), and records ONE
+ * composite operation (selection-clear + batched delete).
+ */
+struct ObjectDeleteRequested
+{
 };
 
 } // namespace neurus

@@ -35,7 +35,7 @@
 #include <cereal/types/memory.hpp>
 #include <cereal/types/unordered_map.hpp>
 
-#include "UID.h"
+#include "scene/ObjectID.h"
 #include "core/Selections.h"
 
 #include "Camera.h"
@@ -50,6 +50,7 @@ namespace neurus
 {
 
 class Scene;
+class ResourceManager;
 
 /**
  * @brief Snapshots a pointer-based selection set as absolute object UIDs.
@@ -156,28 +157,39 @@ public:
 	~Scene();
 
 	/**
-	 * @brief Cereal serialization for scene pools and selection state.
+	 * @brief Cereal serialization for scene ID references and selection state.
 	 * @tparam Archive Cereal archive type (input or output).
 	 * @param ar Archive to serialize to/from.
-	 * @note Only typed pools are serialized. obj_list (master pool) is
-	 *       reconstructed from typed pools on deserialization.
-	 *       m_status (runtime state) is not serialized.
+	 * @note Scene owns no pooled objects: it serializes ONLY typed ID lists
+	 *       (the ResourceManager pool owns and serializes the real objects).
+	 *       obj_list (master pool) is reconstructed from the typed pools by
+	 *       ResolveReferences after the ID lists resolve.
 	 * @note Selection is stored at runtime as pointers (const ObjectID*) but
-	 *       persisted as object UIDs, mirroring SelectionState in
-	 *       SceneOperations.h. On load, UIDs are resolved back to pointers via
-	 *       GetObjectID() AFTER obj_list is rebuilt. The selection block is
-	 *       optional: legacy project files that predate it load with an empty
-	 *       selection instead of failing.
+	 *       persisted as object UIDs; ResolveReferences restores the selection
+	 *       AFTER obj_list is rebuilt. The selection block is optional:
+	 *       legacy project files that predate it load with an empty selection.
+	 * @note Legacy files (old full-pool "m_scene" format) fail to read the ID
+	 *       lists and degrade to an empty scene + default-camera fallback
+	 *       (SceneComponent).
 	 */
 	template<class Archive>
 	void serialize(Archive& ar)
 	{
-		ar(CEREAL_NVP(cam_list), CEREAL_NVP(mesh_list), CEREAL_NVP(light_list),
-		   CEREAL_NVP(sprite_list), CEREAL_NVP(dLine_list), CEREAL_NVP(dPoints_list),
-		   CEREAL_NVP(env_list));
-
 		if constexpr (Archive::is_saving::value)
 		{
+			// Save each typed pool as an ID list (objects live in the pool).
+			std::vector<int> camIds, meshIds, lightIds, spriteIds, dLineIds, dPointsIds, envIds;
+			for (const auto& [id, obj] : cam_list)     { (void)obj; camIds.push_back(id); }
+			for (const auto& [id, obj] : mesh_list)    { (void)obj; meshIds.push_back(id); }
+			for (const auto& [id, obj] : light_list)   { (void)obj; lightIds.push_back(id); }
+			for (const auto& [id, obj] : sprite_list)  { (void)obj; spriteIds.push_back(id); }
+			for (const auto& [id, obj] : dLine_list)   { (void)obj; dLineIds.push_back(id); }
+			for (const auto& [id, obj] : dPoints_list) { (void)obj; dPointsIds.push_back(id); }
+			for (const auto& [id, obj] : env_list)     { (void)obj; envIds.push_back(id); }
+			ar(CEREAL_NVP(camIds), CEREAL_NVP(meshIds), CEREAL_NVP(lightIds),
+			   CEREAL_NVP(spriteIds), CEREAL_NVP(dLineIds), CEREAL_NVP(dPointsIds),
+			   CEREAL_NVP(envIds));
+
 			// Persist selection as UIDs (pointers are not serializable).
 			std::vector<int> selectedUids;
 			int activeUid = 0;
@@ -186,11 +198,31 @@ public:
 		}
 		else
 		{
-			// Rebuild obj_list from typed pools before resolving UIDs.
-			RebuildObjList();
+			// Read ID lists into pending members; SceneComponent drives
+			// ResolveReferences() afterwards to fill the typed pools.
+			std::vector<int> camIds, meshIds, lightIds, spriteIds, dLineIds, dPointsIds, envIds;
+			try
+			{
+				ar(CEREAL_NVP(camIds), CEREAL_NVP(meshIds), CEREAL_NVP(lightIds),
+				   CEREAL_NVP(spriteIds), CEREAL_NVP(dLineIds), CEREAL_NVP(dPointsIds),
+				   CEREAL_NVP(envIds));
+			}
+			catch (const cereal::Exception&)
+			{
+				// Legacy file (old full-pool format): degrade to an empty scene.
+				camIds.clear(); meshIds.clear(); lightIds.clear();
+				spriteIds.clear(); dLineIds.clear(); dPointsIds.clear(); envIds.clear();
+			}
+			m_pendingCamIds = std::move(camIds);
+			m_pendingMeshIds = std::move(meshIds);
+			m_pendingLightIds = std::move(lightIds);
+			m_pendingSpriteIds = std::move(spriteIds);
+			m_pendingDLineIds = std::move(dLineIds);
+			m_pendingDPointsIds = std::move(dPointsIds);
+			m_pendingEnvIds = std::move(envIds);
 
-			// Restore selection from UIDs. Missing block (legacy files)
-			// degrades gracefully to no selection.
+			// Restore selection UIDs (missing block = legacy file -> no selection).
+			// Keys must match the save branch ("selectedUids"/"activeUid").
 			std::vector<int> selectedUids;
 			int activeUid = 0;
 			try
@@ -202,8 +234,8 @@ public:
 				selectedUids.clear();
 				activeUid = 0;
 			}
-
-			RestoreSelectionUids(*this, selectedUids, activeUid);
+			m_pendingSelectedUids = std::move(selectedUids);
+			m_pendingActiveUid = activeUid;
 		}
 	}
 
@@ -257,6 +289,21 @@ public:
 	/// Stores const ObjectID* — compatible with both Editor (mutable objects via GetObjectID)
 	/// and Outliner (const ObjectID* from GetObjectIDs enumeration).
 	Selections<const ObjectID*> selections;
+
+	/**
+	 * @brief Resolves the pending ID references against the resource pool.
+	 *
+	 * Fills the typed pools from the ResourceManager (fetched by ID + cast),
+	 * rebuilds obj_list, and restores the selection. Called by
+	 * SceneComponent::Load AFTER the pool has been deserialized (pool first,
+	 * then Scene). Per-object data-resource wiring (Mesh -> MeshData/Shader,
+	 * Environment -> ImageData) is NOT here - it is a pool-wide concern done
+	 * by ResourceComponent::Load (the pool's own restore step), so pooled
+	 * orphans (undo history) stay self-contained and uploadable.
+	 *
+	 * @param resources The ResourceManager pool (transient parameter, never a member).
+	 */
+	void ResolveReferences(ResourceManager& resources);
 
 	// -------------------------------------------------------------------
 	// Registration - store in both type-specific pool AND obj_list
@@ -332,20 +379,63 @@ public:
 		RegisterObject(env, env_list);
 	}
 
+	/**
+	 * @brief Unregisters an object from its type pool and obj_list.
+	 * @tparam T Object type (Camera, Mesh, Light, Environment, ...).
+	 * @param id Object UID.
+	 * @param typePool Type-specific pool to remove from.
+	 * @return true if the object was registered under this type.
+	 * @note Mirrors RegisterObject(): erases from the typed pool and the
+	 *       master obj_list and clears the object from the selection. The
+	 *       pooled resource itself is NOT removed from the ResourceManager —
+	 *       deleting only drops the scene reference, so the operation stays
+	 *       invertible (undo re-registers without any reload).
+	 */
+	template<typename T>
+	bool RemoveObject(int id, ResPool<T>& typePool)
+	{
+		auto it = typePool.find(id);
+		if (it == typePool.end())
+			return false; // not registered as this type — stale UID is a safe no-op
+		auto oit = obj_list.find(id);
+		if (oit != obj_list.end())
+			selections.Deselect(oit->second.get(), false);
+		typePool.erase(id);
+		obj_list.erase(id);
+		return true;
+	}
+
+	/**
+	 * @brief Removes a camera's scene reference.
+	 * @param id Camera UID.
+	 * @return true if a camera with that UID was registered.
+	 */
+	bool RemoveCamera(int id) { return RemoveObject(id, cam_list); }
+
+	/**
+	 * @brief Removes a mesh's scene reference.
+	 * @param id Mesh UID.
+	 * @return true if a mesh with that UID was registered.
+	 */
+	bool RemoveMesh(int id) { return RemoveObject(id, mesh_list); }
+
+	/**
+	 * @brief Removes a light's scene reference.
+	 * @param id Light UID.
+	 * @return true if a light with that UID was registered.
+	 */
+	bool RemoveLight(int id) { return RemoveObject(id, light_list); }
+
+	/**
+	 * @brief Removes an environment's scene reference.
+	 * @param id Environment UID.
+	 * @return true if an environment with that UID was registered.
+	 */
+	bool RemoveEnvironment(int id) { return RemoveObject(id, env_list); }
+
 	// -------------------------------------------------------------------
 	// Lookup
 	// -------------------------------------------------------------------
-
-	/**
-	 * @brief Casts a const UID* to a Scene* (no type tag on UID, so just const_cast).
-	 * @param scene Base UID pointer from an event payload.
-	 * @return Non-owning Scene*, or nullptr if null.
-	 */
-	static Scene* As(const UID* scene)
-	{
-		if (!scene) return nullptr;
-		return static_cast<Scene*>(const_cast<UID*>(scene));
-	}
 
 	/**
 	 * @brief Retrieves an object by its unique ID from the master pool.
@@ -386,6 +476,24 @@ public:
 
 private:
 	SceneModifStatus sc_status = SceneModifStatus::SceneChanged; ///< Current scene modification state
+
+	// -------------------------------------------------------------------
+	// Pending ID references (populated by serialize(load), consumed by
+	// ResolveReferences). The pool is a transient parameter, never a member.
+	// -------------------------------------------------------------------
+
+	std::vector<int> m_pendingCamIds;        ///< Pending camera UIDs (from project file)
+	std::vector<int> m_pendingMeshIds;       ///< Pending mesh UIDs
+	std::vector<int> m_pendingLightIds;      ///< Pending light UIDs
+	std::vector<int> m_pendingSpriteIds;     ///< Pending sprite UIDs
+	std::vector<int> m_pendingDLineIds;      ///< Pending debug-line UIDs
+	std::vector<int> m_pendingDPointsIds;    ///< Pending debug-point UIDs
+	std::vector<int> m_pendingEnvIds;        ///< Pending environment UIDs
+	std::vector<int> m_pendingSelectedUids;  ///< Pending selection UIDs
+	int             m_pendingActiveUid = 0;  ///< Pending active-object UID
+
+	/** @brief Clears all pending reference lists (legacy-file fallback). */
+	void ClearPendingReferences();
 
 	/**
 	 * @brief Rebuilds obj_list from all typed pools after deserialization.

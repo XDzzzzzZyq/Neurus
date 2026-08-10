@@ -4,17 +4,17 @@
  *
  * An Operation is a value-only description of a scene edit. It never mutates
  * the scene directly: Apply() dispatches this operation's absolute-set event
- * synchronously on the EventQueue, so the existing controller handler performs
- * the actual mutation (single mutation path).
+ * synchronously on the event queue, so the existing controller handler performs
+ * the actual mutation (single mutation path). Operations carry only integer
+ * object UIDs plus absolute before/after values — no raw pointers — so they
+ * survive across scene mutations, serialize trivially, and safely no-op when
+ * the referenced object no longer exists (the controller handler resolves the
+ * UID at replay time and ignores stale ids).
  *
  * Undo/redo is group-theoretic (Design B): the undo stack holds the forward
  * operation `g`; undo emits `g.Inverse()` and pushes the inverse to redo; redo
  * emits `(g⁻¹).Inverse() = g`. This requires Inverse() to be an involution:
  * `Inverse()∘Inverse()` must yield an operation equivalent to the original.
- *
- * Operations store a scene object's integer UID (not a raw pointer) plus
- * absolute before/after values, so they survive across scene mutations and
- * safely no-op when the referenced object no longer exists (stale identity).
  */
 
 #pragma once
@@ -22,8 +22,11 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <cereal/cereal.hpp>
+#include <cereal/types/memory.hpp>
+#include <cereal/types/vector.hpp>
 
 #include "editor/operations/OperationContext.h"
 
@@ -39,8 +42,9 @@ public:
 
 	/**
 	 * @brief Dispatches this operation's absolute-set event synchronously.
-	 * @param ctx Replay context (scene for UID resolution + event queue).
-	 * @note Must resolve its target by UID and no-op if the object is gone.
+	 * @param ctx Replay context (event queue for synchronous dispatch).
+	 * @note Emits an event carrying integer object UIDs; the receiving
+	 *       controller handler resolves them and no-ops stale ids.
 	 */
 	virtual void Apply(OperationContext& ctx) = 0;
 
@@ -106,7 +110,7 @@ public:
  * there is no stored function object, so an operation is trivially serializable.
  *
  * @tparam Derived Concrete subclass (CRTP); must provide
- *                 `TEvent MakeEvent(const ObjectID*, const Value&) const` and
+ *                 `TEvent MakeEvent(int objectUid, const Value&) const` and
  *                 `static constexpr const char* kLabel`.
  * @tparam TEvent  Scene event struct dispatched on replay.
  * @tparam Value   Stored value type (float, bool, glm::vec3, ...).
@@ -125,9 +129,10 @@ public:
 
 	void Apply(OperationContext& ctx) override
 	{
-		const ObjectID* obj = ctx.Resolve(m_uid);
-		if (!obj) return; // Stale identity: object gone, safe no-op.
-		ctx.bus.emitNow(static_cast<const Derived*>(this)->MakeEvent(obj, m_after));
+		// The replayed event carries the target UID; the controller handler
+		// resolves it and no-ops stale ids (object gone) — operations never
+		// resolve objects themselves.
+		ctx.events.emitNow(static_cast<const Derived*>(this)->MakeEvent(m_uid, m_after));
 	}
 
 	std::unique_ptr<Operation> Inverse() const override
@@ -167,6 +172,68 @@ protected:
 	int m_uid = 0;      ///< Target object UID (serialized).
 	Value m_before{};   ///< Value before the edit (serialized).
 	Value m_after{};    ///< Value after the edit (serialized).
+};
+
+/**
+ * @brief Composes a sequence of operations into a single undo entry.
+ *
+ * Group-theoretic composite: Apply() replays the sequence in forward order;
+ * Inverse() returns a composite of the reversed, individually-inverted
+ * operations (o = h·g·f ⇒ o⁻¹ = f⁻¹·g⁻¹·h⁻¹), so inversion is an involution.
+ *
+ * Used wherever one user gesture spans several primitive edits that must
+ * collapse to one history entry — e.g. add an object AND select it, or delete
+ * several selected objects AND clear the selection. The contained ops are
+ * ordinary absolute state-sets, so the composite is trivially serializable
+ * (polymorphic vector, the same pattern as the OperationManager stacks).
+ */
+class CompositeOp : public Operation
+{
+public:
+	CompositeOp() = default;
+
+	/**
+	 * @brief Constructs a composite from a forward-order sequence.
+	 * @param ops Primitive operations, applied in order on redo.
+	 */
+	explicit CompositeOp(std::vector<std::unique_ptr<Operation>> ops)
+		: m_ops(std::move(ops))
+	{}
+
+	void Apply(OperationContext& ctx) override
+	{
+		for (const auto& op : m_ops)
+			op->Apply(ctx);
+	}
+
+	std::unique_ptr<Operation> Inverse() const override
+	{
+		std::vector<std::unique_ptr<Operation>> inv;
+		inv.reserve(m_ops.size());
+		for (auto it = m_ops.rbegin(); it != m_ops.rend(); ++it)
+			inv.push_back((*it)->Inverse());
+		return std::make_unique<CompositeOp>(std::move(inv));
+	}
+
+	std::string Label() const override
+	{
+		return m_ops.empty() ? "Composite" : m_ops.front()->Label();
+	}
+
+	/**
+	 * @brief Serializes the contained operation sequence polymorphically.
+	 * @note All contained concrete types must be registered (see
+	 *       OperationRegistration.cpp); reconstruction default-constructs and
+	 *       loads each op, so every contained type must be default-constructible.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(CEREAL_NVP(m_ops));
+	}
+
+private:
+	std::vector<std::unique_ptr<Operation>> m_ops; ///< Forward-order primitive sequence.
 };
 
 } // namespace neurus

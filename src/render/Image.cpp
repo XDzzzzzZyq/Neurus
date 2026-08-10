@@ -349,22 +349,23 @@ void Image::GenerateMipmaps(const vk::raii::CommandBuffer& cmdBuf)
 			{ blit },
 			vk::Filter::eLinear);
 
-		// --- Transition level (i-1) TransferSrc → ShaderRead ---
+		// --- Release level (i-1): transfer writes available to graphics usage
+		//     (transfer-valid dstStage; see VUID-vkCmdPipelineBarrier2-dstStageMask-09676) ---
 		im_state = ImageState::TransferSrc;
 		{
 			vk::ImageSubresourceRange range(aspect, i - 1, 1, 0, im_arrayLayers);
-			Barrier::Transition(*cmdBuf, *this, ImageState::ColorShaderRead, range);
+			Barrier::ReleaseToRead(*cmdBuf, *im_image, ImageState::TransferSrc, range);
 		}
 
 		mipWidth  = dstWidth;
 		mipHeight = dstHeight;
 	}
 
-	// --- Transition last mip level TransferDst → ShaderRead ---
+	// --- Release last mip level: transfer writes available to graphics usage ---
 	im_state = ImageState::TransferDst;
 	{
 		vk::ImageSubresourceRange lastRange(aspect, im_mipLevels - 1, 1, 0, im_arrayLayers);
-		Barrier::Transition(*cmdBuf, *this, ImageState::ColorShaderRead, lastRange);
+		Barrier::ReleaseToRead(*cmdBuf, *im_image, ImageState::TransferDst, lastRange);
 	}
 
 	// Update CPU-side state tracking to reflect the final layout
@@ -410,10 +411,13 @@ void Image::UploadImageData(const vk::raii::Device& device,
 		                      { copyRegion });
 	}
 
-	// --- Transition mip level 0 TransferDst → ShaderRead (only the uploaded mip) ---
+	// --- Release mip level 0: make transfer writes available to graphics usage
+	//     without a graphics-stage dstStage (invalid on transfer-only command
+	//     pools per VUID-vkCmdPipelineBarrier2-dstStageMask-09676). The layout
+	//     becomes ShaderReadOnlyOptimal; consuming passes re-transition on use. ---
 	{
 		vk::ImageSubresourceRange mip0Range(AspectFromFormat(im_format), 0, 1, 0, im_arrayLayers);
-		Barrier::Transition(cmd, *this, ImageState::ColorShaderRead, mip0Range);
+		Barrier::ReleaseToRead(cmd, *im_image, ImageState::TransferDst, mip0Range);
 	}
 
 	// Update CPU-side state tracking (other mips stay in TransferDst for mipmap generation)
@@ -426,19 +430,19 @@ void Image::UploadImageData(const vk::raii::Device& device,
 // GPU readback
 // ---------------------------------------------------------------------------
 
-ImageData Image::ReadImageData(const vk::raii::Device& device,
-                                const vk::raii::PhysicalDevice& physicalDevice,
-                                vk::Queue queue,
-                                uint32_t queueFamilyIndex,
-                                const vk::ImageSubresourceRange* subresourceRange,
-                                vk::Extent2D readExtent)
+std::shared_ptr<ImageData> Image::ReadImageData(const vk::raii::Device& device,
+                                                const vk::raii::PhysicalDevice& physicalDevice,
+                                                vk::Queue queue,
+                                                uint32_t queueFamilyIndex,
+                                                const vk::ImageSubresourceRange* subresourceRange,
+                                                vk::Extent2D readExtent)
 {
 	const uint32_t bytesPerPixel = PixelByteSize(im_format);
 
 	if (bytesPerPixel == 0)
 	{
 		NEURUS_ERR("[Image] ReadImageData: unsupported format " << vk::to_string(im_format));
-		return ImageData();
+		return nullptr;
 	}
 
 	// Extent to read: explicit override or full image
@@ -487,7 +491,7 @@ ImageData Image::ReadImageData(const vk::raii::Device& device,
 
 	void* mapped = staging.Map();
 	const PixelFormat pf = FromVkFormat(im_format);
-	ImageData result(mapped, copyExtent.width, copyExtent.height, pf, layerCount);
+	auto result = std::make_shared<ImageData>(mapped, copyExtent.width, copyExtent.height, pf, layerCount);
 	staging.Unmap();
 
 	return result;

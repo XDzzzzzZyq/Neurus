@@ -18,7 +18,11 @@
 
 #include "asset/Project.h"
 #include "asset/components/SceneComponent.h"
+#include "asset/components/ResourceComponent.h"
 #include "asset/components/ConfigComponent.h"
+#include "asset/data/ImageData.h"
+#include "asset/data/MeshData.h"
+#include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
@@ -50,16 +54,20 @@ static std::string DefaultProjectPath()
 // -----------------------------------------------------------------------
 
 /**
- * @brief Creates a Project serializer with SceneComponent + ConfigComponent bound.
+ * @brief Creates a Project serializer with ResourceComponent + SceneComponent +
+ *        ConfigComponent bound (mirrors Application::BuildProject ordering).
  *
- * @param scene   Scene object to deserialize into.
- * @param config  RenderConfig object to deserialize into.
+ * @param scene     Scene object to deserialize into.
+ * @param config    RenderConfig object to deserialize into.
+ * @param resources ResourceManager pool (registered first; Scene resolves its
+ *                  ID references against it).
  * @return Initialised project::Project ready for Load().
  */
-static project::Project MakeProject(Scene& scene, RenderConfig& config)
+static project::Project MakeProject(Scene& scene, RenderConfig& config, ResourceManager& resources)
 {
 	project::Project p;
-	p.Register<project::SceneComponent>(scene);
+	p.Register<project::ResourceComponent>(resources);
+	p.Register<project::SceneComponent>(scene, resources);
 	p.Register<project::ConfigComponent>(config);
 	return p;
 }
@@ -75,8 +83,9 @@ TEST(DefaultProject, LoadsWithoutException)
 {
 	Scene scene;
 	RenderConfig config;
+	ResourceManager resources;
 	EXPECT_NO_THROW({
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Load(DefaultProjectPath());
 	});
 }
@@ -93,11 +102,13 @@ TEST(DefaultProject, HasCamera)
 {
 	Scene scene;
 	RenderConfig config;
+	ResourceManager resources;
 	{
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_GE(scene.cam_list.size(), 1u);
+	ASSERT_GE(scene.cam_list.size(), 1u);
 	auto* cam = scene.cam_list.begin()->second.get();
 	ASSERT_NE(cam, nullptr);
 	EXPECT_EQ(cam->o_type, ObjectID::GOType::GO_CAM);
@@ -118,15 +129,20 @@ TEST(DefaultProject, HasMesh)
 {
 	Scene scene;
 	RenderConfig config;
+	ResourceManager resources;
 	{
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_GE(scene.mesh_list.size(), 1u);
+	ASSERT_GE(scene.mesh_list.size(), 1u);
 	auto* mesh = scene.mesh_list.begin()->second.get();
 	ASSERT_NE(mesh, nullptr);
 	EXPECT_EQ(mesh->o_type, ObjectID::GOType::GO_MESH);
-	EXPECT_FALSE(mesh->o_meshPath.empty());
+	// Geometry is a pooled MeshData reference in the new format.
+	EXPECT_NE(mesh->o_meshDataId, 0);
+	ASSERT_NE(mesh->o_mesh, nullptr);
+	EXPECT_EQ(mesh->o_mesh->GetObjectID(), mesh->o_meshDataId);
 }
 
 // -----------------------------------------------------------------------
@@ -141,11 +157,13 @@ TEST(DefaultProject, HasLight)
 {
 	Scene scene;
 	RenderConfig config;
+	ResourceManager resources;
 	{
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_GE(scene.light_list.size(), 1u);
+	ASSERT_GE(scene.light_list.size(), 1u);
 	auto* light = scene.light_list.begin()->second.get();
 	ASSERT_NE(light, nullptr);
 	EXPECT_EQ(light->o_type, ObjectID::GOType::GO_LIGHT);
@@ -164,12 +182,17 @@ TEST(DefaultProject, HasEnvironment)
 {
 	Scene scene;
 	RenderConfig config;
+	ResourceManager resources;
 	{
-		auto p = MakeProject(scene, config);
+		auto p = MakeProject(scene, config, resources);
 		p.Load(DefaultProjectPath());
 	}
 	EXPECT_FALSE(scene.env_list.empty());
 	auto env = scene.env_list.begin()->second;
 	ASSERT_NE(env, nullptr);
-	EXPECT_EQ(env->GetEquirectPath(), "tex/hdr/room.hdr");
+	// The Environment wraps the pooled ImageData; the path lives in the
+	// data layer (ImageData::GetPath), not on the scene object.
+	ASSERT_NE(env->GetEquirectData(), nullptr);
+	EXPECT_EQ(env->GetEquirectData()->GetPath(), "res/tex/hdr/room.hdr");
+	EXPECT_TRUE(env->GetEquirectData()->IsValid());
 }

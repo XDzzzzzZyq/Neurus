@@ -5,6 +5,7 @@
 #include <stb_image_write.h>
 
 #include "asset/data/ImageData.h"
+#include "asset/data/AssetPath.h"
 #include "core/Log.h"
 
 #include <algorithm>
@@ -113,8 +114,17 @@ void ImageData::SwizzleBGRtoRGB(void* data, uint32_t width,
 // ===========================================================================
 
 ImageData::ImageData(const std::string& path)
+	: m_path(path)
 {
-	LoadFromPath(path);
+	LoadFromPath(ResolveAssetPath(path));
+}
+
+void ImageData::ReloadContent()
+{
+	if (m_path.empty())
+		return;
+
+	LoadFromPath(ResolveAssetPath(m_path));
 }
 
 ImageData::ImageData(const void* data, uint32_t w, uint32_t h, PixelFormat fmt,

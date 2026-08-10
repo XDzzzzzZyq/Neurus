@@ -9,6 +9,7 @@
 #include "editor/events/EventBus.h"
 #include "editor/operations/HistoryView.h"
 #include "editor/operations/OperationManager.h"
+#include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
 #include "scene/EditorContext.h"
 
@@ -16,8 +17,8 @@
 namespace neurus {
 class DeferredRenderer;
 class Scene;
-class Environment;
 class UploadManager;
+struct ShaderCreateRequested;
 }
 
 namespace neurus {
@@ -55,7 +56,15 @@ public:
 	bool IsDirty() const { return m_dirty; }
 	void MarkDirty() { m_dirty = true; }
 	void ClearDirty() { m_dirty = false; }
-	void SetAssetDir(const std::string& dir) { m_assetDir = dir; }
+
+	/**
+	 * @brief Returns the app-scoped ResourceManager (UID object pool).
+	 *
+	 * The Application registers a project::ResourceComponent + SceneComponent
+	 * against this so the pool is saved first and the Scene resolves its ID
+	 * references against it on load.
+	 */
+	ResourceManager& GetResourceManager() { return *m_resources; }
 
 	/**
 	 * @brief Returns the shared editor state (scene + render config).
@@ -88,7 +97,7 @@ public:
 	void RegisterController()
 	{
 		auto ctrl = std::make_unique<T>();
-		ctrl->Init(ed_eventBus, ed_operations);
+		ctrl->Init(m_ctx);
 		ed_controllers.push_back(std::move(ctrl));
 	}
 
@@ -102,6 +111,7 @@ public:
 	void HandleResize(uint32_t width, uint32_t height);
 	void UploadSceneResources();
 	void UploadLighting();
+
 private:
 	// --- Handlers called by EventQueue subscribers in Initialize() ---
 	void OnMeshImport(const std::string& path);
@@ -110,17 +120,30 @@ private:
 	void OnSunLightAdd();
 	void OnSpotLightAdd();
 	void OnIBLLoad();
-	void GenerateIBL(const std::shared_ptr<Environment>& env);
+	void OnCreateShader(const ShaderCreateRequested& e);
+	void OnSceneObjectGpuUpload(int objectUid);
 
 	// --- Owned state ---
 	std::unique_ptr<Scene> m_scene;
+	std::unique_ptr<ResourceManager> m_resources;  ///< App-scoped UID object pool
 	RenderConfig          m_config;
-	std::string           m_assetDir;
 	bool                  m_dirty = false;
 
 	// --- Editor infrastructure ---
 	EventQueue ed_eventBus;                        ///< Editor-owned event dispatch queue.
 	OperationManager ed_operations;                ///< Undo/redo history over event-replay ops.
+
+	/**
+	 * @brief The three controller-facing interfaces + editor singleton access.
+	 *
+	 * Declared AFTER the pieces it references (bus, operations, pool, scene,
+	 * config) and BEFORE the controller list, so it outlives the controllers'
+	 * event subscriptions (handler lambdas capture it by value).
+	 */
+	ControllerContext m_ctx{ ed_eventBus, *m_resources, ed_operations,
+	                         [this]() { return m_scene.get(); },
+	                         [this]() { return &m_config; } };
+
 	std::vector<std::unique_ptr<Controllers>> ed_controllers;
 
 	// --- Non-owning references ---

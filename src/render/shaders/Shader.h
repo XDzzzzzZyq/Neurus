@@ -2,6 +2,11 @@
 
 #include "ShaderUnit.h"
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/string.hpp>
+
+#include "core/UID.h"
+
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -31,26 +36,46 @@ enum class ShaderType
  * 2. Call ParseAndGenerate() to populate ShaderUnits from source files
  * 3. Access stage data via GetStage() / GetParsedStruct() / GetGeneratedCode()
  *
- * @note Non-copyable (owns stage data by unique map entries).
+ * Resource identity: Shader is a pooled resource (UID base, core). The
+ * concrete leaf (RenderShader) is registered in the pool; pass/test shaders
+ * created via ShaderLibrary stay outside the pool. Each shader serializes
+ * itself (name + source paths); RenderShader::serialize(load) re-parses its
+ * stages from disk and recompiles them to SPIR-V (CompileToSpv) so the
+ * per-mesh pipeline is ready immediately after a project load.
+ *
+ * @note Non-copyable, non-movable (UID semantics - held via shared_ptr).
  * @note Thread-safety: Not thread-safe. Must be used from the main thread.
  */
-class Shader
+class Shader : public UID
 {
 public:
 	/**
 	 * @brief Constructs a shader with a human-readable name.
 	 * @param name Human-readable shader name (for logging and debugging).
 	 */
-	Shader(std::string name);
+	explicit Shader(std::string name = "");
 	virtual ~Shader() = default;
 
-	// Non-copyable
+	// Non-copyable / non-movable (inherits UID semantics).
 	Shader(const Shader&) = delete;
 	Shader& operator=(const Shader&) = delete;
+	Shader(Shader&&) = delete;
+	Shader& operator=(Shader&&) = delete;
 
-	// Movable
-	Shader(Shader&&) noexcept = default;
-	Shader& operator=(Shader&&) noexcept = default;
+	/**
+	 * @brief Cereal serialization - forwards to UID + name.
+	 *
+	 * Concrete leaves must forward cereal::base_class<Shader>(this) and their
+	 * own source paths so they can re-parse after load.
+	 *
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(m_name));
+	}
 
 	/**
 	 * @brief Parses shader source files and generates GLSL code.

@@ -8,24 +8,24 @@
 #include "core/Log.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/events/EventBus.h"
-#include "scene/Scene.h"
 
 namespace neurus {
 
-OperationManager::OperationManager(EventQueue& bus, std::function<Scene*()> sceneProvider,
-                                   size_t maxUndoDepth)
+OperationManager::OperationManager(EventQueue& bus, size_t maxUndoDepth)
 	: m_bus(bus)
-	, m_sceneProvider(std::move(sceneProvider))
 	, m_maxUndoDepth(maxUndoDepth)
 {}
 
 void OperationManager::Submit(std::unique_ptr<Operation> op)
 {
 	// Replay re-runs the originating handler, which calls Submit again;
-	// suppress it so history is not corrupted by its own playback.
+	// suppress it so history is not corrupted by its own playback. This is the
+	// EXPECTED path on every undo/redo (handlers are re-entered by replay), so
+	// it is informational, not an error condition.
 	if (m_phase == Phase::Replaying)
 	{
-		NEURUS_ERR("[OperationManager] Submit suppressed during replay: " << op->Label());
+		NEURUS_LOG("[OperationManager] Submit suppressed during replay (expected): "
+		           << op->Label());
 		return;
 	}
 	if (!op) return;
@@ -153,22 +153,10 @@ HistoryView OperationManager::GetHistoryView() const
 
 bool OperationManager::Replay(Operation& op)
 {
-	Scene* scene = m_sceneProvider ? m_sceneProvider() : nullptr;
-	if (!scene)
-	{
-		// No scene provider: the op cannot apply, but this is an environmental
-		// no-op, not a replay failure — Undo/Redo still move the op between
-		// stacks (camera-controller bookkeeping tests rely on this). Only an
-		// exception inside Apply() counts as failure (op is then dropped).
-		NEURUS_LOG("[OperationManager] Replay skipped: no scene provider ('" << op.Label()
-		           << "' moves stacks without applying)");
-		return true;
-	}
-
 	NEURUS_LOG("[OperationManager] Replay: applying '" << op.Label()
 	           << "' (phase -> Replaying)");
 
-	OperationContext ctx{ *scene, m_bus };
+	OperationContext ctx{ m_bus };
 
 	// m_phase must be restored on every exit path (success or caught handler
 	// exception). A stuck Replaying phase would silently suppress every later

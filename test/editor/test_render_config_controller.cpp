@@ -13,9 +13,8 @@
  *   - Slider drag: bounded by ConfigEditBegin/ConfigEditEnd — the whole stream
  *     of intermediate values collapses to a single op committed on release.
  *
- * Replay requires a non-null Scene* (OperationManager::Replay early-returns on a
- * null scene), so the fixture supplies a real empty Scene even though
- * SetRenderConfigOp only touches the bus.
+ * Replay dispatches the stored config event on the bus only (no scene or
+ * resource access), so the fixture needs no object pool.
  */
 
 #include <gtest/gtest.h>
@@ -28,6 +27,7 @@
 #include "editor/operations/ConfigOperations.h"
 #include "editor/operations/OperationContext.h"
 #include "editor/operations/OperationManager.h"
+#include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
 #include "scene/Scene.h"
 
@@ -54,17 +54,20 @@ class RenderConfigControllerTest : public ::testing::Test
 protected:
 	void SetUp() override
 	{
-		m_controller = std::make_unique<RenderConfigController>(
-			[this]() -> RenderConfig* { return &m_config; });
-		m_controller->Init(m_eventBus, m_operations);
+		m_controller = std::make_unique<RenderConfigController>();
+		m_controller->Init(m_ctx);
 	}
 
 	void Process() { m_eventBus.Process(); }
 
 	EventQueue m_eventBus;
 	Scene m_scene; // real scene so OperationManager::Replay executes
-	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	OperationManager m_operations{ m_eventBus };
+	ResourceManager m_resources;
 	RenderConfig m_config; // stands in for the Editor-owned live config
+	ControllerContext m_ctx{ m_eventBus, m_resources, m_operations,
+	                         [this]() { return &m_scene; },
+	                         [this]() { return &m_config; } };
 	std::unique_ptr<RenderConfigController> m_controller;
 };
 
@@ -173,7 +176,7 @@ TEST_F(RenderConfigControllerTest, SetRenderConfigOp_Inverse_IsInvolution)
 
 	EXPECT_EQ(twice->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	twice->Apply(ctx); // (g⁻¹)⁻¹ reproduces the original forward effect.
 	EXPECT_FLOAT_EQ(m_config.r_gamma, 2.2f);
 }
@@ -185,7 +188,7 @@ TEST_F(RenderConfigControllerTest, SetRenderConfigOp_Inverse_AppliesBefore)
 	auto op = std::make_unique<SetRenderConfigOp>(before, after);
 	auto inv = op->Inverse();
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	inv->Apply(ctx); // inverse applies the "before" config.
 	EXPECT_FLOAT_EQ(m_config.r_gamma, 1.0f);
 }

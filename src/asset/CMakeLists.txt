@@ -13,10 +13,16 @@ add_library(neurus_asset STATIC
 	components/UIComponent.cpp
 	components/HistoryComponent.h
 	components/HistoryComponent.cpp
+	components/ResourceComponent.h
+	components/ResourceComponent.cpp
+	registrations/DataRegistration.h
+	registrations/DataRegistration.cpp
 	data/ImageData.h
 	data/ImageData.cpp
 	data/MeshData.h
 	data/MeshData.cpp
+	data/AssetPath.h
+	data/AssetPath.cpp
 )
 
 target_link_libraries(neurus_asset PUBLIC
@@ -26,6 +32,10 @@ target_link_libraries(neurus_asset PUBLIC
 	neurus_scene
 	cereal
 	neurus_render      # needed by ConfigComponent.cpp
+)
+
+target_compile_definitions(neurus_asset PRIVATE
+	NEURUS_RES_DIR="${CMAKE_SOURCE_DIR}/res/"
 )
 
 target_include_directories(neurus_asset PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

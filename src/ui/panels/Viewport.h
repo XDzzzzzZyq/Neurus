@@ -6,6 +6,7 @@
 #include <glm/glm.hpp>
 
 #include "editor/events/InputEvents.h"
+#include "editor/events/SceneEvents.h"
 
 class QKeyEvent;
 class QMouseEvent;
@@ -50,10 +51,11 @@ public:
 	/**
 	 * @brief Refreshes the panel from a UIContext snapshot.
 	 *
-	 * Currently a no-op - the Viewport is event-driven (input forwarding)
-	 * and renders via Vulkan outside the Qt widget hierarchy.
+	 * The viewport is pure input forwarding + Vulkan rendering; it holds no
+	 * scene state. Mouse/Delete events are pure intents - the Editor wraps
+	 * the active scene and forwards dedicated events to controllers.
 	 *
-	 * @param ctx Read-only UI context (unused).
+	 * @param ctx Read-only UI context (scene snapshot).
 	 */
 	void Refresh(const UIContext& ctx) override;
 
@@ -107,6 +109,12 @@ signals:
 	 * @param event MouseScrollEvent with delta, position, modifiers, and button state.
 	 */
 	void mouseScrolled(const neurus::MouseScrollEvent& event);
+
+	/**
+	 * @brief Emitted when the Delete key is pressed while the viewport has focus.
+	 * @note Pure intent - the Editor wraps the active scene and deletes ALL selected objects.
+	 */
+	void deleteRequested(const neurus::DeleteRequested& event);
 
 protected:
 	/**

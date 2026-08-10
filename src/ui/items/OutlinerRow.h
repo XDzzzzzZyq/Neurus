@@ -4,14 +4,14 @@
  *
  * OutlinerRow encapsulates a Blender-style outliner row: [type icon] [name]
  * [eye toggle] [monitor toggle]. It is self-contained with no scene-layer
- * dependencies — the object pointer is stored directly and surfaced through
- * Qt signals.
+ * dependencies — the object's integer UID is stored directly and surfaced
+ * through Qt signals.
  *
  * Architecture:
  * - Constructor creates the layout and child widgets once.
- * - setObject() binds object data (icon name, name, object*); resets toggles.
+ * - setObject() binds object data (icon name, name, object UID); resets toggles.
  * - setSelectionMode() / setRowIndex() apply visual state (QSS property + alternating bg).
- * - Signal lambdas read from m_object at emission time, so recycling
+ * - Signal lambdas read from m_objectUid at emission time, so recycling
  *   a row to a new object is transparent — no manual rewire needed.
  * - Visibility toggle buttons swap between visible/invisible icons
  *   loaded via Icons::GetIcon().
@@ -22,8 +22,9 @@
 #include <QIcon>
 #include <QWidget>
 
+#include "editor/events/InputEvents.h"
 #include "editor/events/SceneEvents.h"
-#include "scene/UID.h"
+#include "scene/ObjectID.h"
 
 #include <cstdint>
 
@@ -69,15 +70,17 @@ public:
 	/**
 	 * @brief Binds a scene object's identity data to this row.
 	 *
-	 * Updates the type icon pixmap, name text, and stored object pointer.
+	 * Updates the type icon pixmap, name text, and stored object UID.
 	 * Resets visibility toggles to checked (signals blocked to avoid
 	 * cascading events during pool recycling) and sets their icons.
+	 * Dirty-checks the stored UID: a row already bound to the same object
+	 * is left untouched (lazy update).
 	 *
-	 * @param icon     Type icon for this object.
-	 * @param name     Display name shown in the row.
-	 * @param object   Scene object pointer (non-owning).
+	 * @param icon      Type icon for this object.
+	 * @param name      Display name shown in the row.
+	 * @param objectUid Scene object UID (0 = none).
 	 */
-	void setObject(const QIcon& icon, const QString& name, const ObjectID* object);
+	void setObject(const QIcon& icon, const QString& name, int objectUid);
 
 	/**
 	 * @brief Sets visibility toggle states without emitting signals.
@@ -113,12 +116,12 @@ public:
 	 */
 	void setRowIndex(int rowIndex);
 
-	/** @brief Returns the bound object pointer (nullptr if none). */
-	const ObjectID* getObject() const { return m_object; }
+	/** @brief Returns the bound object UID (0 if none). */
+	int getObjectUid() const { return m_objectUid; }
 
 signals:
 	/** @brief Emitted when the name button is clicked. */
-	void objectSelected(const ObjectSelected& e);
+	void objectClicked(const ObjectClicked& e);
 
 	/** @brief Emitted when either visibility toggle changes. */
 	void visibilityChanged(const VisibilityChanged& e);
@@ -134,7 +137,7 @@ private:
 	QPushButton* m_nameBtn       = nullptr;
 	QPushButton* m_eyeBtn        = nullptr;
 	QPushButton* m_renderBtn     = nullptr;
-	const ObjectID* m_object = nullptr;
+	int          m_objectUid     = 0;
 	int 		 m_mode          = -1;
 	int 		 m_idx           = -1;
 	bool         m_eyeVisible    = true;

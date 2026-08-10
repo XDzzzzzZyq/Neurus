@@ -17,8 +17,6 @@
 
 namespace neurus {
 
-class ObjectID;
-
 /**
  * @brief Emitted when the scene state changes in a way that invalidates
  *  temporal accumulation. Subscribe to this to reset any per-frame history
@@ -54,12 +52,12 @@ struct SceneModified
 /**
  * @brief Emitted by SceneController when a single light's GPU SSBO struct must
  *  be updated (power/radius/cutoff/outerCutoff changes).
- *  Editor subscribes, casts object to Light*, and calls
+ *  Editor subscribes, resolves the pooled Light by UID, and calls
  *  UploadLighting(*light) + RenderCache::UpdateLight(id, struct).
  */
 struct LightGpuChanged
 {
-	const ObjectID* object = nullptr; ///< The changed light (Light*).
+	int objectUid = 0; ///< The changed light's UID (resolved via the pool).
 };
 
 /**
@@ -69,6 +67,25 @@ struct LightGpuChanged
  */
 struct LightingRebuild
 {
+};
+
+/**
+ * @brief Emitted when a scene object's GPU resources must exist but may not be
+ *  cached yet.
+ *
+ * Fired by SceneController when an object enters the scene (live add OR
+ * undo/redo replay of SceneObjectAddRequested) and when a light's shadow is
+ * toggled on. GPU caches are scene-scoped (Editor::UploadSceneResources only
+ * uploads objects present at load), so re-added objects and freshly
+ * shadow-enabled lights need an on-demand upload. Editor subscribes, casts to
+ * the concrete type, and uploads if not already cached (skip-if-cached).
+ *
+ * Light SSBO handling stays separate (LightingRebuild); this event covers the
+ * per-object GPU resources: MeshGPU, LightGPU (shadow maps), EnvironmentGPU.
+ */
+struct SceneObjectGpuUploadRequested
+{
+	int objectUid = 0; ///< The object entering the scene (or light with shadow just enabled).
 };
 
 } // namespace neurus

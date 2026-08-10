@@ -13,6 +13,11 @@
 
 #include "asset/PixelFormat.h"
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/string.hpp>
+
+#include "core/UID.h"
+
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -20,7 +25,14 @@
 
 namespace neurus {
 
-class ImageData
+/**
+ * @brief CPU-side image data (pooled resource).
+ *
+ * Inherits UID identity; held via shared_ptr (e.g. Environment::o_equirectData).
+ * Serializes itself (UID + source path); content loads on construction and is
+ * re-loaded in serialize(load). Non-copyable/non-movable (UID semantics).
+ */
+class ImageData : public UID
 {
 public:
 	/**
@@ -34,6 +46,7 @@ public:
 	 * Auto-detects HDR vs LDR format using stb_is_hdr().
 	 * HDR images (.hdr) are loaded as RGBA32F.
 	 * LDR images (.png, .bmp, .jpg, .tga) are loaded as RGBA8S.
+	 * Stores the path for later ReloadContent() use.
 	 *
 	 * @param path File path to the image.
 	 */
@@ -55,6 +68,33 @@ public:
 
 	/** @brief True if a valid image is loaded (non-zero dimensions, non-empty pixel data). */
 	bool IsValid() const { return im_width > 0 && im_height > 0 && !im_pixelData.empty(); }
+
+	/**
+	 * @brief (Re)loads the image content from disk.
+	 *
+	 * Called on construction (path ctor) and at the end of serialize(load).
+	 * No-op when m_path is empty (procedural data).
+	 */
+	void ReloadContent();
+
+	/**
+	 * @brief Cereal serialization - UID + source path, then content reload.
+	 *
+	 * On load, restores identity + path and re-loads the image from disk
+	 * (self-contained; no pool hook needed).
+	 *
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(m_path));
+		if constexpr (Archive::is_loading::value)
+		{
+			ReloadContent();
+		}
+	}
 
 	// --- Getters ---
 
@@ -111,6 +151,14 @@ public:
 	 */
 	bool SaveHDR(const std::string& path) const;
 
+	/**
+	 * @brief Returns the source image path (serialized, relative to asset dir).
+	 * @return Const reference to the stored path (empty for procedural data).
+	 * @note The path lives HERE (data layer) - scene objects wrap this
+	 *       ImageData and never hold the path themselves.
+	 */
+	const std::string& GetPath() const { return m_path; }
+
 private:
 	// --- Internal helpers ---
 
@@ -125,6 +173,7 @@ private:
 
 	// --- Data ---
 
+	std::string m_path;               ///< Source image path (relative to asset dir; serialized)
 	std::vector<uint8_t> im_pixelData;  ///< Owning pixel data (raw bytes, format-dependent byte count)
 	uint32_t im_width = 0;
 	uint32_t im_height = 0;

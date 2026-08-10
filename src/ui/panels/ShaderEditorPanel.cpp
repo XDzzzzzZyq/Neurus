@@ -198,18 +198,18 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	// --- Compile button -> emit with unitType (0=Code, 1=Struct) ---
 	QObject::connect(m_compileBtn, &QPushButton::clicked, [this]()
 	{
-		if (m_activeObject)
+		if (m_activeObjectId != 0)
 		{
 			int unitType = (m_contentStack->currentIndex() == 0) ? 0 : 1;
-			emit compileRequested({m_activeObject, m_cachedStageType, unitType});
+			emit compileRequested({m_activeObjectId, m_cachedStageType, unitType});
 		}
 	});
 
 	// --- CodeEditor text changes -> codeEdited event ---
 	QObject::connect(m_codeEditor, &CodeEditor::codeChanged, [this](const std::string& code)
 	{
-		if (m_activeObject)
-			emit codeEdited({m_activeObject, m_cachedStageType, code});
+		if (m_activeObjectId != 0)
+			emit codeEdited({m_activeObjectId, m_cachedStageType, code});
 	});
 
 	// --- CodeEditor focus in/out -> gesture brackets for undo coalescing ---
@@ -217,36 +217,36 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	// entry recorded on focus-out (debounce_discrete).
 	QObject::connect(m_codeEditor, &CodeEditor::editingStarted, [this]()
 	{
-		if (m_activeObject)
-			emit editBegin({m_activeObject, m_cachedStageType});
+		if (m_activeObjectId != 0)
+			emit editBegin({m_activeObjectId, m_cachedStageType});
 	});
 	QObject::connect(m_codeEditor, &CodeEditor::editingFinished, [this]()
 	{
-		if (m_activeObject)
-			emit editEnd({m_activeObject, m_cachedStageType});
+		if (m_activeObjectId != 0)
+			emit editEnd({m_activeObjectId, m_cachedStageType});
 	});
 
 	// --- Create Shader button -> event signal ---
 	QObject::connect(m_createBtn, &QPushButton::clicked, [this]()
 	{
-		if (m_activeObject)
-			emit createShaderRequested({m_activeObject});
+		if (m_activeObjectId != 0)
+			emit createShaderRequested({m_activeObjectId});
 	});
 
 	// --- Stage combo change -> invalidate cache ---
 	QObject::connect(m_stageCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
 	                 [this](int index) {
 		m_cachedStageType = index;
-		m_activeObject = nullptr;  // Re-read on next Refresh
+		m_activeObjectId = 0;  // Re-read on next Refresh
 	});
 
 	// --- Tree model edits -> structEdited event ---
 	QObject::connect(m_model, &ShaderStructModel::fieldEdited,
 	                 [this](ShaderSection section, int fieldIndex, int subFieldIndex,
 	                        const QString& field, const QString& value) {
-		if (m_activeObject)
+		if (m_activeObjectId != 0)
 		{
-			emit structEdited({m_activeObject, m_cachedStageType, section,
+			emit structEdited({m_activeObjectId, m_cachedStageType, section,
 			                   fieldIndex, subFieldIndex, field.toStdString(), value.toStdString()});
 			m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
 		}
@@ -267,7 +267,7 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
-		m_activeObject = nullptr;
+		m_activeObjectId = 0;
 		return;
 	}
 
@@ -276,7 +276,7 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
-		m_activeObject = nullptr;
+		m_activeObjectId = 0;
 		return;
 	}
 
@@ -285,9 +285,11 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	{
 		setShowEmptyState(true);
 		setShowCreateButton(false);
-		m_activeObject = nullptr;
+		m_activeObjectId = 0;
 		return;
 	}
+
+	const int objectId = activeObj->GetObjectID();
 
 	// Get shader unit and its version (-1 if no shader)
 	int unitVersion = -1;
@@ -295,12 +297,12 @@ void ShaderEditorPanel::Refresh(const UIContext& ctx)
 	if (unitPtr)
 		unitVersion = static_cast<const ShaderUnit*>(unitPtr)->GetVersion();
 
-	// Dirty-check: same object AND same version = nothing changed
-	if (activeObj == m_activeObject && unitVersion == m_cachedShaderVersion)
+	// Dirty-check: same object UID AND same version = nothing changed
+	if (objectId == m_activeObjectId && unitVersion == m_cachedShaderVersion)
 		return;
 
-	bool objectChanged = (activeObj != m_activeObject);
-	m_activeObject = activeObj;
+	bool objectChanged = (objectId != m_activeObjectId);
+	m_activeObjectId = objectId;
 	m_cachedShaderVersion = unitVersion;
 
 	if (!unitPtr)
@@ -408,7 +410,7 @@ void ShaderEditorPanel::populateSections(const void* shaderUnitPtr, bool objectC
 
 void ShaderEditorPanel::handleAddClick(const QModelIndex& index)
 {
-	if (!m_activeObject || !index.isValid())
+	if (m_activeObjectId == 0 || !index.isValid())
 		return;
 
 	m_treeView->expand(index);  // reveal the appended row
@@ -420,7 +422,7 @@ void ShaderEditorPanel::handleAddClick(const QModelIndex& index)
 	if (nodeType == ShaderStructModel::NodeStructDef)
 		subFieldIndex = index.data(ShaderStructModel::RoleFieldIndex).toInt();
 
-	emit fieldAdded({m_activeObject, m_cachedStageType, section, subFieldIndex});
+	emit fieldAdded({m_activeObjectId, m_cachedStageType, section, subFieldIndex});
 	m_cachedShaderVersion = -1;  // invalidate cache -> re-read on next Refresh
 }
 

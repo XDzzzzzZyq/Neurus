@@ -2,9 +2,10 @@
  * @file MeshProperties.h
  * @brief Reusable QWidget subpanel for editing Mesh properties.
  *
- * Displays o_meshPath (read-only file path), using_shadow (checkbox),
- * and using_material (checkbox). All edits emit signals carrying the
- * object ID for routing through the Editor event system.
+ * Displays the pooled MeshData source path (read-only label, fed via
+ * setMeshPath()), using_shadow (checkbox), and using_material (checkbox).
+ * All edits emit signals carrying the object ID for routing through the
+ * Editor event system.
  *
  * Supports lazy update via dirty-check: each setter caches the last
  * value and no-ops if unchanged. setObjectId() resets all caches when
@@ -34,7 +35,8 @@ namespace neurus
  *
  * Layout:
  *   [Mesh Asset group]
- *     o_meshPath  (readonly QLabel, gray, word-wrapped, text-selectable)
+ *     Source path   (readonly QLabel, gray, word-wrapped, text-selectable;
+ *                    path owned by the pooled MeshData)
  *   [Mesh Flags group]
  *     Cast Shadow   (QCheckBox)
  *     Use Material  (QCheckBox)

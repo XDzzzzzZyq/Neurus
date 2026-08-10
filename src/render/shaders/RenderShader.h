@@ -44,21 +44,72 @@ class RenderShader : public Shader
 public:
 	/**
 	 * @brief Constructs a render shader with file paths to GLSL source.
+	 *
+	 * Default arguments make this the default ctor used by cereal's
+	 * polymorphic load; content loads later via ReloadContent() (pool)
+	 * or an explicit ParseAndGenerate() call (ShaderLibrary).
+	 *
 	 * @param name     Human-readable shader name (for logging and cache keys).
 	 * @param vertPath Path to the vertex shader GLSL source file.
 	 * @param fragPath Path to the fragment shader GLSL source file.
 	 */
-	RenderShader(std::string name, std::string vertPath, std::string fragPath);
+	RenderShader(std::string name = "", std::string vertPath = "", std::string fragPath = "");
 
 	~RenderShader() override = default;
 
-	// Non-copyable (inherits from Shader)
+	// Non-copyable / non-movable (inherits UID semantics).
 	RenderShader(const RenderShader&) = delete;
 	RenderShader& operator=(const RenderShader&) = delete;
+	RenderShader(RenderShader&&) = delete;
+	RenderShader& operator=(RenderShader&&) = delete;
 
-	// Movable
-	RenderShader(RenderShader&&) noexcept = default;
-	RenderShader& operator=(RenderShader&&) noexcept = default;
+	/**
+	 * @brief (Re)loads both shader stages from disk.
+	 *
+	 * Called at the end of serialize(load) so a pooled RenderShader restores
+	 * its parsed IR + generated code. No-op for empty paths (identity shell).
+	 */
+	void ReloadContent();
+
+	/**
+	 * @brief Compiles every stage's GLSL to SPIR-V in place and bumps versions.
+	 *
+	 * Mirrors the runtime create flow (Editor::OnCreateShader): each stage's
+	 * `spv` is built from its generated `code` and the stage version bumped;
+	 * Shader::m_version bumps once if every present stage compiled. Stages
+	 * that already hold SPIR-V are skipped (idempotent).
+	 *
+	 * Used after project load, where serialization restores only the source
+	 * paths and re-parses content but never recompiles - without this,
+	 * GeometryPass cannot create the per-mesh pipeline.
+	 *
+	 * @return true if every present stage compiled to non-empty SPIR-V.
+	 */
+	bool CompileToSpv();
+
+	/**
+	 * @brief Cereal serialization - name (via Shader) + both source paths,
+	 *        then content reload (re-parse both stages) + SPIR-V recompile.
+	 *
+	 * Load restores the object's own state per the ResourceManager design
+	 * (each pooled object's serialize(load) restores its content): paths are
+	 * restored, ReloadContent() re-parses the stages from disk, and
+	 * CompileToSpv() regenerates the derived SPIR-V so GeometryPass can build
+	 * the per-mesh pipeline immediately (no post-load recompile step).
+	 *
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<Shader>(this), CEREAL_NVP(m_vertPath), CEREAL_NVP(m_fragPath));
+		if constexpr (Archive::is_loading::value)
+		{
+			ReloadContent();
+			CompileToSpv();
+		}
+	}
 
 	// ----------------------------------
 	// Shader interface (override)

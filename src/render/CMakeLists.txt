@@ -67,6 +67,8 @@ add_library(neurus_render STATIC
 	render_graph/DescriptorBinder.h
 	render_graph/RenderGraph.h
 	render_graph/RenderGraph.cpp
+	registrations/ShaderRegistration.h
+	registrations/ShaderRegistration.cpp
 )
 
 add_subdirectory(passes)

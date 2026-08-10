@@ -1,16 +1,20 @@
 /**
- * @file UID.h
- * @brief Unique identifier system for all scene objects.
+ * @file ObjectID.h
+ * @brief Scene identity + metadata base class for all scene graph objects.
  *
- * Provides base UID class for unique ID generation and ObjectID for scene
- * graph objects. Every object in the scene hierarchy inherits from ObjectID
- * to enable identity tracking, type discrimination, and polymorphic component
- * access.
+ * ObjectID extends the core UID primitive with scene-specific metadata:
+ * - Object name for display in editor UI
+ * - Type enumeration for runtime type discrimination
+ * - Visibility flags for viewport and rendering
+ * - Polymorphic accessors for optional components (Transform, Shader, Material)
+ *
+ * All scene objects (Camera, Light, Mesh, ...) inherit from ObjectID to
+ * participate in the scene graph.
  *
  * Architecture:
- * - UID provides globally unique integer IDs (sequential, not thread-safe)
- * - ObjectID extends UID with scene-specific metadata (name, type, visibility)
- * - All scene objects (Camera, Light, Mesh, etc.) inherit from ObjectID
+ * - UID (core/UID.h) provides globally unique integer IDs
+ * - ObjectID extends UID with scene-specific metadata
+ * - Scene containers hold ObjectID-derived objects as shared_ptr
  * - ID-based lookups enable efficient object management
  */
 
@@ -21,94 +25,10 @@
 #include <cereal/cereal.hpp>
 #include <cereal/types/string.hpp>
 
+#include "core/UID.h"
+
 namespace neurus
 {
-
-/**
- * @brief Base class providing globally unique integer IDs.
- *
- * UID generates sequential unique IDs for all instances. Each UID tracks
- * a monotonically increasing ID counter to ensure no collisions.
- *
- * @note Thread-safety: Not thread-safe. IDs should be allocated on main thread.
- * @note Lifetime: IDs are never reused, even after object destruction.
- */
-class UID
-{
-private:
-	int o_id;            ///< Unique identifier for this instance
-	static int s_count;  ///< Global counter for ID generation
-
-public:
-	/**
-	 * @brief Constructs a UID and assigns a unique ID.
-	 */
-	UID();
-
-	/**
-	 * @brief Virtual destructor for polymorphic use.
-	 */
-	virtual ~UID() = default;
-
-	/**
-	 * @brief Deleted copy constructor - UIDs must be unique.
-	 */
-	UID(const UID&) = delete;
-
-	/**
-	 * @brief Deleted copy assignment - UIDs must be unique.
-	 */
-	UID& operator=(const UID&) = delete;
-
-	/**
-	 * @brief Deleted move constructor - UIDs must be unique.
-	 */
-	UID(UID&&) = delete;
-
-	/**
-	 * @brief Deleted move assignment - UIDs must be unique.
-	 */
-	UID& operator=(UID&&) = delete;
-
-	/**
-	 * @brief Returns the unique ID of this object.
-	 * @return Unique integer identifier.
-	 */
-	inline int GetObjectID() const
-	{
-		return o_id;
-	}
-
-	/**
-	 * @brief Returns total number of UIDs allocated.
-	 * @return Total allocation count (includes destroyed objects).
-	 */
-	static int GetTotalAllocated()
-	{
-		return s_count;
-	}
-
-	/**
-	 * @brief Cereal serialization for the unique ID.
-	 *
-	 * Serializes o_id to preserve identity across save/load cycles.
-	 * On deserialization, bumps s_count to stay ahead of the loaded ID
-	 * so newly created objects do not collide with restored ones.
-	 *
-	 * @tparam Archive Cereal archive type (input or output).
-	 * @param ar Archive to serialize to/from.
-	 */
-	template<class Archive>
-	void serialize(Archive& ar)
-	{
-		ar(CEREAL_NVP(o_id));
-		if constexpr (Archive::is_loading::value)
-		{
-			if (o_id >= s_count)
-				s_count = o_id + 1;
-		}
-	}
-};
 
 /**
  * @brief Base class for all scene graph objects with type and component access.
@@ -208,12 +128,12 @@ public:
 	/**
 	 * @brief Constructs an ObjectID with default values.
 	 */
-	ObjectID();
+	ObjectID() = default;
 
 	/**
 	 * @brief Destroys the ObjectID.
 	 */
-	~ObjectID() override;
+	~ObjectID() override = default;
 
 	/**
 	 * @brief Cereal serialization for object identity and metadata.
@@ -229,4 +149,3 @@ public:
 };
 
 } // namespace neurus
-

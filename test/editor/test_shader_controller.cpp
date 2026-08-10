@@ -20,12 +20,12 @@
  *     on focus-out if the code actually changed.
  *   - Discrete edit (struct-field / field-add): no gesture, recorded immediately.
  *
- * Replay requires a non-null Scene* (OperationManager replays through a scene
- * provider), so the fixture supplies a real scene holding the mesh so the op's
- * stored UID resolves back to the live object.
+ * The fixture supplies a real scene holding the mesh so the controller can
+ * resolve the event UIDs back to the live object at dispatch/replay time.
  *
- * Create/Compile stay non-undoable lifecycle actions and are not exercised here
- * (they require GPU compilation); only the undoable content-edit path is tested.
+ * Create Shader IS undoable via ShaderLinkOp (pool-preserving membership
+ * toggle) and is exercised in ShaderCreateUndoTest below; Compile stays a
+ * non-undoable lifecycle action (GPU compilation not exercised here).
  */
 
 #include <gtest/gtest.h>
@@ -44,12 +44,15 @@
 #include "editor/operations/OperationManager.h"
 #include "editor/operations/registrations/OperationRegistration.h"
 #include "editor/operations/ShaderOperations.h"
+#include "core/ResourceManager.h"
+#include "render/RenderConfig.h"
 #include "render/shaders/RenderShader.h"
 #include "render/shaders/Shader.h"
 #include "render/shaders/ShaderParser.h"
 #include "render/shaders/ShaderUnit.h"
 #include "scene/Mesh.h"
 #include "scene/Scene.h"
+#include "core/ResourceManager.h"
 
 #include <fstream>
 #include <sstream>
@@ -85,7 +88,7 @@ protected:
 
 	void SetUp() override
 	{
-		m_controller.Init(m_eventBus, m_operations);
+		m_controller.Init(m_ctx);
 
 		// Build a mesh with a CPU-only shader carrying seeded vertex+fragment
 		// stages. GetStage() default-inserts the stage, so HasStage() is true.
@@ -102,11 +105,17 @@ protected:
 	/** @brief The live vertex ShaderUnit for assertions. */
 	ShaderUnit& VertexUnit() { return m_mesh->o_shader->GetStage(ShaderType::VERTEX); }
 
-	const ObjectID* MeshObj() const { return m_mesh.get(); }
+	/** @brief The mesh's UID, used as the event payload. */
+	int MeshObj() const { return m_mesh->GetObjectID(); }
 
 	EventQueue m_eventBus;
-	Scene m_scene; // real scene so the op's stored UID resolves at replay
-	OperationManager m_operations{ m_eventBus, [this]() -> Scene* { return &m_scene; } };
+	Scene m_scene; // real scene so event UIDs resolve at dispatch/replay
+	OperationManager m_operations{ m_eventBus };
+	ResourceManager m_resources;
+	RenderConfig m_config;
+	ControllerContext m_ctx{ m_eventBus, m_resources, m_operations,
+	                         [this]() { return &m_scene; },
+	                         [this]() { return &m_config; } };
 	ShaderController m_controller;
 	std::shared_ptr<Mesh> m_mesh;
 };
@@ -229,7 +238,7 @@ TEST_F(ShaderControllerTest, SetShaderCodeOp_Inverse_IsInvolution)
 
 	EXPECT_EQ(twice->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	twice->Apply(ctx); // (g⁻¹)⁻¹ reproduces the original forward effect.
 	EXPECT_EQ(VertexUnit().code, "CODE_B");
 }
@@ -240,7 +249,7 @@ TEST_F(ShaderControllerTest, SetShaderCodeOp_Inverse_AppliesBefore)
 	auto op = std::make_unique<SetShaderCodeOp>(uid, kVertex, "CODE_A", "CODE_B");
 	auto inv = op->Inverse();
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	inv->Apply(ctx); // inverse applies the "before" code.
 	EXPECT_EQ(VertexUnit().code, "CODE_A");
 }
@@ -256,7 +265,7 @@ TEST_F(ShaderControllerTest, SetShaderCodeOp_Serialize_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetShaderCodeOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx); // "after" survived
 	EXPECT_EQ(VertexUnit().code, "CODE_AFTER");
 
@@ -281,7 +290,7 @@ TEST_F(ShaderControllerTest, SetShaderFieldOp_Inverse_IsInvolution)
 
 	EXPECT_EQ(twice->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	twice->Apply(ctx); // reproduces the original forward effect.
 	EXPECT_EQ(VertexUnit().parsed.AB_list[0].name, "renamed");
 }
@@ -302,7 +311,7 @@ TEST_F(ShaderControllerTest, SetShaderFieldOp_Serialize_RoundTrip)
 	EXPECT_NE(dynamic_cast<SetShaderFieldOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx); // "after" element + section + index survived
 	EXPECT_EQ(VertexUnit().parsed.AB_list[0].name, "renamed");
 
@@ -320,7 +329,7 @@ TEST_F(ShaderControllerTest, AddShaderFieldOp_Inverse_RemovesThenReadds)
 	auto op = std::make_unique<AddShaderFieldOp>(
 		uid, kVertex, ShaderSection::Attributes, /*subFieldIndex*/ -1, /*add*/ true);
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	op->Apply(ctx); // re-append default
 	EXPECT_EQ(VertexUnit().parsed.AB_list.size(), 1u);
 
@@ -346,7 +355,7 @@ TEST_F(ShaderControllerTest, AddShaderFieldOp_Serialize_RoundTrip)
 	EXPECT_NE(dynamic_cast<AddShaderFieldOp*>(restored.get()), nullptr);
 	EXPECT_EQ(restored->Label(), op->Label());
 
-	OperationContext ctx{ m_scene, m_eventBus };
+	OperationContext ctx{ m_eventBus };
 	restored->Apply(ctx); // add flag + section survived -> appends
 	EXPECT_EQ(VertexUnit().parsed.AB_list.size(), 1u);
 
@@ -548,4 +557,99 @@ TEST_F(ShaderControllerTest, FieldAdd_RealGbufferVert_AttributesAndPassOutputs_U
 	// The surviving entries are untouched — LIFO removal hit the right lists.
 	EXPECT_EQ(VertexUnit().parsed.AB_list.front().name, "inPosition");
 	EXPECT_EQ(VertexUnit().parsed.pass_list.front().name, "fragWorldPos");
+}
+
+// ---------------------------------------------------------------------------
+// Create Shader undo/redo (ShaderLinkOp) - pool-preserving membership toggle
+// ---------------------------------------------------------------------------
+
+class ShaderCreateUndoTest : public ::testing::Test
+{
+protected:
+	void SetUp() override
+	{
+		// Pooled mesh registered in a real scene (so the op's stored UID
+		// resolves at replay) + a pooled RenderShader the restore handlers
+		// relink by UID. Subscriptions mirror Editor::Initialize's
+		// ShaderLinkRestored / ShaderUnlinkRestored handlers (RenderResetEvent
+		// omitted - not needed in a unit test).
+		m_mesh = m_pool.Load<Mesh>();
+		m_scene.UseMesh(m_mesh);
+		m_shader = m_pool.Load<RenderShader>("MeshShader_1", "v.vert", "f.frag");
+
+		m_eventBus.subscribe<ShaderLinkRestored>([this](const ShaderLinkRestored& e) {
+			auto mesh = m_pool.Get<Mesh>(e.objectUid);
+			if (!mesh) return;
+			mesh->SetObjShader(m_pool.Get<RenderShader>(e.shaderId));
+		});
+		m_eventBus.subscribe<ShaderUnlinkRestored>([this](const ShaderUnlinkRestored& e) {
+			auto mesh = m_pool.Get<Mesh>(e.objectUid);
+			if (!mesh) return;
+			mesh->SetObjShader(nullptr);
+		});
+	}
+
+	EventQueue m_eventBus;
+	Scene m_scene;
+	ResourceManager m_pool;
+	OperationManager m_operations{ m_eventBus };
+	std::shared_ptr<Mesh> m_mesh;
+	std::shared_ptr<RenderShader> m_shader;
+};
+
+TEST_F(ShaderCreateUndoTest, UndoDropsRedoRelinksSamePooledShader)
+{
+	const int shaderId = m_shader->GetObjectID();
+
+	// Mirror Editor::OnCreateShader: link the pooled shader, then record.
+	m_mesh->SetObjShader(m_shader);
+	m_operations.Submit(std::make_unique<ShaderLinkOp>(m_mesh->GetObjectID(), shaderId, true));
+
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId);
+
+	// Undo: reference dropped, pool keeps the shader.
+	m_operations.Undo();
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);
+	EXPECT_NE(m_pool.Get<RenderShader>(shaderId), nullptr);
+
+	// Redo: same pooled shader relinked (no new pooled object minted).
+	m_operations.Redo();
+	ASSERT_NE(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId);
+	EXPECT_EQ(m_mesh->o_shader->GetObjectID(), shaderId);
+}
+
+TEST_F(ShaderCreateUndoTest, StaleMeshUidNoOps)
+{
+	// A mesh that no longer exists resolves to null and must no-op safely.
+	m_operations.Submit(std::make_unique<ShaderLinkOp>(123456, m_shader->GetObjectID(), true));
+	EXPECT_NO_THROW(m_operations.Undo());
+	EXPECT_NO_THROW(m_operations.Redo());
+	// Stacks advance like any other op (stale-UID no-op does not alter them);
+	// the unresolved mesh is never linked.
+	EXPECT_TRUE(m_operations.CanUndo());
+	EXPECT_FALSE(m_operations.CanRedo());
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);
+}
+
+TEST_F(ShaderCreateUndoTest, RoundTripsThroughCereal)
+{
+	const int shaderId = m_shader->GetObjectID();
+	std::unique_ptr<Operation> op =
+		std::make_unique<ShaderLinkOp>(m_mesh->GetObjectID(), shaderId, true);
+
+	auto restored = RoundTrip(op);
+	ASSERT_NE(restored, nullptr);
+	EXPECT_NE(dynamic_cast<ShaderLinkOp*>(restored.get()), nullptr);
+	EXPECT_EQ(restored->Label(), "Create Shader");
+
+	OperationContext ctx{ m_eventBus };
+	restored->Apply(ctx);
+	EXPECT_EQ(m_mesh->o_shaderId, shaderId);
+
+	restored->Inverse()->Apply(ctx);
+	EXPECT_EQ(m_mesh->o_shader, nullptr);
+	EXPECT_EQ(m_mesh->o_shaderId, 0);
 }

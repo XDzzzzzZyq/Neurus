@@ -26,6 +26,13 @@ model, coalescing rules, and persistence.
 - `TransitionOp<Derived, TEvent, Value>` (CRTP) covers per-object value edits;
   `Inverse()` swaps before/after. `MergeKey()`/`MergeFrom()` coalesce a
   continuous manipulation (e.g. camera drag) into one undo entry.
+- **Replay is ID-only**: ops re-dispatch via
+  `MakeEvent(int objectUid, const Value&)`, producing events whose `int objectUid`
+  field binds directly from the stored UID. Operations NEVER resolve objects
+  themselves — the receiving controller handler resolves the UID against the
+  current scene/pool via its `ControllerContext` at replay time, so stale ids
+  no-op in the handler (matching the old `ctx.Resolve` behavior). The manager
+  therefore needs NO scene or resource access.
 - `Operation::PreservesRedo()` (default false): a branching edit clears the redo
   stack. **Selection** ops (`SetSelectionOp`) override it to `true` so navigating
   the selection appends to undo *without* discarding a pending redo — safe
@@ -34,6 +41,28 @@ model, coalescing rules, and persistence.
   selection is also persisted independently of history by `Scene::serialize`
   (as UIDs — see data-resource.instructions.md), so a reopened project restores
   its selection even with an empty undo/redo history.
+- **`CompositeOp`** (in `Operation.h`, a general-purpose core op) composes any
+  sequence of `Operation`s into ONE undo entry. Group-theoretic inverse: it
+  replays the sequence in forward order, and `Inverse()` returns a composite of
+  the reversed, individually-inverted operations (o = h·g·f ⇒ o⁻¹ = f⁻¹·g⁻¹·h⁻¹),
+  so inversion is an involution. Serializes its contained ops polymorphically
+  (same pattern as the manager stacks).
+- **`SceneObjectAddOp`** (membership toggle) makes Add/Delete undoable. It
+  stores the object UID plus an `add` flag (the `AddShaderFieldOp` convention):
+  `Apply()` re-dispatches the ORIGINATING events
+  `SceneObjectAddRequested` / `SceneObjectDeleteRequested`, so replay runs the
+  same controller handler as a live edit; the handler's `Submit` is muted by
+  `Phase::Replaying`, so playback does not re-record (the expected "Submit
+  suppressed during replay" LOG). `Inverse()` flips the flag — the inverse of
+  Add is Delete and vice versa. Delete NEVER removes the pooled resource: it
+  only drops the scene reference, so undo re-registers from the pool without
+  any reload from disk, and the operation survives project save/load (pool +
+  history both persist).
+  - **Note (design):** replay re-enters the forward handler (harmless — Submit
+    is muted). If a handler carries gesture side effects (selection, gesture
+    state) that must NOT re-run on replay, give it a dedicated restore event
+    (ShaderCodeRestored convention) instead of the forward event — but keep
+    ops minimal by default.
 
 ## Bounded undo depth
 
@@ -46,7 +75,7 @@ Redo is bounded implicitly: its entries only ever originate from undo pops.
 ## Coalescing gestures into one undo entry
 
 A continuous manipulation (a slider drag, a camera orbit) fires a *stream* of
-value changes but must collapse to a single undo entry. Two strategies exist:
+value changes but must collapse to a single undo entry. Three strategies exist:
 
 - **Implicit merge (MergeKey):** the op declares a non-empty `MergeKey()`;
   `OperationManager::Submit` folds a same-key edit into the undo-stack top.
@@ -58,6 +87,14 @@ value changes but must collapse to a single undo entry. Two strategies exist:
   Used where the UI has a real press/release boundary. This needs NO changes to
   `OperationManager` or `IOperationSink` — the boundaries are ordinary typed
   events flowing through the same controller chain.
+- **Composite (one gesture → many primitive ops):** where one gesture spans
+  several *distinct* edits, the controller records a single `CompositeOp`
+  holding the primitive sequence. Scene add records
+  `CompositeOp[SceneObjectAddOp({u},true), SetSelectionOp(before→{u})]` (add
+  AND select = one undo entry); scene delete records
+  `CompositeOp[SetSelectionOp(before→∅), SceneObjectAddOp(uids,false)]`
+  (deselect AND remove every selected object in ONE batched op = one undo
+  entry). Undo replays the reversed, inverted sequence.
 
 For the concrete controller wiring (`CameraController`,
 `RenderConfigController`, `ShaderController`), see
@@ -77,6 +114,15 @@ op immediately per change. The ops are deliberately non-mergeable (empty
 event (`ShaderCodeRestored` / `ShaderFieldRestored` / `ShaderFieldAddRestored` /
 `ShaderFieldRemoved`) that re-applies one edit dimension and bumps
 `ShaderUnit::m_version`, never recompiling to SPIR-V.
+Shader **Create** is recorded by the Editor (`Editor::OnCreateShader`), not the
+controller, as a pool-preserving membership toggle `ShaderLinkOp`
+(`{mesh UID, pooled shader UID, add}` flag - the `SceneObjectAddOp`
+convention): undo drops the mesh's shader reference (the pooled `RenderShader`
+is never removed), redo relinks the same pooled shader by UID. Replay dispatches
+dedicated restore events (`ShaderLinkRestored` / `ShaderUnlinkRestored`,
+Editor-handled - it owns the pool) so it never re-enters the forward create
+handler (no reload/recompile, no duplicate pooled shader). Compile stays
+non-undoable.
 
 ## Persisting the history stacks
 

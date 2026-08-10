@@ -7,6 +7,11 @@
 
 #include <glm/glm.hpp>
 
+#include <cereal/types/base_class.hpp>
+#include <cereal/types/string.hpp>
+
+#include "core/UID.h"
+
 namespace neurus {
 
 /**
@@ -16,8 +21,13 @@ namespace neurus {
  * Vertex layout (14 floats): position(3), normal(3), uv(2), tangent(3), bitangent(3).
  *
  * Pure CPU data - no Vulkan/GPU resources.
+ *
+ * Resource identity: MeshData is a pooled resource (UID base). It serializes
+ * itself (UID + source path); content is loaded from the path on construction
+ * and re-loaded in serialize(load). Non-copyable/non-movable (UID semantics) -
+ * held via shared_ptr (Mesh::o_mesh).
  */
-class MeshData
+class MeshData : public UID
 {
 public:
 	/**
@@ -34,6 +44,23 @@ public:
 	MeshData() = default;
 
 	/**
+	 * @brief Path constructor: stores the source path and loads content.
+	 *
+	 * The path is used as-is (absolute or resolvable from the working
+	 * directory). Content is loaded immediately so the resource is ready
+	 * after ResourceManager::Load<MeshData>(path).
+	 *
+	 * @param path OBJ file path.
+	 */
+	explicit MeshData(const std::string& path);
+
+	// Non-copyable / non-movable (UID identity).
+	MeshData(const MeshData&) = delete;
+	MeshData& operator=(const MeshData&) = delete;
+	MeshData(MeshData&&) = delete;
+	MeshData& operator=(MeshData&&) = delete;
+
+	/**
 	 * @brief Load OBJ from a file path.
 	 * @param path File path to .obj file.
 	 * @return true if parsing succeeded.
@@ -46,6 +73,34 @@ public:
 	 * @return true if parsing succeeded.
 	 */
 	bool LoadObjFromString(const std::string& objContent);
+
+	/**
+	 * @brief (Re)loads the OBJ content from disk.
+	 *
+	 * Called on construction (path ctor) and at the end of serialize(load),
+	 * so a pooled MeshData restores its content after deserialization. No-op
+	 * when m_path is empty (procedural/test data).
+	 */
+	void ReloadContent();
+
+	/**
+	 * @brief Cereal serialization - UID + source path, then content reload.
+	 *
+	 * On load, restores identity + path and re-parses the OBJ from disk
+	 * (self-contained; no pool hook needed).
+	 *
+	 * @tparam Archive Cereal archive type (input or output).
+	 * @param ar Archive to serialize to/from.
+	 */
+	template<class Archive>
+	void serialize(Archive& ar)
+	{
+		ar(cereal::base_class<UID>(this), CEREAL_NVP(m_path));
+		if constexpr (Archive::is_loading::value)
+		{
+			ReloadContent();
+		}
+	}
 
 	/**
 	 * @brief Get read-only access to the parsed mesh data.
@@ -63,6 +118,14 @@ public:
 	std::string GetMeshName() const;
 
 	/**
+	 * @brief Returns the source OBJ path (serialized, relative to asset dir).
+	 * @return Const reference to the stored path (empty for procedural data).
+	 * @note The path lives HERE (data layer) - scene objects wrap this
+	 *       MeshData and never hold the path themselves.
+	 */
+	const std::string& GetPath() const { return m_path; }
+
+	/**
 	 * @brief Get number of unique vertices in the interleaved array.
 	 */
 	size_t GetVertexCount() const;
@@ -73,6 +136,7 @@ public:
 	size_t GetIndexCount() const;
 
 private:
+	std::string m_path;       ///< Source OBJ path (relative to asset dir; serialized)
 	ByteArray me_meshData;
 
 	// --- Parsing helpers ---

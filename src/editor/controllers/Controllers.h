@@ -1,10 +1,8 @@
 #pragma once
 
-#include "editor/events/EventBus.h"
+#include "editor/controllers/ControllerContext.h"
 
 namespace neurus {
-
-class IOperationSink;
 
 class Controllers
 {
@@ -13,10 +11,13 @@ public:
 
 	/**
 	 * @brief Subscribes the controller to its events.
-	 * @param bus Event queue to subscribe to.
-	 * @param ops Sink for recording undoable operations at mutation time.
+	 * @param ctx Controller context: event dispatch (IEventQueue), pooled-object
+	 *            lookup (IResourceLookup), and the operation sink
+	 *            (IOperationSink). Controllers must NOT retain the context or
+	 *            any of its members; handler lambdas may capture it by
+	 *            reference (the Editor owns it and it outlives the bus).
 	 */
-	virtual void Init(EventQueue& bus, IOperationSink& ops) = 0;
+	virtual void Init(ControllerContext& ctx) = 0;
 };
 
 } // namespace neurus

@@ -1,13 +1,14 @@
 {
     "project": {
-        "m_scene": {
-            "cam_list": [
+        "m_resources": {
+            "resources_": [
                 {
                     "key": 2,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483649,
+                        "polymorphic_name": "neurus::Camera",
                         "ptr_wrapper": {
-                            "id": 2147483649,
+                            "id": 2147483650,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -49,15 +50,30 @@
                             }
                         }
                     }
-                }
-            ],
-            "mesh_list": [
+                },
+                {
+                    "key": 100,
+                    "value": {
+                        "polymorphic_id": 2147483650,
+                        "polymorphic_name": "neurus::MeshData",
+                        "ptr_wrapper": {
+                            "id": 2147483748,
+                            "data": {
+                                "value0": {
+                                    "o_id": 100
+                                },
+                                "m_path": "res/obj/shadow/ground.obj"
+                            }
+                        }
+                    }
+                },
                 {
                     "key": 10,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483651,
+                        "polymorphic_name": "neurus::Mesh",
                         "ptr_wrapper": {
-                            "id": 2147483650,
+                            "id": 2147483658,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -85,11 +101,28 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/ground.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
-                                "is_closure": true
+                                "is_closure": true,
+                                "o_meshDataId": 100,
+                                "o_shaderId": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "key": 101,
+                    "value": {
+                        "polymorphic_id": 2147483652,
+                        "polymorphic_name": "neurus::MeshData",
+                        "ptr_wrapper": {
+                            "id": 2147483749,
+                            "data": {
+                                "value0": {
+                                    "o_id": 101
+                                },
+                                "m_path": "res/obj/shadow/grid2.obj"
                             }
                         }
                     }
@@ -97,9 +130,10 @@
                 {
                     "key": 9,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483653,
+                        "polymorphic_name": "neurus::Mesh",
                         "ptr_wrapper": {
-                            "id": 2147483651,
+                            "id": 2147483657,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -127,11 +161,28 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/grid2.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
-                                "is_closure": true
+                                "is_closure": true,
+                                "o_meshDataId": 101,
+                                "o_shaderId": 0
+                            }
+                        }
+                    }
+                },
+                {
+                    "key": 102,
+                    "value": {
+                        "polymorphic_id": 2147483654,
+                        "polymorphic_name": "neurus::MeshData",
+                        "ptr_wrapper": {
+                            "id": 2147483750,
+                            "data": {
+                                "value0": {
+                                    "o_id": 102
+                                },
+                                "m_path": "res/obj/shadow/grid1.obj"
                             }
                         }
                     }
@@ -139,9 +190,10 @@
                 {
                     "key": 8,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483655,
+                        "polymorphic_name": "neurus::Mesh",
                         "ptr_wrapper": {
-                            "id": 2147483652,
+                            "id": 2147483656,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -169,23 +221,23 @@
                                         "z": 1.0
                                     }
                                 },
-                                "o_meshPath": "obj/shadow/grid1.obj",
                                 "using_shadow": true,
                                 "using_material": true,
                                 "using_sdf": true,
-                                "is_closure": true
+                                "is_closure": true,
+                                "o_meshDataId": 102,
+                                "o_shaderId": 0
                             }
                         }
                     }
-                }
-            ],
-            "light_list": [
+                },
                 {
                     "key": 6,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483656,
+                        "polymorphic_name": "neurus::Light",
                         "ptr_wrapper": {
-                            "id": 2147483653,
+                            "id": 2147483654,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -218,8 +270,8 @@
                                 "light_power": 0.5,
                                 "light_color": {
                                     "x": 1.0,
-                                    "y": 0.30000001192092898,
-                                    "z": 0.30000001192092898
+                                    "y": 0.30000001192092896,
+                                    "z": 0.30000001192092896
                                 },
                                 "light_radius": 0.009999999776482582,
                                 "spot_cutoff": 0.8999999761581421,
@@ -232,9 +284,10 @@
                 {
                     "key": 5,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483657,
+                        "polymorphic_name": "neurus::Light",
                         "ptr_wrapper": {
-                            "id": 2147483654,
+                            "id": 2147483653,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -266,9 +319,9 @@
                                 "light_type": 0,
                                 "light_power": 10.0,
                                 "light_color": {
-                                    "x": 0.30000001192092898,
+                                    "x": 0.30000001192092896,
                                     "y": 1.0,
-                                    "z": 0.30000001192092898
+                                    "z": 0.30000001192092896
                                 },
                                 "light_radius": 0.009999999776482582,
                                 "spot_cutoff": 0.8999999761581421,
@@ -281,9 +334,10 @@
                 {
                     "key": 4,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483658,
+                        "polymorphic_name": "neurus::Light",
                         "ptr_wrapper": {
-                            "id": 2147483655,
+                            "id": 2147483652,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -315,8 +369,8 @@
                                 "light_type": 0,
                                 "light_power": 10.0,
                                 "light_color": {
-                                    "x": 0.30000001192092898,
-                                    "y": 0.30000001192092898,
+                                    "x": 0.30000001192092896,
+                                    "y": 0.30000001192092896,
                                     "z": 1.0
                                 },
                                 "light_radius": 0.009999999776482582,
@@ -330,9 +384,10 @@
                 {
                     "key": 3,
                     "value": {
-                        "polymorphic_id": 1073741824,
+                        "polymorphic_id": 2147483659,
+                        "polymorphic_name": "neurus::Light",
                         "ptr_wrapper": {
-                            "id": 2147483656,
+                            "id": 2147483651,
                             "data": {
                                 "value0": {
                                     "value0": {
@@ -376,11 +431,27 @@
                         }
                     }
                 }
+            ]
+        },
+        "m_scene": {
+            "camIds": [
+                2
             ],
-            "sprite_list": [],
-            "dLine_list": [],
-            "dPoints_list": [],
-            "env_list": [],
+            "meshIds": [
+                10,
+                9,
+                8
+            ],
+            "lightIds": [
+                6,
+                5,
+                4,
+                3
+            ],
+            "spriteIds": [],
+            "dLineIds": [],
+            "dPointsIds": [],
+            "envIds": [],
             "selectedUids": [],
             "activeUid": 0
         },
@@ -391,13 +462,13 @@
             "r_shadow": 1,
             "r_ssr": 0,
             "r_gamma": 1.0,
-            "r_shadow_bias": 0.0020000000949949028,
+            "r_shadow_bias": 0.0020000000949949026,
             "r_ao_ksize": 16,
             "r_ao_radius": 0.5,
             "r_sample_pf": 128,
-            "r_transparent": false,
+            "r_transparent": true,
             "r_fxaa_subpix": 0.75,
-            "r_fxaa_edge_threshold": 0.16599999368190766,
+            "r_fxaa_edge_threshold": 0.16599999368190765,
             "r_fxaa_edge_threshold_min": 0.08330000191926956,
             "r_sampling_mode": 0
         },

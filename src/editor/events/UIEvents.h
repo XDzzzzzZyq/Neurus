@@ -6,6 +6,7 @@
 #include "editor/events/ProjectEvents.h"
 #include "editor/events/AssetEvents.h"
 #include "editor/events/OperationEvents.h"
+#include "editor/events/SceneEvents.h"
 
 namespace neurus {
 

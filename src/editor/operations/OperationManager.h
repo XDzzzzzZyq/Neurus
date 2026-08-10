@@ -9,12 +9,14 @@
  *
  * Replay is synchronous and guarded by Phase::Replaying, so Submit() (called
  * by the re-run handler) is suppressed and does not corrupt the stacks. This
- * is only safe because Apply() dispatches via EventQueue::emitNow (direct
+ * is only safe because Apply() dispatches via IEventQueue::emitNow (direct
  * dispatch), never through the deferred queue.
  *
- * The manager does not own the Scene: it holds a provider so the correct
- * (possibly swapped) scene is resolved at replay time. Implements
- * IOperationSink so controllers can record without knowing the concrete type.
+ * The manager needs NO scene or resource access: operations are pure value
+ * descriptors that replay by dispatching events carrying integer object UIDs;
+ * the controller handlers resolve the ids against their ControllerContext at
+ * replay time. Implements IOperationSink so controllers can record without
+ * knowing the concrete type.
  */
 
 #pragma once
@@ -31,7 +33,6 @@
 namespace neurus {
 
 class EventQueue;
-class Scene;
 
 /**
  * @brief Owns the undo/redo history and drives synchronous replay.
@@ -45,13 +46,10 @@ public:
 	/**
 	 * @brief Constructs the manager.
 	 * @param bus Event queue operations replay their events on.
-	 * @param sceneProvider Returns the current scene (re-queried each replay,
-	 *        so a scene swap does not leave a dangling reference).
 	 * @param maxUndoDepth Cap on undo-stack entries; oldest are evicted past it
 	 *        (default kDefaultMaxUndoDepth). Bounds memory for long sessions.
 	 */
-	OperationManager(EventQueue& bus, std::function<Scene*()> sceneProvider,
-	                 size_t maxUndoDepth = kDefaultMaxUndoDepth);
+	OperationManager(EventQueue& bus, size_t maxUndoDepth = kDefaultMaxUndoDepth);
 
 	// --- IOperationSink ---
 	void Submit(std::unique_ptr<Operation> op) override;
@@ -110,7 +108,6 @@ private:
 	void EnforceUndoLimit();
 
 	EventQueue& m_bus;
-	std::function<Scene*()> m_sceneProvider;
 
 	std::vector<std::unique_ptr<Operation>> m_undo;
 	std::vector<std::unique_ptr<Operation>> m_redo;
