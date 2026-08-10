@@ -28,4 +28,13 @@ namespace neurus
  */
 std::string ResolveAssetPath(const std::string& path);
 
+/**
+ * @brief Converts a path into the portable form stored in project files.
+ * @param path Absolute path (e.g. from a file dialog) or already-relative path.
+ * @return "res/..." when @p path lies under the res dir, otherwise @p path
+ *         unchanged (caller decides whether to warn about non-portability).
+ * @note Inverse of ResolveAssetPath for files inside the res dir.
+ */
+std::string MakePortableAssetPath(const std::string& path);
+
 } // namespace neurus

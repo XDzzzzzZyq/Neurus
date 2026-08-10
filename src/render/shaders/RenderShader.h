@@ -46,7 +46,7 @@ public:
 	 * @brief Constructs a render shader with file paths to GLSL source.
 	 *
 	 * Default arguments make this the default ctor used by cereal's
-	 * polymorphic load; content loads later via ReloadContent(assetDir) (pool)
+	 * polymorphic load; content loads later via ReloadContent() (pool)
 	 * or an explicit ParseAndGenerate() call (ShaderLibrary).
 	 *
 	 * @param name     Human-readable shader name (for logging and cache keys).

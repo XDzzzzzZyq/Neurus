@@ -46,7 +46,7 @@ public:
 	 * Auto-detects HDR vs LDR format using stb_is_hdr().
 	 * HDR images (.hdr) are loaded as RGBA32F.
 	 * LDR images (.png, .bmp, .jpg, .tga) are loaded as RGBA8S.
-	 * Stores the path for later ReloadContent(assetDir) use.
+	 * Stores the path for later ReloadContent() use.
 	 *
 	 * @param path File path to the image.
 	 */

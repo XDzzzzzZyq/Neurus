@@ -7,9 +7,6 @@
 
 #include "core/Log.h"
 #include "core/ResourceManager.h"
-#include "asset/data/ImageData.h"
-#include "asset/data/MeshData.h"
-#include "render/shaders/Shader.h"
 
 namespace neurus
 {

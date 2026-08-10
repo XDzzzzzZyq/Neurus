@@ -49,4 +49,26 @@ std::string ResolveAssetPath(const std::string& path)
 	return path; // not found - caller logs and stays an identity shell
 }
 
+std::string MakePortableAssetPath(const std::string& path)
+{
+	if (path.empty() || !IsAbsolutePath(path))
+		return path;
+
+	std::error_code ec;
+	const auto resDir = std::filesystem::weakly_canonical(std::filesystem::path(NEURUS_RES_DIR), ec);
+	if (ec)
+		return path;
+
+	const auto abs = std::filesystem::weakly_canonical(std::filesystem::path(path), ec);
+	if (ec)
+		return path;
+
+	// Outside the res dir ("..") -> not portable, keep the absolute path.
+	const auto rel = abs.lexically_relative(resDir);
+	if (rel.empty() || rel.begin()->string() == "..")
+		return path;
+
+	return "res/" + rel.generic_string();
+}
+
 } // namespace neurus

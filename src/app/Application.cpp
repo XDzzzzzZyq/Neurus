@@ -157,11 +157,9 @@ int Application::Run()
 	InitEditor();
 
 	const auto projectPath = resolveResourcePath("shadow.neurus.json").toStdString();
-	const auto assetDir = resolveResourcePath("").toStdString();
 	// Relative path: pooled resources store relative "res/..." paths so project
 	// files stay portable; the asset layer resolves them against the res dir.
 	const std::string objPath = "res/obj/sphere.obj";
-	app_editor->SetAssetDir(assetDir);
 
 	try
 	{

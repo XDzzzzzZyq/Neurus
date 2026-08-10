@@ -58,16 +58,6 @@ public:
 	void ClearDirty() { m_dirty = false; }
 
 	/**
-	 * @brief Sets the asset directory used to resolve resource paths.
-	 * @note The Editor resolves relative resource paths (mesh/IBL) against
-	 *       this directory when creating pooled resources.
-	 */
-	void SetAssetDir(const std::string& dir)
-	{
-		m_assetDir = dir;
-	}
-
-	/**
 	 * @brief Returns the app-scoped ResourceManager (UID object pool).
 	 *
 	 * The Application registers a project::ResourceComponent + SceneComponent
@@ -137,7 +127,6 @@ private:
 	std::unique_ptr<Scene> m_scene;
 	std::unique_ptr<ResourceManager> m_resources;  ///< App-scoped UID object pool
 	RenderConfig          m_config;
-	std::string           m_assetDir;
 	bool                  m_dirty = false;
 
 	// --- Editor infrastructure ---

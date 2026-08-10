@@ -29,4 +29,10 @@ Environment::Environment(std::shared_ptr<ImageData> data)
 
 Environment::~Environment() = default;
 
+void Environment::SetEquirectData(std::shared_ptr<ImageData> data)
+{
+	o_equirectData = std::move(data);
+	o_imageDataId = o_equirectData ? o_equirectData->GetObjectID() : 0;
+}
+
 } // namespace neurus

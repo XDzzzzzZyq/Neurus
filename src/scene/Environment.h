@@ -31,10 +31,11 @@
 
 #include "scene/ObjectID.h"
 #include "Transform.h"
-#include "asset/data/ImageData.h"
 
 namespace neurus
 {
+	
+class ImageData;
 
 /**
  * @brief IBL environment map providing image-based lighting for the scene.
@@ -98,12 +99,9 @@ public:
 	 * @brief Directly sets the CPU-side equirectangular pixel data.
 	 * @param data Shared ImageData to reference (pooled resource).
 	 * @note No file loading; records the pooled ID for persistence.
+	 * @note Out-of-line: needs the complete ImageData type (GetObjectID).
 	 */
-	void SetEquirectData(std::shared_ptr<ImageData> data)
-	{
-		o_equirectData = std::move(data);
-		o_imageDataId = o_equirectData ? o_equirectData->GetObjectID() : 0;
-	}
+	void SetEquirectData(std::shared_ptr<ImageData> data);
 
 	// -----------------------------------------------------------------------
 	// Intensity

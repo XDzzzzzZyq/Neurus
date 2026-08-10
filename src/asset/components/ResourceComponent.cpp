@@ -57,13 +57,33 @@ void ResourceComponent::Load(cereal::JSONInputArchive& ar)
 	m_resources->ForEach<Mesh>([&](const std::shared_ptr<Mesh>& mesh) {
 		if (!mesh) return;
 		if (mesh->o_meshDataId != 0)
-			mesh->o_mesh = m_resources->Get<MeshData>(mesh->o_meshDataId);
+		{
+			auto meshData = m_resources->Get<MeshData>(mesh->o_meshDataId);
+			if (meshData)
+				mesh->o_mesh = meshData;
+			else
+				NEURUS_ERR("[ResourceComponent] stale MeshData UID " << mesh->o_meshDataId);
+		}
 		if (mesh->o_shaderId != 0)
-			mesh->o_shader = m_resources->Get<Shader>(mesh->o_shaderId);
+		{
+			auto shader = m_resources->Get<Shader>(mesh->o_shaderId);
+			if (shader)
+				mesh->o_shader = shader;
+			else
+				NEURUS_ERR("[ResourceComponent] stale Shader UID " << mesh->o_shaderId);
+		}
 	});
 	m_resources->ForEach<Environment>([&](const std::shared_ptr<Environment>& env) {
 		if (!env || env->o_imageDataId == 0) return;
-		env->SetEquirectData(m_resources->Get<ImageData>(env->o_imageDataId));
+		auto imageData = m_resources->Get<ImageData>(env->o_imageDataId);
+		if (!imageData)
+		{
+			// Keep o_imageDataId (do not zero it) so the broken reference is
+			// visible and reported instead of being silently dropped forever.
+			NEURUS_ERR("[ResourceComponent] stale ImageData UID " << env->o_imageDataId);
+			return;
+		}
+		env->SetEquirectData(imageData);
 	});
 }
 

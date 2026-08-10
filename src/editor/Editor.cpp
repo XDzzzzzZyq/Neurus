@@ -29,6 +29,7 @@
 #include "ui/UIContext.h"
 
 #include "core/Log.h"
+#include "asset/data/AssetPath.h"
 #include "asset/data/MeshData.h"
 #include "scene/Camera.h"
 #include "scene/Environment.h"
@@ -379,11 +380,21 @@ void Editor::OnMeshImport(const std::string& path)
 		// the MeshGPU upload happens on demand when the add is processed
 		// (SceneObjectAddRequested -> SceneObjectGpuUploadRequested ->
 		// OnSceneObjectGpuUpload) - no inline upload here.
-		auto meshData = m_resources->Load<MeshData>(path);
+		//
+		// Store a portable relative "res/..." path when the file lives under
+		// the res dir, so project files stay machine-independent. Paths
+		// outside it are stored as-is (best effort, warned).
+		const std::string storedPath = MakePortableAssetPath(path);
+		if (storedPath.rfind("res/", 0) != 0)
+		{
+			NEURUS_ERR("[Editor] Mesh import outside asset dir is stored as-is (non-portable): " << path);
+		}
+
+		auto meshData = m_resources->Load<MeshData>(storedPath);
 		auto mesh = m_resources->Load<Mesh>(meshData);
 
 		ed_eventBus.enqueue(SceneObjectAddRequested{mesh->GetObjectID()});
-		NEURUS_LOG("[Editor] Imported mesh: " << path);
+		NEURUS_LOG("[Editor] Imported mesh: " << storedPath);
 	}
 	catch (const std::exception& e) {
 		NEURUS_ERR("Failed to import mesh: " << e.what());

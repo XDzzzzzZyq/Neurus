@@ -20,6 +20,7 @@
 #include "asset/components/SceneComponent.h"
 #include "asset/components/ResourceComponent.h"
 #include "asset/components/ConfigComponent.h"
+#include "asset/data/ImageData.h"
 #include "asset/data/MeshData.h"
 #include "core/ResourceManager.h"
 #include "render/RenderConfig.h"
