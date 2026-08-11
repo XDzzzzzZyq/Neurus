@@ -96,6 +96,36 @@ std::vector<uint8_t> ImageData::ConvertHalfToU8(const void* data,
 	return result;
 }
 
+std::vector<uint8_t> ImageData::ConvertFloatToU8(const void* data,
+                                                 uint32_t width,
+                                                 uint32_t height,
+                                                 bool remapSigned)
+{
+	const auto* src = static_cast<const float*>(data);
+	const size_t pixelCount = static_cast<size_t>(width) * height;
+	std::vector<uint8_t> result(pixelCount * 4);
+
+	for (size_t i = 0; i < pixelCount; ++i)
+	{
+		// Background pixels: clear value (0, 0, 0) — leave transparent.
+		const bool isBackground = (src[i * 4 + 0] == 0.0f)
+			&& (src[i * 4 + 1] == 0.0f)
+			&& (src[i * 4 + 2] == 0.0f);
+
+		for (int c = 0; c < 4; ++c)
+		{
+			float val = src[i * 4 + c];
+			if (remapSigned && c < 3 && !isBackground)
+				val = (val + 1.0f) * 0.5f;
+			val = (val < 0.0f) ? 0.0f : ((val > 1.0f) ? 1.0f : val);
+			result[i * 4 + c] = static_cast<uint8_t>(val * 255.0f + 0.5f);
+		}
+		if (!isBackground)
+			result[i * 4 + 3] = 255;
+	}
+	return result;
+}
+
 void ImageData::SwizzleBGRtoRGB(void* data, uint32_t width,
                                  uint32_t height, uint32_t channels)
 {

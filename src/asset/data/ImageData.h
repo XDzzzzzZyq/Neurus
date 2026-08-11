@@ -124,6 +124,17 @@ public:
 	                                             uint32_t height,
 	                                             bool remapSigned = false);
 
+	/**
+	 * @brief Converts RGBA32F float data to RGBA8.
+	 * @param remapSigned If true, remap [-1,1]→[0,1] for RGB, handle
+	 *                    background transparency, force alpha to 255
+	 *                    on geometry pixels.
+	 */
+	static std::vector<uint8_t> ConvertFloatToU8(const void* data,
+	                                              uint32_t width,
+	                                              uint32_t height,
+	                                              bool remapSigned = false);
+
 	/** @brief Swaps R↔B channel in place for BGRA data. */
 	static void SwizzleBGRtoRGB(void* data, uint32_t width,
 	                            uint32_t height, uint32_t channels);

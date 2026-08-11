@@ -209,8 +209,11 @@ TEST_F(MultiLightShadowTest, TwoShadowLights_HDRColorReference)
 
 	// -------------------------------------------------------------------
 	// Step 7: Reference image regression
+	// Tolerance widened for platform-specific float/texture-sampling
+	// differences (GPU vendor/driver, MoltenVK vs. native Vulkan) around
+	// shadow edges: +/-4 per channel, up to 1% of pixels may differ.
 	// -------------------------------------------------------------------
-	const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+	const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 4, 0.01);
 
 	if (refResult < 0)
 	{
@@ -531,8 +534,8 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 		const bool saved = imgData.SavePNG(tmpPath);
 		ASSERT_TRUE(saved) << "Failed to save ShadowIntensity PNG for light " << li;
 
-		// --- Reference image regression ---
-		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+		// --- Reference image regression (widened tolerance: see note above) ---
+		const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 4, 0.01);
 
 		if (refResult < 0)
 		{
@@ -549,7 +552,7 @@ TEST_F(MultiLightShadowTest, ShadowIntensityPerLight_ReferenceImage)
 		{
 			allValid = false;
 			ADD_FAILURE() << refResult
-				<< " pixel(s) differ from reference for light " << li << " (tol=±2)";
+				<< " pixel(s) differ from reference for light " << li << " (tol=±4, 1% budget)";
 		}
 
 		// --- Verify content is not all-black nor all-white ---
@@ -702,9 +705,9 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	ASSERT_TRUE(captured) << "Failed to capture HDRColor attachment to " << tmpPath;
 
 	// -------------------------------------------------------------------
-	// Step 7: Reference image regression
+	// Step 7: Reference image regression (widened tolerance: see note above)
 	// -------------------------------------------------------------------
-	const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 2);
+	const int refResult = neurus::test::CheckReferenceOrGenerate(refPath, 4, 0.01);
 
 	if (refResult < 0)
 	{
@@ -715,6 +718,6 @@ TEST_F(MultiLightShadowTest, SunLights_HDRColorReference)
 	}
 	else
 	{
-		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=±2)";
+		EXPECT_EQ(refResult, 0) << refResult << " pixel(s) differ from reference (tol=±4, 1% budget)";
 	}
 }

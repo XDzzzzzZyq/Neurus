@@ -28,6 +28,7 @@
 #include "asset/data/MeshData.h"
 #include "render/buffers/VertexBuffer.h"
 #include "render/buffers/IndexBuffer.h"
+#include "shared/TestShadowPrimitives.h"
 
 #include <vulkan/vulkan_raii.hpp>
 #include <glm/glm.hpp>
@@ -90,32 +91,9 @@ inline SimpleShadowResources LoadSimpleShadow(
 	//     8 unique vertices, 12 triangles (36 indices)
 	// ===================================================================
 
-	const char* kCubeObj = R"OBJ(
-v -0.5 -0.5 -0.5
-v 0.5 -0.5 -0.5
-v 0.5 -0.5 0.5
-v -0.5 -0.5 0.5
-v -0.5 0.5 -0.5
-v 0.5 0.5 -0.5
-v 0.5 0.5 0.5
-v -0.5 0.5 0.5
-
-f 1 2 3 4
-f 5 8 7 6
-f 1 5 6 2
-f 4 3 7 8
-f 1 4 8 5
-f 2 6 7 3
-)OBJ";
-
 	{
-		auto cubeMeshData = std::make_shared<MeshData>();
-		const bool ok = cubeMeshData->LoadObjFromString(kCubeObj);
-		if (!ok)
-		{
-			NEURUS_ERR("[LoadSimpleShadow] Failed to parse cube OBJ string");
-			return res;
-		}
+		auto cubeMeshData = MakeShadowTestCubeMeshData("[LoadSimpleShadow]");
+		if (!cubeMeshData) return res;
 
 		auto cubeMesh = std::make_shared<Mesh>();
 		cubeMesh->o_name = "SimpleShadowCube";
@@ -131,23 +109,9 @@ f 2 6 7 3
 	//     4 vertices, 2 triangles (6 indices)
 	// ===================================================================
 
-	const char* kPlaneObj = R"OBJ(
-v -10 -10 0
-v 10 -10 0
-v 10 10 0
-v -10 10 0
-
-f 1 2 3 4
-)OBJ";
-
 	{
-		auto planeMeshData = std::make_shared<MeshData>();
-		const bool ok = planeMeshData->LoadObjFromString(kPlaneObj);
-		if (!ok)
-		{
-			NEURUS_ERR("[LoadSimpleShadow] Failed to parse plane OBJ string");
-			return res;
-		}
+		auto planeMeshData = MakeShadowTestPlaneMeshData("[LoadSimpleShadow]");
+		if (!planeMeshData) return res;
 
 		auto planeMesh = std::make_shared<Mesh>();
 		planeMesh->o_name = "SimpleShadowPlane";

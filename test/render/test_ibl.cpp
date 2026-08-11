@@ -5,8 +5,10 @@
  * Validates:
  *   - E2C (equirect → cubemap) compute shader produces valid cubemap
  *   - C2E (cubemap → equirect) compute shader roundtrip matches input
- *   - Cubemap 6-face readback and .hdr saving (Radiance format)
- *   - Cubemap 6-face .png saving (LDR)
+ *   - Cubemap 6-face readback and .hdr saving (Radiance format), verified as
+ *     reference-image regressions (first run generates + SKIP, subsequent
+ *     runs compare against the committed reference with tolerance)
+ *   - Cubemap 6-face .png saving (LDR), same reference-image pattern
  *   - Direct HDR float image saving via ImageData::SaveHDR
  *
  * @note Requires a Vulkan 1.4-capable GPU. Skipped in CI without GPU.
@@ -190,9 +192,16 @@ protected:
 				const float warm = std::max(0.0f, (0.5f - u) * 2.0f);
 				const float cool = std::max(0.0f, (u - 0.5f) * 2.0f);
 
-				pixels[idx + 0] = (warm * 1.0f + cool * 0.2f) * brightness;
-				pixels[idx + 1] = (warm * 0.4f + cool * 0.7f) * brightness;
-				pixels[idx + 2] = (warm * 0.1f + cool * 1.0f) * brightness;
+				// Small floor added to every channel so RGB never lands exactly
+				// on (0,0,0), which ConvertFloatToU8() treats as a "background"
+				// sentinel (forces alpha=0 / fully transparent pixel). Without
+				// this floor, u==0.5 columns produce warm=cool=0 and, combined
+				// with the poles (brightness->0), a black RGB triple that gets
+				// flagged as background.
+				constexpr float kFloor = 0.02f;
+				pixels[idx + 0] = kFloor + (warm * 1.0f + cool * 0.2f) * brightness;
+				pixels[idx + 1] = kFloor + (warm * 0.4f + cool * 0.7f) * brightness;
+				pixels[idx + 2] = kFloor + (warm * 0.1f + cool * 1.0f) * brightness;
 				pixels[idx + 3] = 1.0f;
 			}
 		}
@@ -230,7 +239,10 @@ protected:
 			                                vk::ImageLayout::eShaderReadOnlyOptimal);
 			m_e2cSets[0].WriteImage(0, srcInfo, vk::DescriptorType::eCombinedImageSampler);
 
-			vk::DescriptorImageInfo dstInfo(nullptr, *cubeDst.ImageViewHandle(),
+			// e2c.comp declares u_CubeOut as image2DArray, so bind the cube's
+			// 2D_ARRAY view (ArrayView()), not the default eCube view
+			// (ImageViewHandle()) which is only valid for imageCube bindings.
+			vk::DescriptorImageInfo dstInfo(nullptr, *cubeDst.ArrayView(),
 			                                vk::ImageLayout::eGeneral);
 			m_e2cSets[0].WriteImage(1, dstInfo, vk::DescriptorType::eStorageImage);
 		}
@@ -408,26 +420,44 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsHDR_ProducesValidFiles)
 	const std::string outDir = neurus::test::ReferencePath::Make("ibl/");
 	std::filesystem::create_directories(std::filesystem::path(outDir + "faces.hdr"));
 
+	// Reference-image pattern: write to .tmp, then compare/skip/generate via
+	// CheckReferenceOrGenerate — never overwrite a committed reference directly.
+	bool anyGenerated = false;
+	bool allValid = true;
+
 	for (int face = 0; face < 6; ++face)
 	{
 		const std::string path = outDir + "faces.hdr/cube_face_" + kFaceNames[face] + ".hdr";
+		const std::string tmpPath = path + ".tmp";
 		const float* faceData = cubeFloats + face * faceFloats;
 		ImageData faceImg(faceData, kCubeFaceRes, kCubeFaceRes, PixelFormat::RGBA32F);
-		bool saved = faceImg.SaveHDR(path);
+		bool saved = faceImg.SaveHDR(tmpPath);
 		EXPECT_TRUE(saved) << "Failed to save HDR face " << kFaceNames[face];
+		if (!saved) { allValid = false; continue; }
 
-		if (saved)
 		{
-			std::ifstream file(path, std::ios::binary);
-			EXPECT_TRUE(file.is_open()) << "HDR file should exist: " << path;
+			std::ifstream file(tmpPath, std::ios::binary);
+			EXPECT_TRUE(file.is_open()) << "HDR file should exist: " << tmpPath;
 			if (file.is_open())
 			{
 				std::string header(11, '\0');
 				file.read(&header[0], 11);
-				EXPECT_EQ(header, "#?RADIANCE\n") << "HDR file missing Radiance header: " << path;
+				EXPECT_EQ(header, "#?RADIANCE\n") << "HDR file missing Radiance header: " << tmpPath;
 			}
 		}
+
+		const int refResult = neurus::test::CheckReferenceOrGenerateHDR(path, 0.02f, 0.02);
+		if (refResult == -1)
+			anyGenerated = true;
+		else if (refResult == -2)
+			ADD_FAILURE() << "Failed to load reference HDR face " << kFaceNames[face];
+		else if (refResult > 0)
+			ADD_FAILURE() << refResult << " pixel(s) differ from reference HDR face " << kFaceNames[face];
 	}
+
+	if (anyGenerated)
+		GTEST_SKIP() << "Reference HDR faces generated. Re-run the test to compare.";
+	EXPECT_TRUE(allValid);
 }
 
 // ===========================================================================
@@ -438,8 +468,11 @@ TEST_F(IBLConversionTest, SaveHDRFloatImage_ProducesValidHDRFile)
 {
 	auto pixels = GenerateEquirectGradient(64, 32);
 
-	const std::string hdrPath = neurus::test::ReferencePath::Make("ibl/test_gradient.hdr");
-	std::filesystem::create_directories(std::filesystem::path(hdrPath).parent_path());
+	// Write to a scratch temp file — this test only validates SaveHDR()'s output
+	// format, it is NOT a reference-image regression, so it must never touch a
+	// committed reference. Clean up the scratch file when done.
+	const std::string hdrPath =
+		(std::filesystem::temp_directory_path() / "neurus_test_gradient.hdr").string();
 
 	ImageData gradientImg(pixels.data(), 64, 32, PixelFormat::RGBA32F);
 	bool saved = gradientImg.SaveHDR(hdrPath);
@@ -460,6 +493,9 @@ TEST_F(IBLConversionTest, SaveHDRFloatImage_ProducesValidHDRFile)
 		const auto fileSize = file.tellg();
 		EXPECT_GT(fileSize, 100) << "HDR file should contain pixel data";
 	}
+
+	std::error_code ec;
+	std::filesystem::remove(hdrPath, ec);
 }
 
 // ===========================================================================
@@ -483,7 +519,7 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 	vk::ImageSubresourceRange cubeAll(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 6);
 	auto cubeData = m_cubemapImage->ReadImageData(
 		*m_device, PhysicalDevice(), m_queue, m_graphicsQueueFamily, &cubeAll);
-	const auto* halfData = reinterpret_cast<const uint16_t*>(cubeData->GetPixelData().data());
+	const auto* cubeFloats = reinterpret_cast<const float*>(cubeData->GetPixelData().data());
 	const size_t facePixelCount = static_cast<size_t>(kCubeFaceRes) * kCubeFaceRes;
 
 	static const char* kFaceNames[6] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
@@ -491,15 +527,31 @@ TEST_F(IBLConversionTest, SaveCubemapFacesAsPNG_ProducesValidFiles)
 	const std::string outDir = neurus::test::ReferencePath::Make("ibl/");
 	std::filesystem::create_directories(std::filesystem::path(outDir + "faces.png"));
 
+	// Reference-image pattern: write to .tmp, then compare/skip/generate via
+	// CheckReferenceOrGenerate — never overwrite a committed reference directly.
+	bool anyGenerated = false;
+
 	for (int face = 0; face < 6; ++face)
 	{
 		const std::string path = outDir + "faces.png/cube_face_" + kFaceNames[face] + ".png";
+		const std::string tmpPath = path + ".tmp";
 
-		const uint16_t* faceSrc = halfData + face * facePixelCount * 4;
-		auto u8Data = ImageData::ConvertHalfToU8(faceSrc, kCubeFaceRes, kCubeFaceRes, false);
+		const float* faceSrc = cubeFloats + face * facePixelCount * 4;
+		auto u8Data = ImageData::ConvertFloatToU8(faceSrc, kCubeFaceRes, kCubeFaceRes, false);
 
 		ImageData img(u8Data.data(), kCubeFaceRes, kCubeFaceRes, PixelFormat::RGBA8U);
-		bool saved = img.SavePNG(path);
-		EXPECT_TRUE(saved) << "Failed to save PNG face " << kFaceNames[face];
+		bool saved = img.SavePNG(tmpPath);
+		ASSERT_TRUE(saved) << "Failed to save PNG face " << kFaceNames[face];
+
+		const int refResult = neurus::test::CheckReferenceOrGenerate(path, 4, 0.02);
+		if (refResult == -1)
+			anyGenerated = true;
+		else if (refResult == -2)
+			ADD_FAILURE() << "Failed to load reference PNG face " << kFaceNames[face];
+		else if (refResult > 0)
+			ADD_FAILURE() << refResult << " pixel(s) differ from reference PNG face " << kFaceNames[face];
 	}
+
+	if (anyGenerated)
+		GTEST_SKIP() << "Reference PNG faces generated. Re-run the test to compare.";
 }

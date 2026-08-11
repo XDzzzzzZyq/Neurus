@@ -54,21 +54,6 @@
 
 using namespace neurus;
 
-static uint32_t FindHostVisibleMemType(const vk::raii::PhysicalDevice& pd,
-                                       const vk::MemoryRequirements& memReqs)
-{
-	auto memProps = pd.getMemoryProperties();
-	for (uint32_t i = 0; i < memProps.memoryTypeCount; ++i)
-	{
-		if ((memReqs.memoryTypeBits & (1u << i)) &&
-		    (memProps.memoryTypes[i].propertyFlags &
-		     (vk::MemoryPropertyFlagBits::eHostVisible |
-		      vk::MemoryPropertyFlagBits::eHostCoherent)))
-			return i;
-	}
-	return UINT32_MAX;
-}
-
 class ShadowIntensityTest : public VulkanTestShared
 {
 protected:
@@ -203,7 +188,8 @@ TEST_F(ShadowIntensityTest, ShadowIntensity_MatchesExpectedAndReference)
 		vk::raii::Buffer stagingBuf(*m_device,
 			vk::BufferCreateInfo({}, bufSize, vk::BufferUsageFlagBits::eTransferDst));
 		auto memReqs = stagingBuf.getMemoryRequirements();
-		uint32_t memType = FindHostVisibleMemType(pd, memReqs);
+		uint32_t memType = VulkanTestShared::FindMemoryType(pd, memReqs.memoryTypeBits,
+			vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
 		ASSERT_LT(memType, UINT32_MAX);
 		vk::raii::DeviceMemory stagingMem(*m_device, vk::MemoryAllocateInfo(memReqs.size, memType));
 		stagingBuf.bindMemory(*stagingMem, 0);
