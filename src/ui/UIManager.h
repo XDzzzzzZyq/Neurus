@@ -21,7 +21,6 @@ class QMenu;
 
 namespace neurus {
 
-class Preferences;
 class PreferencesDialog;
 
 class UIManager : public QMainWindow
@@ -31,12 +30,18 @@ class UIManager : public QMainWindow
 public:
 	/**
 	 * @brief Constructs the main window.
-	 * @param preferences App-scoped preferences (Application-owned, non-owning
-	 *                    pointer) used by the Preferences dialog. Must outlive
-	 *                    this window.
+	 *
+	 * The Application seeds the UI with plain preference values — the UI
+	 * layer never touches the app-layer Preferences type.
+	 *
+	 * @param language        Active language code ("en", "zh_CN").
+	 * @param targetFps       Render-loop target FPS (0 = unlimited).
+	 * @param preferencesPath Absolute path of ~/.neurus/preferences.json
+	 *                        (displayed by the Preferences dialog).
 	 * @param parent Parent widget.
 	 */
-	explicit UIManager(Preferences* preferences, QWidget* parent = nullptr);
+	explicit UIManager(const QString& language, int targetFps,
+	                   const QString& preferencesPath, QWidget* parent = nullptr);
 	~UIManager() override;
 
 	/** @brief Returns the Viewport's native window handle for VkSurface creation. */
@@ -142,7 +147,11 @@ private:
 	QStringList           m_redoLabels;         ///< Undone ops, in replay order.
 
 	// --- Preferences dialog (lazy, non-dock panel) ---
-	Preferences*      m_preferences = nullptr;      ///< Application-owned, non-owning.
+	// The dialog is seeded with plain values (the Application is the sole
+	// owner of the app-layer Preferences type).
+	QString            m_currentLanguage;    ///< Cached active language code.
+	int                m_targetFps = 60;     ///< Cached render-loop target FPS.
+	QString            m_preferencesPath;    ///< ~/.neurus/preferences.json.
 	PreferencesDialog* m_preferencesDialog = nullptr; ///< Lazy-created; Qt parent owns.
 
 	// --- Texture Viewer placeholder dock (not a UIPanel) ---

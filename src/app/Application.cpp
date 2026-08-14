@@ -47,7 +47,7 @@
 #include "ui/UIManager.h"
 #include "ui/UIContext.h"
 #include "ui/utils/I18n.h"
-#include "ui/utils/Preferences.h"
+#include "app/Preferences.h"
 #include "ui/panels/Outliner.h"
 #include "ui/panels/PropertyPanel.h"
 #include "ui/panels/RenderConfigPanel.h"
@@ -132,12 +132,20 @@ Application::~Application()
 
 int Application::Run()
 {
-	// --- App-level preferences: load BEFORE the window is built so the UI
-	// starts in the saved language, and generate ~/.neurus/preferences.json
-	// on first run (missing file → defaults + immediate save). ---
+	// --- App-level preferences: the Application is their sole manager. Load
+	// BEFORE the window is built so the UI starts in the saved language, and
+	// generate ~/.neurus/preferences.json on first run. The UI only ever
+	// receives plain values (see the UIManager ctor below). ---
 	app_preferences = std::make_unique<neurus::Preferences>();
 	const std::string prefsPath = neurus::Preferences::DefaultPath();
-	if (!app_preferences->Load(prefsPath))
+	const bool prefsLoaded = app_preferences->Load(prefsPath);
+
+	// "auto" means "follow the system UI language" — resolve to a concrete
+	// code here (the Application owns I18n; Preferences stays UI-free).
+	if (app_preferences->language.empty() || app_preferences->language == "auto")
+		app_preferences->language = neurus::I18n::systemLanguage().toStdString();
+
+	if (!prefsLoaded)
 		app_preferences->Save(prefsPath);  // First run: create the file.
 	neurus::I18n::instance().setLanguage(
 		QString::fromStdString(app_preferences->language));
@@ -234,8 +242,13 @@ bool Application::InitVulkan()
 		auto vkInstance = neurus::VulkanContext::CreateInstance(*app_platform);
 		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
-		// Step 2: Create Qt window with Viewport
-		app_mainWindow = std::make_unique<neurus::UIManager>(app_preferences.get());
+		// Step 2: Create Qt window with Viewport. The Application seeds the UI
+		// with plain preference values (language / FPS / file path) — the UI
+		// layer never touches the app-layer Preferences type.
+		app_mainWindow = std::make_unique<neurus::UIManager>(
+			QString::fromStdString(app_preferences->language),
+			app_preferences->targetFps,
+			QString::fromStdString(neurus::Preferences::DefaultPath()));
 		app_mainWindow->show();  // Must show before surface creation on macOS
 
 		// Step 3: Create VkSurfaceKHR via platform abstraction

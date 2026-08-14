@@ -1,7 +1,6 @@
 #include "panels/PreferencesDialog.h"
 
 #include "ui/utils/I18n.h"
-#include "ui/utils/Preferences.h"
 
 #include <QComboBox>
 #include <QFormLayout>
@@ -14,9 +13,13 @@
 
 namespace neurus {
 
-PreferencesDialog::PreferencesDialog(Preferences* prefs, QWidget* parent)
+PreferencesDialog::PreferencesDialog(const QString& language, int targetFps,
+                                     const QString& preferencesPath,
+                                     QWidget* parent)
 	: QDialog(parent)
-	, m_prefs(prefs)
+	, m_language(language)
+	, m_targetFps(targetFps)
+	, m_preferencesPath(preferencesPath)
 {
 	// Drop the context-help "?" button on Windows.
 	setWindowFlag(Qt::WindowContextHelpButtonHint, false);
@@ -78,7 +81,7 @@ PreferencesDialog::PreferencesDialog(Preferences* prefs, QWidget* parent)
 	        this, &PreferencesDialog::Retranslate);
 
 	// Push current values in, then apply the initial language.
-	SyncFromPreferences();
+	SyncFrom(m_language, m_targetFps);
 	Retranslate();
 }
 
@@ -98,24 +101,23 @@ void PreferencesDialog::Retranslate()
 	m_fpsCombo->setItemText(3, QStringLiteral("120"));
 
 	m_pathLabel->setText(i18n.translate("Preferences file") + QStringLiteral(": ")
-	                     + QString::fromStdString(Preferences::DefaultPath()));
+	                     + m_preferencesPath);
 	m_resetBtn->setText(i18n.translate("Reset to Defaults"));
 	m_closeBtn->setText(i18n.translate("Close"));
 }
 
-void PreferencesDialog::SyncFromPreferences()
+void PreferencesDialog::SyncFrom(const QString& language, int targetFps)
 {
-	if (!m_prefs)
-		return;
+	m_language = language;
+	m_targetFps = targetFps;
 
-	const int langIndex = m_languageCombo->findData(
-		QString::fromStdString(m_prefs->language));
+	const int langIndex = m_languageCombo->findData(language);
 	{
 		QSignalBlocker block(m_languageCombo);
 		m_languageCombo->setCurrentIndex(langIndex >= 0 ? langIndex : 0);
 	}
 
-	const int fpsIndex = m_fpsCombo->findData(m_prefs->targetFps);
+	const int fpsIndex = m_fpsCombo->findData(targetFps);
 	{
 		QSignalBlocker block(m_fpsCombo);
 		m_fpsCombo->setCurrentIndex(fpsIndex >= 0 ? fpsIndex : 2);  // default 60

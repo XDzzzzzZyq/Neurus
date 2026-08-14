@@ -1,7 +1,6 @@
-#include "ui/utils/Preferences.h"
+#include "app/Preferences.h"
 
 #include "core/Log.h"
-#include "ui/utils/I18n.h"
 
 #include <QDir>
 
@@ -37,22 +36,14 @@ bool Preferences::Load(const std::string& path)
 		return false;
 	}
 
-	// "auto" (or an empty value) means "follow the system language".
-	if (language.empty() || language == "auto")
-		language = I18n::systemLanguage().toStdString();
-
+	// Note: "auto" language is intentionally left as-is here. Resolving it to
+	// a concrete code is the Application's responsibility (it owns I18n), so
+	// this data type stays free of any UI-layer dependency.
 	return true;
 }
 
 bool Preferences::Save(const std::string& path) const
 {
-	// "auto" never reaches disk: resolve to the detected system language so
-	// the persisted file always carries an explicit, loadable code.
-	const std::string effectiveLanguage =
-		(language.empty() || language == "auto")
-			? I18n::systemLanguage().toStdString()
-			: language;
-
 	// Ensure the ~/.neurus/ directory exists before writing.
 	const std::string::size_type sep = path.find_last_of("/\\");
 	if (sep != std::string::npos && sep > 0)
@@ -68,7 +59,7 @@ bool Preferences::Save(const std::string& path) const
 	try
 	{
 		cereal::JSONOutputArchive ar(out);
-		ar(cereal::make_nvp("language", effectiveLanguage),
+		ar(cereal::make_nvp("language", language),
 		   cereal::make_nvp("target_fps", targetFps));
 	}
 	catch (const std::exception& e)
@@ -77,7 +68,7 @@ bool Preferences::Save(const std::string& path) const
 		return false;
 	}
 
-	NEURUS_LOG("[Preferences] saved " << path << " (language=" << effectiveLanguage
+	NEURUS_LOG("[Preferences] saved " << path << " (language=" << language
 	           << ", target_fps=" << targetFps << ")");
 	return true;
 }

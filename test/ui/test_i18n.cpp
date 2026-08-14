@@ -91,4 +91,15 @@ TEST_F(I18nTest, SystemLanguageIsDetected)
 	EXPECT_TRUE(lang == QStringLiteral("en") || lang == QStringLiteral("zh_CN"));
 }
 
+TEST_F(I18nTest, AutoLanguageResolvesToSystemLanguage)
+{
+	// Safety net: "auto" (used by Preferences before the Application resolves
+	// it) is treated as "follow the system UI language".
+	I18n& i18n = I18n::instance();
+	i18n.setLanguage(QStringLiteral("auto"));
+	EXPECT_NE(i18n.language(), QStringLiteral("auto"));
+	EXPECT_TRUE(i18n.language() == QStringLiteral("en")
+	            || i18n.language() == QStringLiteral("zh_CN"));
+}
+
 } // namespace

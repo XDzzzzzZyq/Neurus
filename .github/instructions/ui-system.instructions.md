@@ -21,7 +21,6 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/LogPanel.h/cpp` | Realtime log viewer dock: filter bar + list view (issue #39) |
 | `src/ui/panels/PreferencesDialog.h/cpp` | Preferences dialog — live-applied language + target FPS (File → Preferences…, Ctrl+,) |
 | `src/ui/utils/I18n.h/cpp` | Lightweight runtime i18n manager: dictionary-based, instant language switch |
-| `src/ui/utils/Preferences.h/cpp` | App-scoped preferences (data + cereal JSON persistence to ~/.neurus/preferences.json) |
 | `src/ui/models/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
 | `src/ui/models/LogModel.h/cpp` | QAbstractListModel over the core LogBuffer |
 | `src/ui/models/LogFilterProxy.h/cpp` | QSortFilterProxyModel: level filter + text search |
@@ -164,20 +163,25 @@ code + native display name to `I18n::supportedLanguages()`.
 ## Preferences
 
 App-level settings (distinct from the per-project `.neurus.json` files) live
-in `~/.neurus/preferences.json`, persisted with cereal JSON by
-`Preferences` (`src/ui/utils/Preferences.h/cpp`):
+in `~/.neurus/preferences.json`, persisted with cereal JSON by the
+`Preferences` struct in **`src/app/Preferences.h/cpp`** — an **Application
+Layer** concept (future settings: CUDA enablement, theme, shortcut schemes).
 
-- Fields: `language` (`"en"`/`"zh_CN"`, or `"auto"` = detect at load) and
-  `target_fps` (0 = unlimited).
-- The **Application owns** the instance: it loads (and creates, on first run)
-  the file before the window is built, applies the saved language and target
-  FPS, saves on every edit, and saves once more on `aboutToQuit`.
-- **Flow**: `PreferencesDialog` (File → Preferences… / `Ctrl+,`) reads the
-  current values through its non-owning `Preferences*` and emits
-  `languageChangeRequested(QString)` / `targetFpsChangeRequested(int)` →
-  `UIEvents` → Application applies + persists + (for language) calls
-  `I18n::setLanguage()`, which fans out the live retranslation. Changes apply
-  immediately; the dialog only has Close (no OK/Cancel).
+- Fields: `language` (`"en"`/`"zh_CN"`, or `"auto"` = follow the system UI
+  language) and `target_fps` (0 = unlimited).
+- The **Application is the sole manager**: it loads (and creates, on first
+  run) the file before the window is built, resolves `"auto"` to a concrete
+  code (it owns I18n — `Preferences` itself is UI-free), applies the saved
+  language and target FPS, saves on every edit, and saves once more on
+  `aboutToQuit`.
+- **The UI never touches the `Preferences` type.** The Application seeds the
+  window with plain values (`UIManager(language, targetFps, prefsPath)`); the
+  `PreferencesDialog` (File → Preferences… / `Ctrl+,`) is a pure UI widget
+  holding only those plain values and emits `languageChangeRequested(QString)`
+  / `targetFpsChangeRequested(int)` → `UIEvents` → Application applies +
+  persists + (for language) calls `I18n::setLanguage()`, which fans out the
+  live retranslation. Changes apply immediately; the dialog only has Close
+  (no OK/Cancel).
 - The dialog also has a "Reset to Defaults" button (system language + 60 FPS).
 
 ## Build Integration

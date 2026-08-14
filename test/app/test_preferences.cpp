@@ -3,8 +3,9 @@
  * @brief Unit tests for the Preferences persistence (cereal JSON).
  *
  * Covers the ~/.neurus path convention, missing-file behavior (defaults kept,
- * never throws), save/load roundtrip, "auto" language resolution, and parent
- * directory creation. All file I/O is confined to QTemporaryDir.
+ * never throws), save/load roundtrip (including the "auto" language marker,
+ * which the Application resolves), and parent directory creation. All file
+ * I/O is confined to QTemporaryDir.
  */
 
 #include <gtest/gtest.h>
@@ -12,7 +13,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 
-#include "ui/utils/Preferences.h"
+#include "app/Preferences.h"
 
 using namespace neurus;
 
@@ -56,8 +57,11 @@ TEST(PreferencesTest, SaveLoadRoundtrip)
 	EXPECT_EQ(loaded.targetFps, 30);
 }
 
-TEST(PreferencesTest, AutoLanguageResolvesOnLoad)
+TEST(PreferencesTest, RoundtripPreservesAutoLanguage)
 {
+	// "auto" is stored/loaded verbatim by the data type; resolving it to a
+	// concrete code is the Application's responsibility (it owns I18n), so
+	// the round-trip must be lossless.
 	QTemporaryDir dir;
 	ASSERT_TRUE(dir.isValid());
 	const std::string path = dir.filePath(QStringLiteral("preferences.json"))
@@ -70,8 +74,8 @@ TEST(PreferencesTest, AutoLanguageResolvesOnLoad)
 
 	Preferences loaded;
 	EXPECT_TRUE(loaded.Load(path));
-	EXPECT_FALSE(loaded.language.empty());
-	EXPECT_NE(loaded.language, "auto");
+	EXPECT_EQ(loaded.language, "auto");
+	EXPECT_EQ(loaded.targetFps, 60);
 }
 
 TEST(PreferencesTest, SaveCreatesParentDirectory)

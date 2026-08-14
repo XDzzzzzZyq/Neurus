@@ -1,17 +1,21 @@
 /**
  * @file Preferences.h
- * @brief App-scoped user preferences persisted to ~/.neurus/preferences.json.
+ * @brief Application-layer user preferences persisted to ~/.neurus/preferences.json.
  *
- * Preferences are application-level (not project-level) settings: the active
- * UI language, the render-loop target FPS, etc. The Application owns the
- * instance, loads it at startup before the window is built, and saves it on
- * every change and on exit.
+ * Preferences are app-level (NOT project-level) settings, owned and managed
+ * exclusively by the Application: the active UI language, the render-loop
+ * target FPS, and — in the future — options such as CUDA enablement, theme,
+ * or shortcut schemes. The UI layer never sees this type: the Application
+ * seeds the Preferences dialog with plain values (language, target FPS,
+ * file path) and receives change requests back through UIEvents signals.
  *
  * Architecture:
- * - Pure data struct + cereal JSON persistence; no Qt widgets, no editor or
- *   renderer state.
+ * - Pure data struct + cereal JSON persistence (Qt-free apart from
+ *   QDir::homePath() used for the default file location).
  * - Missing/corrupt files fall back to defaults (never throw).
- * - The "auto" language resolves to the detected system language at load.
+ * - "auto" language means "follow the system UI language"; resolving it to a
+ *   concrete code is the Application's job (it owns I18n, so this data type
+ *   stays free of any UI dependency).
  */
 
 #pragma once
@@ -44,7 +48,7 @@ struct Preferences
 	/**
 	 * @brief Saves settings to @p path, creating the parent directory.
 	 * @param path Filesystem path (see DefaultPath()).
-	 * @return true on success, false on I/O or parse failure.
+	 * @return true on success, false on I/O failure.
 	 */
 	bool Save(const std::string& path) const;
 };

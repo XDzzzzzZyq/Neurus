@@ -12,8 +12,8 @@
 #include "render/DeferredRenderer.h"
 #include "render/Screenshot.h"
 #include "render/UploadManager.h"
+#include "app/Preferences.h"
 #include "ui/UIManager.h"
-#include "ui/utils/Preferences.h"
 #include "platform/PlatformSurface.h"
 
 namespace neurus {

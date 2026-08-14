@@ -33,8 +33,6 @@ add_library(neurus_ui STATIC
 	utils/ShaderHighlighter.cpp
 	utils/I18n.h
 	utils/I18n.cpp
-	utils/Preferences.h
-	utils/Preferences.cpp
 	presets/CameraProperties.h
 	presets/CameraProperties.cpp
 	presets/MeshProperties.h
@@ -68,7 +66,6 @@ target_link_libraries(neurus_ui PUBLIC
 	Qt6::Qml
 	Qt6::Widgets
 	neurus_editor
-	cereal
 	ads::qtadvanceddocking-qt6
 )
 

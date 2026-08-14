@@ -10,7 +10,6 @@
 #include "panels/Viewport.h"
 #include "UIContext.h"
 #include "ui/utils/I18n.h"
-#include "ui/utils/Preferences.h"
 
 #include "editor/events/UIEvents.h"
 #include "editor/operations/HistoryView.h"
@@ -38,9 +37,12 @@ namespace neurus {
 // Constructor / Destructor
 // =========================================================================
 
-UIManager::UIManager(Preferences* preferences, QWidget* parent)
+UIManager::UIManager(const QString& language, int targetFps,
+                       const QString& preferencesPath, QWidget* parent)
 	: QMainWindow(parent)
-	, m_preferences(preferences)
+	, m_currentLanguage(language)
+	, m_targetFps(targetFps)
+	, m_preferencesPath(preferencesPath)
 {
 	Icons::Initialize();
 
@@ -487,24 +489,29 @@ void UIManager::RetranslateAll()
 
 void UIManager::OpenPreferences()
 {
-	if (!m_preferences)
-		return;
-
 	if (!m_preferencesDialog)
 	{
-		m_preferencesDialog = new PreferencesDialog(m_preferences, this);
+		m_preferencesDialog = new PreferencesDialog(
+			m_currentLanguage, m_targetFps, m_preferencesPath, this);
 
-		// Dialog changes are routed through the UIEvents bus so the
-		// Application applies + persists them (UI → UIEvents → Application).
+		// Dialog changes update the local cache and are routed through the
+		// UIEvents bus so the Application applies + persists them
+		// (UI → UIEvents → Application).
 		connect(m_preferencesDialog, &PreferencesDialog::languageChangeRequested,
-		        [](const QString& lang) {
+		        this, [this](const QString& lang) {
+		            m_currentLanguage = lang;
 		            neurus::UIEvents::instance().requestLanguageChange(lang);
 		        });
 		connect(m_preferencesDialog, &PreferencesDialog::targetFpsChangeRequested,
-		        [](int fps) {
+		        this, [this](int fps) {
+		            m_targetFps = fps;
 		            neurus::UIEvents::instance().requestTargetFps(fps);
 		        });
 	}
+
+	// Re-seed the controls from the cache in case values changed since the
+	// dialog was last shown (e.g. after a Reset to Defaults).
+	m_preferencesDialog->SyncFrom(m_currentLanguage, m_targetFps);
 
 	m_preferencesDialog->show();
 	m_preferencesDialog->raise();

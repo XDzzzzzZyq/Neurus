@@ -241,8 +241,7 @@ Neurus/
 │   │   │   └── LogDelegate.h/cpp     # Severity-colored row delegate
 │   │   ├── utils/                # Non-widget UI helpers
 │   │   │   ├── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
-│   │   │   ├── I18n.h/cpp            # Runtime i18n manager (dictionary-based, live switch)
-│   │   │   └── Preferences.h/cpp     # App preferences persisted to ~/.neurus/preferences.json
+│   │   │   └── I18n.h/cpp            # Runtime i18n manager (dictionary-based, live switch)
 │   │   ├── panels/               # Dock panel widgets
 │   │   │   ├── UIPanel.h         # Base class for all panels
 │   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
@@ -277,6 +276,10 @@ Neurus/
 │   │   └── registrations/           # cereal polymorphic registration
 │   │       ├── TypeRegistration.h/cpp  # scene types + UID-level relations (force-init)
 │   │       └── TypeRegistration.cpp    # scene object types
+│   ├── app/                # Application layer (lifecycle orchestration)
+│   │   ├── Application.h/cpp  # QApplication lifecycle, signal wiring, project/preferences persistence
+│   │   ├── Preferences.h/cpp  # App-level preferences (language, target FPS) persisted to ~/.neurus/preferences.json — owned exclusively by the Application
+│   │   └── VulkanContext.h/cpp
 │   └── main.cpp            # Application entry point
 ├── test/
 │   ├── render/             # Renderer GPU tests
