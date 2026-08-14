@@ -19,6 +19,9 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/ProfilingPanel.h/cpp` | Real-time GPU profiling tree (Profiling dock) |
 | `src/ui/panels/ShaderEditorPanel.h/cpp` | Shader editor dock — Code mode + Structure mode (tree-based Struct Editor) |
 | `src/ui/panels/LogPanel.h/cpp` | Realtime log viewer dock: filter bar + list view (issue #39) |
+| `src/ui/panels/PreferencesDialog.h/cpp` | Preferences dialog — live-applied language + target FPS (File → Preferences…, Ctrl+,) |
+| `src/ui/utils/I18n.h/cpp` | Lightweight runtime i18n manager: dictionary-based, instant language switch |
+| `src/ui/utils/Preferences.h/cpp` | App-scoped preferences (data + cereal JSON persistence to ~/.neurus/preferences.json) |
 | `src/ui/models/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
 | `src/ui/models/LogModel.h/cpp` | QAbstractListModel over the core LogBuffer |
 | `src/ui/models/LogFilterProxy.h/cpp` | QSortFilterProxyModel: level filter + text search |
@@ -109,9 +112,73 @@ mainWindow->createViewportDock(container);
 
 | Menu | Items |
 |------|-------|
-| **File** | Exit (`Alt+F4`) |
+| **File** | New, Open…, Save, Save As…, Preferences… (`Ctrl+,`), Exit (`Alt+F4`) |
 | **View** | Save Layout (`Ctrl+Shift+S`), Restore Default Layout |
+| **Edit** | Undo, Redo, Add (Mesh… / Camera / Light) |
+| **Tools** | Take Screenshot (`F12`), Screenshot All Passes (`Ctrl+F12`) |
 | **Help** | About Neurus |
+
+## Internationalization (i18n)
+
+Language switching is dictionary-based and **live** — no restart, no Qt
+Linguist toolchain. The `I18n` singleton (`src/ui/utils/I18n.h/cpp`) owns the
+active language code and a `QHash<QString, QString>` dictionary:
+
+- **Keys are the English display strings themselves.** With no dictionary (or
+  a missing key) `I18n::translate(key)` returns the key verbatim, so English
+  is the implicit built-in fallback and untranslated strings degrade
+  gracefully.
+- Optional per-language dictionaries are embedded as Qt resources
+  (`:/i18n/<code>.json`, see `res/i18n/zh_CN.json`), loaded on demand by
+  `setLanguage()`. Values may contain `%1/%2` placeholders (callers apply
+  `.arg()`).
+- `setLanguage()` emits `languageChanged()` only when the code actually
+  changes. `I18n::supportedLanguages()` lists shipped languages (native
+  display names); `I18n::systemLanguage()` detects the OS UI language
+  (Simplified-Chinese → `zh_CN`, else `en`).
+
+**How retranslation reaches the widgets:**
+
+1. `UIPanel` stores its dock title as a translation *key* (`nameKey`, default
+   derived from `PanelType`); `PanelName()` resolves it through `I18n` at call
+   time, so dock titles follow the language with no per-panel code.
+2. Every panel may override `UIPanel::Retranslate()` to re-apply its own
+   labels/buttons/combo items. Panels call `Retranslate()` once at the end of
+   their constructor (so the startup language applies) and the framework calls
+   it again on every language change.
+3. `UIManager::RetranslateAll()` (connected to `I18n::languageChanged()`) is
+   the single fan-out: it re-texts every menu action from its registered
+   `(QAction*, key)` pair, updates every dock title via `setWindowTitle()`
+   (ADS propagates to the tab), calls each panel's `Retranslate()`, and
+   re-translates the Texture Viewer placeholder + Preferences dialog.
+4. The Preferences dialog also connects to `languageChanged()` directly so it
+   retranslates while open.
+
+**Adding a new translatable string:** write the English text as the key,
+wrap it in `I18n::instance().translate("...")` (or add it to the panel's
+`Retranslate()`), and add a `"key": "译文"` entry to `res/i18n/zh_CN.json`.
+**Adding a new language:** drop a `<code>.json` dictionary in `res/i18n/`,
+register it in `qt_add_resources` in `src/ui/CMakeLists.txt`, and add its
+code + native display name to `I18n::supportedLanguages()`.
+
+## Preferences
+
+App-level settings (distinct from the per-project `.neurus.json` files) live
+in `~/.neurus/preferences.json`, persisted with cereal JSON by
+`Preferences` (`src/ui/utils/Preferences.h/cpp`):
+
+- Fields: `language` (`"en"`/`"zh_CN"`, or `"auto"` = detect at load) and
+  `target_fps` (0 = unlimited).
+- The **Application owns** the instance: it loads (and creates, on first run)
+  the file before the window is built, applies the saved language and target
+  FPS, saves on every edit, and saves once more on `aboutToQuit`.
+- **Flow**: `PreferencesDialog` (File → Preferences… / `Ctrl+,`) reads the
+  current values through its non-owning `Preferences*` and emits
+  `languageChangeRequested(QString)` / `targetFpsChangeRequested(int)` →
+  `UIEvents` → Application applies + persists + (for language) calls
+  `I18n::setLanguage()`, which fans out the live retranslation. Changes apply
+  immediately; the dialog only has Close (no OK/Cancel).
+- The dialog also has a "Reset to Defaults" button (system language + 60 FPS).
 
 ## Build Integration
 

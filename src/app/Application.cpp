@@ -46,6 +46,8 @@
 #include "render/shaders/ShaderLibrary.h"
 #include "ui/UIManager.h"
 #include "ui/UIContext.h"
+#include "ui/utils/I18n.h"
+#include "ui/utils/Preferences.h"
 #include "ui/panels/Outliner.h"
 #include "ui/panels/PropertyPanel.h"
 #include "ui/panels/RenderConfigPanel.h"
@@ -130,6 +132,22 @@ Application::~Application()
 
 int Application::Run()
 {
+	// --- App-level preferences: load BEFORE the window is built so the UI
+	// starts in the saved language, and generate ~/.neurus/preferences.json
+	// on first run (missing file → defaults + immediate save). ---
+	app_preferences = std::make_unique<neurus::Preferences>();
+	const std::string prefsPath = neurus::Preferences::DefaultPath();
+	if (!app_preferences->Load(prefsPath))
+		app_preferences->Save(prefsPath);  // First run: create the file.
+	neurus::I18n::instance().setLanguage(
+		QString::fromStdString(app_preferences->language));
+	ApplyTargetFps(app_preferences->targetFps);
+
+	// Persist preferences once more on clean shutdown (safety net; changes
+	// are also saved eagerly on every edit).
+	QObject::connect(app_qtApp.get(), &QCoreApplication::aboutToQuit,
+	                 [this]() { app_preferences->Save(neurus::Preferences::DefaultPath()); });
+
 	if (!InitVulkan())
 	{
 		return -1;
@@ -217,7 +235,7 @@ bool Application::InitVulkan()
 		app_vkContext = std::make_unique<neurus::VulkanContext>(std::move(vkInstance));
 
 		// Step 2: Create Qt window with Viewport
-		app_mainWindow = std::make_unique<neurus::UIManager>();
+		app_mainWindow = std::make_unique<neurus::UIManager>(app_preferences.get());
 		app_mainWindow->show();  // Must show before surface creation on macOS
 
 		// Step 3: Create VkSurfaceKHR via platform abstraction
@@ -315,6 +333,29 @@ void Application::WireSignals()
 	PanelSignals(uiEvents);
 	RecreateSignals(uiEvents);
 	ScreenShotSignals(uiEvents);
+
+	// --- Preferences changes (Preferences dialog → Application) ---
+	// The dialog's live controls emit through UIEvents; the Application
+	// applies the new value, persists it, and (for language) retranslates
+	// the whole UI via I18n::languageChanged.
+	QObject::connect(&uiEvents, &neurus::UIEvents::languageChangeRequested,
+	                 [this](const QString& language) {
+	                     neurus::I18n::instance().setLanguage(language);
+	                     app_preferences->language = language.toStdString();
+	                     app_preferences->Save(neurus::Preferences::DefaultPath());
+	                 });
+	QObject::connect(&uiEvents, &neurus::UIEvents::targetFpsChangeRequested,
+	                 [this](int fps) {
+	                     app_preferences->targetFps = fps;
+	                     app_preferences->Save(neurus::Preferences::DefaultPath());
+	                     ApplyTargetFps(fps);
+	                 });
+}
+
+void Application::ApplyTargetFps(int fps)
+{
+	// 0 = unlimited: let the timer fire as fast as the event loop allows.
+	app_renderTimer->setInterval(fps > 0 ? 1000 / fps : 0);
 }
 
 // =========================================================================

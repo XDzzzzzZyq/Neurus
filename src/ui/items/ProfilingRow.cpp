@@ -180,6 +180,19 @@ void ProfilingHead::setFrame(double cpuMs, double gpuMs, bool gpuShown,
 // ProfilingHead::setNoData - "No profiling data yet" + clear numeric columns
 // =========================================================================
 
+void ProfilingHead::retranslate(const QString& frameLabel,
+                                   const QString& noDataLabel)
+{
+	// Re-text col 0 for the current mode without touching the cached numeric
+	// state (which stays valid across language switches).
+	switch (m_mode)
+	{
+	case Mode::Frame:  m_item->setText(0, frameLabel);  break;
+	case Mode::NoData: m_item->setText(0, noDataLabel); break;
+	default:           break;
+	}
+}
+
 void ProfilingHead::setNoData()
 {
 	if (m_mode == Mode::NoData)

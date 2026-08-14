@@ -29,6 +29,7 @@
 #include <cstdint>
 #include <string>
 
+class QString;
 class QTreeWidget;
 class QTreeWidgetItem;
 
@@ -157,6 +158,13 @@ public:
 	 * @brief Toggles row visibility; no-op if unchanged.
 	 */
 	void setHidden(bool hidden);
+
+	/**
+	 * @brief Re-applies the current mode's label in the active language.
+	 * @param frameLabel  Translated "Frame" label.
+	 * @param noDataLabel Translated "No profiling data yet" label.
+	 */
+	void retranslate(const QString& frameLabel, const QString& noDataLabel);
 
 	/** @brief The wrapped tree item (for parenting child rows via ProfilingRow). */
 	QTreeWidgetItem* item() const { return m_item; }

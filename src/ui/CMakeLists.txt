@@ -31,6 +31,10 @@ add_library(neurus_ui STATIC
 	delegates/ShaderFieldDelegate.cpp
 	utils/ShaderHighlighter.h
 	utils/ShaderHighlighter.cpp
+	utils/I18n.h
+	utils/I18n.cpp
+	utils/Preferences.h
+	utils/Preferences.cpp
 	presets/CameraProperties.h
 	presets/CameraProperties.cpp
 	presets/MeshProperties.h
@@ -54,6 +58,8 @@ add_library(neurus_ui STATIC
 	panels/ShaderEditorPanel.cpp
 	panels/LogPanel.h
 	panels/LogPanel.cpp
+	panels/PreferencesDialog.h
+	panels/PreferencesDialog.cpp
 )
 
 target_link_libraries(neurus_ui PUBLIC
@@ -62,6 +68,7 @@ target_link_libraries(neurus_ui PUBLIC
 	Qt6::Qml
 	Qt6::Widgets
 	neurus_editor
+	cereal
 	ads::qtadvanceddocking-qt6
 )
 
@@ -99,6 +106,14 @@ qt_add_resources(neurus_ui "icons"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/preview_visible.svg"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/render_invisible.svg"
 		"${CMAKE_SOURCE_DIR}/res/ui/icons/editor/render_visible.svg"
+)
+
+# Qt resource file (i18n dictionaries — loaded on demand by I18n)
+qt_add_resources(neurus_ui "i18n"
+	PREFIX "/i18n"
+	BASE "${CMAKE_SOURCE_DIR}/res/i18n"
+	FILES
+		"${CMAKE_SOURCE_DIR}/res/i18n/zh_CN.json"
 )
 
 # Enable Qt MOC, UIC, RCC on this target

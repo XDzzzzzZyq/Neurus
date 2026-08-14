@@ -2,12 +2,15 @@
 #include "Icons.h"
 #include "panels/LogPanel.h"
 #include "panels/Outliner.h"
+#include "panels/PreferencesDialog.h"
 #include "panels/ProfilingPanel.h"
 #include "panels/PropertyPanel.h"
 #include "panels/RenderConfigPanel.h"
 #include "panels/ShaderEditorPanel.h"
 #include "panels/Viewport.h"
 #include "UIContext.h"
+#include "ui/utils/I18n.h"
+#include "ui/utils/Preferences.h"
 
 #include "editor/events/UIEvents.h"
 #include "editor/operations/HistoryView.h"
@@ -35,8 +38,9 @@ namespace neurus {
 // Constructor / Destructor
 // =========================================================================
 
-UIManager::UIManager(QWidget* parent)
+UIManager::UIManager(Preferences* preferences, QWidget* parent)
 	: QMainWindow(parent)
+	, m_preferences(preferences)
 {
 	Icons::Initialize();
 
@@ -51,6 +55,14 @@ UIManager::UIManager(QWidget* parent)
 
 	CreateDocks();
 	CreateMenus();
+
+	// Language switch (e.g. from Preferences) retranslates the whole window
+	// immediately — no restart needed.
+	connect(&I18n::instance(), &I18n::languageChanged,
+	        this, &UIManager::RetranslateAll);
+
+	// Apply the startup language (menus were built with English literals).
+	RetranslateAll();
 }
 
 UIManager::~UIManager()
@@ -162,50 +174,74 @@ void UIManager::PopulateRedoMenu()
 
 void UIManager::CreateMenus()
 {
-	auto* fileMenu = menuBar()->addMenu("&File");
+	auto& i18n = I18n::instance();
 
-	auto* newAction = fileMenu->addAction("&New");
+	// Translated-menu helpers: create a menu/action with the current-language
+	// text and register (action, key) so RetranslateAll() can re-apply texts
+	// on language switches.
+	auto addMenu = [this, &i18n](auto* parent, const char* key) -> QMenu* {
+		auto* menu = parent->addMenu(i18n.translate(key));
+		m_menuItems.emplace_back(menu->menuAction(), key);
+		return menu;
+	};
+	auto trAction = [this, &i18n](auto* parent, const char* key) -> QAction* {
+		auto* action = parent->addAction(i18n.translate(key));
+		m_menuItems.emplace_back(action, key);
+		return action;
+	};
+
+	auto* fileMenu = addMenu(menuBar(), "&File");
+
+	auto* newAction = trAction(fileMenu, "&New");
 	newAction->setShortcut(QKeySequence("Ctrl+N"));
 	connect(newAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestProjectNew();
 	});
 
-	auto* openAction = fileMenu->addAction("&Open...");
+	auto* openAction = trAction(fileMenu, "&Open...");
 	openAction->setShortcut(QKeySequence("Ctrl+O"));
 	connect(openAction, &QAction::triggered, []() {
 		QString path = QFileDialog::getOpenFileName(
-			nullptr, "Open Project", QString(), "Neurus Project (*.neurus.json)");
+			nullptr, I18n::instance().translate("Open Project"), QString(),
+			"Neurus Project (*.neurus.json)");
 		if (!path.isEmpty())
 			neurus::UIEvents::instance().requestProjectOpen(path);
 	});
 
-	auto* saveAction = fileMenu->addAction("&Save");
+	auto* saveAction = trAction(fileMenu, "&Save");
 	saveAction->setShortcut(QKeySequence("Ctrl+S"));
 	connect(saveAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestProjectSave();
 	});
 
-	auto* saveAsAction = fileMenu->addAction("Save &As...");
+	auto* saveAsAction = trAction(fileMenu, "Save &As...");
 	saveAsAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
 	connect(saveAsAction, &QAction::triggered, []() {
 		QString path = QFileDialog::getSaveFileName(
-			nullptr, "Save Project As", QString(), "Neurus Project (*.neurus.json)");
+			nullptr, I18n::instance().translate("Save Project As"), QString(),
+			"Neurus Project (*.neurus.json)");
 		if (!path.isEmpty())
 			neurus::UIEvents::instance().requestProjectSaveAs(path);
 	});
 
 	fileMenu->addSeparator();
 
-	auto* exitAction = fileMenu->addAction("E&xit");
+	auto* prefsAction = trAction(fileMenu, "&Preferences...");
+	prefsAction->setShortcut(QKeySequence::Preferences);
+	connect(prefsAction, &QAction::triggered, this, &UIManager::OpenPreferences);
+
+	fileMenu->addSeparator();
+
+	auto* exitAction = trAction(fileMenu, "E&xit");
 	exitAction->setShortcut(QKeySequence::Quit);
 	connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
 
-	auto* viewMenu = menuBar()->addMenu("&View");
+	auto* viewMenu = addMenu(menuBar(), "&View");
 
-	auto* resetLayoutAction = viewMenu->addAction("Restore &Default Layout");
+	auto* resetLayoutAction = trAction(viewMenu, "Restore &Default Layout");
 	connect(resetLayoutAction, &QAction::triggered, this, &UIManager::RestoreDefaultLayout);
 
-	auto* editMenu = menuBar()->addMenu("&Edit");
+	auto* editMenu = addMenu(menuBar(), "&Edit");
 
 	// Undo/Redo are expandable submenus that reveal their stacks (like "Add").
 	// The actual trigger actions live on the window so Ctrl+Z / Ctrl+Y keep
@@ -226,88 +262,80 @@ void UIManager::CreateMenus()
 	});
 	addAction(redoTrigger);
 
-	m_undoMenu = editMenu->addMenu("&Undo");
+	m_undoMenu = addMenu(editMenu, "&Undo");
 	connect(m_undoMenu, &QMenu::aboutToShow, this, &UIManager::PopulateUndoMenu);
 
-	m_redoMenu = editMenu->addMenu("&Redo");
+	m_redoMenu = addMenu(editMenu, "&Redo");
 	connect(m_redoMenu, &QMenu::aboutToShow, this, &UIManager::PopulateRedoMenu);
 
 	editMenu->addSeparator();
 
-	auto* addMenu = editMenu->addMenu("&Add");
+	auto* addMenu2 = addMenu(editMenu, "&Add");
 
-	auto* meshAction = addMenu->addAction("&Mesh...");
+	auto* meshAction = trAction(addMenu2, "&Mesh...");
 	meshAction->setShortcut(QKeySequence("Ctrl+Shift+M"));
 	connect(meshAction, &QAction::triggered, []() {
 		QString path = QFileDialog::getOpenFileName(
-			nullptr, "Import Mesh", QString(), "OBJ Files (*.obj)");
+			nullptr, I18n::instance().translate("Import Mesh"), QString(),
+			"OBJ Files (*.obj)");
 		if (!path.isEmpty())
 			neurus::UIEvents::instance().requestMeshImport(path);
 	});
 
-	auto* cameraAction = addMenu->addAction("&Camera");
+	auto* cameraAction = trAction(addMenu2, "&Camera");
 	connect(cameraAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestCameraAdd();
 	});
 
-	auto* lightSubmenu = addMenu->addMenu("&Light");
+	auto* lightSubmenu = addMenu(addMenu2, "&Light");
 
-	auto* pointLightAction = lightSubmenu->addAction("&Point Light");
+	auto* pointLightAction = trAction(lightSubmenu, "&Point Light");
 	connect(pointLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestLightAdd();
 	});
 
-	auto* sunLightAction = lightSubmenu->addAction("&Sun Light");
+	auto* sunLightAction = trAction(lightSubmenu, "&Sun Light");
 	connect(sunLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestSunLightAdd();
 	});
 
-	auto* spotLightAction = lightSubmenu->addAction("Spo&t Light");
+	auto* spotLightAction = trAction(lightSubmenu, "Spo&t Light");
 	connect(spotLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestSpotLightAdd();
 	});
 
-	auto* toolsMenu = menuBar()->addMenu("&Tools");
+	auto* toolsMenu = addMenu(menuBar(), "&Tools");
 
-	auto* screenshotAction = toolsMenu->addAction("Take &Screenshot");
+	auto* screenshotAction = trAction(toolsMenu, "Take &Screenshot");
 	screenshotAction->setShortcut(QKeySequence("F12"));
 	connect(screenshotAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestScreenshot();
 	});
 
-	auto* screenshotAllAction = toolsMenu->addAction("Screenshot All &Passes");
+	auto* screenshotAllAction = trAction(toolsMenu, "Screenshot All &Passes");
 	screenshotAllAction->setShortcut(QKeySequence("Ctrl+F12"));
 	connect(screenshotAllAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestScreenshotAll();
 	});
 
-	auto* helpMenu = menuBar()->addMenu("&Help");
-	auto* aboutAction = helpMenu->addAction("&About Neurus");
+	auto* helpMenu = addMenu(menuBar(), "&Help");
+	auto* aboutAction = trAction(helpMenu, "&About Neurus");
 	connect(aboutAction, &QAction::triggered, this, [this]() {
-		QMessageBox::about(this, "About Neurus",
-			"<h2>Neurus</h2>"
-			"<p>A C++20 Vulkan-HPP 1.4 real-time renderer.</p>"
-			"<p>Version 0.1.0 (Triangle MVP)</p>");
+		QMessageBox::about(this,
+			I18n::instance().translate("About Neurus"),
+			QString("<h2>Neurus</h2>"
+			        "<p>%1</p>"
+			        "<p>%2</p>")
+				.arg(I18n::instance().translate(
+					"A C++20 Vulkan-HPP 1.4 real-time renderer."))
+				.arg(I18n::instance().translate(
+					"Version 0.1.0 (Triangle MVP)")));
 	});
 }
 
 // =========================================================================
 // Docks
 // =========================================================================
-
-// Helper: create a labeled placeholder widget
-static QWidget* makePlaceholder(const QString& text)
-{
-	auto* widget = new QWidget();
-	auto* layout = new QVBoxLayout(widget);
-	auto* label = new QLabel(text, widget);
-	label->setAlignment(Qt::AlignCenter);
-	QFont font = label->font();
-	font.setPointSize(14);
-	label->setFont(font);
-	layout->addWidget(label);
-	return widget;
-}
 
 void UIManager::CreateDocks()
 {
@@ -378,11 +406,21 @@ void UIManager::CreateDocks()
 	m_docks[PanelType::Profiling] = profilingDock;
 
 	// --- Bottom: Texture Viewer (placeholder, not a UIPanel) ---
-	auto* textureDock = new ads::CDockWidget(win_dockManager, "Texture Viewer");
-	textureDock->setWidget(makePlaceholder("Texture Viewer"));
-	textureDock->resize(300, 200);
-	textureDock->setMinimumSize(200, 150);
-	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, textureDock);
+	m_textureLabel = new QLabel(I18n::instance().translate("Texture Viewer"));
+	m_textureLabel->setAlignment(Qt::AlignCenter);
+	QFont font = m_textureLabel->font();
+	font.setPointSize(14);
+	m_textureLabel->setFont(font);
+	auto* textureWrap = new QWidget();
+	auto* textureLayout = new QVBoxLayout(textureWrap);
+	textureLayout->addWidget(m_textureLabel);
+
+	m_textureDock = new ads::CDockWidget(win_dockManager,
+	                                     I18n::instance().translate("Texture Viewer"));
+	m_textureDock->setWidget(textureWrap);
+	m_textureDock->resize(300, 200);
+	m_textureDock->setMinimumSize(200, 150);
+	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, m_textureDock);
 
 	// --- Bottom: Log Panel (tabbed onto Texture Viewer area) ---
 	auto logPanel = std::make_unique<neurus::LogPanel>();
@@ -392,7 +430,7 @@ void UIManager::CreateDocks()
 	logDock->resize(640, 220);
 	logDock->setMinimumSize(320, 140);
 	win_dockManager->addDockWidget(ads::BottomDockWidgetArea, logDock,
-	                               textureDock->dockAreaWidget());
+	                               m_textureDock->dockAreaWidget());
 	m_panels[PanelType::Log] = logPanel.release();
 	m_docks[PanelType::Log] = logDock;
 
@@ -400,11 +438,77 @@ void UIManager::CreateDocks()
 	QObject::connect(logPanelRaw, &neurus::LogPanel::errorNotified,
 	                 this, [this](int delta, const QString& first) {
 	                     statusBar()->showMessage(
-	                         tr("%1 new error(s): %2").arg(delta).arg(first), 3000);
+	                         I18n::instance().translate("%1 new error(s): %2")
+	                             .arg(delta).arg(first), 3000);
 	                 });
 
 	// Notify Application of the new native window handle for surface recreation
 	UIEvents::instance().requestUIRecreation(reinterpret_cast<quintptr>(newHwnd));
+}
+
+// =========================================================================
+// RetranslateAll — apply the active language to every user-visible string
+// =========================================================================
+
+void UIManager::RetranslateAll()
+{
+	auto& i18n = I18n::instance();
+
+	// --- Menu bar ---
+	for (const auto& [action, key] : m_menuItems)
+		action->setText(i18n.translate(key));
+
+	// --- Dock titles + per-panel texts ---
+	for (const auto& [type, widget] : m_panels)
+	{
+		auto* panel = qobject_cast<UIPanel*>(widget);
+		if (!panel)
+			continue;
+		auto dockIt = m_docks.find(type);
+		if (dockIt != m_docks.end())
+			dockIt->second->setWindowTitle(panel->PanelName());
+		panel->Retranslate();
+	}
+
+	// --- Texture Viewer placeholder (not a UIPanel) ---
+	if (m_textureDock)
+		m_textureDock->setWindowTitle(i18n.translate("Texture Viewer"));
+	if (m_textureLabel)
+		m_textureLabel->setText(i18n.translate("Texture Viewer"));
+
+	// --- Preferences dialog (if already opened) ---
+	if (m_preferencesDialog)
+		m_preferencesDialog->Retranslate();
+}
+
+// =========================================================================
+// Preferences dialog — lazy creation + show
+// =========================================================================
+
+void UIManager::OpenPreferences()
+{
+	if (!m_preferences)
+		return;
+
+	if (!m_preferencesDialog)
+	{
+		m_preferencesDialog = new PreferencesDialog(m_preferences, this);
+
+		// Dialog changes are routed through the UIEvents bus so the
+		// Application applies + persists them (UI → UIEvents → Application).
+		connect(m_preferencesDialog, &PreferencesDialog::languageChangeRequested,
+		        [](const QString& lang) {
+		            neurus::UIEvents::instance().requestLanguageChange(lang);
+		        });
+		connect(m_preferencesDialog, &PreferencesDialog::targetFpsChangeRequested,
+		        [](int fps) {
+		            neurus::UIEvents::instance().requestTargetFps(fps);
+		        });
+	}
+
+	m_preferencesDialog->show();
+	m_preferencesDialog->raise();
+	m_preferencesDialog->activateWindow();
 }
 
 // =========================================================================

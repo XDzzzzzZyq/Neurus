@@ -10,7 +10,14 @@
  * - Inherits QWidget — panels are embeddable in ads::CDockWidget
  * - Q_OBJECT macro for MOC signal/slot generation
  * - Each panel has a PanelType enum value for O(1) lookup in the panel registry
- * - PanelName() provides the human-readable dock title
+ * - PanelName() provides the human-readable dock title (translated via I18n)
+ *
+ * i18n:
+ * - The dock title is stored as a translation KEY (English by default);
+ *   PanelName() resolves it through I18n at call time, so dock titles follow
+ *   the active language without any per-panel code.
+ * - Panels with additional user-visible text override Retranslate() to
+ *   re-apply their strings; UIManager calls it on every language change.
  *
  * @note UI Layer — no Vulkan or Renderer dependencies.
  */
@@ -22,6 +29,7 @@
 #include <cstdint>
 
 #include "UIContext.h"
+#include "ui/utils/I18n.h"
 
 namespace neurus
 {
@@ -47,13 +55,14 @@ public:
 	/**
 	 * @brief Constructs a UIPanel.
 	 * @param type PanelType enum identifying this panel's role.
-	 * @param name Human-readable dock title. If empty, a default is derived from @p type.
+	 * @param nameKey I18n key for the dock title (English default string).
+	 *                Empty/null → default key derived from @p type.
 	 * @param parent Parent widget.
 	 */
-	explicit UIPanel(PanelType type, const QString& name = QString(), QWidget* parent = nullptr)
+	explicit UIPanel(PanelType type, const char* nameKey = nullptr, QWidget* parent = nullptr)
 		: QWidget(parent)
 		, m_type(type)
-		, m_name(name.isEmpty() ? DefaultName(type) : name) {}
+		, m_nameKey(nameKey && nameKey[0] ? nameKey : DefaultNameKey(type)) {}
 	~UIPanel() override = default;
 
 	UIPanel(const UIPanel&) = delete;
@@ -62,8 +71,8 @@ public:
 	/** @brief Returns the panel type enum. */
 	PanelType GetPanelType() const { return m_type; }
 
-	/** @brief Returns the human-readable panel name (e.g. "Viewport", "Outliner"). */
-	const QString& PanelName() const { return m_name; }
+	/** @brief Returns the human-readable (translated) panel name. */
+	QString PanelName() const { return I18n::instance().translate(m_nameKey); }
 
 	/**
 	 * @brief Refreshes the panel's display from a UIContext snapshot.
@@ -76,9 +85,18 @@ public:
 	 */
 	virtual void Refresh(const neurus::UIContext& ctx) = 0;
 
+	/**
+	 * @brief Re-applies all user-visible texts in the current language.
+	 *
+	 * Called by UIManager on every I18n::languageChanged() so panels switch
+	 * language instantly without a restart. Panels without translatable
+	 * text (e.g. Viewport) keep the default no-op.
+	 */
+	virtual void Retranslate() {}
+
 private:
-	/** @brief Returns the default display name for a given PanelType. */
-	static QString DefaultName(PanelType type)
+	/** @brief Returns the default dock-title key for a given PanelType. */
+	static const char* DefaultNameKey(PanelType type)
 	{
 		switch (type)
 		{
@@ -94,7 +112,7 @@ private:
 	}
 
 	PanelType m_type;
-	QString   m_name;
+	const char* m_nameKey;
 };
 
 } // namespace neurus

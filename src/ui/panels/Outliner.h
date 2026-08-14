@@ -59,6 +59,9 @@ public:
 	 */
 	void Refresh(const UIContext& ctx) override;
 
+	/** @brief Re-applies the category-group title in the active language. */
+	void Retranslate() override;
+
 signals:
 	/** @brief Emitted when a user clicks on a scene object row in the outliner. */
 	void objectClicked(const ObjectClicked& e);

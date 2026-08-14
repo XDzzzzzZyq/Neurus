@@ -240,7 +240,9 @@ Neurus/
 │   │   │   ├── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
 │   │   │   └── LogDelegate.h/cpp     # Severity-colored row delegate
 │   │   ├── utils/                # Non-widget UI helpers
-│   │   │   └── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
+│   │   │   ├── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
+│   │   │   ├── I18n.h/cpp            # Runtime i18n manager (dictionary-based, live switch)
+│   │   │   └── Preferences.h/cpp     # App preferences persisted to ~/.neurus/preferences.json
 │   │   ├── panels/               # Dock panel widgets
 │   │   │   ├── UIPanel.h         # Base class for all panels
 │   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
@@ -248,7 +250,8 @@ Neurus/
 │   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
 │   │   │   ├── RenderConfigPanel.h/cpp  # Live render setting controls
 │   │   │   ├── ShaderEditorPanel.h/cpp  # Code + Structure shader editor
-│   │   │   └── LogPanel.h/cpp        # Realtime log viewer dock (issue #39)
+│   │   │   ├── LogPanel.h/cpp        # Realtime log viewer dock (issue #39)
+│   │   │   └── PreferencesDialog.h/cpp  # Preferences dialog (language, target FPS)
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── Project.h/cpp            # Pure registration-based serializer
