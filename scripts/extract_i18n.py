@@ -10,7 +10,9 @@ obsolete (#~), and existing translations are preserved. Mirrors Blender's
 
 Usage:
   python3 scripts/extract_i18n.py                 # update all catalogs
-  python3 scripts/extract_i18n.py --check         # fail if anything untranslated
+  python3 scripts/extract_i18n.py --check         # read-only: fail if a
+                                                  # catalog is stale or has
+                                                  # untranslated strings
   python3 scripts/extract_i18n.py --min-coverage 95   # fail below threshold
   python3 scripts/extract_i18n.py --verbose       # print every change
 """
@@ -234,45 +236,58 @@ def render_po(header: str, entries: list, obsolete: list) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def load_header(text: str) -> str:
+def default_header(lang: str) -> str:
+    """Builds a canonical header block for a brand-new catalog."""
+    return render_header(
+        "Project-Id-Version: Neurus\n"
+        "Content-Type: text/plain; charset=UTF-8\n"
+        "Content-Transfer-Encoding: 8bit\n"
+        "Language: %s\n"
+        "X-Language-Name: %s\n" % (lang, lang))
+
+
+def render_header(msgstr: str) -> str:
+    """Renders the header entry in canonical gettext multi-line form.
+
+    The header msgstr is a set of `Field: value\\n` lines, so it is emitted as
+    an empty `msgstr ""` followed by one quoted continuation line per field.
+    parse_po() appends bare `"..."` lines, making this round-trip lossless.
+    """
+    lines = ['msgid ""', 'msgstr ""']
+    for field in msgstr.split("\n"):
+        if field:
+            lines.append('"%s"' % encode_c_literal(field + "\n"))
+    return "\n".join(lines) + "\n"
+
+
+def load_header(text: str, lang: str) -> str:
     """Extracts the header entry (msgid \"\") block for preservation."""
-    entries = parse_po(text)
-    for e in entries:
-        if e.msgid == "":
-            lines = []
-            # Rebuild the header block from the parsed context/msgstr.
-            lines.append('msgid ""')
-            for chunk in _split_multiline(e.msgstr):
-                lines.append('msgstr "%s"' % encode_c_literal(chunk))
-            return "\n".join(lines) + "\n"
-    return 'msgid ""\nmsgstr "Content-Type: text/plain; charset=UTF-8\\n"\n'
-
-
-def _split_multiline(text: str, width=72) -> list:
-    """Splits a long string into quoted continuation chunks (best effort)."""
-    if len(text) <= width:
-        return [text]
-    chunks = []
-    for i in range(0, len(text), width):
-        chunks.append(text[i:i + width])
-    return chunks
+    for e in parse_po(text):
+        if e.msgid == "" and e.msgstr:
+            return render_header(e.msgstr)
+    return default_header(lang)
 
 
 # ---------------------------------------------------------------------------
 # Catalog update
 # ---------------------------------------------------------------------------
 
-def update_catalog(po_path: str, keys: list, verbose: bool) -> dict:
-    """Merges code keys into one catalog; returns coverage stats."""
+def update_catalog(po_path: str, keys: list, verbose: bool, write=True) -> dict:
+    """Merges code keys into one catalog; returns coverage stats.
+
+    With write=False the catalog is left untouched and the rendered result is
+    only compared against the file on disk (reported as "stale").
+    """
     old_entries = []
+    old_text = None
+    lang = os.path.basename(po_path)[:-3]
     if os.path.exists(po_path):
         with open(po_path, encoding="utf-8") as f:
             old_text = f.read()
         old_entries = parse_po(old_text)
-        header = load_header(old_text)
+        header = load_header(old_text, lang)
     else:
-        header = ('msgid ""\n'
-                  'msgstr "Content-Type: text/plain; charset=UTF-8\\n"\n')
+        header = default_header(lang)
 
     old_by_key = {}
     old_obsolete_by_key = {}
@@ -306,13 +321,16 @@ def update_catalog(po_path: str, keys: list, verbose: bool) -> dict:
             if verbose:
                 print("  ~ obsolete: [%s] %s" % (e.context or "IFACE", e.msgid))
 
-    with open(po_path, "w", encoding="utf-8") as f:
-        f.write(render_po(header, new_entries, obsolete))
+    new_text = render_po(header, new_entries, obsolete)
+    stale = new_text != old_text
+    if write and stale:
+        with open(po_path, "w", encoding="utf-8") as f:
+            f.write(new_text)
 
     total = len(new_entries)
     coverage = 100.0 * (total - missing) / total if total else 100.0
     return {"total": total, "missing": missing, "obsolete": len(obsolete),
-            "coverage": coverage}
+            "coverage": coverage, "stale": stale}
 
 
 # ---------------------------------------------------------------------------
@@ -322,7 +340,8 @@ def update_catalog(po_path: str, keys: list, verbose: bool) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Neurus translation extractor")
     parser.add_argument("--check", action="store_true",
-                        help="fail (exit 1) if any string is untranslated")
+                        help="read-only: fail (exit 1) if a catalog is stale "
+                             "or any string is untranslated")
     parser.add_argument("--min-coverage", type=float, default=0.0,
                         help="fail if a language's coverage drops below this %%")
     parser.add_argument("--verbose", action="store_true",
@@ -345,7 +364,7 @@ def main() -> int:
     for name in po_files:
         path = os.path.join(I18N_DIR, name)
         lang = name[:-3]
-        stats = update_catalog(path, keys, args.verbose)
+        stats = update_catalog(path, keys, args.verbose, write=not args.check)
         status = "OK"
         if stats["missing"]:
             status = "MISSING %d" % stats["missing"]
@@ -356,6 +375,11 @@ def main() -> int:
               % (lang, stats["total"] - stats["missing"], stats["total"],
                  stats["coverage"], status, stats["obsolete"]))
         if args.min_coverage > stats["coverage"]:
+            failed = True
+        if args.check and stats["stale"]:
+            print("[extract_i18n] %s is out of date — run "
+                  "`python3 scripts/extract_i18n.py` and commit the result"
+                  % os.path.relpath(path, ROOT), file=sys.stderr)
             failed = True
 
     return 1 if failed else 0

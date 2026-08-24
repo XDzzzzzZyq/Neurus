@@ -2,7 +2,9 @@
 
 #include "core/Log.h"
 
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QLocale>
 
 namespace neurus {
@@ -126,6 +128,30 @@ void ParseCatalog(const QByteArray& data,
 	flush();
 }
 
+/**
+ * @brief Reads one field out of a catalog's PO header entry.
+ * @param data Raw .po file bytes.
+ * @param name Field name, e.g. "X-Language-Name".
+ * @return The trimmed field value, or an empty string if absent.
+ */
+QString HeaderField(const QByteArray& data, QLatin1String name)
+{
+	// The header is the first entry (msgid ""), one "Field: value\n" per line.
+	const QStringList lines = QString::fromUtf8(data).split(QLatin1Char('\n'));
+	for (const QString& rawLine : lines)
+	{
+		const QString line = rawLine.trimmed();
+		if (line.startsWith(QLatin1String("msgid")) && !line.endsWith(QLatin1String("\"\"")))
+			break;  // Past the header entry — give up.
+		if (!line.startsWith(QLatin1Char('"')))
+			continue;
+		const QString field = ParseQuotedField(line);
+		if (field.startsWith(name) && field.mid(name.size()).startsWith(QLatin1Char(':')))
+			return field.mid(name.size() + 1).trimmed();
+	}
+	return QString();
+}
+
 } // namespace
 
 I18n& I18n::instance()
@@ -165,10 +191,35 @@ QString I18n::translateCtx(const char* key, const char* context) const
 
 QList<I18n::LanguageInfo> I18n::supportedLanguages()
 {
-	return {
-		{ QStringLiteral("en"),    QStringLiteral("English") },
-		{ QStringLiteral("zh_CN"), QStringLiteral("简体中文") },
-	};
+	// English is implicit: the msgids ARE the English strings, so it has no
+	// catalog. Every other language is discovered from the embedded catalogs,
+	// making a new res/i18n/<code>.po the only edit needed to add a language.
+	QList<LanguageInfo> langs{ { QStringLiteral("en"), QStringLiteral("English") } };
+
+	const QFileInfoList files = QDir(QStringLiteral(":/i18n"))
+	                                .entryInfoList({ QStringLiteral("*.po") },
+	                                               QDir::Files, QDir::Name);
+	for (const QFileInfo& info : files)
+	{
+		const QString code = info.completeBaseName();
+		if (code == QLatin1String("en"))
+			continue;
+
+		QString name;
+		QFile file(info.filePath());
+		if (file.open(QIODevice::ReadOnly))
+		{
+			name = HeaderField(file.readAll(), QLatin1String("X-Language-Name"));
+			file.close();
+		}
+		if (name.isEmpty())
+			name = QLocale(code).nativeLanguageName();
+		if (name.isEmpty())
+			name = code;
+
+		langs.append({ code, name });
+	}
+	return langs;
 }
 
 QString I18n::systemLanguage()

@@ -1,5 +1,11 @@
 msgid ""
-msgstr "fer-Encoding: 8bit\nPlural-Forms: nplurals=2; plural=(n != 1);\n"
+msgstr ""
+"Project-Id-Version: Neurus\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: zh_CN\n"
+"X-Language-Name: 简体中文\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
 
 msgid "&About Neurus"
 msgstr "关于 Neurus(&A)"
@@ -219,9 +225,6 @@ msgstr "未选中对象"
 
 msgid "No profiling data yet"
 msgstr "暂无性能数据"
-
-msgid "No selected object"
-msgstr "未选中对象"
 
 msgid "None"
 msgstr "无"

@@ -45,7 +45,8 @@ PropertyPanel::PropertyPanel(QWidget* parent)
 	mainLayout->addWidget(m_lightProps);
 	mainLayout->addWidget(m_envProps);
 
-	m_emptyLabel = new QLabel("No selected object");
+	// Text is filled in by the Retranslate() call at the end of this ctor.
+	m_emptyLabel = new QLabel();
 	m_emptyLabel->setAlignment(Qt::AlignCenter);
 	QFont emptyFont = m_emptyLabel->font();
 	emptyFont.setPointSize(emptyFont.pointSize() + 1);
@@ -71,7 +72,7 @@ void PropertyPanel::Retranslate()
 {
 	auto& i18n = I18n::instance();
 
-	m_emptyLabel->setText(i18n.translate("No selected object"));
+	m_emptyLabel->setText(i18n.translate("No object selected"));
 	m_transformGroup->setTitle(i18n.translate("Transform"));
 	m_posLabel->setText(i18n.translate("Position"));
 	m_rotLabel->setText(i18n.translate("Rotation"));

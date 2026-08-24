@@ -42,6 +42,10 @@ QString LoadLogPanelStyle()
 
 } // namespace
 
+// Status-bar counter format — one spelling shared by every update site.
+// N_ registers it with the extractor without translating it here.
+static constexpr const char* kStatsFormat = N_("INFO %1 · ERROR %2");
+
 LogPanel::LogPanel(QWidget* parent)
 	: UIPanel(PanelType::Log, "Log", parent)
 {
@@ -83,7 +87,7 @@ void LogPanel::Retranslate()
 	m_filter->setItemText(2, i18n.translate("Errors"));
 
 	m_search->setPlaceholderText(i18n.translateCtx("Search...", "Placeholder"));
-	m_stats->setText(i18n.translate("INFO %1 \u00b7 ERROR %2")
+	m_stats->setText(i18n.translate(kStatsFormat)
 	                     .arg(m_lastInfoCount).arg(m_lastErrorCount));
 	m_autoScrollBtn->setText(i18n.translate("Auto-scroll"));
 	m_pauseBtn->setText(i18n.translate("Pause"));
@@ -211,7 +215,7 @@ void LogPanel::Refresh(const UIContext& ctx)
 	{
 		m_lastInfoCount = info;
 		m_lastErrorCount = errors;
-		m_stats->setText(I18n::instance().translate("INFO %1 · ERROR %2")
+		m_stats->setText(I18n::instance().translate(kStatsFormat)
 		                     .arg(info).arg(errors));
 	}
 
@@ -265,7 +269,7 @@ void LogPanel::OnClearClicked()
 	m_lastInfoCount = 0;
 	m_model.Refresh(&LogBuffer::instance());
 	m_delegate.setSourcePad(m_model.MaxSourceChars());
-	m_stats->setText(I18n::instance().translate("INFO %1 · ERROR %2")
+	m_stats->setText(I18n::instance().translate(kStatsFormat)
 	                     .arg(0).arg(0));
 }
 

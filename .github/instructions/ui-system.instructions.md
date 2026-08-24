@@ -170,9 +170,15 @@ uses), so translators can work with Poedit / Weblate. The `I18n` singleton
   (`#~`, preserved across runs and restored if the key comes back), and
   reports per-language coverage.
 - `python3 scripts/extract_i18n.py` → update catalogs;
-  `--check` / `--min-coverage <pct>` → fail (for CI);
+  `--check` → **read-only**: writes nothing and exits 1 if a catalog is stale
+  (i.e. re-running the extractor would change it) or has untranslated strings;
+  `--min-coverage <pct>` → fail below a coverage threshold;
   `--verbose` → list every added/obsoleted key.
-- CI runs `--check` before the build, so a missing translation fails the PR.
+- CI runs `--check` before the build, so a missing translation or an
+  uncommitted catalog update fails the PR without dirtying the tree.
+- The header entry (`msgid ""`) is round-tripped verbatim in canonical gettext
+  form (`msgstr ""` + one quoted continuation line per field), so hand-written
+  fields like `X-Language-Name` and `Plural-Forms` survive every run.
 - At runtime `I18n` logs its load, e.g.
   `[I18n] loaded 145/145 strings for 'zh_CN' (0 untranslated)`.
 
@@ -180,9 +186,12 @@ uses), so translators can work with Poedit / Weblate. The `I18n` singleton
 wrap it in `I18n::instance().translate("...")` (or `translateCtx`/`N_` as
 appropriate), then run `scripts/extract_i18n.py` — the new key appears in the
 catalog automatically and the coverage report tells you if it is translated.
-**Adding a new language:** drop a `<code>.po` catalog in `res/i18n/`,
-register it in `qt_add_resources` in `src/ui/CMakeLists.txt`, and add its
-code + native display name to `I18n::supportedLanguages()`.
+**Adding a new language:** drop a `<code>.po` catalog in `res/i18n/` — that is
+the only step. `src/ui/CMakeLists.txt` globs `res/i18n/*.po` into
+`qt_add_resources` (`CONFIGURE_DEPENDS`), and `I18n::supportedLanguages()`
+enumerates the embedded `:/i18n/*.po` at runtime, taking each display name from
+the catalog's `X-Language-Name` header field (falling back to
+`QLocale::nativeLanguageName()`, then the code itself).
 
 ## Preferences
 

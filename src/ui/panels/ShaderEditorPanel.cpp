@@ -122,7 +122,8 @@ ShaderEditorPanel::ShaderEditorPanel(QWidget* parent)
 	rootLayout->addLayout(toolbarContainer);
 
 	// --- Empty state label (shown above content stack in both modes) ---
-	m_emptyLabel = new QLabel("No object selected", this);
+	// Text is filled in by Retranslate() once the widget tree is built.
+	m_emptyLabel = new QLabel(this);
 	m_emptyLabel->setAlignment(Qt::AlignCenter);
 	m_emptyLabel->setStyleSheet("color: gray;");
 	m_emptyLabel->setVisible(false);

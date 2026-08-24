@@ -106,11 +106,15 @@ qt_add_resources(neurus_ui "icons"
 )
 
 # Qt resource file (i18n dictionaries — loaded on demand by I18n)
+# Globbed so dropping res/i18n/<code>.po in is the only step needed to add a
+# language; I18n::supportedLanguages() enumerates the embedded catalogs.
+file(GLOB NEURUS_I18N_CATALOGS CONFIGURE_DEPENDS
+	"${CMAKE_SOURCE_DIR}/res/i18n/*.po")
 qt_add_resources(neurus_ui "i18n"
 	PREFIX "/i18n"
 	BASE "${CMAKE_SOURCE_DIR}/res/i18n"
 	FILES
-		"${CMAKE_SOURCE_DIR}/res/i18n/zh_CN.po"
+		${NEURUS_I18N_CATALOGS}
 )
 
 # Enable Qt MOC, UIC, RCC on this target

@@ -79,7 +79,14 @@ public:
 		QString displayName; ///< native name, e.g. "English", "简体中文"
 	};
 
-	/** @brief All languages shipped with the app (extendable). */
+	/**
+	 * @brief All languages shipped with the app.
+	 *
+	 * English first (it has no catalog — the msgids are the English strings),
+	 * then one entry per embedded res/i18n/<code>.po, sorted by code. The
+	 * display name comes from the catalog's X-Language-Name header field,
+	 * falling back to QLocale's native language name.
+	 */
 	static QList<LanguageInfo> supportedLanguages();
 
 	/**
