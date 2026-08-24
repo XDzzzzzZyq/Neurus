@@ -279,7 +279,7 @@ void ShaderEditorPanel::Retranslate()
 	m_saveBtn->setText(i18n.translate("Save"));
 	m_emptyLabel->setText(i18n.translate("No object selected"));
 	m_createBtn->setText(i18n.translate("Create Shader"));
-	m_removeBtn->setToolTip(i18n.translate("Remove entry"));
+	m_removeBtn->setToolTip(i18n.translateCtx("Remove entry", "Tooltip"));
 }
 
 // =========================================================================

@@ -119,18 +119,26 @@ mainWindow->createViewportDock(container);
 
 ## Internationalization (i18n)
 
-Language switching is dictionary-based and **live** — no restart, no Qt
-Linguist toolchain. The `I18n` singleton (`src/ui/utils/I18n.h/cpp`) owns the
-active language code and a `QHash<QString, QString>` dictionary:
+Language switching is **live** — no restart, no Qt Linguist toolchain — and
+the catalogs use the **GNU gettext .po format** (the same system Blender
+uses), so translators can work with Poedit / Weblate. The `I18n` singleton
+(`src/ui/utils/I18n.h/cpp`) owns the active language code and a
+`QHash<(context, msgid), QString>` catalog:
 
-- **Keys are the English display strings themselves.** With no dictionary (or
-  a missing key) `I18n::translate(key)` returns the key verbatim, so English
-  is the implicit built-in fallback and untranslated strings degrade
-  gracefully.
-- Optional per-language dictionaries are embedded as Qt resources
-  (`:/i18n/<code>.json`, see `res/i18n/zh_CN.json`), loaded on demand by
+- **msgid keys are the English display strings themselves.** A missing
+  catalog, context or msgid makes `I18n::translate*()` return the key
+  verbatim, so English is the implicit built-in fallback.
+- Per-language catalogs are embedded as Qt resources
+  (`:/i18n/<code>.po`, see `res/i18n/zh_CN.po`), parsed on demand by
   `setLanguage()`. Values may contain `%1/%2` placeholders (callers apply
   `.arg()`).
+- **Contexts (msgctxt) disambiguate identical English strings:**
+  `translate(key)` uses the default context; `translateCtx(key, "Dock" |
+  "Tooltip" | "Dialog" | "StatusBar" | "Placeholder")` targets a specific
+  one. Keys that are forwarded to helpers instead of written as
+  `translate("...")` literals are marked with the no-op `N_()` macro
+  (gettext convention) so the extractor can find them (menus,
+  RenderConfigPanel helper args).
 - `setLanguage()` emits `languageChanged()` only when the code actually
   changes. `I18n::supportedLanguages()` lists shipped languages (native
   display names); `I18n::systemLanguage()` detects the OS UI language
@@ -139,8 +147,9 @@ active language code and a `QHash<QString, QString>` dictionary:
 **How retranslation reaches the widgets:**
 
 1. `UIPanel` stores its dock title as a translation *key* (`nameKey`, default
-   derived from `PanelType`); `PanelName()` resolves it through `I18n` at call
-   time, so dock titles follow the language with no per-panel code.
+   derived from `PanelType`); `PanelName()` resolves it through `I18n` in the
+   `"Dock"` context at call time, so dock titles follow the language with no
+   per-panel code.
 2. Every panel may override `UIPanel::Retranslate()` to re-apply its own
    labels/buttons/combo items. Panels call `Retranslate()` once at the end of
    their constructor (so the startup language applies) and the framework calls
@@ -153,10 +162,25 @@ active language code and a `QHash<QString, QString>` dictionary:
 4. The Preferences dialog also connects to `languageChanged()` directly so it
    retranslates while open.
 
-**Adding a new translatable string:** write the English text as the key,
-wrap it in `I18n::instance().translate("...")` (or add it to the panel's
-`Retranslate()`), and add a `"key": "译文"` entry to `res/i18n/zh_CN.json`.
-**Adding a new language:** drop a `<code>.json` dictionary in `res/i18n/`,
+**Translation management (Blender-style pipeline):**
+
+- `scripts/extract_i18n.py` scans `src/ui/` for `translate()` /
+  `translateCtx()` / `N_()` keys plus the dock-title keys in `UIPanel.h`,
+  merges them into every `res/i18n/*.po`, marks removed keys obsolete
+  (`#~`, preserved across runs and restored if the key comes back), and
+  reports per-language coverage.
+- `python3 scripts/extract_i18n.py` → update catalogs;
+  `--check` / `--min-coverage <pct>` → fail (for CI);
+  `--verbose` → list every added/obsoleted key.
+- CI runs `--check` before the build, so a missing translation fails the PR.
+- At runtime `I18n` logs its load, e.g.
+  `[I18n] loaded 145/145 strings for 'zh_CN' (0 untranslated)`.
+
+**Adding a new translatable string:** write the English text as the msgid,
+wrap it in `I18n::instance().translate("...")` (or `translateCtx`/`N_` as
+appropriate), then run `scripts/extract_i18n.py` — the new key appears in the
+catalog automatically and the coverage report tells you if it is translated.
+**Adding a new language:** drop a `<code>.po` catalog in `res/i18n/`,
 register it in `qt_add_resources` in `src/ui/CMakeLists.txt`, and add its
 code + native display name to `I18n::supportedLanguages()`.
 

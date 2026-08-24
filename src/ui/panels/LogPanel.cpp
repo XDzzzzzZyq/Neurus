@@ -82,7 +82,7 @@ void LogPanel::Retranslate()
 	m_filter->setItemText(1, i18n.translate("Info"));
 	m_filter->setItemText(2, i18n.translate("Errors"));
 
-	m_search->setPlaceholderText(i18n.translate("Search..."));
+	m_search->setPlaceholderText(i18n.translateCtx("Search...", "Placeholder"));
 	m_stats->setText(i18n.translate("INFO %1 \u00b7 ERROR %2")
 	                     .arg(m_lastInfoCount).arg(m_lastErrorCount));
 	m_autoScrollBtn->setText(i18n.translate("Auto-scroll"));
@@ -288,16 +288,16 @@ bool LogPanel::eventFilter(QObject* watched, QEvent* event)
 void LogPanel::OnExportClicked()
 {
 	const QString path = QFileDialog::getSaveFileName(
-	    this, I18n::instance().translate("Save Log"), QStringLiteral("neurus.log"),
-	    I18n::instance().translate("Log Files (*.log)"));
+	    this, I18n::instance().translateCtx("Save Log", "Dialog"), QStringLiteral("neurus.log"),
+	    I18n::instance().translateCtx("Log Files (*.log)", "Dialog"));
 	if (path.isEmpty())
 		return;
 
 	std::ofstream file(path.toStdString(), std::ios::binary);
 	if (!file.is_open())
 	{
-		QMessageBox::warning(this, I18n::instance().translate("Save Log"),
-		                     I18n::instance().translate("Failed to open file for writing."));
+		QMessageBox::warning(this, I18n::instance().translateCtx("Save Log", "Dialog"),
+		                     I18n::instance().translateCtx("Failed to open file for writing.", "Dialog"));
 		return;
 	}
 
@@ -314,8 +314,8 @@ void LogPanel::OnExportClicked()
 	file.close();
 	if (!file.good())
 	{
-		QMessageBox::warning(this, I18n::instance().translate("Save Log"),
-		                     I18n::instance().translate("Error writing log file."));
+		QMessageBox::warning(this, I18n::instance().translateCtx("Save Log", "Dialog"),
+		                     I18n::instance().translateCtx("Error writing log file.", "Dialog"));
 		return;
 	}
 }

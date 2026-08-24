@@ -72,7 +72,7 @@ public:
 	PanelType GetPanelType() const { return m_type; }
 
 	/** @brief Returns the human-readable (translated) panel name. */
-	QString PanelName() const { return I18n::instance().translate(m_nameKey); }
+	QString PanelName() const { return I18n::instance().translateCtx(m_nameKey, "Dock"); }
 
 	/**
 	 * @brief Refreshes the panel's display from a UIContext snapshot.

@@ -2,10 +2,11 @@
  * @file test_i18n.cpp
  * @brief Unit tests for the I18n runtime translation manager.
  *
- * Covers the English built-in fallback, the zh_CN dictionary lookup,
- * unknown-language fallback, the languageChanged() signal contract, and the
- * supported-language registry. English is restored in SetUp/TearDown so the
- * singleton's state cannot leak between tests.
+ * Covers the English built-in fallback, the zh_CN PO catalog lookup
+ * (including msgctxt context disambiguation), unknown-language fallback, the
+ * languageChanged() signal contract, and the supported-language registry.
+ * English is restored in SetUp/TearDown so the singleton's state cannot leak
+ * between tests.
  */
 
 #include <gtest/gtest.h>
@@ -36,18 +37,37 @@ TEST_F(I18nTest, EnglishIsTheBuiltinFallback)
 	EXPECT_EQ(i18n.translate("Anything at all"), QStringLiteral("Anything at all"));
 }
 
-TEST_F(I18nTest, ChineseDictionaryTranslatesKnownKeys)
+TEST_F(I18nTest, ChineseCatalogTranslatesKnownKeys)
 {
 	I18n& i18n = I18n::instance();
 	i18n.setLanguage("zh_CN");
 	EXPECT_EQ(i18n.language(), QStringLiteral("zh_CN"));
 
 	EXPECT_EQ(i18n.translate("&File"), QStringLiteral("文件(&F)"));
-	EXPECT_EQ(i18n.translate("Viewport"), QStringLiteral("视口"));
+	EXPECT_EQ(i18n.translate("Algorithm"), QStringLiteral("算法"));
 
 	// Untranslated keys fall back to English verbatim.
 	EXPECT_EQ(i18n.translate("Some untranslated key"),
 	          QStringLiteral("Some untranslated key"));
+}
+
+TEST_F(I18nTest, ContextsDisambiguateIdenticalStrings)
+{
+	I18n& i18n = I18n::instance();
+	i18n.setLanguage("zh_CN");
+
+	// "Viewport" is only translated in the "Dock" context (dock titles).
+	EXPECT_EQ(i18n.translateCtx("Viewport", "Dock"), QStringLiteral("视口"));
+	EXPECT_EQ(i18n.translate("Viewport"), QStringLiteral("Viewport"));
+
+	// Tooltip vs. default context.
+	EXPECT_EQ(i18n.translateCtx("Remove entry", "Tooltip"),
+	          QStringLiteral("移除条目"));
+
+	// Dialog context.
+	EXPECT_EQ(i18n.translateCtx("Save Log", "Dialog"),
+	          QStringLiteral("保存日志"));
+	EXPECT_EQ(i18n.translate("Save Log"), QStringLiteral("Save Log"));
 }
 
 TEST_F(I18nTest, UnknownLanguageFallsBackToEnglish)

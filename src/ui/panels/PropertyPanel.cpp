@@ -78,7 +78,7 @@ void PropertyPanel::Retranslate()
 	m_sclLabel->setText(i18n.translate("Scale"));
 	m_resetBtn->setText(i18n.translate("Reset Transform"));
 	m_resetBtn->setToolTip(
-		i18n.translate("Reset position, rotation, and scale to identity values."));
+		i18n.translateCtx("Reset position, rotation, and scale to identity values.", "Tooltip"));
 
 	// Type-specific subpanels.
 	m_cameraProps->Retranslate();

@@ -1,26 +1,39 @@
 /**
  * @file I18n.h
- * @brief Lightweight runtime UI translation manager (dictionary-based).
+ * @brief Lightweight runtime UI translation manager (gettext-style PO).
  *
  * Translation keys are the English display strings themselves (the built-in
- * fallback). Optional per-language JSON dictionaries are embedded as Qt
- * resources (:/i18n/<code>.json) and loaded on demand. setLanguage() swaps
- * the active dictionary and emits languageChanged() so every widget can
- * retranslate immediately — no application restart required.
+ * fallback). Per-language catalogs are **GNU gettext .po files**
+ * (res/i18n/<code>.po), embedded as Qt resources (:/i18n/<code>.po) and
+ * parsed on demand — the same format Blender uses, so translators can work
+ * with Poedit / Weblate and the extraction pipeline in
+ * scripts/extract_i18n.py keeps the catalogs in sync with the code.
  *
- * Architecture:
- * - UI-layer singleton (QObject), no editor/renderer coupling.
- * - English is implicit: with no dictionary (or a missing key) translate()
- *   returns the key itself, so untranslated strings degrade gracefully.
- * - Values may contain %1/%2 placeholders; callers apply .arg().
- * - UIManager connects to languageChanged() and re-applies menu texts,
- *   dock titles and every panel's Retranslate() hook.
+ * Contexts (msgctxt) disambiguate identical English strings:
+ *   translate(key)              -> default context
+ *   translateCtx(key, context)  -> contexted lookup
+ * A missing catalog, context or msgid falls back to the English key itself.
+ *
+ * setLanguage() swaps the active catalog and emits languageChanged() so every
+ * widget can retranslate immediately — no application restart required.
+ * UIManager connects to languageChanged() and re-applies menu texts, dock
+ * titles and every panel's Retranslate() hook.
  */
 
 #pragma once
 
+/**
+ * @brief No-op marker for strings that are translated at runtime through I18n
+ *        but do not appear as literal translate() arguments at the call
+ *        site (e.g. keys forwarded to menu-builder helpers). Exists so
+ *        scripts/extract_i18n.py can discover the msgid — the gettext N_
+ *        convention.
+ */
+#define N_(text) text
+
 #include <QHash>
 #include <QObject>
+#include <QPair>
 #include <QString>
 #include <QStringList>
 
@@ -39,18 +52,25 @@ public:
 
 	/**
 	 * @brief Switches the active language and emits languageChanged().
-	 * @param code Language code ("en", "zh_CN"). Empty or unknown codes
-	 *             fall back to the built-in English dictionary (keys).
+	 * @param code Language code ("en", "zh_CN"). Empty, "auto" or unknown
+	 *             codes fall back to the built-in English catalog (keys).
 	 */
 	void setLanguage(const QString& code);
 
 	/**
-	 * @brief Translates @p key for the active language.
-	 * @param key English source string (also the dictionary key).
-	 * @return The translated string, or @p key itself when no translation
-	 *         exists (English fallback).
+	 * @brief Translates @p key in the default context.
+	 * @param key English source string (also the catalog msgid).
+	 * @return The translated string, or @p key itself when untranslated.
 	 */
 	QString translate(const char* key) const;
+
+	/**
+	 * @brief Translates @p key within @p context (gettext msgctxt).
+	 * @param key     English source string (msgid).
+	 * @param context Disambiguating context, e.g. "Dock", "Tooltip", "Dialog".
+	 * @return The translated string, or @p key itself when untranslated.
+	 */
+	QString translateCtx(const char* key, const char* context) const;
 
 	/** @brief One supported language: code + native display name. */
 	struct LanguageInfo
@@ -69,7 +89,7 @@ public:
 	static QString systemLanguage();
 
 signals:
-	/** @brief Emitted after the active dictionary was swapped. */
+	/** @brief Emitted after the active catalog was swapped. */
 	void languageChanged();
 
 private:
@@ -78,11 +98,13 @@ private:
 	I18n(const I18n&) = delete;
 	I18n& operator=(const I18n&) = delete;
 
-	/** @brief Loads (and replaces) the dictionary for @p code from resources. */
-	void loadDictionary(const QString& code);
+	/** @brief Loads (and replaces) the catalog for @p code from resources. */
+	void loadCatalog(const QString& code);
 
 	QString m_language = QStringLiteral("en");
-	QHash<QString, QString> m_dict;
+
+	/** @brief (context, msgid) -> translation; empty context = default. */
+	QHash<QPair<QString, QString>, QString> m_dict;
 };
 
 } // namespace neurus

@@ -109,45 +109,45 @@ void RenderConfigPanel::Retranslate()
 
 	// --- Shadows ---
 	m_shadowsGroup->setTitle(i18n.translate("Shadows"));
-	SetFormRowLabel(shadowsForm, m_shadowAlgCombo, "Algorithm");
+	SetFormRowLabel(shadowsForm, m_shadowAlgCombo, N_("Algorithm"));
 	SetComboItems(m_shadowAlgCombo,
-	              {"None", "Shadow Mapping", "SDF Soft Shadow", "VSSM"});
-	SetFormRowLabel(shadowsForm, m_shadowPCFCombo, "PCF Filter");
-	SetComboItems(m_shadowPCFCombo, {"Hard", "Soft PCF 16", "Soft PCF 64"});
-	SetFormRowLabel(shadowsForm, m_shadowBiasSlider, "Bias");
-	SetFormRowLabel(shadowsForm, m_samplingModeCombo, "Sampling Mode");
-	SetComboItems(m_samplingModeCombo, {"Fixed EMA (1/8)", "Moving Average"});
+	              {N_("None"), N_("Shadow Mapping"), N_("SDF Soft Shadow"), N_("VSSM")});
+	SetFormRowLabel(shadowsForm, m_shadowPCFCombo, N_("PCF Filter"));
+	SetComboItems(m_shadowPCFCombo, {N_("Hard"), N_("Soft PCF 16"), N_("Soft PCF 64")});
+	SetFormRowLabel(shadowsForm, m_shadowBiasSlider, N_("Bias"));
+	SetFormRowLabel(shadowsForm, m_samplingModeCombo, N_("Sampling Mode"));
+	SetComboItems(m_samplingModeCombo, {N_("Fixed EMA (1/8)"), N_("Moving Average")});
 
 	// --- Ambient Occlusion ---
 	m_aoGroup->setTitle(i18n.translate("Ambient Occlusion"));
-	SetFormRowLabel(aoForm, m_aoAlgCombo, "Algorithm");
-	SetComboItems(m_aoAlgCombo, {"None", "SSAO"});
-	SetFormRowLabel(aoForm, m_aoKernelSpin, "Kernel Size");
-	SetFormRowLabel(aoForm, m_aoRadiusSlider, "Radius");
+	SetFormRowLabel(aoForm, m_aoAlgCombo, N_("Algorithm"));
+	SetComboItems(m_aoAlgCombo, {N_("None"), N_("SSAO")});
+	SetFormRowLabel(aoForm, m_aoKernelSpin, N_("Kernel Size"));
+	SetFormRowLabel(aoForm, m_aoRadiusSlider, N_("Radius"));
 
 	// --- Lighting ---
 	m_lightingGroup->setTitle(i18n.translate("Lighting"));
 	m_iblCheckBox->setText(i18n.translate("Enable IBL"));
 	m_transCheckBox->setText(i18n.translate("Transparent Background"));
-	SetFormRowLabel(lightingForm, m_exposureSlider, "Exposure");
+	SetFormRowLabel(lightingForm, m_exposureSlider, N_("Exposure"));
 
 	// --- Post-Processing ---
 	m_postGroup->setTitle(i18n.translate("Post-Processing"));
-	SetFormRowLabel(postForm, m_aaCombo, "Anti-Aliasing");
-	SetComboItems(m_aaCombo, {"None", "MSAA", "FXAA"});
-	SetFormRowLabel(postForm, m_gammaSlider, "Gamma");
-	SetFormRowLabel(postForm, m_fxaaSubpixSlider, "FXAA Subpix");
-	SetFormRowLabel(postForm, m_fxaaEdgeSlider, "FXAA Edge");
-	SetFormRowLabel(postForm, m_fxaaEdgeMinSlider, "FXAA Edge Min");
+	SetFormRowLabel(postForm, m_aaCombo, N_("Anti-Aliasing"));
+	SetComboItems(m_aaCombo, {N_("None"), N_("MSAA"), N_("FXAA")});
+	SetFormRowLabel(postForm, m_gammaSlider, N_("Gamma"));
+	SetFormRowLabel(postForm, m_fxaaSubpixSlider, N_("FXAA Subpix"));
+	SetFormRowLabel(postForm, m_fxaaEdgeSlider, N_("FXAA Edge"));
+	SetFormRowLabel(postForm, m_fxaaEdgeMinSlider, N_("FXAA Edge Min"));
 
 	// --- Pipeline ---
 	m_pipelineGroup->setTitle(i18n.translate("Pipeline"));
-	SetFormRowLabel(pipelineForm, m_pipelineCombo, "Pipeline");
-	SetComboItems(m_pipelineCombo, {"Forward", "Deferred"});
-	SetFormRowLabel(pipelineForm, m_ssrCombo, "SSR");
+	SetFormRowLabel(pipelineForm, m_pipelineCombo, N_("Pipeline"));
+	SetComboItems(m_pipelineCombo, {N_("Forward"), N_("Deferred")});
+	SetFormRowLabel(pipelineForm, m_ssrCombo, N_("SSR"));
 	SetComboItems(m_ssrCombo,
-	              {"None", "Ray Marching", "SDF Ray Marching", "SDF Resolved"});
-	SetFormRowLabel(pipelineForm, m_samplesPerFrameSpin, "Samples / Frame");
+	              {N_("None"), N_("Ray Marching"), N_("SDF Ray Marching"), N_("SDF Resolved")});
+	SetFormRowLabel(pipelineForm, m_samplesPerFrameSpin, N_("Samples / Frame"));
 }
 
 // =========================================================================

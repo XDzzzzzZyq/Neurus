@@ -192,35 +192,35 @@ void UIManager::CreateMenus()
 		return action;
 	};
 
-	auto* fileMenu = addMenu(menuBar(), "&File");
+	auto* fileMenu = addMenu(menuBar(), N_("&File"));
 
-	auto* newAction = trAction(fileMenu, "&New");
+	auto* newAction = trAction(fileMenu, N_("&New"));
 	newAction->setShortcut(QKeySequence("Ctrl+N"));
 	connect(newAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestProjectNew();
 	});
 
-	auto* openAction = trAction(fileMenu, "&Open...");
+	auto* openAction = trAction(fileMenu, N_("&Open..."));
 	openAction->setShortcut(QKeySequence("Ctrl+O"));
 	connect(openAction, &QAction::triggered, []() {
 		QString path = QFileDialog::getOpenFileName(
-			nullptr, I18n::instance().translate("Open Project"), QString(),
+			nullptr, I18n::instance().translateCtx("Open Project", "Dialog"), QString(),
 			"Neurus Project (*.neurus.json)");
 		if (!path.isEmpty())
 			neurus::UIEvents::instance().requestProjectOpen(path);
 	});
 
-	auto* saveAction = trAction(fileMenu, "&Save");
+	auto* saveAction = trAction(fileMenu, N_("&Save"));
 	saveAction->setShortcut(QKeySequence("Ctrl+S"));
 	connect(saveAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestProjectSave();
 	});
 
-	auto* saveAsAction = trAction(fileMenu, "Save &As...");
+	auto* saveAsAction = trAction(fileMenu, N_("Save &As..."));
 	saveAsAction->setShortcut(QKeySequence("Ctrl+Shift+S"));
 	connect(saveAsAction, &QAction::triggered, []() {
 		QString path = QFileDialog::getSaveFileName(
-			nullptr, I18n::instance().translate("Save Project As"), QString(),
+			nullptr, I18n::instance().translateCtx("Save Project As", "Dialog"), QString(),
 			"Neurus Project (*.neurus.json)");
 		if (!path.isEmpty())
 			neurus::UIEvents::instance().requestProjectSaveAs(path);
@@ -228,22 +228,22 @@ void UIManager::CreateMenus()
 
 	fileMenu->addSeparator();
 
-	auto* prefsAction = trAction(fileMenu, "&Preferences...");
+	auto* prefsAction = trAction(fileMenu, N_("&Preferences..."));
 	prefsAction->setShortcut(QKeySequence::Preferences);
 	connect(prefsAction, &QAction::triggered, this, &UIManager::OpenPreferences);
 
 	fileMenu->addSeparator();
 
-	auto* exitAction = trAction(fileMenu, "E&xit");
+	auto* exitAction = trAction(fileMenu, N_("E&xit"));
 	exitAction->setShortcut(QKeySequence::Quit);
 	connect(exitAction, &QAction::triggered, qApp, &QApplication::quit);
 
-	auto* viewMenu = addMenu(menuBar(), "&View");
+	auto* viewMenu = addMenu(menuBar(), N_("&View"));
 
-	auto* resetLayoutAction = trAction(viewMenu, "Restore &Default Layout");
+	auto* resetLayoutAction = trAction(viewMenu, N_("Restore &Default Layout"));
 	connect(resetLayoutAction, &QAction::triggered, this, &UIManager::RestoreDefaultLayout);
 
-	auto* editMenu = addMenu(menuBar(), "&Edit");
+	auto* editMenu = addMenu(menuBar(), N_("&Edit"));
 
 	// Undo/Redo are expandable submenus that reveal their stacks (like "Add").
 	// The actual trigger actions live on the window so Ctrl+Z / Ctrl+Y keep
@@ -264,74 +264,74 @@ void UIManager::CreateMenus()
 	});
 	addAction(redoTrigger);
 
-	m_undoMenu = addMenu(editMenu, "&Undo");
+	m_undoMenu = addMenu(editMenu, N_("&Undo"));
 	connect(m_undoMenu, &QMenu::aboutToShow, this, &UIManager::PopulateUndoMenu);
 
-	m_redoMenu = addMenu(editMenu, "&Redo");
+	m_redoMenu = addMenu(editMenu, N_("&Redo"));
 	connect(m_redoMenu, &QMenu::aboutToShow, this, &UIManager::PopulateRedoMenu);
 
 	editMenu->addSeparator();
 
-	auto* addMenu2 = addMenu(editMenu, "&Add");
+	auto* addMenu2 = addMenu(editMenu, N_("&Add"));
 
-	auto* meshAction = trAction(addMenu2, "&Mesh...");
+	auto* meshAction = trAction(addMenu2, N_("&Mesh..."));
 	meshAction->setShortcut(QKeySequence("Ctrl+Shift+M"));
 	connect(meshAction, &QAction::triggered, []() {
 		QString path = QFileDialog::getOpenFileName(
-			nullptr, I18n::instance().translate("Import Mesh"), QString(),
+			nullptr, I18n::instance().translateCtx("Import Mesh", "Dialog"), QString(),
 			"OBJ Files (*.obj)");
 		if (!path.isEmpty())
 			neurus::UIEvents::instance().requestMeshImport(path);
 	});
 
-	auto* cameraAction = trAction(addMenu2, "&Camera");
+	auto* cameraAction = trAction(addMenu2, N_("&Camera"));
 	connect(cameraAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestCameraAdd();
 	});
 
-	auto* lightSubmenu = addMenu(addMenu2, "&Light");
+	auto* lightSubmenu = addMenu(addMenu2, N_("&Light"));
 
-	auto* pointLightAction = trAction(lightSubmenu, "&Point Light");
+	auto* pointLightAction = trAction(lightSubmenu, N_("&Point Light"));
 	connect(pointLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestLightAdd();
 	});
 
-	auto* sunLightAction = trAction(lightSubmenu, "&Sun Light");
+	auto* sunLightAction = trAction(lightSubmenu, N_("&Sun Light"));
 	connect(sunLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestSunLightAdd();
 	});
 
-	auto* spotLightAction = trAction(lightSubmenu, "Spo&t Light");
+	auto* spotLightAction = trAction(lightSubmenu, N_("Spo&t Light"));
 	connect(spotLightAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestSpotLightAdd();
 	});
 
-	auto* toolsMenu = addMenu(menuBar(), "&Tools");
+	auto* toolsMenu = addMenu(menuBar(), N_("&Tools"));
 
-	auto* screenshotAction = trAction(toolsMenu, "Take &Screenshot");
+	auto* screenshotAction = trAction(toolsMenu, N_("Take &Screenshot"));
 	screenshotAction->setShortcut(QKeySequence("F12"));
 	connect(screenshotAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestScreenshot();
 	});
 
-	auto* screenshotAllAction = trAction(toolsMenu, "Screenshot All &Passes");
+	auto* screenshotAllAction = trAction(toolsMenu, N_("Screenshot All &Passes"));
 	screenshotAllAction->setShortcut(QKeySequence("Ctrl+F12"));
 	connect(screenshotAllAction, &QAction::triggered, []() {
 		neurus::UIEvents::instance().requestScreenshotAll();
 	});
 
-	auto* helpMenu = addMenu(menuBar(), "&Help");
-	auto* aboutAction = trAction(helpMenu, "&About Neurus");
+	auto* helpMenu = addMenu(menuBar(), N_("&Help"));
+	auto* aboutAction = trAction(helpMenu, N_("&About Neurus"));
 	connect(aboutAction, &QAction::triggered, this, [this]() {
 		QMessageBox::about(this,
-			I18n::instance().translate("About Neurus"),
+			I18n::instance().translateCtx("About Neurus", "Dialog"),
 			QString("<h2>Neurus</h2>"
 			        "<p>%1</p>"
 			        "<p>%2</p>")
-				.arg(I18n::instance().translate(
-					"A C++20 Vulkan-HPP 1.4 real-time renderer."))
-				.arg(I18n::instance().translate(
-					"Version 0.1.0 (Triangle MVP)")));
+				.arg(I18n::instance().translateCtx(
+					"A C++20 Vulkan-HPP 1.4 real-time renderer.", "Dialog"))
+				.arg(I18n::instance().translateCtx(
+					"Version 0.1.0 (Triangle MVP)", "Dialog")));
 	});
 }
 
@@ -408,7 +408,7 @@ void UIManager::CreateDocks()
 	m_docks[PanelType::Profiling] = profilingDock;
 
 	// --- Bottom: Texture Viewer (placeholder, not a UIPanel) ---
-	m_textureLabel = new QLabel(I18n::instance().translate("Texture Viewer"));
+	m_textureLabel = new QLabel(I18n::instance().translateCtx("Texture Viewer", "Dock"));
 	m_textureLabel->setAlignment(Qt::AlignCenter);
 	QFont font = m_textureLabel->font();
 	font.setPointSize(14);
@@ -418,7 +418,7 @@ void UIManager::CreateDocks()
 	textureLayout->addWidget(m_textureLabel);
 
 	m_textureDock = new ads::CDockWidget(win_dockManager,
-	                                     I18n::instance().translate("Texture Viewer"));
+	                                     I18n::instance().translateCtx("Texture Viewer", "Dock"));
 	m_textureDock->setWidget(textureWrap);
 	m_textureDock->resize(300, 200);
 	m_textureDock->setMinimumSize(200, 150);
@@ -440,7 +440,7 @@ void UIManager::CreateDocks()
 	QObject::connect(logPanelRaw, &neurus::LogPanel::errorNotified,
 	                 this, [this](int delta, const QString& first) {
 	                     statusBar()->showMessage(
-	                         I18n::instance().translate("%1 new error(s): %2")
+	                         I18n::instance().translateCtx("%1 new error(s): %2", "StatusBar")
 	                             .arg(delta).arg(first), 3000);
 	                 });
 
@@ -474,9 +474,9 @@ void UIManager::RetranslateAll()
 
 	// --- Texture Viewer placeholder (not a UIPanel) ---
 	if (m_textureDock)
-		m_textureDock->setWindowTitle(i18n.translate("Texture Viewer"));
+		m_textureDock->setWindowTitle(i18n.translateCtx("Texture Viewer", "Dock"));
 	if (m_textureLabel)
-		m_textureLabel->setText(i18n.translate("Texture Viewer"));
+		m_textureLabel->setText(i18n.translateCtx("Texture Viewer", "Dock"));
 
 	// --- Preferences dialog (if already opened) ---
 	if (m_preferencesDialog)

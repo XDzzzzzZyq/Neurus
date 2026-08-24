@@ -159,7 +159,7 @@ Neurus/
 ├── cmake/                  # CMake helper modules
 ├── dep/                    # Git submodule dependencies
 │   └── qtadvanceddocking/  # Qt-Advanced-Docking-System (ADS)
-├── res/shaders/            # GLSL shader source files
+├── res/i18n/              # gettext .po translation catalogs (zh_CN.po, ...)
 ├── src/
 │   ├── render/             # Renderer layer (Vulkan-HPP)
 │   │   ├── Barrier.h/cpp            # Centralized image barrier management
@@ -241,7 +241,7 @@ Neurus/
 │   │   │   └── LogDelegate.h/cpp     # Severity-colored row delegate
 │   │   ├── utils/                # Non-widget UI helpers
 │   │   │   ├── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
-│   │   │   └── I18n.h/cpp            # Runtime i18n manager (dictionary-based, live switch)
+│   │   │   └── I18n.h/cpp            # Runtime i18n manager (gettext .po catalogs, live switch)
 │   │   ├── panels/               # Dock panel widgets
 │   │   │   ├── UIPanel.h         # Base class for all panels
 │   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget

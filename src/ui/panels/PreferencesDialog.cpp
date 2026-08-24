@@ -89,7 +89,7 @@ void PreferencesDialog::Retranslate()
 {
 	auto& i18n = I18n::instance();
 
-	setWindowTitle(i18n.translate("Preferences"));
+	setWindowTitle(i18n.translateCtx("Preferences", "Dialog"));
 	m_generalGroup->setTitle(i18n.translate("General"));
 	m_languageLabel->setText(i18n.translate("Language"));
 	m_fpsLabel->setText(i18n.translate("Target FPS"));

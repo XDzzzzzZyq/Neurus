@@ -110,7 +110,7 @@ qt_add_resources(neurus_ui "i18n"
 	PREFIX "/i18n"
 	BASE "${CMAKE_SOURCE_DIR}/res/i18n"
 	FILES
-		"${CMAKE_SOURCE_DIR}/res/i18n/zh_CN.json"
+		"${CMAKE_SOURCE_DIR}/res/i18n/zh_CN.po"
 )
 
 # Enable Qt MOC, UIC, RCC on this target
