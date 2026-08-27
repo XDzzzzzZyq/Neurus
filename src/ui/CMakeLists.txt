@@ -42,6 +42,7 @@ add_library(neurus_ui STATIC
 	presets/EnvironmentProperties.h
 	presets/EnvironmentProperties.cpp
 	panels/UIPanel.h
+	panels/UIPanel.cpp
 	panels/Outliner.h
 	panels/Outliner.cpp
 	panels/PropertyPanel.h

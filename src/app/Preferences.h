@@ -10,8 +10,8 @@
  * file path) and receives change requests back through UIEvents signals.
  *
  * Architecture:
- * - Pure data struct + cereal JSON persistence (Qt-free apart from
- *   QDir::homePath() used for the default file location).
+ * - Pure data struct + cereal JSON persistence, fully Qt-free (the home
+ *   directory comes from the Platform layer's HomeDirectory(), not QDir).
  * - Missing/corrupt files fall back to defaults (never throw).
  * - "auto" language means "follow the system UI language"; resolving it to a
  *   concrete code is the Application's job (it owns I18n, so this data type

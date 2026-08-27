@@ -1,19 +1,19 @@
 #include "app/Preferences.h"
 
 #include "core/Log.h"
-
-#include <QDir>
+#include "platform/PlatformPaths.h"
 
 #include <cereal/archives/json.hpp>
 
+#include <filesystem>
 #include <fstream>
+#include <system_error>
 
 namespace neurus {
 
 std::string Preferences::DefaultPath()
 {
-	return (QDir::homePath() + QStringLiteral("/.neurus/preferences.json"))
-		.toStdString();
+	return (HomeDirectory() / ".neurus" / "preferences.json").generic_string();
 }
 
 bool Preferences::Load(const std::string& path)
@@ -45,9 +45,19 @@ bool Preferences::Load(const std::string& path)
 bool Preferences::Save(const std::string& path) const
 {
 	// Ensure the ~/.neurus/ directory exists before writing.
-	const std::string::size_type sep = path.find_last_of("/\\");
-	if (sep != std::string::npos && sep > 0)
-		QDir().mkpath(QString::fromStdString(path.substr(0, sep)));
+	const std::filesystem::path parent =
+		std::filesystem::path(path).parent_path();
+	if (!parent.empty())
+	{
+		std::error_code ec;
+		std::filesystem::create_directories(parent, ec);
+		if (ec)
+		{
+			NEURUS_ERR("[Preferences] failed to create parent directory for "
+			           << path << ": " << ec.message());
+			return false;
+		}
+	}
 
 	std::ofstream out(path, std::ios::binary);
 	if (!out.is_open())

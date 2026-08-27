@@ -243,7 +243,7 @@ Neurus/
 │   │   │   ├── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
 │   │   │   └── I18n.h/cpp            # Runtime i18n manager (gettext .po catalogs, live switch)
 │   │   ├── panels/               # Dock panel widgets
-│   │   │   ├── UIPanel.h         # Base class for all panels
+│   │   │   ├── UIPanel.h/cpp     # Base class for all panels (I18n.h kept out of the header)
 │   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
 │   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
 │   │   │   ├── PropertyEditor.h/cpp  # Object property inspector

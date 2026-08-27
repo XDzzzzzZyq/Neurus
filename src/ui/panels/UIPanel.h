@@ -29,7 +29,6 @@
 #include <cstdint>
 
 #include "UIContext.h"
-#include "ui/utils/I18n.h"
 
 namespace neurus
 {
@@ -72,7 +71,7 @@ public:
 	PanelType GetPanelType() const { return m_type; }
 
 	/** @brief Returns the human-readable (translated) panel name. */
-	QString PanelName() const { return I18n::instance().translateCtx(m_nameKey, "Dock"); }
+	QString PanelName() const;  // Defined in UIPanel.cpp (needs I18n).
 
 	/**
 	 * @brief Refreshes the panel's display from a UIContext snapshot.
