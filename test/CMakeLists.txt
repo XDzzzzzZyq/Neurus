@@ -67,6 +67,9 @@ add_executable(neurus_test
 	core/test_uid.cpp
 	core/test_resource_manager.cpp
 	ui/test_log_model.cpp
+	ui/test_i18n.cpp
+	app/test_preferences.cpp
+	platform/test_platform_paths.cpp
 )
 
 target_link_libraries(neurus_test PRIVATE

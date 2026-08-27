@@ -159,7 +159,7 @@ Neurus/
 ├── cmake/                  # CMake helper modules
 ├── dep/                    # Git submodule dependencies
 │   └── qtadvanceddocking/  # Qt-Advanced-Docking-System (ADS)
-├── res/shaders/            # GLSL shader source files
+├── res/i18n/              # gettext .po translation catalogs (zh_CN.po, ...)
 ├── src/
 │   ├── render/             # Renderer layer (Vulkan-HPP)
 │   │   ├── Barrier.h/cpp            # Centralized image barrier management
@@ -240,15 +240,17 @@ Neurus/
 │   │   │   ├── ShaderFieldDelegate.h/cpp  # Type/name editors for struct fields
 │   │   │   └── LogDelegate.h/cpp     # Severity-colored row delegate
 │   │   ├── utils/                # Non-widget UI helpers
-│   │   │   └── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
+│   │   │   ├── ShaderHighlighter.h/cpp  # GLSL syntax highlighter
+│   │   │   └── I18n.h/cpp            # Runtime i18n manager (gettext .po catalogs, live switch)
 │   │   ├── panels/               # Dock panel widgets
-│   │   │   ├── UIPanel.h         # Base class for all panels
+│   │   │   ├── UIPanel.h/cpp     # Base class for all panels (I18n.h kept out of the header)
 │   │   │   ├── Viewport.h/cpp    # Native HWND Vulkan surface widget
 │   │   │   ├── Outliner.h/cpp    # Scene object hierarchy tree
 │   │   │   ├── PropertyEditor.h/cpp  # Object property inspector
 │   │   │   ├── RenderConfigPanel.h/cpp  # Live render setting controls
 │   │   │   ├── ShaderEditorPanel.h/cpp  # Code + Structure shader editor
-│   │   │   └── LogPanel.h/cpp        # Realtime log viewer dock (issue #39)
+│   │   │   ├── LogPanel.h/cpp        # Realtime log viewer dock (issue #39)
+│   │   │   └── PreferencesDialog.h/cpp  # Preferences dialog (language, target FPS)
 │   │   └── qml/            # QML source files (legacy)
 │   ├── asset/              # Asset layer (Vulkan-free)
 │   │   ├── Project.h/cpp            # Pure registration-based serializer
@@ -274,6 +276,10 @@ Neurus/
 │   │   └── registrations/           # cereal polymorphic registration
 │   │       ├── TypeRegistration.h/cpp  # scene types + UID-level relations (force-init)
 │   │       └── TypeRegistration.cpp    # scene object types
+│   ├── app/                # Application layer (lifecycle orchestration)
+│   │   ├── Application.h/cpp  # QApplication lifecycle, signal wiring, project/preferences persistence
+│   │   ├── Preferences.h/cpp  # App-level preferences (language, target FPS) persisted to ~/.neurus/preferences.json — owned exclusively by the Application
+│   │   └── VulkanContext.h/cpp
 │   └── main.cpp            # Application entry point
 ├── test/
 │   ├── render/             # Renderer GPU tests

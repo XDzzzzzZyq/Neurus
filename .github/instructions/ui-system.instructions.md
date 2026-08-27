@@ -19,6 +19,8 @@ The UI layer is a **Qt6 Widgets** application with **Qt-Advanced-Docking-System 
 | `src/ui/panels/ProfilingPanel.h/cpp` | Real-time GPU profiling tree (Profiling dock) |
 | `src/ui/panels/ShaderEditorPanel.h/cpp` | Shader editor dock — Code mode + Structure mode (tree-based Struct Editor) |
 | `src/ui/panels/LogPanel.h/cpp` | Realtime log viewer dock: filter bar + list view (issue #39) |
+| `src/ui/panels/PreferencesDialog.h/cpp` | Preferences dialog — live-applied language + target FPS (File → Preferences…, Ctrl+,) |
+| `src/ui/utils/I18n.h/cpp` | Lightweight runtime i18n manager: dictionary-based, instant language switch |
 | `src/ui/models/ShaderStructModel.h/cpp` | QAbstractItemModel tree for the ShaderStruct IR (3-level: sections → fields/structs → members) |
 | `src/ui/models/LogModel.h/cpp` | QAbstractListModel over the core LogBuffer |
 | `src/ui/models/LogFilterProxy.h/cpp` | QSortFilterProxyModel: level filter + text search |
@@ -109,9 +111,111 @@ mainWindow->createViewportDock(container);
 
 | Menu | Items |
 |------|-------|
-| **File** | Exit (`Alt+F4`) |
+| **File** | New, Open…, Save, Save As…, Preferences… (`Ctrl+,`), Exit (`Alt+F4`) |
 | **View** | Save Layout (`Ctrl+Shift+S`), Restore Default Layout |
+| **Edit** | Undo, Redo, Add (Mesh… / Camera / Light) |
+| **Tools** | Take Screenshot (`F12`), Screenshot All Passes (`Ctrl+F12`) |
 | **Help** | About Neurus |
+
+## Internationalization (i18n)
+
+Language switching is **live** — no restart, no Qt Linguist toolchain — and
+the catalogs use the **GNU gettext .po format** (the same system Blender
+uses), so translators can work with Poedit / Weblate. The `I18n` singleton
+(`src/ui/utils/I18n.h/cpp`) owns the active language code and a
+`QHash<(context, msgid), QString>` catalog:
+
+- **msgid keys are the English display strings themselves.** A missing
+  catalog, context or msgid makes `I18n::translate*()` return the key
+  verbatim, so English is the implicit built-in fallback.
+- Per-language catalogs are embedded as Qt resources
+  (`:/i18n/<code>.po`, see `res/i18n/zh_CN.po`), parsed on demand by
+  `setLanguage()`. Values may contain `%1/%2` placeholders (callers apply
+  `.arg()`).
+- **Contexts (msgctxt) disambiguate identical English strings:**
+  `translate(key)` uses the default context; `translateCtx(key, "Dock" |
+  "Tooltip" | "Dialog" | "StatusBar" | "Placeholder")` targets a specific
+  one. Keys that are forwarded to helpers instead of written as
+  `translate("...")` literals are marked with the no-op `N_()` macro
+  (gettext convention) so the extractor can find them (menus,
+  RenderConfigPanel helper args).
+- `setLanguage()` emits `languageChanged()` only when the code actually
+  changes. `I18n::supportedLanguages()` lists shipped languages (native
+  display names); `I18n::systemLanguage()` detects the OS UI language
+  (Simplified-Chinese → `zh_CN`, else `en`).
+
+**How retranslation reaches the widgets:**
+
+1. `UIPanel` stores its dock title as a translation *key* (`nameKey`, default
+   derived from `PanelType`); `PanelName()` resolves it through `I18n` in the
+   `"Dock"` context at call time, so dock titles follow the language with no
+   per-panel code.
+2. Every panel may override `UIPanel::Retranslate()` to re-apply its own
+   labels/buttons/combo items. Panels call `Retranslate()` once at the end of
+   their constructor (so the startup language applies) and the framework calls
+   it again on every language change.
+3. `UIManager::RetranslateAll()` (connected to `I18n::languageChanged()`) is
+   the single fan-out: it re-texts every menu action from its registered
+   `(QAction*, key)` pair, updates every dock title via `setWindowTitle()`
+   (ADS propagates to the tab), calls each panel's `Retranslate()`, and
+   re-translates the Texture Viewer placeholder + Preferences dialog.
+4. The Preferences dialog also connects to `languageChanged()` directly so it
+   retranslates while open.
+
+**Translation management (Blender-style pipeline):**
+
+- `scripts/extract_i18n.py` scans `src/ui/` for `translate()` /
+  `translateCtx()` / `N_()` keys plus the dock-title keys in `UIPanel.h`,
+  merges them into every `res/i18n/*.po`, marks removed keys obsolete
+  (`#~`, preserved across runs and restored if the key comes back), and
+  reports per-language coverage.
+- `python3 scripts/extract_i18n.py` → update catalogs;
+  `--check` → **read-only**: writes nothing and exits 1 if a catalog is stale
+  (i.e. re-running the extractor would change it) or has untranslated strings;
+  `--min-coverage <pct>` → fail below a coverage threshold;
+  `--verbose` → list every added/obsoleted key.
+- CI runs `--check` before the build, so a missing translation or an
+  uncommitted catalog update fails the PR without dirtying the tree.
+- The header entry (`msgid ""`) is round-tripped verbatim in canonical gettext
+  form (`msgstr ""` + one quoted continuation line per field), so hand-written
+  fields like `X-Language-Name` and `Plural-Forms` survive every run.
+- At runtime `I18n` logs its load, e.g.
+  `[I18n] loaded 145/145 strings for 'zh_CN' (0 untranslated)`.
+
+**Adding a new translatable string:** write the English text as the msgid,
+wrap it in `I18n::instance().translate("...")` (or `translateCtx`/`N_` as
+appropriate), then run `scripts/extract_i18n.py` — the new key appears in the
+catalog automatically and the coverage report tells you if it is translated.
+**Adding a new language:** drop a `<code>.po` catalog in `res/i18n/` — that is
+the only step. `src/ui/CMakeLists.txt` globs `res/i18n/*.po` into
+`qt_add_resources` (`CONFIGURE_DEPENDS`), and `I18n::supportedLanguages()`
+enumerates the embedded `:/i18n/*.po` at runtime, taking each display name from
+the catalog's `X-Language-Name` header field (falling back to
+`QLocale::nativeLanguageName()`, then the code itself).
+
+## Preferences
+
+App-level settings (distinct from the per-project `.neurus.json` files) live
+in `~/.neurus/preferences.json`, persisted with cereal JSON by the
+`Preferences` struct in **`src/app/Preferences.h/cpp`** — an **Application
+Layer** concept (future settings: CUDA enablement, theme, shortcut schemes).
+
+- Fields: `language` (`"en"`/`"zh_CN"`, or `"auto"` = follow the system UI
+  language) and `target_fps` (0 = unlimited).
+- The **Application is the sole manager**: it loads (and creates, on first
+  run) the file before the window is built, resolves `"auto"` to a concrete
+  code (it owns I18n — `Preferences` itself is UI-free), applies the saved
+  language and target FPS, saves on every edit, and saves once more on
+  `aboutToQuit`.
+- **The UI never touches the `Preferences` type.** The Application seeds the
+  window with plain values (`UIManager(language, targetFps, prefsPath)`); the
+  `PreferencesDialog` (File → Preferences… / `Ctrl+,`) is a pure UI widget
+  holding only those plain values and emits `languageChangeRequested(QString)`
+  / `targetFpsChangeRequested(int)` → `UIEvents` → Application applies +
+  persists + (for language) calls `I18n::setLanguage()`, which fans out the
+  live retranslation. Changes apply immediately; the dialog only has Close
+  (no OK/Cancel).
+- The dialog also has a "Reset to Defaults" button (system language + 60 FPS).
 
 ## Build Integration
 

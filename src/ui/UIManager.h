@@ -5,6 +5,7 @@
 #include "platform/PlatformSurface.h"
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "panels/UIPanel.h"
@@ -15,16 +16,32 @@ class CDockWidget;
 }
 
 class QAction;
+class QLabel;
 class QMenu;
 
 namespace neurus {
+
+class PreferencesDialog;
 
 class UIManager : public QMainWindow
 {
 	Q_OBJECT
 
 public:
-	explicit UIManager(QWidget* parent = nullptr);
+	/**
+	 * @brief Constructs the main window.
+	 *
+	 * The Application seeds the UI with plain preference values — the UI
+	 * layer never touches the app-layer Preferences type.
+	 *
+	 * @param language        Active language code ("en", "zh_CN").
+	 * @param targetFps       Render-loop target FPS (0 = unlimited).
+	 * @param preferencesPath Absolute path of ~/.neurus/preferences.json
+	 *                        (displayed by the Preferences dialog).
+	 * @param parent Parent widget.
+	 */
+	explicit UIManager(const QString& language, int targetFps,
+	                   const QString& preferencesPath, QWidget* parent = nullptr);
 	~UIManager() override;
 
 	/** @brief Returns the Viewport's native window handle for VkSurface creation. */
@@ -95,6 +112,16 @@ private:
 	void CreateDocks();
 	void RestoreDefaultLayout();
 
+	/**
+	 * @brief Re-applies every user-visible string in the active language:
+	 *        menu bar, dock titles, panel texts, Preferences dialog.
+	 *        Connected to I18n::languageChanged() and called once at startup.
+	 */
+	void RetranslateAll();
+
+	/** @brief Shows (or creates) the Preferences dialog. */
+	void OpenPreferences();
+
 	/** @brief Populates the Undo submenu with the applied-operation stack. */
 	void PopulateUndoMenu();
 	/** @brief Populates the Redo submenu with the undone-operation stack. */
@@ -108,6 +135,9 @@ private:
 	// --- Dock registry (raw pointers; CDockManager owns via Qt parent-child) ---
 	std::map<PanelType, ads::CDockWidget*> m_docks;
 
+	// --- Menu translation registry: (action, i18n key) pairs ---
+	std::vector<std::pair<QAction*, const char*>> m_menuItems;
+
 	// --- Edit-menu Undo/Redo submenus (view-only stack lists) ---
 	QMenu*                m_undoMenu = nullptr; ///< Expands to the applied-op stack.
 	QMenu*                m_redoMenu = nullptr; ///< Expands to the undone-op stack.
@@ -115,6 +145,18 @@ private:
 	std::vector<QAction*> m_redoItems;          ///< Rows currently shown in Redo menu.
 	QStringList           m_undoLabels;         ///< Applied ops, oldest → newest.
 	QStringList           m_redoLabels;         ///< Undone ops, in replay order.
+
+	// --- Preferences dialog (lazy, non-dock panel) ---
+	// The dialog is seeded with plain values (the Application is the sole
+	// owner of the app-layer Preferences type).
+	QString            m_currentLanguage;    ///< Cached active language code.
+	int                m_targetFps = 60;     ///< Cached render-loop target FPS.
+	QString            m_preferencesPath;    ///< ~/.neurus/preferences.json.
+	PreferencesDialog* m_preferencesDialog = nullptr; ///< Lazy-created; Qt parent owns.
+
+	// --- Texture Viewer placeholder dock (not a UIPanel) ---
+	ads::CDockWidget* m_textureDock  = nullptr;
+	QLabel*           m_textureLabel = nullptr;
 };
 
 } // namespace neurus

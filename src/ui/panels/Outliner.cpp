@@ -18,6 +18,7 @@
 
 #include "Icons.h"
 #include "UIContext.h"
+#include "ui/utils/I18n.h"
 #include "items/OutlinerRow.h"
 
 #include "scene/Scene.h"
@@ -40,7 +41,7 @@ namespace neurus
 // =========================================================================
 
 Outliner::Outliner(QWidget* parent)
-	: UIPanel(PanelType::Outliner, QString(), parent)
+	: UIPanel(PanelType::Outliner, nullptr, parent)
 {
 	setFocusPolicy(Qt::StrongFocus);
 
@@ -62,6 +63,18 @@ Outliner::Outliner(QWidget* parent)
 
 	m_sceneGroup = AddCategoryGroup(QString::fromUtf8("Scene"));
 	m_groupLayout = qobject_cast<QVBoxLayout*>(m_sceneGroup->layout());
+
+	// Apply the active language (group title was built in English).
+	Retranslate();
+}
+
+// =========================================================================
+// Retranslate - re-apply the category-group title
+// =========================================================================
+
+void Outliner::Retranslate()
+{
+	m_sceneGroup->setTitle(I18n::instance().translate("Scene"));
 }
 
 // =========================================================================
