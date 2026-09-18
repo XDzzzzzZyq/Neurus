@@ -20,6 +20,7 @@
 #include "passes/ShadowIntensityPass.h"
 #include "passes/GizmoPass.h"
 #include "passes/ComposePass.h"
+#include "passes/DebugPass.h"
 #include "passes/FXAAPass.h"
 
 #include "render/HaltonSequence.h"
@@ -144,7 +145,18 @@ DeferredRenderer::DeferredRenderer(const vk::raii::Device& device,
 		NEURUS_LOG("[DeferredRenderer] FXAAPass created");
 	}
 
-	// --- 8f. Build the Wave 3 shading-tail RenderGraph ---
+	// --- 8f. Create debug overlay pass (lines / points / wireframes over the
+	//         composed image; a no-op on frames with no debug geometry) ---
+	{
+		auto debugPass = std::make_unique<DebugPass>(
+			device, physicalDevice,
+			kMaxFramesInFlight);
+		r_debugPass = debugPass.get();
+		r_passes.push_back(std::move(debugPass));
+		NEURUS_LOG("[DeferredRenderer] DebugPass created");
+	}
+
+	// --- 8g. Build the Wave 3 shading-tail RenderGraph ---
 	// Initial build uses a default signature (no FXAA); recordFrame rebuilds
 	// it whenever the pipeline signature derived from RenderConfig changes.
 	RebuildMainGraph(PipelineSignature{});
@@ -224,6 +236,27 @@ vk::raii::CommandPool DeferredRenderer::createCommandPool(const vk::raii::Device
 
 const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 {
+	// --- Precondition: the scene must have an active camera ---
+	// Every pass dereferences Scene::GetActiveCamera() unconditionally to build
+	// its view-projection, so a camera-less scene faults deep inside whichever
+	// pass the graph happens to run first (a stack that says nothing about the
+	// cause). The Editor holds the invariant on both ends - NewScene()/
+	// CreateDefaultScene() seed a camera, SceneController refuses to delete the
+	// last one - so getting here means a scene-mutation path broke it. Name it
+	// once and skip the frame.
+	const auto* frameScene = static_cast<const Scene*>(ctx.editor.scene);
+	if (!frameScene || !frameScene->GetActiveCamera())
+	{
+		if (!m_reportedNoCamera)
+		{
+			m_reportedNoCamera = true;
+			NEURUS_ERR("[DeferredRenderer] Scene has no active camera - skipping frames "
+			           "until one exists");
+		}
+		return m_frameProfile;
+	}
+	m_reportedNoCamera = false;
+
 	auto& fence = r_inFlightFences[r_currentFrame];
 	auto& imageAvailable = r_imageAvailableSemaphores[r_currentFrame];
 
@@ -295,7 +328,12 @@ const FrameProfile& DeferredRenderer::DrawFrame(const RenderContext& ctx)
 	}
 
 	auto& renderFinished = r_renderFinishedSemaphores[imageIndex];
-	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+	// The swapchain image's first use is a layout transition + blit at the transfer
+	// stage, not a color-attachment write, so the acquire semaphore must be waited
+	// on before transfer as well: waiting only at eColorAttachmentOutput lets the
+	// blit overwrite an image the presentation engine is still reading.
+	vk::PipelineStageFlags waitStage = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+	                                   vk::PipelineStageFlagBits::eTransfer;
 
 	vk::SubmitInfo submitInfo(*imageAvailable, waitStage, cmdBufRaw, *renderFinished);
 	r_graphicsQueue.submit(submitInfo, *fence);
@@ -347,6 +385,7 @@ void DeferredRenderer::RebuildMainGraph(const PipelineSignature& sig)
 	auto* lightingNode  = m_mainGraph.AddPass(r_lightingPass);
 	auto* gizmoNode     = m_mainGraph.AddPass(r_gizmoPass);
 	auto* composeNode   = m_mainGraph.AddPass(r_composePass);
+	auto* debugNode     = m_mainGraph.AddPass(r_debugPass);
 
 	// Geometry (G-Buffer) → consumers
 	m_mainGraph.Connect(geometryNode, AttachmentName::Position,          ssaoNode);
@@ -368,10 +407,16 @@ void DeferredRenderer::RebuildMainGraph(const PipelineSignature& sig)
 	m_mainGraph.Connect(lightingNode, AttachmentName::HDRColor,       composeNode);
 	m_mainGraph.Connect(gizmoNode,    AttachmentName::GizmoHighlight, composeNode);
 
+	// Compose → debug overlay. DebugPass edits ComposedOutput in place, so it also
+	// needs the G-Buffer depth it tests against, and it — not ComposePass — is now
+	// the last writer that FXAA (or the final blit) consumes.
+	m_mainGraph.Connect(composeNode,   AttachmentName::ComposedOutput, debugNode);
+	m_mainGraph.Connect(geometryNode,  AttachmentName::Depth,          debugNode);
+
 	if (sig.fxaa)
 	{
 		auto* fxaaNode = m_mainGraph.AddPass(r_fxaaPass);
-		m_mainGraph.Connect(composeNode, AttachmentName::ComposedOutput, fxaaNode);
+		m_mainGraph.Connect(debugNode, AttachmentName::ComposedOutput, fxaaNode);
 	}
 
 	m_mainGraph.Compile();
@@ -564,8 +609,18 @@ void DeferredRenderer::recordFrame(const vk::raii::CommandBuffer& cmdBuf, uint32
 	const vk::Image composedImage = *blitSource.ImageHandle();
 	const vk::Image swapchainImage = r_swapchain->images()[imageIndex];
 
-	// Barrier 1: Blit source is already in TransferSrc from ComposePass (or FXAAPass)
+	// Barrier 1: Blit source → TRANSFER_SRC_OPTIMAL.
+	//
+	// The transition is issued *here*, by the consumer, and not left to whichever
+	// pass wrote the image last. A producer that pre-transitions its output to the
+	// state it guesses the next consumer wants makes the following consumer's own
+	// barrier a no-op: its src scope becomes the guessed access (TransferRead),
+	// which names no writes, so the real producer writes are never made visible.
+	// That is exactly how DebugPass's overlay used to race ComposePass's compute
+	// writes into ComposedOutput — see the barrier note in DebugPass::Record.
+	//
 	// Barrier 2: Swapchain image UNDEFINED → TRANSFER_DST_OPTIMAL
+	Barrier::Transition(cmdBuf, blitSource, ImageState::TransferSrc);
 	{
 		Barrier::Transition(*cmdBuf, swapchainImage,
 			ImageState::Undefined, ImageState::TransferDst,

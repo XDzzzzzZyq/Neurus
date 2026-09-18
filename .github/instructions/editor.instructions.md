@@ -11,7 +11,8 @@ changes through the event system.
 - `src/editor/Input.h` - InputState struct + GetInputState() / UpdateState()
 - `src/editor/Editor.h` - Editor orchestrator (owns Scene, RenderConfig, Context, Controllers)
   - Exposes an explicit scene-load lifecycle for Application-driven persistence:
-    `NewScene()` (empty project), `BeginLoad()` (WaitIdle + fresh Scene/RenderConfig)
+    `NewScene(objPath)` (fresh document holding the **default starter scene** —
+    see the invariant below), `BeginLoad()` (WaitIdle + fresh Scene/RenderConfig)
     and `FinishLoad()` (upload scene resources, IBL). Editor no longer owns the
     project file path or performs Save/LoadProject — `Application` coordinates
     persistence and owns the project path + dirty aggregation (`Editor::IsDirty()` /
@@ -22,6 +23,65 @@ changes through the event system.
 - `src/editor/controllers/SceneController.h/cpp` - Event-driven scene mutations (selection, transform, visibility, property edits); emits EditorEvents for GPU uploads
 - `src/editor/controllers/ShaderController.h` - Event-driven shader lifecycle (create, compile, code/struct edit, field add)
 - `src/editor/events/ShaderEvents.h` - Shader editor event structs (see events.instructions.md)
+- `src/editor/DebugDrawBuilder.h/cpp` - Flattens the Scene's debug objects into the `DebugDrawList` the renderer consumes
+
+## Scene Invariant: a scene always owns at least one camera
+
+Every view-projection pass builds its matrices from `Scene::GetActiveCamera()` and
+dereferences the result **without a null check** — `ShadowDepthPass.cpp:432`,
+`ShadowIntensityPass.cpp:593`, `SSAOPass.cpp:339`, `LightingPass.cpp:297`,
+`GeometryPass.cpp:214`. `GetActiveCamera()` returns `nullptr` on an empty
+`cam_list`, so a camera-less scene does not degrade — it segfaults inside
+whichever pass the graph happens to run first, on a stack that says nothing
+about the cause.
+
+The Editor is the only owner of this invariant, and holds it at both ends:
+
+- **Creation**: `CreateDefaultScene(objPath)` is the single starter-scene
+  builder (fresh Scene, pool `Clear()`, default RenderConfig, camera at
+  `(0,-5,2)` looking at the origin, mesh, point light, environment, demo debug
+  objects). `NewScene(objPath)` **delegates to it** rather than building an empty
+  scene, so File → New is a fresh *document*, not an empty one: the same content
+  a first launch shows, then `ed_operations.Clear()`, `m_dirty = false`,
+  `UploadSceneResources()` and `OnIBLLoad()`. `Application` passes the same
+  `kDefaultSceneObj` constant to both paths so they cannot drift.
+- **Deletion**: `SceneController`'s last-camera guard refuses a delete that
+  would empty `cam_list` (`SceneController.cpp:548`).
+- **Loading**: `BeginLoad()`/`FinishLoad()` inherit the camera from the project
+  file; a project saved through the paths above always has one.
+
+Why New seeds content rather than just a camera: a camera-only scene is *legal*
+but renders solid black with an empty Outliner, which is indistinguishable from a
+crash. The minimum legal scene and the minimum useful scene are not the same
+thing, and New owes the user the latter.
+
+Every scene object also sets `o_name` in its constructor (`"Camera"`, `"Mesh"`,
+`ParseLightName()` for typed lights, `"DebugLine"`, …). A blank `o_name` renders
+as an empty Outliner row that looks broken; `test_editor_scene_lifecycle.cpp`
+asserts no seeded object leaves it empty.
+
+`DeferredRenderer::DrawFrame()` carries a matching precondition check as defense
+in depth: a scene with no active camera skips the frame and logs once
+(`m_reportedNoCamera`) instead of faulting. That guard is a diagnostic, not a
+license — if it ever fires, a scene-mutation path broke the invariant and that
+path is the bug. `test/editor/test_editor_scene_lifecycle.cpp` pins the creation
+half of the contract (GPU-free, runs in CI).
+
+### The viewport extent outlives the scene
+
+`HandleResize(w, h)` caches the extent in `m_viewportW/H` **unconditionally and
+before** its own active-camera check: the extent is a property of the viewport,
+not of whichever scene happens to be loaded, and it arrives once at startup —
+long before any File → New. A camera seeded later, or restored from a project
+saved on a differently sized window, carries an aspect ratio unrelated to the
+current viewport (a fresh `Camera` is 1×1), and only a window resize ever
+corrected it, so New rendered a squashed frame until the user dragged the window.
+
+`ApplyViewportToActiveCamera()` replays the cached extent onto the active camera
+and is called from both scene-swap paths. It no-ops while the extent is still
+`0×0` (startup, before the window is shown) rather than pushing a degenerate
+aspect into the projection. Both branches are pinned by
+`test_editor_scene_lifecycle.cpp`.
 
 ## Core Responsibilities
 
@@ -127,7 +187,91 @@ Editor::Edit()
         └── etc.
 ```
 
-### CameraController (Event-Driven)
+### DebugDrawBuilder (issue #22)
+
+`DebugDrawBuilder` is the **only** place that walks `Scene::dLine_list`,
+`dPoints_list` and `dMesh_list` and flattens them into the `DebugDrawList` that
+`EditorContext::debugDraw` publishes to `DebugPass`. It is a plain member of
+`Editor` (`m_debugDraw`), not a controller: it has no events of its own.
+
+**Lifecycle — dirty-flagged, never per-frame polling:**
+
+```
+RenderResetEvent  ──► m_debugDraw.MarkDirty()      // O(1), the existing
+                                                    // "something visible changed" broadcast
+Editor::Edit()
+  └── EventQueue::Process()
+  └── m_debugDraw.Rebuild(*m_scene)                 // after the queue drains, so a
+                                                    // scene change and its overlay
+                                                    // consequences land in one frame
+```
+
+`Rebuild()` returns immediately when clean, which is the common case — debug objects
+are **stateful** and rarely move. `m_dirty` starts `true` so the first `Edit()`
+populates the list. `BeginLoad()` / `FinishLoad()` / `NewScene()` also `MarkDirty()`,
+because a scene swap invalidates the whole flattened overlay.
+
+**Three contracts the renderer trusts and no GPU test can check** (all pinned by
+`test/editor/test_debug_draw_builder.cpp`):
+
+1. **Partition.** Every depth-tested primitive precedes every x-ray one;
+   `xraySegmentStart` / `xrayPointStart` mark the boundary exactly. X-ray primitives
+   are staged in member scratch vectors (`m_xraySegments` / `m_xrayPoints` — members
+   so their capacity survives across frames, cleared at the top of every `Rebuild`)
+   and concatenated at the end, so **no sort is ever needed**. `DebugPass` turns
+   those two integers straight into draw ranges, so an off-by-one draws x-ray
+   geometry with the depth test still on while every draw and pixel count still
+   looks plausible. Wire meshes are deliberately **not** partitioned — there are few
+   of them and `DebugPass` already switches pipeline per mesh.
+2. **Revision.** Exactly **one `Touch()` per rebuild**. `DebugDrawList::Clear()`
+   deliberately does *not* Touch, so a clear+refill counts as one revision. A
+   missing Touch freezes the overlay; a double Touch re-uploads every frame.
+3. **World-space baking.** `DebugDrawList` carries no matrix for segments or
+   sprites, so the builder folds each object's `GetModelMatrix()` in while copying.
+   Only `DebugWireMesh` keeps a `model` matrix, because its geometry is never copied
+   — `DebugPass` draws it straight from the mesh's MeshGPU with the transform in a
+   push constant.
+
+**Flattening rules:**
+
+- `DebugLine` vertices are **endpoint pairs**; a trailing odd vertex is dropped and
+  a lone vertex emits nothing.
+- Opacity is folded into the packed alpha (`PackTinted`), because the GPU only ever
+  sees one alpha — opacity is an authoring convenience, not a second channel.
+- `DebugPoints::PointType::CUBE` has **no sprite form** (a screen-aligned sprite
+  cannot show a cube's orientation), so it decomposes into 12 axis-aligned wireframe
+  segments of width 1.0 with half extent `GetScale() * 0.5f`. `ScreenSpaceSize` is
+  deliberately *not* set on them: their size is world-space by definition.
+- `ScreenSpaceSize` is set for sprites when `GetProjectionMode() == 0`. It is
+  meaningless for segments — segment width is always pixels.
+- A `DebugMesh` without geometry (`!HasGeometry()`) is skipped: the wireframe is
+  drawn from its MeshGPU, which does not exist until the geometry is uploaded.
+
+> **Ordering caveat for tests and callers:** `Scene::ResPool` is an
+> `unordered_map`, so the order of primitives coming from *different* objects is
+> unspecified. Never depend on an absolute index — assert over counts, boundary
+> values, or predicates keyed off the boundary itself.
+
+**MeshGPU upload for `DebugMesh`.** A wireframe needs vertex/index buffers in the
+`RenderCache`, keyed by the object id `DebugWireMesh::meshObjectId` carries — without
+them `DebugPass` silently skips the mesh, so this is the difference between a wired
+feature and an inert one. `DebugMesh` derives from `ObjectID + Transform3D`, **not**
+from `Mesh`, so `UploadManager::UploadMesh(const Mesh&)` cannot serve it by upcast;
+the geometry half is split out as `UploadManager::UploadMeshData(const MeshData&)`
+and both paths share it. Three places must stay in step:
+
+| Site | Role |
+|------|------|
+| `UploadDebugMeshGpu()` (Editor.cpp anon namespace) | the single upload path, skip-if-cached, mirroring `UploadMeshGpu()` |
+| `Editor::UploadSceneResources()` | `dMesh_list` loop, for objects present at project load |
+| `Editor::OnSceneObjectGpuUpload()` | `Get<DebugMesh>` branch, for on-demand upload of an object entering the scene |
+
+`ResourceComponent::Load` needs a matching `ForEach<DebugMesh>` block to re-wire
+`o_mesh` from `o_meshDataId`: the `ForEach<Mesh>` block above it does not reach a
+`DebugMesh`, so without it a reloaded project leaves the wireframe geometry-less and
+the upload is skipped for a reason that looks like a rendering bug.
+
+
 
 ```cpp
 void CameraController::Init(ControllerContext& ctx)

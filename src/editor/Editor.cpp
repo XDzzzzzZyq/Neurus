@@ -32,6 +32,9 @@
 #include "asset/data/AssetPath.h"
 #include "asset/data/MeshData.h"
 #include "scene/Camera.h"
+#include "scene/DebugLine.h"
+#include "scene/DebugMesh.h"
+#include "scene/DebugPoints.h"
 #include "scene/Environment.h"
 #include "scene/Light.h"
 #include "scene/Mesh.h"
@@ -48,6 +51,21 @@ namespace neurus {
 
 namespace {
 
+/**
+ * @brief Uniform scale applied to the starter mesh (and its wireframe copy).
+ *
+ * res/obj/sphere.obj is a Blender icosphere exported at a ~7.44-unit radius,
+ * while the rest of the starter scene is authored in unit space: the camera
+ * stands 5.4 units out, the demo axes span +-4, the light box is 0.4 wide. Left
+ * raw, the camera sits INSIDE the mesh and every debug object is buried in it.
+ *
+ * Normalising the mesh (1 / 7.44 ~= 0.135, so radius ~= 1) is the fix rather
+ * than pushing the camera ~30 units back, because the debug overlay is the point
+ * of this scene and distance would shrink it to a few pixels. The GPU tests take
+ * the same approach (test_ibl_render.cpp scales the same asset by 0.25).
+ */
+constexpr float kStarterMeshScale = 0.135f;
+
 /** @brief Single MeshGPU upload path: uploads the mesh geometry if not cached. */
 void UploadMeshGpu(UploadManager& uploader, DeferredRenderer& renderer, const Mesh& mesh)
 {
@@ -57,6 +75,25 @@ void UploadMeshGpu(UploadManager& uploader, DeferredRenderer& renderer, const Me
 	auto meshGPU = uploader.UploadMesh(mesh);
 	cache.UseMeshGPU(objId, std::move(meshGPU));
 	NEURUS_LOG("[Editor] Uploaded MeshGPU for objectId=" << objId);
+}
+
+/**
+ * @brief Single MeshGPU upload path for a DebugMesh (issue #22).
+ *
+ * DebugMesh derives from ObjectID + Transform3D, not from Mesh, so it cannot
+ * reuse UploadMeshGpu() by upcast. It carries the same MeshData, though, so it
+ * goes through UploadManager::UploadMeshData() and lands in the same
+ * RenderCache MeshGPU slot keyed by object id — which is exactly what
+ * DebugWireMesh::meshObjectId resolves against in DebugPass.
+ */
+void UploadDebugMeshGpu(UploadManager& uploader, DeferredRenderer& renderer, const DebugMesh& mesh)
+{
+	const int objId = mesh.GetObjectID();
+	auto& cache = renderer.GetRenderCache();
+	if (cache.GetMeshGPU(objId)) return;
+	auto meshGPU = uploader.UploadMeshData(*mesh.o_mesh);
+	cache.UseMeshGPU(objId, std::move(meshGPU));
+	NEURUS_LOG("[Editor] Uploaded MeshGPU for DebugMesh objectId=" << objId);
 }
 
 /** @brief Single LightGPU upload path: uploads shadow maps if the light casts shadows. */
@@ -246,6 +283,11 @@ void Editor::Initialize()
 	ed_eventBus.subscribe<RenderResetEvent>([this](const RenderResetEvent&) {
 		if (ed_renderer)
 			ed_renderer->ResetShadowAccumulation();
+
+		// Same signal, second consumer: this is the codebase's existing "something
+		// visible changed" broadcast, so it is exactly when the debug overlay may
+		// have gone stale. Marking is O(1); the rebuild happens once in Edit().
+		m_debugDraw.MarkDirty();
 	});
 
 	// --- SceneController GPU-sync + dirty subscriptions ---
@@ -281,6 +323,11 @@ EditorContext Editor::GetContext() const
 	EditorContext ctx;
 	ctx.scene = m_scene.get();
 	ctx.config = &m_config;
+
+	// r_debug_draw gates publication rather than graph topology: with a null list
+	// DebugPass returns before touching any image, so toggling the overlay never
+	// rebuilds the RenderGraph.
+	ctx.debugDraw = m_config.RequiresDebugDraw() ? &m_debugDraw.List() : nullptr;
 	return ctx;
 }
 
@@ -296,11 +343,16 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 
 	auto camera = m_resources->Load<Camera>();
 	camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
-	camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+	camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 	m_scene->UseCamera(camera);
+	// A brand-new camera is born 1x1; the viewport is not. Adopt the live extent
+	// here so the very first frame of a new document is already framed correctly
+	// (File > New has no resize event of its own to piggyback on).
+	ApplyViewportToActiveCamera();
 
 	auto meshData = m_resources->Load<MeshData>(objPath);
 	auto mesh = m_resources->Load<Mesh>(meshData);
+	mesh->SetScale(glm::vec3(kStarterMeshScale)); // see kStarterMeshScale
 	m_scene->UseMesh(mesh);
 
 	auto light = m_resources->Load<Light>(POINTLIGHT, 10.0f, glm::vec3(1.0f));
@@ -315,10 +367,89 @@ void Editor::CreateDefaultScene(const std::string& objPath)
 	auto env = m_resources->Load<Environment>(imageData);
 	m_scene->UseEnvironment(env);
 
+	AddDefaultDebugObjects(meshData);
+
 	m_dirty = true;
+	m_debugDraw.MarkDirty(); // new scene => the old flattened overlay is stale
 }
 
-void Editor::NewScene()
+/**
+ * @brief Populates the default scene with one debug object of each kind.
+ *
+ * Part of the demo content, exactly like the .obj and .hdr loaded above: it
+ * gives the overlay something to draw out of the box, so a fresh launch is
+ * enough to see (and screenshot) depth occlusion, x-ray, stipple, screen-space
+ * point sprites and the CUBE decomposition without any UI interaction.
+ */
+void Editor::AddDefaultDebugObjects(const std::shared_ptr<MeshData>& meshData)
+{
+	// The axis spans, reused by the depth-tested and x-ray lines below so the
+	// two overlap exactly and the difference between them is only the depth mode.
+	const std::vector<glm::vec3> axisSpans = {
+		{-4.0f, 0.0f, 0.0f}, {4.0f, 0.0f, 0.0f},
+		{0.0f, -4.0f, 0.0f}, {0.0f, 4.0f, 0.0f},
+		{0.0f, 0.0f, -4.0f}, {0.0f, 0.0f, 4.0f},
+	};
+
+	// World axes, thick and solid: the depth-tested reference. They pass through
+	// the demo mesh, so the hidden halves are the depth-occlusion proof.
+	auto axes = m_resources->Load<DebugLine>();
+	axes->SetWidth(3.0f);
+	axes->SetSmooth(true);
+	axes->SetColor(glm::vec4(0.95f, 0.75f, 0.15f, 1.0f));
+	axes->PushDebugLines(axisSpans);
+	m_scene->UseDebugLine(axes);
+
+	// The same spans as a thin dashed x-ray line: visible on top of the mesh
+	// exactly where the solid one is occluded, showing both modes at once.
+	auto xrayAxes = m_resources->Load<DebugLine>();
+	xrayAxes->SetWidth(1.0f);
+	xrayAxes->SetStipple(true);
+	xrayAxes->SetXRay(true);
+	xrayAxes->SetColor(glm::vec4(0.2f, 0.9f, 1.0f, 0.8f));
+	xrayAxes->PushDebugLines(axisSpans);
+	m_scene->UseDebugLine(xrayAxes);
+
+	// Circular sprites at the axis tips, screen-space sized so they stay legible
+	// at any zoom — the default projection mode, exercised here on purpose.
+	auto tips = m_resources->Load<DebugPoints>();
+	tips->SetPointType(DebugPoints::PointType::CIR);
+	tips->SetScale(10.0f);
+	tips->SetColor(glm::vec4(1.0f, 0.35f, 0.35f, 1.0f));
+	tips->PushDebugPoints({
+		{4.0f, 0.0f, 0.0f}, {0.0f, 4.0f, 0.0f}, {0.0f, 0.0f, 4.0f},
+	});
+	m_scene->UseDebugPoints(tips);
+
+	// A wireframe cube around the light, via the CUBE point type: this is the
+	// path that decomposes one point into 12 segments.
+	auto lightBox = m_resources->Load<DebugPoints>();
+	lightBox->SetPointType(DebugPoints::PointType::CUBE);
+	lightBox->SetProjectionMode(1);  // world units — a cube has real extent
+	lightBox->SetScale(0.4f);
+	lightBox->SetColor(glm::vec4(1.0f, 1.0f, 0.6f, 1.0f));
+	lightBox->PushDebugPoint({3.0f, 3.0f, 3.0f});
+	m_scene->UseDebugPoints(lightBox);
+
+	// A wireframe copy of the demo mesh, scaled slightly up and offset so it
+	// reads as a shell rather than z-fighting with the shaded original. This is
+	// the third primitive kind (PolygonMode::eLine over a real MeshGPU), so the
+	// default scene exercises all of lines, points and wire meshes.
+	if (meshData)
+	{
+		auto wire = m_resources->Load<DebugMesh>(meshData);
+		wire->SetPosition(glm::vec3(2.5f, 0.0f, 0.0f));
+		// Same normalisation as the shaded copy (kStarterMeshScale), 2% larger so
+		// it reads as a shell. At 2.5 units out the two spheres (radius ~1) stay
+		// clear of each other, so this is a sibling object, not a z-fighting skin.
+		wire->SetScale(glm::vec3(kStarterMeshScale * 1.02f));
+		wire->SetColor(glm::vec4(0.4f, 1.0f, 0.5f, 1.0f));
+		wire->SetOpacity(0.9f);
+		m_scene->UseDebugMesh(wire);
+	}
+}
+
+void Editor::NewScene(const std::string& objPath)
 {
 	try
 	{
@@ -328,11 +459,26 @@ void Editor::NewScene()
 			ed_renderer->WaitIdle();
 		}
 
-		m_scene = std::make_unique<Scene>();
-		m_resources->Clear(); // No stale pooled object may leak into a save.
-		m_config = RenderConfig{};
-		m_dirty = false;
 		ed_operations.Clear(); // History does not span scenes.
+
+		// New builds the SAME starter scene a first launch does (camera, mesh,
+		// light, environment, demo debug objects) instead of an empty one, for
+		// two reasons:
+		//  - Correctness: an empty Scene owns no camera, and every
+		//    view-projection pass dereferences GetActiveCamera() without a null
+		//    check - see the scene invariant in editor.instructions.md.
+		//  - Usability: a camera-only scene renders solid black with nothing in
+		//    the outliner to select, which reads as a crash rather than as a
+		//    fresh document.
+		// CreateDefaultScene() owns the reset (fresh Scene, pool Clear(),
+		// default RenderConfig, MarkDirty()), so it is not repeated here.
+		CreateDefaultScene(objPath);
+
+		// CreateDefaultScene() marks the scene dirty because it MUTATES a scene;
+		// as the content of a brand-new document it is the saved baseline, not an
+		// unsaved edit (Application rebases its own dirty baseline in step).
+		m_dirty = false;
+
 		NEURUS_LOG("[Editor] Created new scene.");
 
 		UploadSceneResources();
@@ -367,6 +513,10 @@ void Editor::FinishLoad()
 	// serialize(load). SceneComponent then resolves the scene's ID references.
 	// Nothing mesh/shader-specific is needed here.
 	m_dirty = false;
+	// The archived aspect belongs to whatever window the project was saved from,
+	// so re-adopt the live one instead of trusting it.
+	ApplyViewportToActiveCamera();
+	m_debugDraw.MarkDirty(); // debug objects came back from the project file
 	UploadSceneResources();
 	OnIBLLoad();
 }
@@ -406,7 +556,9 @@ void Editor::OnCameraAdd()
 	try {
 		auto camera = m_resources->Load<Camera>();
 		camera->SetPosition(glm::vec3(0.0f, -5.0f, 2.0f));
-		camera->cam_tar = glm::vec3(0.0f, 0.0f, 0.0f);
+		// SetTarPos, not a raw cam_tar write: the view matrix is cached eagerly, so
+		// assigning the field would leave the cache looking at the old target.
+		camera->SetTarPos(glm::vec3(0.0f, 0.0f, 0.0f));
 		ed_eventBus.enqueue(SceneObjectAddRequested{camera->GetObjectID()});
 		NEURUS_LOG("[Editor] Added camera at (0, -5, 2)");
 	}
@@ -569,6 +721,10 @@ void Editor::OnSceneObjectGpuUpload(int objectUid)
 	{
 		GenerateIBL(*ed_uploadManager, *ed_renderer, env);
 	}
+	else if (auto dMesh = m_resources->Get<DebugMesh>(objectUid))
+	{
+		if (dMesh->HasGeometry()) UploadDebugMeshGpu(*ed_uploadManager, *ed_renderer, *dMesh);
+	}
 }
 
 void Editor::OnIBLLoad()
@@ -628,6 +784,14 @@ void Editor::UploadSceneResources()
 		UploadLightGpu(*ed_uploadManager, *ed_renderer, *light);
 	}
 
+	// DebugMesh wireframes need a MeshGPU too: DebugPass skips any DebugWireMesh
+	// whose meshObjectId resolves to no cached vertex/index buffer.
+	for (const auto& [uid, dMesh] : m_scene->dMesh_list)
+	{
+		if (!dMesh || !dMesh->HasGeometry()) continue;
+		UploadDebugMeshGpu(*ed_uploadManager, *ed_renderer, *dMesh);
+	}
+
 	// The light SSBO remains a scene projection (built from scene->light_list).
 	UploadLighting();
 
@@ -650,6 +814,15 @@ void Editor::UploadLighting()
 
 void Editor::HandleResize(uint32_t width, uint32_t height)
 {
+	// Remembered unconditionally, BEFORE the camera check: the extent is a
+	// property of the viewport, not of whatever scene happens to be loaded, and
+	// every later scene (File > New, File > Open) needs it to frame its camera.
+	if (width > 0 && height > 0)
+	{
+		m_viewportW = width;
+		m_viewportH = height;
+	}
+
 	auto* cam = GetScene().GetActiveCamera();
 	if (!cam) return;
 
@@ -659,12 +832,37 @@ void Editor::HandleResize(uint32_t width, uint32_t height)
 }
 
 // =========================================================================
+// ApplyViewportToActiveCamera() 鈥?re-frame a camera the Editor just seeded
+// =========================================================================
+
+void Editor::ApplyViewportToActiveCamera()
+{
+	// Direct mutation rather than a CameraResizeEvent, because this runs while a
+	// scene is being built: the camera must be correctly framed on the FIRST
+	// frame, and the event queue is only drained in the next Edit(). It stays
+	// inside the Editor's own scene, so no layer boundary is crossed.
+	if (m_viewportW == 0 || m_viewportH == 0) return; // no viewport yet (startup)
+
+	auto* cam = const_cast<Camera*>(GetScene().GetActiveCamera());
+	if (!cam) return;
+
+	cam->ChangeCamRatio(static_cast<float>(m_viewportW),
+	                    static_cast<float>(m_viewportH));
+}
+
+// =========================================================================
 // Edit() 鈥?process all enqueued events (called from newFrame)
 // =========================================================================
 
 void Editor::Edit()
 {
 	ed_eventBus.Process();
+
+	// After the queue is drained, so a scene change and its debug-overlay
+	// consequences land in the same frame. Returns immediately when clean, which
+	// is the common case: debug objects are stateful and rarely move.
+	if (m_scene)
+		m_debugDraw.Rebuild(*m_scene);
 }
 
 } // namespace neurus
